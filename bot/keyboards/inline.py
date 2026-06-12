@@ -33,8 +33,9 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
         kb.button(text="🎒 Забрать добычу", callback_data="exp_claim")
     kb.button(text="💰 Собрать доход", callback_data="income")
     kb.button(text="📦 Склад", callback_data="warehouse")
+    kb.button(text="🧍 Персонаж", callback_data="character")
     kb.button(text="🔨 Улучшить таверну", callback_data="upgrade")
-    kb.adjust(1, 2, 1)
+    kb.adjust(1, 2, 2)
     return kb.as_markup()
 
 
@@ -71,4 +72,41 @@ def claim_kb() -> InlineKeyboardMarkup:
 def back_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="↩️ К таверне", callback_data="tavern")
+    return kb.as_markup()
+
+
+def character_kb(craft_ready: bool = False) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    if craft_ready:
+        kb.button(text="🎁 Забрать у мастера", callback_data="craft_claim")
+    kb.button(text="⚒ Кузница", callback_data="forge")
+    kb.button(text="🏠 К таверне", callback_data="tavern_new")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def forge_kb() -> InlineKeyboardMarkup:
+    from bot.game.items import CATALOG
+
+    kb = InlineKeyboardBuilder()
+    for item in CATALOG.values():
+        kb.button(text=item.name, callback_data=f"forge_item:{item.id}")
+    kb.button(text="↩️ Назад", callback_data="character")
+    kb.adjust(2)
+    return kb.as_markup()
+
+
+def forge_item_kb(item_id: str) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⚒ Заказать", callback_data=f"forge_make:{item_id}")
+    kb.button(text="↩️ В кузницу", callback_data="forge")
+    kb.adjust(2)
+    return kb.as_markup()
+
+
+def craft_claim_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🎁 Забрать вещь", callback_data="craft_claim")
+    kb.button(text="🧍 Персонаж", callback_data="character")
+    kb.adjust(1)
     return kb.as_markup()

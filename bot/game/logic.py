@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from bot.db.models import Player, Tavern
-from bot.game import balance
+from bot.game import balance, items
 
 
 def _now() -> datetime:
@@ -35,13 +35,15 @@ def start_expedition(player: Player, resource: str) -> ExpeditionStart:
         return ExpeditionStart(ok=False, reason="busy")
 
     level = player.tavern.level if player.tavern else 1
-    pay = balance.worker_pay(level)
+    equipment = getattr(player, "equipment", None)
+    pay = max(1, int(balance.worker_pay(level) * items.pay_multiplier(equipment)))
     if player.gold < pay:
         return ExpeditionStart(ok=False, reason="no_gold", pay=pay)
 
     player.gold -= pay
     player.expedition_resource = resource
-    player.expedition_ends_at = _now() + timedelta(hours=balance.EXPEDITION_HOURS)
+    hours = balance.EXPEDITION_HOURS * items.speed_multiplier(equipment)
+    player.expedition_ends_at = _now() + timedelta(hours=hours)
     player.expedition_notified = False
     return ExpeditionStart(ok=True, pay=pay)
 
@@ -66,6 +68,7 @@ def claim_expedition(player: Player) -> ExpeditionClaim:
     resource = player.expedition_resource
     level = player.tavern.level if player.tavern else 1
     amount = balance.expedition_yield(resource, level, player.region)
+    amount = int(amount * items.yield_multiplier(getattr(player, "equipment", None), resource))
 
     setattr(player, resource, getattr(player, resource) + amount)
     player.expedition_resource = None
@@ -85,7 +88,8 @@ def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
     since = tavern.last_income_at or now
     hours = (now - since).total_seconds() / 3600
     hours = min(hours, balance.INCOME_CAP_HOURS)
-    gold = int(tavern.income_rate * hours)
+    mult = items.income_multiplier(getattr(player, "equipment", None))
+    gold = int(tavern.income_rate * hours * mult)
     if gold <= 0:
         return IncomeResult(ok=False)
 
@@ -133,3 +137,68 @@ def try_upgrade(player: Player, tavern: Tavern) -> UpgradeResult:
     player.level = tavern.level
 
     return UpgradeResult(ok=True, cost=cost, new_level=tavern.level)
+
+
+def craft_state(player: Player) -> tuple[str, int]:
+    """("none"|"active"|"ready", минут до готовности)."""
+    if player.craft_item is None or player.craft_ends_at is None:
+        return "none", 0
+    left = (player.craft_ends_at - _now()).total_seconds()
+    if left > 0:
+        return "active", int(left // 60) + 1
+    return "ready", 0
+
+
+@dataclass
+class CraftStart:
+    ok: bool
+    reason: str = ""  # busy | unknown | not_enough
+    item: object = None
+
+
+def start_craft(player: Player, item_id: str) -> CraftStart:
+    """Заказать вещь у мастера. Один заказ за раз."""
+    state, _ = craft_state(player)
+    if state != "none":
+        return CraftStart(ok=False, reason="busy")
+    item = items.CATALOG.get(item_id)
+    if item is None:
+        return CraftStart(ok=False, reason="unknown")
+    c = item.cost
+    if (player.gold < c.get("gold", 0) or player.wood < c.get("wood", 0)
+            or player.grain < c.get("grain", 0) or player.hops < c.get("hops", 0)):
+        return CraftStart(ok=False, reason="not_enough", item=item)
+
+    player.gold -= c.get("gold", 0)
+    player.wood -= c.get("wood", 0)
+    player.grain -= c.get("grain", 0)
+    player.hops -= c.get("hops", 0)
+    player.craft_item = item_id
+    player.craft_ends_at = _now() + timedelta(hours=item.craft_hours)
+    player.craft_notified = False
+    return CraftStart(ok=True, item=item)
+
+
+@dataclass
+class CraftClaim:
+    ok: bool
+    reason: str = ""  # none | not_ready
+    minutes_left: int = 0
+    item: object = None
+
+
+def claim_craft(player: Player) -> CraftClaim:
+    """Забрать готовую вещь — сразу надевается в свой слот."""
+    state, minutes = craft_state(player)
+    if state == "none":
+        return CraftClaim(ok=False, reason="none")
+    if state == "active":
+        return CraftClaim(ok=False, reason="not_ready", minutes_left=minutes)
+
+    item = items.CATALOG[player.craft_item]
+    equipment = dict(player.equipment or {})
+    equipment[item.slot] = item.id
+    player.equipment = equipment
+    player.craft_item = None
+    player.craft_ends_at = None
+    return CraftClaim(ok=True, item=item)

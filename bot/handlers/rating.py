@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import texts
 from bot.db import repo
-from bot.game import balance
+from bot.game import balance, items
 
 router = Router()
 
@@ -38,6 +38,7 @@ async def show_rating(message: Message, session: AsyncSession) -> None:
             income_rate=tavern.income_rate,
             reputation=tavern.reputation,
         )
+        gdp += items.gear_value(getattr(player, "equipment", None))
         rated.append((gdp, tavern, player))
 
     rated.sort(key=lambda x: (-x[0], x[1].name))

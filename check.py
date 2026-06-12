@@ -15,13 +15,13 @@ TAIL_MARKERS = {
     "bot/main.py": "asyncio.run(main())",
     "bot/middlewares.py": "raise",
     "bot/images.py": "return best",
-    "bot/texts.py": "join(lines)",
+    "bot/texts.py": "Носи и не потеряй",
     "bot/notifier.py": "await session.commit()",
     "bot/game/balance.py": "reputation * 3",
-    "bot/game/logic.py": "new_level=tavern.level)",
+    "bot/game/logic.py": "return CraftClaim(ok=True, item=item)",
     "bot/game/worldmap.py": "return _cache_bytes",
-    "bot/db/base.py": "ALTER TABLE",
-    "bot/db/models.py": 'back_populates="tavern")',
+        "bot/db/models.py": 'back_populates="tavern")',
+    "bot/db/base.py": "craft_notified BOOLEAN",
     "bot/db/repo.py": "return list(result.all())",
     "bot/handlers/start.py": "await callback.answer()",
     "bot/handlers/tavern.py": "callback.answer(",
@@ -31,6 +31,9 @@ TAIL_MARKERS = {
     "bot/handlers/rating.py": "rating_screen(top, total_gdp, len(rated))",
     "bot/handlers/worldmap_cmd.py": "caption=caption",
     "bot/keyboards/inline.py": "return kb.as_markup()",
+    "bot/game/items.py": "return int(total)",
+    "bot/game/character.py": "return _cache_bytes",
+    "bot/handlers/character.py": "_show_character(callback, player)",
 }
 
 

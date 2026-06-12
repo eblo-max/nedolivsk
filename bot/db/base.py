@@ -51,3 +51,17 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS map_slot INTEGER UNIQUE"
         ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "equipment JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS craft_item VARCHAR(32)"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS craft_ends_at TIMESTAMPTZ"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "craft_notified BOOLEAN NOT NULL DEFAULT FALSE"
+        ))

@@ -10,7 +10,7 @@ from sqlalchemy import select
 from bot import texts
 from bot.db.base import session_factory
 from bot.db.models import Player
-from bot.keyboards.inline import claim_kb
+from bot.keyboards.inline import claim_kb, craft_claim_kb
 
 CHECK_INTERVAL_SECONDS = 60
 
@@ -28,6 +28,8 @@ async def notifier_loop(bot: Bot) -> None:
 
 
 async def _notify_returned(bot: Bot) -> None:
+    from bot.game.items import CATALOG
+
     now = datetime.now(timezone.utc)
     async with session_factory() as session:
         result = await session.execute(
@@ -39,8 +41,7 @@ async def _notify_returned(bot: Bot) -> None:
             )
             .with_for_update(skip_locked=True)
         )
-        players = result.scalars().all()
-        for player in players:
+        for player in result.scalars().all():
             try:
                 await bot.send_message(
                     player.id,
@@ -50,4 +51,26 @@ async def _notify_returned(bot: Bot) -> None:
             except Exception:  # заблокировал бота и т.п. — не повторяем
                 logger.warning("Не доставлено уведомление игроку %s", player.id)
             player.expedition_notified = True
+
+        result = await session.execute(
+            select(Player)
+            .where(
+                Player.craft_item.is_not(None),
+                Player.craft_ends_at <= now,
+                Player.craft_notified.is_(False),
+            )
+            .with_for_update(skip_locked=True)
+        )
+        for player in result.scalars().all():
+            item = CATALOG.get(player.craft_item)
+            if item is not None:
+                try:
+                    await bot.send_message(
+                        player.id,
+                        texts.craft_ready_notification(item),
+                        reply_markup=craft_claim_kb(),
+                    )
+                except Exception:
+                    logger.warning("Не доставлен крафт игроку %s", player.id)
+            player.craft_notified = True
         await session.commit()

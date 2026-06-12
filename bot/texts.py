@@ -244,3 +244,115 @@ def rating_screen(rows: list, total_gdp: int, total_taverns: int) -> str:
         "пьёшь больше, чем зарабатываешь."
     )
     return "\n".join(lines)
+
+
+# ===== Персонаж и кузница =====
+
+def _item_bonus_line(item) -> str:
+    parts = []
+    if item.income_pct: parts.append(f"+{item.income_pct}% доход")
+    if item.yield_pct: parts.append(f"+{item.yield_pct}% добыча")
+    if item.yield_wood_pct: parts.append(f"+{item.yield_wood_pct}% 🪵")
+    if item.speed_pct: parts.append(f"−{item.speed_pct}% время вылазки")
+    if item.pay_discount_pct: parts.append(f"−{item.pay_discount_pct}% плата")
+    if item.damage: parts.append(f"⚔{item.damage}")
+    if item.crit: parts.append(f"💥{item.crit}%")
+    if item.armor: parts.append(f"🛡{item.armor}")
+    if item.luck: parts.append(f"🍀{item.luck}")
+    return " · ".join(parts) if parts else "—"
+
+
+def character_screen(player, craft_line: str = "") -> str:
+    from bot.game import items as it
+
+    equipment = getattr(player, "equipment", None) or {}
+    stats = it.combat_stats(equipment)
+    worn = len(equipment)
+    body = (
+        f"🧍 <b>{escape(player.first_name)}, хозяин кабака</b>\n"
+        f"Морда кирпичом, руки в мозолях. Надето: {worn}/{len(it.SLOTS)}.\n"
+    )
+    if craft_line:
+        body += craft_line + "\n"
+    body += (
+        f"\n⚔ Урон: {stats['damage']} · 💥 Крит: {stats['crit']}% · "
+        f"🛡 Броня: {stats['armor']} · 🍀 Удача: {stats['luck']}\n"
+    )
+    bonuses = []
+    if it.income_multiplier(equipment) > 1:
+        bonuses.append(f"+{round((it.income_multiplier(equipment)-1)*100)}% доход")
+    ym = it.yield_multiplier(equipment, "grain")
+    if ym > 1:
+        bonuses.append(f"+{round((ym-1)*100)}% добыча")
+    if it.speed_multiplier(equipment) < 1:
+        bonuses.append(f"−{round((1-it.speed_multiplier(equipment))*100)}% время вылазок")
+    if it.pay_multiplier(equipment) < 1:
+        bonuses.append(f"−{round((1-it.pay_multiplier(equipment))*100)}% плата работникам")
+    if bonuses:
+        body += "💼 Хозяйство: " + " · ".join(bonuses) + "\n"
+    body += "\nГолый трактирщик — смешной трактирщик. Загляни в кузницу."
+    return body
+
+
+def forge_screen(player) -> str:
+    return (
+        "⚒ <b>Кузница Недоливска</b>\n"
+        "Мастер плюёт на ладони и смотрит на твоё золото.\n"
+        "Один заказ за раз. Деньги вперёд, претензии — никогда.\n\n"
+        f"🪙 {player.gold} · 🪵 {player.wood} · 🌾 {player.grain} · 🌿 {player.hops}"
+    )
+
+
+def forge_item_screen(item, player) -> str:
+    from bot.game import items as it
+
+    c = item.cost
+    have_mark = lambda k, have: "✅" if have >= c.get(k, 0) else "❌"
+    cur = (getattr(player, "equipment", None) or {}).get(item.slot)
+    cur_line = ""
+    if cur and cur in it.CATALOG:
+        cur_line = f"\nСейчас в слоте: {it.CATALOG[cur].name} (заменится)"
+    return (
+        f"<b>{item.name}</b> · слот: {it.SLOTS[item.slot]}\n"
+        f"<i>{item.description}</i>\n\n"
+        f"Даёт: {_item_bonus_line(item)}\n"
+        f"Ковать: {item.craft_hours} ч\n\n"
+        f"Цена: 🪙 {c.get('gold',0)} {have_mark('gold', player.gold)} · "
+        f"🪵 {c.get('wood',0)} {have_mark('wood', player.wood)} · "
+        f"🌾 {c.get('grain',0)} {have_mark('grain', player.grain)} · "
+        f"🌿 {c.get('hops',0)} {have_mark('hops', player.hops)}"
+        f"{cur_line}"
+    )
+
+
+def craft_started(item) -> str:
+    return (
+        f"⚒ Мастер забрал плату и взялся за <b>{item.name}</b>.\n"
+        f"Будет готово через {item.craft_hours} ч. Не стой над душой."
+    )
+
+
+def craft_not_enough(item) -> str:
+    return (
+        f"На <b>{item.name}</b> у тебя кишка тонка и мошна пуста. "
+        "Иди заработай, потом приходи."
+    )
+
+
+def craft_in_progress(minutes: int) -> str:
+    return f"⚒ Мастер ещё куёт. Готово через {_fmt_minutes(minutes)}. Не зуди."
+
+
+def craft_ready_notification(item) -> str:
+    return (
+        f"🔔 Мастер закончил <b>{item.name}</b>!\n"
+        "Забирай, пока не перепродал кому побогаче."
+    )
+
+
+def craft_claimed(item) -> str:
+    return (
+        f"⚒ <b>{item.name}</b> — твоё!\n"
+        f"Надето. {_item_bonus_line(item)}.\n"
+        "Носи и не потеряй по пьяни."
+    )

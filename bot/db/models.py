@@ -37,6 +37,12 @@ class Player(Base):
     )
     expedition_notified: Mapped[bool] = mapped_column(default=False)
 
+    # Экипировка и крафт
+    equipment: Mapped[dict] = mapped_column(JSONB, default=dict)
+    craft_item: Mapped[str | None] = mapped_column(String(32))
+    craft_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    craft_notified: Mapped[bool] = mapped_column(default=False)
+
     tavern: Mapped["Tavern | None"] = relationship(
         back_populates="player", uselist=False, lazy="selectin"
     )
