@@ -6,7 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from bot.config import settings
-from bot.db.base import create_tables
+from bot.db.base import create_tables, engine
 from bot.handlers import group, start, tavern
 from bot.middlewares import DbSessionMiddleware
 
@@ -26,7 +26,10 @@ async def main() -> None:
     dp.include_routers(start.router, tavern.router, group.router)
 
     await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await engine.dispose()
 
 
 if __name__ == "__main__":

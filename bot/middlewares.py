@@ -18,6 +18,10 @@ class DbSessionMiddleware(BaseMiddleware):
     ) -> Any:
         async with session_factory() as session:
             data["session"] = session
-            result = await handler(event, data)
-            await session.commit()
-            return result
+            try:
+                result = await handler(event, data)
+                await session.commit()
+                return result
+            except Exception:
+                await session.rollback()
+                raise

@@ -6,7 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.db.models import Player, Tavern
 
 
-async def get_player(session: AsyncSession, telegram_id: int) -> Player | None:
+async def get_player(
+    session: AsyncSession, telegram_id: int, *, for_update: bool = False
+) -> Player | None:
+    """Игрок по Telegram ID. for_update=True блокирует строку до конца
+    транзакции — одновременные клики обрабатываются по очереди."""
+    if for_update:
+        return await session.get(Player, telegram_id, with_for_update=True)
     return await session.get(Player, telegram_id)
 
 
