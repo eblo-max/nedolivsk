@@ -9,6 +9,7 @@ from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import balance, logic
+from bot.handlers.common import send_tavern_screen
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -26,6 +27,21 @@ async def _safe_edit(callback: CallbackQuery, text: str, markup) -> None:
         pass
 
 
+async def _show_tavern(callback: CallbackQuery, player: Player) -> None:
+    """Экран таверны. Если текущее сообщение без фото (например, пришли из
+    уведомления) — заменяем его новым сообщением с картинкой уровня."""
+    if callback.message.photo:
+        await _safe_edit(
+            callback, texts.tavern_screen(player, player.tavern), kb.tavern_kb(player)
+        )
+        return
+    try:
+        await callback.message.delete()
+    except TelegramBadRequest:
+        pass  # сообщение старше 48ч — Telegram не даст удалить
+    await send_tavern_screen(callback.message, player)
+
+
 async def _get_player(
     callback: CallbackQuery, session: AsyncSession, *, lock: bool = False
 ) -> Player | None:
@@ -41,9 +57,7 @@ async def cb_tavern(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session)
     if player is None:
         return
-    await _safe_edit(
-        callback, texts.tavern_screen(player, player.tavern), kb.tavern_kb(player)
-    )
+    await _show_tavern(callback, player)
     await callback.answer()
 
 
@@ -112,9 +126,7 @@ async def cb_exp_status(callback: CallbackQuery, session: AsyncSession) -> None:
     state, minutes = logic.expedition_state(player)
     if state == "ready":
         # Пока кнопка висела, работники успели вернуться — обновим экран
-        await _safe_edit(
-            callback, texts.tavern_screen(player, player.tavern), kb.tavern_kb(player)
-        )
+        await _show_tavern(callback, player)
         await callback.answer("Уже приползли!")
         return
     await callback.answer(texts.expedition_in_progress(minutes), show_alert=True)
@@ -201,7 +213,11 @@ async def cb_upgrade_confirm(callback: CallbackQuery, session: AsyncSession) -> 
     if callback.message.photo and new_img is not None and new_img != old_img:
         try:
             await callback.message.edit_media(
-                InputMediaPhoto(media=FSInputFile(new_img), caption=success_text),
+                InputMediaPhoto(
+                    media=FSInputFile(new_img),
+                    caption=success_text,
+                    parse_mode="HTML",
+                ),
                 reply_markup=kb.back_kb(),
             )
         except TelegramBadRequest:
