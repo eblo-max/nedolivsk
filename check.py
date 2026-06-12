@@ -18,7 +18,7 @@ TAIL_MARKERS = {
     "bot/texts.py": "Носи и не потеряй",
     "bot/notifier.py": "await session.commit()",
     "bot/game/balance.py": "reputation * 3",
-    "bot/game/logic.py": "return CraftClaim(ok=True, item=item)",
+    "bot/game/logic.py": "return CraftClaim(ok=True, item=item, tier=tier)",
     "bot/game/worldmap.py": "return _cache_bytes",
         "bot/db/models.py": 'back_populates="tavern")',
     "bot/db/base.py": "craft_notified BOOLEAN",

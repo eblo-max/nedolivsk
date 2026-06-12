@@ -43,6 +43,50 @@ SLOTS = {
     "bag": "Сумка",
 }
 
+# ===== Ярусы качества =====
+TIER_MAX = 3
+TIER_NAMES = {1: "обычный", 2: "добротный", 3: "мастерский"}
+TIER_STARS = {1: "★", 2: "★★", 3: "★★★"}
+TIER_COST_MULT = {1: 1, 2: 3, 3: 8}     # цена ковки данного яруса
+TIER_INVESTED = {1: 1, 2: 4, 3: 12}     # суммарно вложено к ярусу (для ВВП)
+
+
+def parse_entry(entry: str) -> tuple[str, int]:
+    """'kovsh:2' -> (kovsh, 2); старый формат 'kovsh' -> (kovsh, 1)."""
+    if ":" in entry:
+        item_id, _, tier_s = entry.partition(":")
+        try:
+            tier = max(1, min(TIER_MAX, int(tier_s)))
+        except ValueError:
+            tier = 1
+        return item_id, tier
+    return entry, 1
+
+
+def make_entry(item_id: str, tier: int) -> str:
+    return f"{item_id}:{tier}"
+
+
+def tier_cost(item: "Item", tier: int) -> dict:
+    mult = TIER_COST_MULT[tier]
+    return {k: v * mult for k, v in item.cost.items()}
+
+
+def tier_hours(item: "Item", tier: int) -> int:
+    return item.craft_hours * tier
+
+
+def equipped_tier(equipment: dict | None, item_id: str) -> int:
+    """Какой ярус этого предмета надет (0 — не надет)."""
+    if not equipment:
+        return 0
+    for entry in equipment.values():
+        eid, tier = parse_entry(entry)
+        if eid == item_id:
+            return tier
+    return 0
+
+
 CATALOG: dict[str, Item] = {
     item.id: item
     for item in [
@@ -116,51 +160,62 @@ CATALOG: dict[str, Item] = {
 }
 
 
-def equipped_items(equipment: dict | None) -> list[Item]:
+def equipped_items(equipment: dict | None) -> list[tuple[Item, int]]:
+    """[(предмет, ярус), ...] — статы предмета умножаются на ярус."""
     if not equipment:
         return []
-    return [CATALOG[i] for i in equipment.values() if i in CATALOG]
+    result = []
+    for entry in equipment.values():
+        item_id, tier = parse_entry(entry)
+        if item_id in CATALOG:
+            result.append((CATALOG[item_id], tier))
+    return result
 
 
 def income_multiplier(equipment: dict | None) -> float:
-    return 1 + sum(i.income_pct for i in equipped_items(equipment)) / 100
+    return 1 + sum(i.income_pct * t for i, t in equipped_items(equipment)) / 100
 
 
 def yield_multiplier(equipment: dict | None, resource: str) -> float:
-    items = equipped_items(equipment)
-    pct = sum(i.yield_pct for i in items)
+    pairs = equipped_items(equipment)
+    pct = sum(i.yield_pct * t for i, t in pairs)
     if resource == "wood":
-        pct += sum(i.yield_wood_pct for i in items)
+        pct += sum(i.yield_wood_pct * t for i, t in pairs)
     return 1 + pct / 100
 
 
 def speed_multiplier(equipment: dict | None) -> float:
-    pct = min(50, sum(i.speed_pct for i in equipped_items(equipment)))
+    pct = min(50, sum(i.speed_pct * t for i, t in equipped_items(equipment)))
     return 1 - pct / 100
 
 
 def pay_multiplier(equipment: dict | None) -> float:
-    pct = min(50, sum(i.pay_discount_pct for i in equipped_items(equipment)))
+    pct = min(50, sum(i.pay_discount_pct * t for i, t in equipped_items(equipment)))
     return 1 - pct / 100
 
 
 def combat_stats(equipment: dict | None) -> dict:
-    items = equipped_items(equipment)
+    pairs = equipped_items(equipment)
     return {
-        "damage": sum(i.damage for i in items),
-        "crit": sum(i.crit for i in items),
-        "armor": sum(i.armor for i in items),
-        "luck": sum(i.luck for i in items),
+        "damage": sum(i.damage * t for i, t in pairs),
+        "crit": sum(i.crit * t for i, t in pairs),
+        "armor": sum(i.armor * t for i, t in pairs),
+        "luck": sum(i.luck * t for i, t in pairs),
     }
 
 
-def gear_value(equipment: dict | None) -> int:
-    """Стоимость экипировки в золоте (для ВВП)."""
+def _base_value(item: Item) -> float:
     from bot.game.balance import RESOURCE_PRICE
 
+    total = float(item.cost.get("gold", 0))
+    for res, price in RESOURCE_PRICE.items():
+        total += item.cost.get(res, 0) * price
+    return total
+
+
+def gear_value(equipment: dict | None) -> int:
+    """Стоимость экипировки в золоте с учётом ярусов (для ВВП)."""
     total = 0.0
-    for item in equipped_items(equipment):
-        total += item.cost.get("gold", 0)
-        for res, price in RESOURCE_PRICE.items():
-            total += item.cost.get(res, 0) * price
+    for item, tier in equipped_items(equipment):
+        total += _base_value(item) * TIER_INVESTED[tier]
     return int(total)

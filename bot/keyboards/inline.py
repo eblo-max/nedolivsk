@@ -85,20 +85,24 @@ def character_kb(craft_ready: bool = False) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def forge_kb() -> InlineKeyboardMarkup:
-    from bot.game.items import CATALOG
+def forge_kb(player: Player | None = None) -> InlineKeyboardMarkup:
+    from bot.game.items import CATALOG, TIER_STARS, equipped_tier
 
+    equipment = getattr(player, "equipment", None) if player else None
     kb = InlineKeyboardBuilder()
     for item in CATALOG.values():
-        kb.button(text=item.name, callback_data=f"forge_item:{item.id}")
+        tier = equipped_tier(equipment, item.id)
+        label = f"{item.name} {TIER_STARS[tier]}" if tier else item.name
+        kb.button(text=label, callback_data=f"forge_item:{item.id}")
     kb.button(text="↩️ Назад", callback_data="character")
     kb.adjust(2)
     return kb.as_markup()
 
 
-def forge_item_kb(item_id: str) -> InlineKeyboardMarkup:
+def forge_item_kb(item_id: str, maxed: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="⚒ Заказать", callback_data=f"forge_make:{item_id}")
+    if not maxed:
+        kb.button(text="⚒ Заказать", callback_data=f"forge_make:{item_id}")
     kb.button(text="↩️ В кузницу", callback_data="forge")
     kb.adjust(2)
     return kb.as_markup()

@@ -28,7 +28,7 @@ async def notifier_loop(bot: Bot) -> None:
 
 
 async def _notify_returned(bot: Bot) -> None:
-    from bot.game.items import CATALOG
+    from bot.game.items import CATALOG, parse_entry
 
     now = datetime.now(timezone.utc)
     async with session_factory() as session:
@@ -62,12 +62,13 @@ async def _notify_returned(bot: Bot) -> None:
             .with_for_update(skip_locked=True)
         )
         for player in result.scalars().all():
-            item = CATALOG.get(player.craft_item)
+            item_id, tier = parse_entry(player.craft_item)
+            item = CATALOG.get(item_id)
             if item is not None:
                 try:
                     await bot.send_message(
                         player.id,
-                        texts.craft_ready_notification(item),
+                        texts.craft_ready_notification(item, tier),
                         reply_markup=craft_claim_kb(),
                     )
                 except Exception:

@@ -303,39 +303,68 @@ def forge_screen(player) -> str:
     )
 
 
-def forge_item_screen(item, player) -> str:
+def _tier_bonus_line(item, tier: int) -> str:
+    parts = []
+    if item.income_pct: parts.append(f"+{item.income_pct * tier}% доход")
+    if item.yield_pct: parts.append(f"+{item.yield_pct * tier}% добыча")
+    if item.yield_wood_pct: parts.append(f"+{item.yield_wood_pct * tier}% 🪵")
+    if item.speed_pct: parts.append(f"−{item.speed_pct * tier}% время вылазки")
+    if item.pay_discount_pct: parts.append(f"−{item.pay_discount_pct * tier}% плата")
+    if item.damage: parts.append(f"⚔{item.damage * tier}")
+    if item.crit: parts.append(f"💥{item.crit * tier}%")
+    if item.armor: parts.append(f"🛡{item.armor * tier}")
+    if item.luck: parts.append(f"🍀{item.luck * tier}")
+    return " · ".join(parts) if parts else "—"
+
+
+def forge_item_screen(item, player, cur_tier: int, next_tier: int) -> str:
     from bot.game import items as it
 
-    c = item.cost
+    if cur_tier >= it.TIER_MAX:
+        return (
+            f"<b>{item.name} {it.TIER_STARS[it.TIER_MAX]}</b> · "
+            f"слот: {it.SLOTS[item.slot]}\n"
+            f"<i>{item.description}</i>\n\n"
+            f"Даёт: {_tier_bonus_line(item, it.TIER_MAX)}\n\n"
+            "Мастерская работа. Лучше уже не выкуют — даже не проси."
+        )
+    c = it.tier_cost(item, next_tier)
+    hours = it.tier_hours(item, next_tier)
     have_mark = lambda k, have: "✅" if have >= c.get(k, 0) else "❌"
-    cur = (getattr(player, "equipment", None) or {}).get(item.slot)
-    cur_line = ""
-    if cur and cur in it.CATALOG:
-        cur_line = f"\nСейчас в слоте: {it.CATALOG[cur].name} (заменится)"
+    head = f"<b>{item.name} {it.TIER_STARS[next_tier]}</b> · слот: {it.SLOTS[item.slot]}"
+    if cur_tier > 0:
+        head += (
+            f"\nПерековка: {it.TIER_STARS[cur_tier]} → {it.TIER_STARS[next_tier]} "
+            f"({it.TIER_NAMES[next_tier]})"
+        )
     return (
-        f"<b>{item.name}</b> · слот: {it.SLOTS[item.slot]}\n"
+        f"{head}\n"
         f"<i>{item.description}</i>\n\n"
-        f"Даёт: {_item_bonus_line(item)}\n"
-        f"Ковать: {item.craft_hours} ч\n\n"
+        f"Будет давать: {_tier_bonus_line(item, next_tier)}\n"
+        f"Ковать: {hours} ч\n\n"
         f"Цена: 🪙 {c.get('gold',0)} {have_mark('gold', player.gold)} · "
         f"🪵 {c.get('wood',0)} {have_mark('wood', player.wood)} · "
         f"🌾 {c.get('grain',0)} {have_mark('grain', player.grain)} · "
         f"🌿 {c.get('hops',0)} {have_mark('hops', player.hops)}"
-        f"{cur_line}"
     )
 
 
-def craft_started(item) -> str:
+def craft_started(item, tier: int, hours: int) -> str:
+    from bot.game import items as it
+
     return (
-        f"⚒ Мастер забрал плату и взялся за <b>{item.name}</b>.\n"
-        f"Будет готово через {item.craft_hours} ч. Не стой над душой."
+        f"⚒ Мастер забрал плату и взялся за <b>{item.name} "
+        f"{it.TIER_STARS[tier]}</b>.\n"
+        f"Будет готово через {hours} ч. Не стой над душой."
     )
 
 
-def craft_not_enough(item) -> str:
+def craft_not_enough(item, tier: int = 1) -> str:
+    from bot.game import items as it
+
     return (
-        f"На <b>{item.name}</b> у тебя кишка тонка и мошна пуста. "
-        "Иди заработай, потом приходи."
+        f"На «{item.name} {it.TIER_STARS[tier]}» у тебя кишка тонка "
+        "и мошна пуста. Иди заработай, потом приходи."
     )
 
 
@@ -343,16 +372,20 @@ def craft_in_progress(minutes: int) -> str:
     return f"⚒ Мастер ещё куёт. Готово через {_fmt_minutes(minutes)}. Не зуди."
 
 
-def craft_ready_notification(item) -> str:
+def craft_ready_notification(item, tier: int = 1) -> str:
+    from bot.game import items as it
+
     return (
-        f"🔔 Мастер закончил <b>{item.name}</b>!\n"
+        f"🔔 Мастер закончил <b>{item.name} {it.TIER_STARS[tier]}</b>!\n"
         "Забирай, пока не перепродал кому побогаче."
     )
 
 
-def craft_claimed(item) -> str:
+def craft_claimed(item, tier: int = 1) -> str:
+    from bot.game import items as it
+
     return (
-        f"⚒ <b>{item.name}</b> — твоё!\n"
-        f"Надето. {_item_bonus_line(item)}.\n"
+        f"⚒ <b>{item.name} {it.TIER_STARS[tier]}</b> — твоё!\n"
+        f"Надето. {_tier_bonus_line(item, tier)}.\n"
         "Носи и не потеряй по пьяни."
     )

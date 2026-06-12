@@ -40,8 +40,9 @@ async def _caption_edit(callback: CallbackQuery, text: str, markup) -> None:
 def _craft_line(player: Player) -> str:
     state, minutes = logic.craft_state(player)
     if state == "active":
-        item = items.CATALOG.get(player.craft_item)
-        name = item.name if item else "вещь"
+        item_id, tier = items.parse_entry(player.craft_item)
+        item = items.CATALOG.get(item_id)
+        name = f"{item.name} {items.TIER_STARS[tier]}" if item else "вещь"
         return f"⚒ Мастер куёт «{name}» — ещё {minutes // 60} ч {minutes % 60} мин."
     if state == "ready":
         return "🎁 Мастер закончил заказ — забери вещь!"
@@ -95,7 +96,7 @@ async def cb_forge(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session)
     if player is None:
         return
-    await _caption_edit(callback, texts.forge_screen(player), kb.forge_kb())
+    await _caption_edit(callback, texts.forge_screen(player), kb.forge_kb(player))
     await callback.answer()
 
 
@@ -108,8 +109,12 @@ async def cb_forge_item(callback: CallbackQuery, session: AsyncSession) -> None:
     if item is None:
         await callback.answer()
         return
+    cur_tier = items.equipped_tier(getattr(player, "equipment", None), item.id)
+    next_tier = min(cur_tier + 1, items.TIER_MAX)
     await _caption_edit(
-        callback, texts.forge_item_screen(item, player), kb.forge_item_kb(item.id)
+        callback,
+        texts.forge_item_screen(item, player, cur_tier, next_tier),
+        kb.forge_item_kb(item.id, maxed=cur_tier >= items.TIER_MAX),
     )
     await callback.answer()
 
@@ -132,12 +137,22 @@ async def cb_forge_make(callback: CallbackQuery, session: AsyncSession) -> None:
     result = logic.start_craft(player, item_id)
     if not result.ok:
         if result.reason == "not_enough":
-            await callback.answer(texts.craft_not_enough(result.item), show_alert=True)
+            await callback.answer(
+                texts.craft_not_enough(result.item, result.tier), show_alert=True
+            )
+        elif result.reason == "max_tier":
+            await callback.answer(
+                "Лучше уже не выкуют. Это вершина ремесла.", show_alert=True
+            )
         else:
             await callback.answer()
         return
 
-    await _caption_edit(callback, texts.craft_started(result.item), kb.character_kb())
+    await _caption_edit(
+        callback,
+        texts.craft_started(result.item, result.tier, result.hours),
+        kb.character_kb(),
+    )
     await callback.answer("Мастер взялся за дело!")
 
 
@@ -157,5 +172,5 @@ async def cb_craft_claim(callback: CallbackQuery, session: AsyncSession) -> None
             await callback.answer("Мастер ничего для тебя не ковал.", show_alert=True)
         return
 
-    await callback.answer(f"{result.item.name} — твоё!")
+    await callback.answer(f"{result.item.name} {items.TIER_STARS[result.tier]} — твоё!")
     await _show_character(callback, player)

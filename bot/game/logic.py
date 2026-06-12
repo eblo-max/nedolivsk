@@ -152,31 +152,47 @@ def craft_state(player: Player) -> tuple[str, int]:
 @dataclass
 class CraftStart:
     ok: bool
-    reason: str = ""  # busy | unknown | not_enough
+    reason: str = ""  # busy | unknown | not_enough | max_tier
     item: object = None
+    tier: int = 1
+    cost: dict | None = None
+    hours: int = 0
+
+
+def next_craft_tier(player: Player, item_id: str) -> int:
+    """Какой ярус будет коваться: 1 для новой вещи, +1 для надетой."""
+    return items.equipped_tier(getattr(player, "equipment", None), item_id) + 1
 
 
 def start_craft(player: Player, item_id: str) -> CraftStart:
-    """Заказать вещь у мастера. Один заказ за раз."""
+    """Заказать вещь у мастера. Один заказ за раз.
+    Если предмет уже надет — перековка на следующий ярус."""
     state, _ = craft_state(player)
     if state != "none":
         return CraftStart(ok=False, reason="busy")
     item = items.CATALOG.get(item_id)
     if item is None:
         return CraftStart(ok=False, reason="unknown")
-    c = item.cost
+
+    tier = next_craft_tier(player, item_id)
+    if tier > items.TIER_MAX:
+        return CraftStart(ok=False, reason="max_tier", item=item)
+
+    c = items.tier_cost(item, tier)
+    hours = items.tier_hours(item, tier)
     if (player.gold < c.get("gold", 0) or player.wood < c.get("wood", 0)
             or player.grain < c.get("grain", 0) or player.hops < c.get("hops", 0)):
-        return CraftStart(ok=False, reason="not_enough", item=item)
+        return CraftStart(ok=False, reason="not_enough", item=item,
+                          tier=tier, cost=c, hours=hours)
 
     player.gold -= c.get("gold", 0)
     player.wood -= c.get("wood", 0)
     player.grain -= c.get("grain", 0)
     player.hops -= c.get("hops", 0)
-    player.craft_item = item_id
-    player.craft_ends_at = _now() + timedelta(hours=item.craft_hours)
+    player.craft_item = items.make_entry(item_id, tier)
+    player.craft_ends_at = _now() + timedelta(hours=hours)
     player.craft_notified = False
-    return CraftStart(ok=True, item=item)
+    return CraftStart(ok=True, item=item, tier=tier, cost=c, hours=hours)
 
 
 @dataclass
@@ -185,6 +201,7 @@ class CraftClaim:
     reason: str = ""  # none | not_ready
     minutes_left: int = 0
     item: object = None
+    tier: int = 1
 
 
 def claim_craft(player: Player) -> CraftClaim:
@@ -195,10 +212,11 @@ def claim_craft(player: Player) -> CraftClaim:
     if state == "active":
         return CraftClaim(ok=False, reason="not_ready", minutes_left=minutes)
 
-    item = items.CATALOG[player.craft_item]
+    item_id, tier = items.parse_entry(player.craft_item)
+    item = items.CATALOG[item_id]
     equipment = dict(player.equipment or {})
-    equipment[item.slot] = item.id
+    equipment[item.slot] = items.make_entry(item_id, tier)
     player.equipment = equipment
     player.craft_item = None
     player.craft_ends_at = None
-    return CraftClaim(ok=True, item=item)
+    return CraftClaim(ok=True, item=item, tier=tier)

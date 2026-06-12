@@ -8,7 +8,7 @@
 import io
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
 BG_FILE = ASSETS_DIR / "character.png"
@@ -55,11 +55,17 @@ def render(equipment: dict | None) -> bytes:
     if key == _cache_key and _cache_bytes is not None:
         return _cache_bytes
 
+    from bot.game.items import parse_entry
+
+    TIER_FRAME = {2: (170, 175, 190, 255), 3: (212, 168, 50, 255)}  # серебро/золото
+
     base = Image.open(BG_FILE).convert("RGBA")
-    for slot, item_id in equipment.items():
+    draw = ImageDraw.Draw(base)
+    for slot, entry in equipment.items():
         box = SLOT_BOXES.get(slot)
         if box is None:
             continue
+        item_id, tier = parse_entry(entry)
         sprite = _item_sprite(item_id)
         if sprite is None:
             continue
@@ -73,6 +79,11 @@ def render(equipment: dict | None) -> bytes:
         px = x1 + (bw - sp.width) // 2
         py = y1 + (bh - sp.height) // 2
         base.alpha_composite(sp, (px, py))
+        if tier in TIER_FRAME and slot != "boots":  # у сапог нет рамки на фоне
+            draw.rounded_rectangle(
+                [x1 - 4, y1 - 4, x2 + 4, y2 + 4],
+                radius=10, outline=TIER_FRAME[tier], width=6,
+            )
 
     out = io.BytesIO()
     base.convert("RGB").save(out, "JPEG", quality=88, optimize=True)
