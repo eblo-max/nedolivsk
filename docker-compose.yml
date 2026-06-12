@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nedolivsk-db
+    environment:
+      POSTGRES_USER: nedolivsk
+      POSTGRES_PASSWORD: nedolivsk
+      POSTGRES_DB: nedolivsk
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:
