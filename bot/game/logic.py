@@ -129,4 +129,7 @@ def try_upgrade(player: Player, tavern: Tavern) -> UpgradeResult:
 
     rep = balance.reputation_for_upgrade(tavern.level)
     tavern.reputation += rep
- 
+    player.reputation += rep
+    player.level = tavern.level
+
+    return UpgradeResult(ok=True, cost=cost, new_level=tavern.level)
