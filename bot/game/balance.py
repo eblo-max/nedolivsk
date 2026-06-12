@@ -36,6 +36,16 @@ REGION_PENALTY = {
 BONUS_MULT = 1.5
 PENALTY_MULT = 0.75
 
+# Счастливые вылазки: шанс двойной добычи
+LUCKY_BASE_CHANCE = 8    # % у голого игрока
+LUCKY_MAX_CHANCE = 40    # потолок с любой удачей
+LUCKY_MULT = 2           # множитель добычи
+
+
+def lucky_chance(luck: int) -> int:
+    return min(LUCKY_MAX_CHANCE, LUCKY_BASE_CHANCE + luck)
+
+
 # Доход
 INCOME_CAP_HOURS = 10  # доход копится максимум за 10 часов
 

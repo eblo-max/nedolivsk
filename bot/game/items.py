@@ -43,6 +43,10 @@ SLOTS = {
     "bag": "Сумка",
 }
 
+# ВРЕМЕННО для теста: вещи бесплатны и куются мгновенно.
+# Перед боевым запуском поставить False!
+TEST_FREE_CRAFT = True
+
 # ===== Ярусы качества =====
 TIER_MAX = 3
 TIER_NAMES = {1: "обычный", 2: "добротный", 3: "мастерский"}
@@ -68,11 +72,15 @@ def make_entry(item_id: str, tier: int) -> str:
 
 
 def tier_cost(item: "Item", tier: int) -> dict:
+    if TEST_FREE_CRAFT:
+        return {k: 0 for k in item.cost}
     mult = TIER_COST_MULT[tier]
     return {k: v * mult for k, v in item.cost.items()}
 
 
 def tier_hours(item: "Item", tier: int) -> int:
+    if TEST_FREE_CRAFT:
+        return 0
     return item.craft_hours * tier
 
 

@@ -145,7 +145,15 @@ def expedition_in_progress(minutes: int) -> str:
     )
 
 
-def expedition_claimed(resource: str, amount: int) -> str:
+def expedition_claimed(resource: str, amount: int, lucky: bool = False) -> str:
+    if lucky:
+        return (
+            f"🍀 <b>Счастливая вылазка!</b>\n\n"
+            f"Работники наткнулись на нетронутую делянку — "
+            f"добыча двойная!\n"
+            f"{RESOURCE_EMOJI[resource]} {RESOURCE_NAMES[resource]}: +{amount}\n\n"
+            "Сегодня даже крысы на складе аплодируют."
+        )
     return (
         f"🎒 <b>Добыча на складе!</b>\n\n"
         f"{RESOURCE_EMOJI[resource]} {RESOURCE_NAMES[resource]}: +{amount}\n\n"
@@ -277,6 +285,8 @@ def character_screen(player, craft_line: str = "") -> str:
     body += (
         f"\n⚔ Урон: {stats['damage']} · 💥 Крит: {stats['crit']}% · "
         f"🛡 Броня: {stats['armor']} · 🍀 Удача: {stats['luck']}\n"
+        f"🍀 Счастливая вылазка (добыча ×2): "
+        f"{balance.lucky_chance(stats['luck'])}%\n"
     )
     bonuses = []
     if it.income_multiplier(equipment) > 1:

@@ -150,10 +150,10 @@ async def cb_exp_claim(callback: CallbackQuery, session: AsyncSession) -> None:
 
     await _safe_edit(
         callback,
-        texts.expedition_claimed(result.resource, result.amount),
+        texts.expedition_claimed(result.resource, result.amount, result.lucky),
         kb.back_kb(),
     )
-    await callback.answer(f"+{result.amount}")
+    await callback.answer(f"🍀 +{result.amount}!" if result.lucky else f"+{result.amount}")
 
 
 @router.callback_query(F.data == "income")

@@ -1,5 +1,6 @@
 """Игровая логика поверх моделей. Все функции меняют объекты, коммит — снаружи."""
 
+import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -55,6 +56,7 @@ class ExpeditionClaim:
     minutes_left: int = 0
     resource: str = ""
     amount: int = 0
+    lucky: bool = False
 
 
 def claim_expedition(player: Player) -> ExpeditionClaim:
@@ -67,13 +69,20 @@ def claim_expedition(player: Player) -> ExpeditionClaim:
 
     resource = player.expedition_resource
     level = player.tavern.level if player.tavern else 1
+    equipment = getattr(player, "equipment", None)
     amount = balance.expedition_yield(resource, level, player.region)
-    amount = int(amount * items.yield_multiplier(getattr(player, "equipment", None), resource))
+    amount = int(amount * items.yield_multiplier(equipment, resource))
+
+    # счастливая вылазка: шанс двойной добычи, удача повышает
+    luck = items.combat_stats(equipment)["luck"]
+    lucky = random.randint(1, 100) <= balance.lucky_chance(luck)
+    if lucky:
+        amount *= balance.LUCKY_MULT
 
     setattr(player, resource, getattr(player, resource) + amount)
     player.expedition_resource = None
     player.expedition_ends_at = None
-    return ExpeditionClaim(ok=True, resource=resource, amount=amount)
+    return ExpeditionClaim(ok=True, resource=resource, amount=amount, lucky=lucky)
 
 
 @dataclass
