@@ -9,6 +9,7 @@ from bot.config import settings
 from bot.db.base import create_tables, engine
 from bot.handlers import group, start, tavern
 from bot.middlewares import DbSessionMiddleware
+from bot.notifier import notifier_loop
 
 
 async def main() -> None:
@@ -25,10 +26,13 @@ async def main() -> None:
     dp.update.middleware(DbSessionMiddleware())
     dp.include_routers(start.router, tavern.router, group.router)
 
+    notifier_task = asyncio.create_task(notifier_loop(bot))
+
     await bot.delete_webhook(drop_pending_updates=True)
     try:
         await dp.start_polling(bot)
     finally:
+        notifier_task.cancel()
         await engine.dispose()
 
 

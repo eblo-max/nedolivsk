@@ -42,6 +42,7 @@ def start_expedition(player: Player, resource: str) -> ExpeditionStart:
     player.gold -= pay
     player.expedition_resource = resource
     player.expedition_ends_at = _now() + timedelta(hours=balance.EXPEDITION_HOURS)
+    player.expedition_notified = False
     return ExpeditionStart(ok=True, pay=pay)
 
 
@@ -128,7 +129,4 @@ def try_upgrade(player: Player, tavern: Tavern) -> UpgradeResult:
 
     rep = balance.reputation_for_upgrade(tavern.level)
     tavern.reputation += rep
-    player.reputation += rep
-    player.level = tavern.level
-
-    return UpgradeResult(ok=True, cost=cost, new_level=tavern.level)
+ 

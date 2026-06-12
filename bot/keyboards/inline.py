@@ -60,6 +60,14 @@ def upgrade_confirm_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def claim_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🎒 Забрать добычу", callback_data="exp_claim")
+    kb.button(text="🏠 К таверне", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def back_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="↩️ К таверне", callback_data="tavern")

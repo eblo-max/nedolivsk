@@ -33,3 +33,7 @@ async def create_tables() -> None:
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "expedition_ends_at TIMESTAMPTZ"
         ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "expedition_notified BOOLEAN NOT NULL DEFAULT FALSE"
+        ))

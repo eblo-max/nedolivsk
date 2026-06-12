@@ -142,6 +142,21 @@ def expedition_claimed(resource: str, amount: int) -> str:
     )
 
 
+RESOURCE_INSTRUMENTAL = {
+    "wood": "древесиной",
+    "grain": "зерном",
+    "hops": "хмелем",
+}
+
+
+def expedition_returned(resource: str) -> str:
+    return (
+        f"🔔 Работники вернулись с {RESOURCE_EMOJI[resource]} "
+        f"{RESOURCE_INSTRUMENTAL[resource]}!\n"
+        "Забери добычу, пока её не растащили крысы."
+    )
+
+
 def income_success(gold: int) -> str:
     return f"💰 Посетители оставили <b>{gold} 🪙</b>. Неплохой день!"
 

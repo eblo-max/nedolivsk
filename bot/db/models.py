@@ -35,6 +35,7 @@ class Player(Base):
     expedition_ends_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    expedition_notified: Mapped[bool] = mapped_column(default=False)
 
     tavern: Mapped["Tavern | None"] = relationship(
         back_populates="player", uselist=False, lazy="selectin"
@@ -63,4 +64,4 @@ class Tavern(Base):
 
     last_income_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    player: Mapped[Player] = relationship(back_populates="tavern")
+  
