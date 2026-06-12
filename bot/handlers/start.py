@@ -1,5 +1,7 @@
 """Регистрация игрока и создание таверны."""
 
+from html import escape
+
 from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
@@ -50,13 +52,13 @@ async def cb_create_tavern(callback: CallbackQuery, state: FSMContext) -> None:
 @router.message(CreateTavern.name, F.text)
 async def tavern_name(message: Message, state: FSMContext) -> None:
     name = message.text.strip()
-    if len(name) > 40:
+    if not 2 <= len(name) <= 40:
         await message.answer(texts.NAME_TOO_LONG)
         return
     await state.update_data(name=name)
     await state.set_state(CreateTavern.region)
     await message.answer(
-        texts.ASK_REGION.format(name=name), reply_markup=kb.regions_kb()
+        texts.ASK_REGION.format(name=escape(name)), reply_markup=kb.regions_kb()
     )
 
 
@@ -80,7 +82,7 @@ async def tavern_region(
         await repo.create_tavern(session, player, data["name"], region)
 
     await callback.message.edit_text(
-        texts.CREATED.format(name=data["name"], region=REGIONS[region])
+        texts.CREATED.format(name=escape(data["name"]), region=REGIONS[region])
     )
     await send_tavern_screen(callback.message, player)
     await callback.answer()

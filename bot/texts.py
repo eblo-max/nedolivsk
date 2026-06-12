@@ -1,5 +1,7 @@
 """Все игровые тексты в одном месте."""
 
+from html import escape
+
 from bot.db.models import Player, Tavern
 from bot.game import balance, logic
 from bot.game.balance import RESOURCE_EMOJI, RESOURCE_NAMES
@@ -17,7 +19,7 @@ ASK_TAVERN_NAME = (
     "Напиши название сообщением (до 40 символов)."
 )
 
-NAME_TOO_LONG = "Слишком длинное название. До 40 символов, трактирщик!"
+NAME_TOO_LONG = "Название должно быть от 2 до 40 символов, трактирщик!"
 
 ASK_REGION = (
     "🗺 Где поставим таверну, <b>{name}</b>?\n\n"
@@ -65,10 +67,10 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
         exp_line = "\n😴 Работники отдыхают и ждут приказа.\n"
 
     return (
-        f"🏠 <b>{tavern.name}</b>\n"
+        f"🏠 <b>{escape(tavern.name)}</b>\n"
         f"📍 {region} · Уровень {tavern.level}\n\n"
         f"Тёплый свет очага, скрип половиц и запах свежего эля. "
-        f"За стойкой — {player.first_name}, хозяин этого заведения.\n"
+        f"За стойкой — {escape(player.first_name)}, хозяин этого заведения.\n"
         f"{exp_line}\n"
         f"👥 Вместимость: {tavern.capacity}\n"
         f"✨ Комфорт: {tavern.comfort}\n"
