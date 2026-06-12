@@ -7,7 +7,7 @@ from aiogram.enums import ParseMode
 
 from bot.config import settings
 from bot.db.base import create_tables, engine
-from bot.handlers import group, start, tavern, worldmap_cmd
+from bot.handlers import admin, group, start, tavern, worldmap_cmd
 from bot.middlewares import DbSessionMiddleware
 from bot.notifier import notifier_loop
 
@@ -24,7 +24,9 @@ async def main() -> None:
     dp = Dispatcher()
 
     dp.update.middleware(DbSessionMiddleware())
-    dp.include_routers(worldmap_cmd.router, start.router, tavern.router, group.router)
+    dp.include_routers(
+        admin.router, worldmap_cmd.router, start.router, tavern.router, group.router
+    )
 
     notifier_task = asyncio.create_task(notifier_loop(bot))
 

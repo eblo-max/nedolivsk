@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     """Конфигурация бота из .env."""
 
     bot_token: str
+    admin_id: int = 0  # Telegram ID владельца; 0 = админ-команды выключены
     database_url: str = (
         "postgresql+asyncpg://nedolivsk:nedolivsk@localhost:5432/nedolivsk"
     )
@@ -22,5 +23,3 @@ class Settings(BaseSettings):
             return v.replace("postgresql://", "postgresql+asyncpg://", 1)
         return v
 
-
-settings = Settings()
