@@ -78,3 +78,38 @@ def stats_for_level(level: int) -> dict:
 
 def reputation_for_upgrade(new_level: int) -> int:
     return new_level * 5
+
+
+# ===== ВВП (валовый продукт таверны) =====
+# Рыночные цены ресурсов в золоте — обратно пропорциональны лёгкости добычи
+RESOURCE_PRICE = {"wood": 2.0, "grain": 2.5, "hops": 4.0}
+
+
+def invested_value(level: int) -> float:
+    """Капитализация здания: всё золото и ресурсы, вложенные в уровни."""
+    total = 0.0
+    for lvl in range(1, level):
+        c = upgrade_cost(lvl)
+        total += c["gold"]
+        for res, price in RESOURCE_PRICE.items():
+            total += c[res] * price
+    return total
+
+
+def tavern_gdp(
+    gold: int, wood: int, grain: int, hops: int,
+    level: int, income_rate: int, reputation: int,
+) -> int:
+    """ВВП таверны: активы + капитализация + дневной оборот + репутация."""
+    assets = (
+        gold
+        + wood * RESOURCE_PRICE["wood"]
+        + grain * RESOURCE_PRICE["grain"]
+        + hops * RESOURCE_PRICE["hops"]
+    )
+    return int(
+        assets
+        + invested_value(level)
+        + income_rate * 24
+        + reputation * 3
+    )

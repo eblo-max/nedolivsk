@@ -216,3 +216,31 @@ UPGRADE_MAX = (
     "🏆 Выше некуда — твой кабак и так легенда Недоливска. "
     "Теперь главное — не профукать."
 )
+
+
+MEDALS = {1: "🥇", 2: "🥈", 3: "🥉"}
+ZONE_EMOJI = {"north_wilds": "❄️", "green_valleys": "🌾", "red_wastes": "🏜"}
+
+
+def rating_screen(rows: list, total_gdp: int, total_taverns: int) -> str:
+    """rows: [(место, название, имя владельца, уровень, регион, ВВП, репутация)]"""
+    lines = [
+        "🏆 <b>ДОСКА ПОЧЁТА НЕДОЛИВСКА</b>",
+        f"Кабаков в городе: {total_taverns} · "
+        f"ВВП города: <b>{total_gdp:,}</b> 🪙".replace(",", " "),
+        "",
+    ]
+    for place, name, owner, level, region, gdp, rep in rows:
+        medal = MEDALS.get(place, f"{place}.")
+        zone = ZONE_EMOJI.get(region, "")
+        gdp_s = f"{gdp:,}".replace(",", " ")
+        lines.append(
+            f"{medal} <b>{escape(name)}</b> {zone} ур.{level}\n"
+            f"      ВВП {gdp_s} 🪙 · ⭐ {rep} · хозяин: {escape(owner)}"
+        )
+    lines.append("")
+    lines.append(
+        "Не нашёл себя в списке? Так и запишем: "
+        "пьёшь больше, чем зарабатываешь."
+    )
+    return "\n".join(lines)
