@@ -64,4 +64,4 @@ class Tavern(Base):
 
     last_income_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-  
+    player: Mapped[Player] = relationship(back_populates="tavern")
