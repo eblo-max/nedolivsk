@@ -63,5 +63,6 @@ class Tavern(Base):
     buildings: Mapped[list] = mapped_column(JSONB, default=list)
 
     last_income_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    map_slot: Mapped[int | None] = mapped_column(unique=True)
 
     player: Mapped[Player] = relationship(back_populates="tavern")

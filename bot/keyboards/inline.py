@@ -5,7 +5,7 @@ from bot.db.models import Player
 from bot.game import balance, logic
 from bot.game.balance import REGIONS, RESOURCE_EMOJI, RESOURCE_NAMES
 
-REGION_EMOJI = {"north": "🏔", "river": "🌊", "forest": "🌲", "trade": "🛤"}
+REGION_EMOJI = {"north_wilds": "❄️", "green_valleys": "🌾", "red_wastes": "🏜"}
 
 
 def create_tavern_kb() -> InlineKeyboardMarkup:

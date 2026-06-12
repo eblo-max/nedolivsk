@@ -45,3 +45,29 @@ async def get_tavern(session: AsyncSession, player_id: int) -> Tavern | None:
         select(Tavern).where(Tavern.player_id == player_id)
     )
     return result.scalar_one_or_none()
+
+
+async def assign_map_slot(session: AsyncSession, tavern: Tavern, region: str) -> int | None:
+    """Выдаёт таверне свободный слот её зоны на карте мира."""
+    from bot.game import worldmap
+
+    if tavern.map_slot is not None:
+        return tavern.map_slot
+    result = await session.execute(
+        select(Tavern.map_slot).where(Tavern.map_slot.is_not(None))
+    )
+    used = {row[0] for row in result}
+    for sid in worldmap.zone_slots(region):
+        if sid not in used:
+            tavern.map_slot = sid
+            await session.flush()
+            return sid
+    return None  # зона заполнена
+
+
+async def get_map_taverns(session: AsyncSession) -> list[tuple[Tavern, Player]]:
+    """Все таверны с их владельцами для рендера карты."""
+    result = await session.execute(
+        select(Tavern, Player).join(Player, Tavern.player_id == Player.id)
+    )
+    return list(result.all())

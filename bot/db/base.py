@@ -37,3 +37,17 @@ async def create_tables() -> None:
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "expedition_notified BOOLEAN NOT NULL DEFAULT FALSE"
         ))
+        # Переход на 3 зоны карты мира (12.06.2026)
+        await conn.execute(text(
+            "UPDATE players SET region = 'north_wilds' "
+            "WHERE region IN ('north', 'forest')"
+        ))
+        await conn.execute(text(
+            "UPDATE players SET region = 'green_valleys' WHERE region = 'river'"
+        ))
+        await conn.execute(text(
+            "UPDATE players SET region = 'red_wastes' WHERE region = 'trade'"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS map_slot INTEGER UNIQUE"
+        ))

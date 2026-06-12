@@ -2,10 +2,9 @@
 
 # Регионы карты
 REGIONS = {
-    "north": "Северные холмы",
-    "river": "Речная долина",
-    "forest": "Лесной край",
-    "trade": "Торговый тракт",
+    "north_wilds": "Северная глушь",
+    "green_valleys": "Зелёные долины",
+    "red_wastes": "Красные пустоши",
 }
 
 # Ресурсы
@@ -23,10 +22,9 @@ WORKER_PAY_PER_LEVEL = 5  # плата работникам за вылазку:
 
 # Бонус региона к добыче (+50% к своему ресурсу)
 REGION_BONUS = {
-    "north": "wood",
-    "river": "grain",
-    "forest": "wood",
-    "trade": "hops",
+    "north_wilds": "wood",
+    "green_valleys": "grain",
+    "red_wastes": "hops",
 }
 
 # Доход

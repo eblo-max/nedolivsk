@@ -79,7 +79,8 @@ async def tavern_region(
             callback.from_user.first_name,
         )
     if player.tavern is None:
-        await repo.create_tavern(session, player, data["name"], region)
+        tavern = await repo.create_tavern(session, player, data["name"], region)
+        await repo.assign_map_slot(session, tavern, region)
 
     await callback.message.edit_text(
         texts.CREATED.format(name=escape(data["name"]), region=REGIONS[region])
