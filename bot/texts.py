@@ -1,4 +1,4 @@
-"""Все игровые тексты в одном месте."""
+"""Все игровые тексты в одном месте. Тон — жёсткий трактирный."""
 
 from html import escape
 
@@ -7,39 +7,43 @@ from bot.game import balance, logic
 from bot.game.balance import RESOURCE_EMOJI, RESOURCE_NAMES
 
 WELCOME = (
-    "🍺 <b>Добро пожаловать в Недоливск!</b>\n\n"
-    "Городок, где эль льётся рекой (но всегда чуть-чуть не доливают).\n"
-    "Здесь ты построишь свою таверну, прославишь её на весь край "
-    "и обойдёшь конкурентов из общего чата.\n\n"
-    "Начнём с главного — твоей таверны."
+    "🍺 <b>Недоливск, приятель.</b>\n\n"
+    "Городишко, где эль не доливают, посуду не моют, "
+    "а за лишний вопрос можно остаться без зубов.\n"
+    "Хочешь свой кабак? Тогда хватит глазеть по сторонам — стройся."
 )
 
 ASK_TAVERN_NAME = (
-    "📜 Как назовём твою таверну?\n\n"
-    "Напиши название сообщением (до 40 символов)."
+    "📜 Как обзовёшь свою забегаловку?\n\n"
+    "Пиши название (от 2 до 40 знаков). Думай головой — "
+    "с этой вывеской тебе жить и спиваться."
 )
 
-NAME_TOO_LONG = "Название должно быть от 2 до 40 символов, трактирщик!"
+NAME_TOO_LONG = "Ты бы ещё поэму накатал. От 2 до 40 знаков — и без соплей."
 
 ASK_REGION = (
-    "🗺 Где поставим таверну, <b>{name}</b>?\n\n"
-    "❄️ <b>Северная глушь</b> — холодные земли, крепкие наливки. Больше 🪵 древесины\n"
-    "🌾 <b>Зелёные долины</b> — плодородные земли, щедрые застолья. Больше 🌾 зерна\n"
-    "🏜 <b>Красные пустоши</b> — жаркие степи, острые закуски. Больше 🌿 хмеля"
+    "🗺 Где вкопаешь первый столб, <b>{name}</b>?\n\n"
+    "❄️ <b>Северная глушь</b> — леса по самое горло (🪵 +50%), "
+    "зато хмель дохнет на морозе (🌿 −25%)\n\n"
+    "🌾 <b>Зелёные долины</b> — зерна хоть лопатой греби (🌾 +50%), "
+    "но лес давно вырубили под пашню (🪵 −25%)\n\n"
+    "🏜 <b>Красные пустоши</b> — дикий хмель крепче кулака (🌿 +50%), "
+    "а зерно горит на солнце (🌾 −25%)\n\n"
+    "Выбирай. Потом не скули."
 )
 
 CREATED = (
-    "🎉 Таверна <b>{name}</b> открыта в регионе <b>{region}</b>!\n\n"
-    "Стартовый капитал: 100 🪙\n"
-    "Отправляй работников за ресурсами, улучшай таверну и зарабатывай репутацию."
+    "🍻 Ну всё, <b>{name}</b> открыта. Регион — <b>{region}</b>.\n\n"
+    "В мошне 100 🪙 — не пропей в первый же вечер.\n"
+    "Гони работников за ресурсами и поднимай этот сарай с колен."
 )
 
 GROUP_HINT = (
-    "🍺 Игра «Недоливск» живёт в личных сообщениях.\n"
-    "Напиши боту в личку, чтобы открыть свою таверну!"
+    "🍺 «Недоливск» наливает только в личке.\n"
+    "Стучись к боту напрямую — здесь только языками чешут."
 )
 
-ALREADY_REGISTERED = "У тебя уже есть таверна! Вот она:"
+ALREADY_REGISTERED = "У тебя уже есть кабак, забыл? Вот он:"
 
 
 def _fmt_minutes(minutes: int) -> str:
@@ -57,19 +61,20 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
     if state == "active":
         res = player.expedition_resource
         exp_line = (
-            f"\n⏳ Работники добывают {RESOURCE_EMOJI[res]} "
-            f"{RESOURCE_NAMES[res].lower()} — вернутся через {_fmt_minutes(minutes)}.\n"
+            f"\n⏳ Работники горбатятся за {RESOURCE_EMOJI[res]} "
+            f"{RESOURCE_NAMES[res].lower()} — приползут через {_fmt_minutes(minutes)}.\n"
         )
     elif state == "ready":
-        exp_line = "\n🎒 Работники вернулись с добычей — забери её!\n"
+        exp_line = "\n🎒 Работники приволокли добычу — забирай, пока не пропили!\n"
     else:
-        exp_line = "\n😴 Работники отдыхают и ждут приказа.\n"
+        exp_line = "\n😴 Работники дрыхнут на сене. Пни их — пусть пользу приносят.\n"
 
     return (
         f"🏠 <b>{escape(tavern.name)}</b>\n"
         f"📍 {region} · Уровень {tavern.level}\n\n"
-        f"Тёплый свет очага, скрип половиц и запах свежего эля. "
-        f"За стойкой — {escape(player.first_name)}, хозяин этого заведения.\n"
+        f"Скрипят половицы, воняет элем и мокрой псиной. "
+        f"За стойкой — {escape(player.first_name)}, "
+        f"и спорить с хозяином тут не принято.\n"
         f"{exp_line}\n"
         f"👥 Вместимость: {tavern.capacity}\n"
         f"✨ Комфорт: {tavern.comfort}\n"
@@ -81,9 +86,10 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
 
 def warehouse_screen(player: Player, tavern: Tavern) -> str:
     lines = [
-        f"📦 <b>Склад таверны «{escape(tavern.name)}»</b>\n",
+        f"📦 <b>Склад «{escape(tavern.name)}»</b>",
+        "Темно, пыльно, по углам шуршат крысы. Вот что ещё не растащили:\n",
         f"🪙 Золото: {player.gold}\n",
-        "<b>Ресурсы:</b>",
+        "<b>Запасы:</b>",
         f"🪵 Древесина: {player.wood}",
         f"🌾 Зерно: {player.grain}",
         f"🌿 Хмель: {player.hops}",
@@ -97,12 +103,12 @@ def warehouse_screen(player: Player, tavern: Tavern) -> str:
             "hops": player.hops,
         }
         emoji = {"gold": "🪙", **RESOURCE_EMOJI}
-        lines.append(f"\n<b>До улучшения (ур. {tavern.level + 1}):</b>")
+        lines.append(f"\n<b>До перестройки (ур. {tavern.level + 1}):</b>")
         for key in ("gold", "wood", "grain", "hops"):
             mark = "✅" if have[key] >= cost[key] else "❌"
             lines.append(f"{emoji[key]} {have[key]} / {cost[key]} {mark}")
     else:
-        lines.append("\n🏆 Таверна максимального уровня.")
+        lines.append("\n🏆 Выше строить некуда — разве что до небес.")
     return "\n".join(lines)
 
 
@@ -110,34 +116,40 @@ def expedition_menu(player: Player) -> str:
     level = player.tavern.level if player.tavern else 1
     pay = balance.worker_pay(level)
     return (
-        "⛏ <b>Куда отправить работников?</b>\n\n"
-        f"Вылазка длится {balance.EXPEDITION_HOURS} ч, "
-        f"работникам нужно заплатить {pay} 🪙.\n"
-        "Добывать можно только один ресурс за раз — выбирай с умом."
+        "⛏ <b>Куда гнать работников?</b>\n\n"
+        f"Ходка — {balance.EXPEDITION_HOURS} ч. Плата — {pay} 🪙 вперёд, "
+        "и попробуй не заплати.\n"
+        "Один ресурс за раз: жадность в Недоливске не лечится."
     )
 
 
 def expedition_started(resource: str, pay: int) -> str:
     return (
-        f"🚶 Работники отправились за {RESOURCE_EMOJI[resource]} "
+        f"🚶 Работники потащились за {RESOURCE_EMOJI[resource]} "
         f"{RESOURCE_NAMES[resource].lower()} (−{pay} 🪙).\n"
-        f"Вернутся через {balance.EXPEDITION_HOURS} ч."
+        f"Вернутся через {balance.EXPEDITION_HOURS} ч — если волки не сожрут."
     )
 
 
 def expedition_no_gold(pay: int, gold: int) -> str:
-    return f"Нечем платить работникам: нужно {pay} 🪙, у тебя {gold} 🪙."
+    return (
+        f"Платить нечем, голодранец: надо {pay} 🪙, у тебя {gold} 🪙. "
+        "Бесплатно тут даже не чихают."
+    )
 
 
 def expedition_in_progress(minutes: int) -> str:
-    return f"⏳ Работники ещё в пути. Вернутся через {_fmt_minutes(minutes)}."
+    return (
+        f"⏳ Ещё пашут. Вернутся через {_fmt_minutes(minutes)} — "
+        "раньше не жди и не ной."
+    )
 
 
 def expedition_claimed(resource: str, amount: int) -> str:
     return (
-        f"🎒 <b>Добыча получена!</b>\n\n"
+        f"🎒 <b>Добыча на складе!</b>\n\n"
         f"{RESOURCE_EMOJI[resource]} {RESOURCE_NAMES[resource]}: +{amount}\n\n"
-        "Работники готовы к новой вылазке."
+        "Работники утёрли пот и ждут новых приказов."
     )
 
 
@@ -150,49 +162,57 @@ RESOURCE_INSTRUMENTAL = {
 
 def expedition_returned(resource: str) -> str:
     return (
-        f"🔔 Работники вернулись с {RESOURCE_EMOJI[resource]} "
+        f"🔔 Работники приволокли {RESOURCE_EMOJI[resource]} "
         f"{RESOURCE_INSTRUMENTAL[resource]}!\n"
-        "Забери добычу, пока её не растащили крысы."
+        "Забирай быстрее, пока крысы не растащили, а пьянь не спёрла."
     )
 
 
 def income_success(gold: int) -> str:
-    return f"💰 Посетители оставили <b>{gold} 🪙</b>. Неплохой день!"
+    return (
+        f"💰 Пьянь оставила в кассе <b>{gold} 🪙</b>. "
+        "Половина монет липкие, но золото есть золото."
+    )
 
 
 def income_empty() -> str:
-    return "💤 Касса пока пуста. Загляни чуть позже."
+    return "💤 Касса пуста, как башка завсегдатая. Заглядывай позже."
 
 
 def upgrade_offer(tavern: Tavern, cost: dict) -> str:
     new_stats = balance.stats_for_level(tavern.level + 1)
     return (
-        f"🔨 <b>Улучшение до уровня {tavern.level + 1}</b>\n\n"
-        f"Стоимость:\n"
+        f"🔨 <b>Перестройка до уровня {tavern.level + 1}</b>\n\n"
+        f"Выложишь:\n"
         f"🪙 {cost['gold']} · 🪵 {cost['wood']} · 🌾 {cost['grain']} · 🌿 {cost['hops']}\n\n"
-        f"Что даст:\n"
+        f"Получишь:\n"
         f"👥 Вместимость: {tavern.capacity} → {new_stats['capacity']}\n"
         f"✨ Комфорт: {tavern.comfort} → {new_stats['comfort']}\n"
-        f"💰 Доход: {tavern.income_rate} → {new_stats['income_rate']} 🪙/час"
+        f"💰 Доход: {tavern.income_rate} → {new_stats['income_rate']} 🪙/час\n\n"
+        "Плотники деньги вперёд берут и сдачу не дают."
     )
 
 
 def upgrade_success(new_level: int) -> str:
     return (
-        f"🎉 <b>Таверна улучшена до уровня {new_level}!</b>\n"
-        f"Слава о ней разносится по Недоливску. "
-        f"+{balance.reputation_for_upgrade(new_level)} ⭐ репутации."
+        f"🔨 <b>Готово! Уровень {new_level}.</b>\n"
+        f"Соседи завидуют, конкуренты скрипят зубами. "
+        f"+{balance.reputation_for_upgrade(new_level)} ⭐ к репутации."
     )
 
 
 def upgrade_not_enough(cost: dict, player: Player) -> str:
     return (
-        "😕 Не хватает ресурсов на улучшение.\n\n"
-        f"Нужно: 🪙 {cost['gold']} · 🪵 {cost['wood']} · "
+        "😕 С такими запасами только сортир во дворе пристроить.\n\n"
+        f"Надо: 🪙 {cost['gold']} · 🪵 {cost['wood']} · "
         f"🌾 {cost['grain']} · 🌿 {cost['hops']}\n"
         f"У тебя: 🪙 {player.gold} · 🪵 {player.wood} · "
-        f"🌾 {player.grain} · 🌿 {player.hops}"
+        f"🌾 {player.grain} · 🌿 {player.hops}\n\n"
+        "Иди работай."
     )
 
 
-UPGRADE_MAX = "🏆 Таверна уже максимального уровня. Ты — легенда Недоливска!"
+UPGRADE_MAX = (
+    "🏆 Выше некуда — твой кабак и так легенда Недоливска. "
+    "Теперь главное — не профукать."
+)

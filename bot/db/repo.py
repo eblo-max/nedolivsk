@@ -53,6 +53,9 @@ async def assign_map_slot(session: AsyncSession, tavern: Tavern, region: str) ->
 
     if tavern.map_slot is not None:
         return tavern.map_slot
+    # сериализуем выдачу слотов: два игрока не получат один круг
+    from sqlalchemy import text
+    await session.execute(text("SELECT pg_advisory_xact_lock(420001)"))
     result = await session.execute(
         select(Tavern.map_slot).where(Tavern.map_slot.is_not(None))
     )

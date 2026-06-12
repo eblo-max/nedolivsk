@@ -31,7 +31,7 @@ async def _get_player(
 ) -> Player | None:
     player = await repo.get_player(session, callback.from_user.id, for_update=lock)
     if not player or not player.tavern:
-        await callback.answer("Сначала создай таверну: /start", show_alert=True)
+        await callback.answer("Сначала обзаведись кабаком: /start", show_alert=True)
         return None
     return player
 
@@ -70,7 +70,7 @@ async def cb_exp_menu(callback: CallbackQuery, session: AsyncSession) -> None:
         )
         return
     if state == "ready":
-        await callback.answer("Сначала забери добычу!", show_alert=True)
+        await callback.answer("Сначала забери добычу, раззява!", show_alert=True)
         return
     await _safe_edit(
         callback, texts.expedition_menu(player), kb.expedition_menu_kb(player)
@@ -91,7 +91,7 @@ async def cb_exp_start(callback: CallbackQuery, session: AsyncSession) -> None:
     result = logic.start_expedition(player, resource)
     if not result.ok:
         if result.reason == "busy":
-            await callback.answer("Работники уже заняты!", show_alert=True)
+            await callback.answer("Работники уже горбатятся, не дёргай их!", show_alert=True)
         else:
             await callback.answer(
                 texts.expedition_no_gold(result.pay, player.gold), show_alert=True
@@ -101,7 +101,7 @@ async def cb_exp_start(callback: CallbackQuery, session: AsyncSession) -> None:
     await _safe_edit(
         callback, texts.expedition_started(resource, result.pay), kb.back_kb()
     )
-    await callback.answer("Работники в пути!")
+    await callback.answer("Потопали!")
 
 
 @router.callback_query(F.data == "exp_status")
@@ -115,7 +115,7 @@ async def cb_exp_status(callback: CallbackQuery, session: AsyncSession) -> None:
         await _safe_edit(
             callback, texts.tavern_screen(player, player.tavern), kb.tavern_kb(player)
         )
-        await callback.answer("Работники уже вернулись!")
+        await callback.answer("Уже приползли!")
         return
     await callback.answer(texts.expedition_in_progress(minutes), show_alert=True)
 
@@ -133,7 +133,7 @@ async def cb_exp_claim(callback: CallbackQuery, session: AsyncSession) -> None:
                 texts.expedition_in_progress(result.minutes_left), show_alert=True
             )
         else:
-            await callback.answer("Работники никуда не ходили.", show_alert=True)
+            await callback.answer("Работники никуда не ходили. Глаза разуй.", show_alert=True)
         return
 
     await _safe_edit(
@@ -208,4 +208,4 @@ async def cb_upgrade_confirm(callback: CallbackQuery, session: AsyncSession) -> 
             await _safe_edit(callback, success_text, kb.back_kb())
     else:
         await _safe_edit(callback, success_text, kb.back_kb())
-    await callback.answer("Уровень повышен! 🎉")
+    await callback.answer("Отгрохал! 🔨")

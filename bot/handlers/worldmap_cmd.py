@@ -1,5 +1,8 @@
 """Команда /map — мировая карта с тавернами игроков."""
 
+import asyncio
+from html import escape
+
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import BufferedInputFile, Message
@@ -28,10 +31,13 @@ async def cmd_map(message: Message, session: AsyncSession) -> None:
         else:
             homeless.append(tavern.name)
 
-    img = worldmap.render(placed)
+    # рендер тяжёлый — уводим в поток, чтобы не блокировать бота
+    img = await asyncio.to_thread(worldmap.render, placed)
     caption = f"🗺 <b>Недоливск — карта мира</b>\nТаверн на карте: {len(placed)}"
     if homeless:
-        caption += "\n⛺ Ждут места: " + ", ".join(homeless[:5])
+        caption += "\n⛺ Ждут места: " + ", ".join(
+            escape(n) for n in homeless[:5]
+        )
     await message.answer_photo(
         BufferedInputFile(img, filename="nedolivsk_map.jpg"), caption=caption
     )

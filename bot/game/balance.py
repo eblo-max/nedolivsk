@@ -20,12 +20,21 @@ EXPEDITION_YIELD = {  # (база на 1-м уровне, прирост за у
 }
 WORKER_PAY_PER_LEVEL = 5  # плата работникам за вылазку: 5 * уровень таверны
 
-# Бонус региона к добыче (+50% к своему ресурсу)
+# Специализация зон: свой ресурс +50%, чужой -25%, третий — как у всех.
+# Каждый ресурс ровно один раз усилен и один раз ослаблен — зоны равноценны,
+# различается стратегия, а не сложность.
 REGION_BONUS = {
-    "north_wilds": "wood",
-    "green_valleys": "grain",
-    "red_wastes": "hops",
+    "north_wilds": "wood",      # тайга
+    "green_valleys": "grain",   # пашни
+    "red_wastes": "hops",       # дикий степной хмель
 }
+REGION_PENALTY = {
+    "north_wilds": "hops",      # хмель не вызревает в холоде
+    "green_valleys": "wood",    # леса вырублены под поля
+    "red_wastes": "grain",      # зерно сохнет на жаре
+}
+BONUS_MULT = 1.5
+PENALTY_MULT = 0.75
 
 # Доход
 INCOME_CAP_HOURS = 10  # доход копится максимум за 10 часов
@@ -38,7 +47,9 @@ def expedition_yield(resource: str, level: int, region: str) -> int:
     base, per_level = EXPEDITION_YIELD[resource]
     amount = base + per_level * (level - 1)
     if REGION_BONUS.get(region) == resource:
-        amount = int(amount * 1.5)
+        return int(amount * BONUS_MULT)
+    if REGION_PENALTY.get(region) == resource:
+        return max(1, int(amount * PENALTY_MULT))
     return amount
 
 
