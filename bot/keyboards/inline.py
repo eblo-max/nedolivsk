@@ -1,7 +1,9 @@
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from bot.game.balance import REGIONS
+from bot.db.models import Player
+from bot.game import balance, logic
+from bot.game.balance import REGIONS, RESOURCE_EMOJI, RESOURCE_NAMES
 
 REGION_EMOJI = {"north": "🏔", "river": "🌊", "forest": "🌲", "trade": "🛤"}
 
@@ -20,12 +22,32 @@ def regions_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def tavern_kb() -> InlineKeyboardMarkup:
+def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="⛏ Собрать ресурсы", callback_data="collect")
+    state, _ = logic.expedition_state(player)
+    if state == "none":
+        kb.button(text="⛏ Отправить работников", callback_data="exp_menu")
+    elif state == "active":
+        kb.button(text="⏳ Работники в пути", callback_data="exp_status")
+    else:
+        kb.button(text="🎒 Забрать добычу", callback_data="exp_claim")
     kb.button(text="💰 Собрать доход", callback_data="income")
     kb.button(text="🔨 Улучшить таверну", callback_data="upgrade")
-    kb.adjust(2, 1)
+    kb.adjust(1, 2)
+    return kb.as_markup()
+
+
+def expedition_menu_kb(player: Player) -> InlineKeyboardMarkup:
+    level = player.tavern.level if player.tavern else 1
+    kb = InlineKeyboardBuilder()
+    for res in ("wood", "grain", "hops"):
+        amount = balance.expedition_yield(res, level, player.region)
+        kb.button(
+            text=f"{RESOURCE_EMOJI[res]} {RESOURCE_NAMES[res]} (+{amount})",
+            callback_data=f"exp:{res}",
+        )
+    kb.button(text="↩️ Назад", callback_data="tavern")
+    kb.adjust(1)
     return kb.as_markup()
 
 

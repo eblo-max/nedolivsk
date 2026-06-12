@@ -27,7 +27,8 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
     if player and player.tavern:
         await message.answer(texts.ALREADY_REGISTERED)
         await message.answer(
-            texts.tavern_screen(player, player.tavern), reply_markup=kb.tavern_kb()
+            texts.tavern_screen(player, player.tavern),
+            reply_markup=kb.tavern_kb(player),
         )
         return
 
@@ -84,6 +85,7 @@ async def tavern_region(
         texts.CREATED.format(name=data["name"], region=REGIONS[region])
     )
     await callback.message.answer(
-        texts.tavern_screen(player, player.tavern), reply_markup=kb.tavern_kb()
+        texts.tavern_screen(player, player.tavern),
+        reply_markup=kb.tavern_kb(player),
     )
     await callback.answer()

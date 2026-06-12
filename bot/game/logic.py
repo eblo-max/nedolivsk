@@ -11,40 +11,71 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def expedition_state(player: Player) -> tuple[str, int]:
+    """Состояние вылазки: ("none"|"active"|"ready", минут до возвращения)."""
+    if player.expedition_resource is None or player.expedition_ends_at is None:
+        return "none", 0
+    left = (player.expedition_ends_at - _now()).total_seconds()
+    if left > 0:
+        return "active", int(left // 60) + 1
+    return "ready", 0
+
+
 @dataclass
-class CollectResult:
+class ExpeditionStart:
     ok: bool
-    wait_minutes: int = 0
-    gained: dict | None = None
+    reason: str = ""  # busy | no_gold
+    pay: int = 0
 
 
-def collect_resources(player: Player) -> CollectResult:
-    """Сбор ресурсов по кулдауну."""
-    now = _now()
-    if player.last_collect_at is not None:
-        elapsed = now - player.last_collect_at
-        cooldown = timedelta(minutes=balance.COLLECT_COOLDOWN_MIN)
-        if elapsed < cooldown:
-            wait = int((cooldown - elapsed).total_seconds() // 60) + 1
-            return CollectResult(ok=False, wait_minutes=wait)
+def start_expedition(player: Player, resource: str) -> ExpeditionStart:
+    """Отправить работников за одним ресурсом."""
+    state, _ = expedition_state(player)
+    if state != "none":
+        return ExpeditionStart(ok=False, reason="busy")
 
     level = player.tavern.level if player.tavern else 1
-    gained = {
-        res: balance.collect_amount(res, level, player.region)
-        for res in balance.COLLECT_BASE
-    }
-    player.wood += gained["wood"]
-    player.grain += gained["grain"]
-    player.hops += gained["hops"]
-    player.last_collect_at = now
-    return CollectResult(ok=True, gained=gained)
+    pay = balance.worker_pay(level)
+    if player.gold < pay:
+        return ExpeditionStart(ok=False, reason="no_gold", pay=pay)
+
+    player.gold -= pay
+    player.expedition_resource = resource
+    player.expedition_ends_at = _now() + timedelta(hours=balance.EXPEDITION_HOURS)
+    return ExpeditionStart(ok=True, pay=pay)
+
+
+@dataclass
+class ExpeditionClaim:
+    ok: bool
+    reason: str = ""  # none | not_ready
+    minutes_left: int = 0
+    resource: str = ""
+    amount: int = 0
+
+
+def claim_expedition(player: Player) -> ExpeditionClaim:
+    """Забрать добычу вернувшихся работников."""
+    state, minutes = expedition_state(player)
+    if state == "none":
+        return ExpeditionClaim(ok=False, reason="none")
+    if state == "active":
+        return ExpeditionClaim(ok=False, reason="not_ready", minutes_left=minutes)
+
+    resource = player.expedition_resource
+    level = player.tavern.level if player.tavern else 1
+    amount = balance.expedition_yield(resource, level, player.region)
+
+    setattr(player, resource, getattr(player, resource) + amount)
+    player.expedition_resource = None
+    player.expedition_ends_at = None
+    return ExpeditionClaim(ok=True, resource=resource, amount=amount)
 
 
 @dataclass
 class IncomeResult:
     ok: bool
     gold: int = 0
-    minutes: int = 0
 
 
 def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
@@ -55,8 +86,7 @@ def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
     hours = min(hours, balance.INCOME_CAP_HOURS)
     gold = int(tavern.income_rate * hours)
     if gold <= 0:
-        minutes_left = max(1, int(60 / max(tavern.income_rate, 1)))
-        return IncomeResult(ok=False, minutes=minutes_left)
+        return IncomeResult(ok=False)
 
     player.gold += gold
     tavern.last_income_at = now

@@ -8,11 +8,20 @@ REGIONS = {
     "trade": "Торговый тракт",
 }
 
-# Сбор ресурсов
-COLLECT_COOLDOWN_MIN = 30  # минут между сборами
-COLLECT_BASE = {"wood": 6, "grain": 6, "hops": 3}  # за сбор на 1-м уровне
+# Ресурсы
+RESOURCE_NAMES = {"wood": "Древесина", "grain": "Зерно", "hops": "Хмель"}
+RESOURCE_EMOJI = {"wood": "🪵", "grain": "🌾", "hops": "🌿"}
 
-# Бонус региона к сбору (+50% к ресурсу)
+# Вылазки работников: игрок отправляет их за ОДНИМ ресурсом на выбор
+EXPEDITION_HOURS = 2
+EXPEDITION_YIELD = {  # (база на 1-м уровне, прирост за уровень)
+    "wood": (25, 6),
+    "grain": (20, 5),
+    "hops": (12, 3),
+}
+WORKER_PAY_PER_LEVEL = 5  # плата работникам за вылазку: 5 * уровень таверны
+
+# Бонус региона к добыче (+50% к своему ресурсу)
 REGION_BONUS = {
     "north": "wood",
     "river": "grain",
@@ -21,26 +30,31 @@ REGION_BONUS = {
 }
 
 # Доход
-INCOME_CAP_HOURS = 8  # доход копится максимум за 8 часов
+INCOME_CAP_HOURS = 10  # доход копится максимум за 10 часов
 
 # Улучшение таверны
 MAX_LEVEL = 10
 
 
-def collect_amount(resource: str, level: int, region: str) -> int:
-    base = COLLECT_BASE[resource] + (level - 1) * 2
+def expedition_yield(resource: str, level: int, region: str) -> int:
+    base, per_level = EXPEDITION_YIELD[resource]
+    amount = base + per_level * (level - 1)
     if REGION_BONUS.get(region) == resource:
-        base = int(base * 1.5)
-    return base
+        amount = int(amount * 1.5)
+    return amount
+
+
+def worker_pay(level: int) -> int:
+    return WORKER_PAY_PER_LEVEL * level
 
 
 def upgrade_cost(level: int) -> dict:
     """Стоимость перехода с level на level+1."""
     return {
         "gold": 100 * level * level,
-        "wood": 20 * level,
-        "grain": 15 * level,
-        "hops": 10 * level,
+        "wood": 30 * level,
+        "grain": 25 * level,
+        "hops": 15 * level,
     }
 
 

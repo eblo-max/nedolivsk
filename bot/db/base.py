@@ -18,7 +18,18 @@ session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_comm
 
 async def create_tables() -> None:
     """Создаёт таблицы при старте (для MVP; позже заменить на Alembic)."""
+    from sqlalchemy import text
+
     from bot.db import models  # noqa: F401 — регистрация моделей
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Мини-миграции для уже существующих таблиц
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "expedition_resource VARCHAR(16)"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "expedition_ends_at TIMESTAMPTZ"
+        ))

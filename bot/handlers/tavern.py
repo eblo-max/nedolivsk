@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import texts
 from bot.db import repo
-from bot.game import logic
+from bot.db.models import Player
+from bot.game import balance, logic
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -21,41 +22,117 @@ async def _safe_edit(callback: CallbackQuery, text: str, markup) -> None:
         pass
 
 
-@router.callback_query(F.data == "tavern")
-async def cb_tavern(callback: CallbackQuery, session: AsyncSession) -> None:
+async def _get_player(
+    callback: CallbackQuery, session: AsyncSession
+) -> Player | None:
     player = await repo.get_player(session, callback.from_user.id)
     if not player or not player.tavern:
         await callback.answer("Сначала создай таверну: /start", show_alert=True)
+        return None
+    return player
+
+
+@router.callback_query(F.data == "tavern")
+async def cb_tavern(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session)
+    if player is None:
         return
     await _safe_edit(
-        callback, texts.tavern_screen(player, player.tavern), kb.tavern_kb()
+        callback, texts.tavern_screen(player, player.tavern), kb.tavern_kb(player)
     )
     await callback.answer()
 
 
-@router.callback_query(F.data == "collect")
-async def cb_collect(callback: CallbackQuery, session: AsyncSession) -> None:
-    player = await repo.get_player(session, callback.from_user.id)
-    if not player or not player.tavern:
-        await callback.answer("Сначала создай таверну: /start", show_alert=True)
+@router.callback_query(F.data == "exp_menu")
+async def cb_exp_menu(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session)
+    if player is None:
         return
-
-    result = logic.collect_resources(player)
-    if not result.ok:
+    state, minutes = logic.expedition_state(player)
+    if state == "active":
         await callback.answer(
-            texts.collect_cooldown(result.wait_minutes), show_alert=True
+            texts.expedition_in_progress(minutes), show_alert=True
         )
         return
+    if state == "ready":
+        await callback.answer("Сначала забери добычу!", show_alert=True)
+        return
+    await _safe_edit(
+        callback, texts.expedition_menu(player), kb.expedition_menu_kb(player)
+    )
+    await callback.answer()
 
-    await _safe_edit(callback, texts.collect_success(result.gained), kb.back_kb())
-    await callback.answer("Собрано!")
+
+@router.callback_query(F.data.startswith("exp:"))
+async def cb_exp_start(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session)
+    if player is None:
+        return
+    resource = callback.data.split(":", 1)[1]
+    if resource not in balance.RESOURCE_NAMES:
+        await callback.answer()
+        return
+
+    result = logic.start_expedition(player, resource)
+    if not result.ok:
+        if result.reason == "busy":
+            await callback.answer("Работники уже заняты!", show_alert=True)
+        else:
+            await callback.answer(
+                texts.expedition_no_gold(result.pay, player.gold), show_alert=True
+            )
+        return
+
+    await _safe_edit(
+        callback, texts.expedition_started(resource, result.pay), kb.back_kb()
+    )
+    await callback.answer("Работники в пути!")
+
+
+@router.callback_query(F.data == "exp_status")
+async def cb_exp_status(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session)
+    if player is None:
+        return
+    state, minutes = logic.expedition_state(player)
+    if state == "ready":
+        # Пока кнопка висела, работники успели вернуться — обновим экран
+        await _safe_edit(
+            callback, texts.tavern_screen(player, player.tavern), kb.tavern_kb(player)
+        )
+        await callback.answer("Работники уже вернулись!")
+        return
+    await callback.answer(texts.expedition_in_progress(minutes), show_alert=True)
+
+
+@router.callback_query(F.data == "exp_claim")
+async def cb_exp_claim(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session)
+    if player is None:
+        return
+
+    result = logic.claim_expedition(player)
+    if not result.ok:
+        if result.reason == "not_ready":
+            await callback.answer(
+                texts.expedition_in_progress(result.minutes_left), show_alert=True
+            )
+        else:
+            await callback.answer("Работники никуда не ходили.", show_alert=True)
+        return
+
+    await _safe_edit(
+        callback,
+        texts.expedition_claimed(result.resource, result.amount),
+        kb.back_kb(),
+    )
+    await callback.answer(f"+{result.amount}")
 
 
 @router.callback_query(F.data == "income")
 async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
-    player = await repo.get_player(session, callback.from_user.id)
-    if not player or not player.tavern:
-        await callback.answer("Сначала создай таверну: /start", show_alert=True)
+    player = await _get_player(callback, session)
+    if player is None:
         return
 
     result = logic.collect_income(player, player.tavern)
@@ -69,14 +146,11 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
 
 @router.callback_query(F.data == "upgrade")
 async def cb_upgrade(callback: CallbackQuery, session: AsyncSession) -> None:
-    player = await repo.get_player(session, callback.from_user.id)
-    if not player or not player.tavern:
-        await callback.answer("Сначала создай таверну: /start", show_alert=True)
+    player = await _get_player(callback, session)
+    if player is None:
         return
 
     tavern = player.tavern
-    from bot.game import balance
-
     if tavern.level >= balance.MAX_LEVEL:
         await callback.answer(texts.UPGRADE_MAX, show_alert=True)
         return
@@ -90,9 +164,8 @@ async def cb_upgrade(callback: CallbackQuery, session: AsyncSession) -> None:
 
 @router.callback_query(F.data == "upgrade_confirm")
 async def cb_upgrade_confirm(callback: CallbackQuery, session: AsyncSession) -> None:
-    player = await repo.get_player(session, callback.from_user.id)
-    if not player or not player.tavern:
-        await callback.answer("Сначала создай таверну: /start", show_alert=True)
+    player = await _get_player(callback, session)
+    if player is None:
         return
 
     result = logic.try_upgrade(player, player.tavern)

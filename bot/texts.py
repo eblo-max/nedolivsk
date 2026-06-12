@@ -1,7 +1,8 @@
 """Все игровые тексты в одном месте."""
 
 from bot.db.models import Player, Tavern
-from bot.game import balance
+from bot.game import balance, logic
+from bot.game.balance import RESOURCE_EMOJI, RESOURCE_NAMES
 
 WELCOME = (
     "🍺 <b>Добро пожаловать в Недоливск!</b>\n\n"
@@ -29,7 +30,7 @@ ASK_REGION = (
 CREATED = (
     "🎉 Таверна <b>{name}</b> открыта в регионе <b>{region}</b>!\n\n"
     "Стартовый капитал: 100 🪙\n"
-    "Собирай ресурсы, улучшай таверну и зарабатывай репутацию."
+    "Отправляй работников за ресурсами, улучшай таверну и зарабатывай репутацию."
 )
 
 GROUP_HINT = (
@@ -40,13 +41,35 @@ GROUP_HINT = (
 ALREADY_REGISTERED = "У тебя уже есть таверна! Вот она:"
 
 
+def _fmt_minutes(minutes: int) -> str:
+    h, m = divmod(minutes, 60)
+    if h and m:
+        return f"{h} ч {m} мин"
+    if h:
+        return f"{h} ч"
+    return f"{m} мин"
+
+
 def tavern_screen(player: Player, tavern: Tavern) -> str:
     region = balance.REGIONS.get(player.region, player.region)
+    state, minutes = logic.expedition_state(player)
+    if state == "active":
+        res = player.expedition_resource
+        exp_line = (
+            f"\n⏳ Работники добывают {RESOURCE_EMOJI[res]} "
+            f"{RESOURCE_NAMES[res].lower()} — вернутся через {_fmt_minutes(minutes)}.\n"
+        )
+    elif state == "ready":
+        exp_line = "\n🎒 Работники вернулись с добычей — забери её!\n"
+    else:
+        exp_line = "\n😴 Работники отдыхают и ждут приказа.\n"
+
     return (
         f"🏠 <b>{tavern.name}</b>\n"
         f"📍 {region} · Уровень {tavern.level}\n\n"
         f"Тёплый свет очага, скрип половиц и запах свежего эля. "
-        f"За стойкой — {player.first_name}, хозяин этого заведения.\n\n"
+        f"За стойкой — {player.first_name}, хозяин этого заведения.\n"
+        f"{exp_line}\n"
         f"👥 Вместимость: {tavern.capacity}\n"
         f"✨ Комфорт: {tavern.comfort}\n"
         f"💰 Доход: {tavern.income_rate} 🪙/час\n"
@@ -57,18 +80,39 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
     )
 
 
-def collect_success(gained: dict) -> str:
+def expedition_menu(player: Player) -> str:
+    level = player.tavern.level if player.tavern else 1
+    pay = balance.worker_pay(level)
     return (
-        "⛏ <b>Ресурсы собраны!</b>\n\n"
-        f"🪵 Древесина: +{gained['wood']}\n"
-        f"🌾 Зерно: +{gained['grain']}\n"
-        f"🌿 Хмель: +{gained['hops']}\n\n"
-        f"Следующий сбор через {balance.COLLECT_COOLDOWN_MIN} мин."
+        "⛏ <b>Куда отправить работников?</b>\n\n"
+        f"Вылазка длится {balance.EXPEDITION_HOURS} ч, "
+        f"работникам нужно заплатить {pay} 🪙.\n"
+        "Добывать можно только один ресурс за раз — выбирай с умом."
     )
 
 
-def collect_cooldown(wait_minutes: int) -> str:
-    return f"⏳ Работники ещё трудятся. Возвращайся через {wait_minutes} мин."
+def expedition_started(resource: str, pay: int) -> str:
+    return (
+        f"🚶 Работники отправились за {RESOURCE_EMOJI[resource]} "
+        f"{RESOURCE_NAMES[resource].lower()} (−{pay} 🪙).\n"
+        f"Вернутся через {balance.EXPEDITION_HOURS} ч."
+    )
+
+
+def expedition_no_gold(pay: int, gold: int) -> str:
+    return f"Нечем платить работникам: нужно {pay} 🪙, у тебя {gold} 🪙."
+
+
+def expedition_in_progress(minutes: int) -> str:
+    return f"⏳ Работники ещё в пути. Вернутся через {_fmt_minutes(minutes)}."
+
+
+def expedition_claimed(resource: str, amount: int) -> str:
+    return (
+        f"🎒 <b>Добыча получена!</b>\n\n"
+        f"{RESOURCE_EMOJI[resource]} {RESOURCE_NAMES[resource]}: +{amount}\n\n"
+        "Работники готовы к новой вылазке."
+    )
 
 
 def income_success(gold: int) -> str:

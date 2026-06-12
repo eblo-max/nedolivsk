@@ -30,8 +30,11 @@ class Player(Base):
     grain: Mapped[int] = mapped_column(default=10)
     hops: Mapped[int] = mapped_column(default=5)
 
-    # Кулдауны
-    last_collect_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Текущая вылазка работников (за одним ресурсом)
+    expedition_resource: Mapped[str | None] = mapped_column(String(16))
+    expedition_ends_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
     tavern: Mapped["Tavern | None"] = relationship(
         back_populates="player", uselist=False, lazy="selectin"
