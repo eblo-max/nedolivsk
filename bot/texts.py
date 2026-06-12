@@ -76,10 +76,35 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
         f"✨ Комфорт: {tavern.comfort}\n"
         f"💰 Доход: {tavern.income_rate} 🪙/час\n"
         f"⭐ Репутация: {tavern.reputation}\n\n"
-        f"<b>Твои запасы:</b>\n"
-        f"🪙 Золото: {player.gold}\n"
-        f"🪵 Древесина: {player.wood} · 🌾 Зерно: {player.grain} · 🌿 Хмель: {player.hops}"
+        f"🪙 Золото: {player.gold}"
     )
+
+
+def warehouse_screen(player: Player, tavern: Tavern) -> str:
+    lines = [
+        f"📦 <b>Склад таверны «{escape(tavern.name)}»</b>\n",
+        f"🪙 Золото: {player.gold}\n",
+        "<b>Ресурсы:</b>",
+        f"🪵 Древесина: {player.wood}",
+        f"🌾 Зерно: {player.grain}",
+        f"🌿 Хмель: {player.hops}",
+    ]
+    if tavern.level < balance.MAX_LEVEL:
+        cost = balance.upgrade_cost(tavern.level)
+        have = {
+            "gold": player.gold,
+            "wood": player.wood,
+            "grain": player.grain,
+            "hops": player.hops,
+        }
+        emoji = {"gold": "🪙", **RESOURCE_EMOJI}
+        lines.append(f"\n<b>До улучшения (ур. {tavern.level + 1}):</b>")
+        for key in ("gold", "wood", "grain", "hops"):
+            mark = "✅" if have[key] >= cost[key] else "❌"
+            lines.append(f"{emoji[key]} {have[key]} / {cost[key]} {mark}")
+    else:
+        lines.append("\n🏆 Таверна максимального уровня.")
+    return "\n".join(lines)
 
 
 def expedition_menu(player: Player) -> str:

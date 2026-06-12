@@ -47,6 +47,17 @@ async def cb_tavern(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "warehouse")
+async def cb_warehouse(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session)
+    if player is None:
+        return
+    await _safe_edit(
+        callback, texts.warehouse_screen(player, player.tavern), kb.back_kb()
+    )
+    await callback.answer()
+
+
 @router.callback_query(F.data == "exp_menu")
 async def cb_exp_menu(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session)
