@@ -2,10 +2,10 @@
 
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, FSInputFile, InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import texts
+from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import balance, logic
@@ -15,8 +15,12 @@ router = Router()
 
 
 async def _safe_edit(callback: CallbackQuery, text: str, markup) -> None:
+    """Правит текст или подпись к фото — смотря что за сообщение."""
     try:
-        await callback.message.edit_text(text, reply_markup=markup)
+        if callback.message.photo:
+            await callback.message.edit_caption(caption=text, reply_markup=markup)
+        else:
+            await callback.message.edit_text(text, reply_markup=markup)
     except TelegramBadRequest:
         # Текст не изменился — Telegram не любит одинаковые edit
         pass
@@ -179,5 +183,18 @@ async def cb_upgrade_confirm(callback: CallbackQuery, session: AsyncSession) -> 
             await callback.answer()
         return
 
-    await _safe_edit(callback, texts.upgrade_success(result.new_level), kb.back_kb())
+    # Если у нового уровня другая картинка — показываем её
+    new_img = images.tavern_image(result.new_level)
+    old_img = images.tavern_image(result.new_level - 1)
+    success_text = texts.upgrade_success(result.new_level)
+    if callback.message.photo and new_img is not None and new_img != old_img:
+        try:
+            await callback.message.edit_media(
+                InputMediaPhoto(media=FSInputFile(new_img), caption=success_text),
+                reply_markup=kb.back_kb(),
+            )
+        except TelegramBadRequest:
+            await _safe_edit(callback, success_text, kb.back_kb())
+    else:
+        await _safe_edit(callback, success_text, kb.back_kb())
     await callback.answer("Уровень повышен! 🎉")

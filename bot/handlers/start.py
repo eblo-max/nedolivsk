@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import texts
 from bot.db import repo
 from bot.game.balance import REGIONS
+from bot.handlers.common import send_tavern_screen
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -26,10 +27,7 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
     player = await repo.get_player(session, message.from_user.id)
     if player and player.tavern:
         await message.answer(texts.ALREADY_REGISTERED)
-        await message.answer(
-            texts.tavern_screen(player, player.tavern),
-            reply_markup=kb.tavern_kb(player),
-        )
+        await send_tavern_screen(message, player)
         return
 
     if not player:
@@ -84,8 +82,5 @@ async def tavern_region(
     await callback.message.edit_text(
         texts.CREATED.format(name=data["name"], region=REGIONS[region])
     )
-    await callback.message.answer(
-        texts.tavern_screen(player, player.tavern),
-        reply_markup=kb.tavern_kb(player),
-    )
+    await send_tavern_screen(callback.message, player)
     await callback.answer()
