@@ -54,7 +54,7 @@ CATALOG: dict[str, Building] = {
                     "дольше и платит охотнее.",
         cost={"gold": 500, "wood": 60, "clay": 30},
         build_hours=2, unlocks="блюда — отдельный спрос на сытость",
-        image="kuhnya",
+        image="kyxnya",
     ),
 }
 ORDER = ["mill", "brewery", "meadery", "kitchen"]
