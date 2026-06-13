@@ -34,7 +34,10 @@ class Player(Base):
     grain: Mapped[int] = mapped_column(default=10)
     hops: Mapped[int] = mapped_column(default=5)
 
-    # Текущая вылазка работников (за одним ресурсом)
+    # Бригады на вылазках (мультислот): [{resource, ends_at, notified}]
+    expeditions: Mapped[list] = mapped_column(JSONB, default=list)
+
+    # DEPRECATED: одиночная вылазка — перелита в expeditions (миграция в base.py)
     expedition_resource: Mapped[str | None] = mapped_column(String(16))
     expedition_ends_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)

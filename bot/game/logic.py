@@ -12,77 +12,97 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def expedition_state(player: Player) -> tuple[str, int]:
-    """Состояние вылазки: ("none"|"active"|"ready", минут до возвращения)."""
-    if player.expedition_resource is None or player.expedition_ends_at is None:
-        return "none", 0
-    left = (player.expedition_ends_at - _now()).total_seconds()
-    if left > 0:
-        return "active", int(left // 60) + 1
-    return "ready", 0
+def expedition_slots(tavern: Tavern) -> int:
+    """Число бригад (параллельных вылазок), растёт с уровнем таверны."""
+    level = tavern.level if tavern else 1
+    return 1 + (level - 1) // 3
+
+
+def _exps(player: Player) -> list:
+    return list(player.expeditions or [])
+
+
+@dataclass
+class ExpeditionCounts:
+    out: int = 0       # в пути
+    ready: int = 0     # вернулись, ждут забора
+    free: int = 0      # свободные слоты
+    total: int = 0     # всего слотов
+    next_minutes: int = 0  # до ближайшего возвращения
+
+
+def expedition_counts(player: Player, tavern: Tavern) -> ExpeditionCounts:
+    now = _now()
+    exps = _exps(player)
+    ready = out = 0
+    next_min = 0
+    for e in exps:
+        left = (datetime.fromisoformat(e["ends_at"]) - now).total_seconds()
+        if left > 0:
+            out += 1
+            m = int(left // 60) + 1
+            next_min = m if next_min == 0 else min(next_min, m)
+        else:
+            ready += 1
+    total = expedition_slots(tavern)
+    return ExpeditionCounts(
+        out=out, ready=ready, free=max(0, total - len(exps)),
+        total=total, next_minutes=next_min,
+    )
 
 
 @dataclass
 class ExpeditionStart:
     ok: bool
-    reason: str = ""  # busy | no_gold
+    reason: str = ""  # no_slot | no_gold
     pay: int = 0
 
 
-def start_expedition(player: Player, resource: str) -> ExpeditionStart:
-    """Отправить работников за одним ресурсом."""
-    state, _ = expedition_state(player)
-    if state != "none":
-        return ExpeditionStart(ok=False, reason="busy")
+def start_expedition(player: Player, tavern: Tavern, resource: str) -> ExpeditionStart:
+    """Отправить ещё одну бригаду за ресурсом, если есть свободный слот."""
+    exps = _exps(player)
+    if len(exps) >= expedition_slots(tavern):
+        return ExpeditionStart(ok=False, reason="no_slot")
 
-    level = player.tavern.level if player.tavern else 1
+    level = tavern.level if tavern else 1
     equipment = getattr(player, "equipment", None)
     pay = max(1, int(balance.worker_pay(level) * items.pay_multiplier(equipment)))
     if player.gold < pay:
         return ExpeditionStart(ok=False, reason="no_gold", pay=pay)
 
     player.gold -= pay
-    player.expedition_resource = resource
     hours = balance.EXPEDITION_HOURS * items.speed_multiplier(equipment)
-    player.expedition_ends_at = _now() + timedelta(hours=hours)
-    player.expedition_notified = False
+    exps.append({
+        "resource": resource,
+        "ends_at": (_now() + timedelta(hours=hours)).isoformat(),
+        "notified": False,
+    })
+    player.expeditions = exps
     return ExpeditionStart(ok=True, pay=pay)
 
 
-@dataclass
-class ExpeditionClaim:
-    ok: bool
-    reason: str = ""  # none | not_ready
-    minutes_left: int = 0
-    resource: str = ""
-    amount: int = 0
-    lucky: bool = False
-
-
-def claim_expedition(player: Player) -> ExpeditionClaim:
-    """Забрать добычу вернувшихся работников."""
-    state, minutes = expedition_state(player)
-    if state == "none":
-        return ExpeditionClaim(ok=False, reason="none")
-    if state == "active":
-        return ExpeditionClaim(ok=False, reason="not_ready", minutes_left=minutes)
-
-    resource = player.expedition_resource
+def claim_expeditions(player: Player) -> list[tuple[str, int, bool]]:
+    """Забрать всех вернувшихся бригад. Возвращает [(ресурс, кол-во, удача)]."""
+    now = _now()
     level = player.tavern.level if player.tavern else 1
     equipment = getattr(player, "equipment", None)
-    amount = balance.expedition_yield(resource, level, player.region)
-    amount = int(amount * items.yield_multiplier(equipment, resource))
-
-    # счастливая вылазка: шанс двойной добычи, удача повышает
-    luck = items.combat_stats(equipment)["luck"]
-    lucky = random.randint(1, 100) <= balance.lucky_chance(luck)
-    if lucky:
-        amount *= balance.LUCKY_MULT
-
-    inventory.add(player, resource, amount)
-    player.expedition_resource = None
-    player.expedition_ends_at = None
-    return ExpeditionClaim(ok=True, resource=resource, amount=amount, lucky=lucky)
+    kept: list = []
+    claimed: list[tuple[str, int, bool]] = []
+    for e in _exps(player):
+        if (datetime.fromisoformat(e["ends_at"]) - now).total_seconds() > 0:
+            kept.append(e)
+            continue
+        resource = e["resource"]
+        amount = balance.expedition_yield(resource, level, player.region)
+        amount = int(amount * items.yield_multiplier(equipment, resource))
+        luck = items.combat_stats(equipment)["luck"]
+        lucky = random.randint(1, 100) <= balance.lucky_chance(luck)
+        if lucky:
+            amount *= balance.LUCKY_MULT
+        inventory.add(player, resource, amount)
+        claimed.append((resource, amount, lucky))
+    player.expeditions = kept
+    return claimed
 
 
 @dataclass

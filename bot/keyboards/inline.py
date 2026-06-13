@@ -31,13 +31,14 @@ def regions_kb() -> InlineKeyboardMarkup:
 
 def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    state, _ = logic.expedition_state(player)
-    if state == "none":
-        kb.button(text="⛏ Отправить работников", callback_data="exp_menu")
-    elif state == "active":
-        kb.button(text="⏳ Работники в пути", callback_data="exp_status")
+    c = logic.expedition_counts(player, player.tavern)
+    if c.ready:
+        exp_label = f"🎒 Бригады вернулись ({c.ready})"
+    elif c.out:
+        exp_label = f"⏳ Бригады в пути ({c.out}/{c.total})"
     else:
-        kb.button(text="🎒 Забрать добычу", callback_data="exp_claim")
+        exp_label = "⛏ Отправить бригады"
+    kb.button(text=exp_label, callback_data="exp_menu")
     kb.button(text="💰 Собрать доход", callback_data="income")
     kb.button(text="📦 Склад", callback_data="warehouse")
     kb.button(text="🧍 Персонаж", callback_data="character")
@@ -48,16 +49,25 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
 
 
 def expedition_menu_kb(player: Player) -> InlineKeyboardMarkup:
-    level = player.tavern.level if player.tavern else 1
+    tavern = player.tavern
+    level = tavern.level if tavern else 1
+    c = logic.expedition_counts(player, tavern)
     kb = InlineKeyboardBuilder()
-    for res in balance.RESOURCES:
-        amount = balance.expedition_yield(res, level, player.region)
-        kb.button(
-            text=f"{RESOURCE_EMOJI[res]} {RESOURCE_NAMES[res]} (+{amount})",
-            callback_data=f"exp:{res}",
-        )
+    sizes: list[int] = []
+    if c.ready:
+        kb.button(text=f"🎒 Забрать вернувшихся ({c.ready})", callback_data="exp_claim")
+        sizes.append(1)
+    if c.free > 0:
+        for res in balance.RESOURCES:
+            amount = balance.expedition_yield(res, level, player.region)
+            kb.button(
+                text=f"{RESOURCE_EMOJI[res]} {RESOURCE_NAMES[res]} (+{amount})",
+                callback_data=f"exp:{res}",
+            )
+        sizes += [2] * (len(balance.RESOURCES) // 2)
     kb.button(text="↩️ Назад", callback_data="tavern")
-    kb.adjust(2)
+    sizes.append(1)
+    kb.adjust(*sizes)
     return kb.as_markup()
 
 

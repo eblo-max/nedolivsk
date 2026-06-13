@@ -68,15 +68,6 @@ async def cb_exp_menu(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session)
     if player is None:
         return
-    state, minutes = logic.expedition_state(player)
-    if state == "active":
-        await callback.answer(
-            texts.expedition_in_progress(minutes), show_alert=True
-        )
-        return
-    if state == "ready":
-        await callback.answer("Сначала забери добычу, раззява!", show_alert=True)
-        return
     await _safe_edit(
         callback, texts.expedition_menu(player), kb.expedition_menu_kb(player)
     )
@@ -93,10 +84,10 @@ async def cb_exp_start(callback: CallbackQuery, session: AsyncSession) -> None:
         await callback.answer()
         return
 
-    result = logic.start_expedition(player, resource)
+    result = logic.start_expedition(player, player.tavern, resource)
     if not result.ok:
-        if result.reason == "busy":
-            await callback.answer("Работники уже горбатятся, не дёргай их!", show_alert=True)
+        if result.reason == "no_slot":
+            await callback.answer(texts.expedition_no_slot(), show_alert=True)
         else:
             await callback.answer(
                 texts.expedition_no_gold(result.pay, player.gold), show_alert=True
@@ -104,23 +95,11 @@ async def cb_exp_start(callback: CallbackQuery, session: AsyncSession) -> None:
         return
 
     await _safe_edit(
-        callback, texts.expedition_started(resource, result.pay), kb.back_kb()
+        callback, texts.expedition_menu(player), kb.expedition_menu_kb(player)
     )
-    await callback.answer("Потопали!")
-
-
-@router.callback_query(F.data == "exp_status")
-async def cb_exp_status(callback: CallbackQuery, session: AsyncSession) -> None:
-    player = await _get_player(callback, session)
-    if player is None:
-        return
-    state, minutes = logic.expedition_state(player)
-    if state == "ready":
-        # Пока кнопка висела, работники успели вернуться — обновим экран
-        await _show_tavern(callback, player)
-        await callback.answer("Уже приползли!")
-        return
-    await callback.answer(texts.expedition_in_progress(minutes), show_alert=True)
+    await callback.answer(
+        f"Бригада ушла за {balance.RESOURCE_NAMES[resource].lower()} (−{result.pay} 🪙)"
+    )
 
 
 @router.callback_query(F.data == "exp_claim")
@@ -129,22 +108,14 @@ async def cb_exp_claim(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         return
 
-    result = logic.claim_expedition(player)
-    if not result.ok:
-        if result.reason == "not_ready":
-            await callback.answer(
-                texts.expedition_in_progress(result.minutes_left), show_alert=True
-            )
-        else:
-            await callback.answer("Работники никуда не ходили. Глаза разуй.", show_alert=True)
+    claimed = logic.claim_expeditions(player)
+    if not claimed:
+        await callback.answer("Бригады ещё не вернулись.", show_alert=True)
         return
 
-    await _safe_edit(
-        callback,
-        texts.expedition_claimed(result.resource, result.amount, result.lucky),
-        kb.back_kb(),
-    )
-    await callback.answer(f"🍀 +{result.amount}!" if result.lucky else f"+{result.amount}")
+    await _safe_edit(callback, texts.expedition_claimed(claimed), kb.back_kb())
+    total = sum(a for _, a, _ in claimed)
+    await callback.answer(f"+{total} на склад")
 
 
 @router.callback_query(F.data == "income")

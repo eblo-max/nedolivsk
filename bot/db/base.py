@@ -76,6 +76,17 @@ async def create_tables() -> None:
             "'wood', COALESCE(wood, 0), 'grain', COALESCE(grain, 0), "
             "'hops', COALESCE(hops, 0)) WHERE inventory IS NULL"
         ))
+        # Мультислот вылазок: одиночная вылазка -> список бригад
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "expeditions JSONB NOT NULL DEFAULT '[]'::jsonb"
+        ))
+        await conn.execute(text(
+            "UPDATE players SET expeditions = jsonb_build_array(jsonb_build_object("
+            "'resource', expedition_resource, 'ends_at', to_jsonb(expedition_ends_at), "
+            "'notified', expedition_notified)), expedition_resource = NULL "
+            "WHERE expedition_resource IS NOT NULL AND expeditions = '[]'::jsonb"
+        ))
         # Слот стройки пристроек
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS build_item VARCHAR(32)"

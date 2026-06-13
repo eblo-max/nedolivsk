@@ -34,23 +34,30 @@ async def _notify_returned(bot: Bot) -> None:
     async with session_factory() as session:
         result = await session.execute(
             select(Player)
-            .where(
-                Player.expedition_resource.is_not(None),
-                Player.expedition_ends_at <= now,
-                Player.expedition_notified.is_(False),
-            )
+            .where(Player.expeditions != [])
             .with_for_update(skip_locked=True)
         )
         for player in result.scalars().all():
+            newly: list[str] = []
+            new_exps = []
+            for e in (player.expeditions or []):
+                ready = datetime.fromisoformat(e["ends_at"]) <= now
+                if ready and not e.get("notified"):
+                    newly.append(e["resource"])
+                    new_exps.append({**e, "notified": True})
+                else:
+                    new_exps.append(e)
+            if not newly:
+                continue
             try:
                 await bot.send_message(
                     player.id,
-                    texts.expedition_returned(player.expedition_resource),
+                    texts.expedition_returned(newly),
                     reply_markup=claim_kb(),
                 )
             except Exception:  # заблокировал бота и т.п. — не повторяем
                 logger.warning("Не доставлено уведомление игроку %s", player.id)
-            player.expedition_notified = True
+            player.expeditions = new_exps
 
         result = await session.execute(
             select(Player)

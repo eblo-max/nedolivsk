@@ -369,17 +369,20 @@ def malt_ready_notification() -> str:
 
 def tavern_screen(player: Player, tavern: Tavern) -> str:
     region = balance.REGIONS.get(player.region, player.region)
-    state, minutes = logic.expedition_state(player)
-    if state == "active":
-        res = player.expedition_resource
+    c = logic.expedition_counts(player, tavern)
+    if c.ready and c.out:
         exp_line = (
-            f"\n⏳ Работники горбатятся за {RESOURCE_EMOJI[res]} "
-            f"{RESOURCE_NAMES[res].lower()} — приползут через {_fmt_minutes(minutes)}.\n"
+            f"\n🎒 Вернулось бригад: {c.ready}, ещё {c.out} в пути. Забирай добычу!\n"
         )
-    elif state == "ready":
-        exp_line = "\n🎒 Работники приволокли добычу — забирай, пока не пропили!\n"
+    elif c.ready:
+        exp_line = f"\n🎒 Бригады вернулись ({c.ready}) — забирай, пока не пропили!\n"
+    elif c.out:
+        exp_line = (
+            f"\n⏳ Бригад в пути: {c.out}/{c.total}, ближайшая через "
+            f"{_fmt_minutes(c.next_minutes)}.\n"
+        )
     else:
-        exp_line = "\n😴 Работники дрыхнут на сене. Пни их — пусть пользу приносят.\n"
+        exp_line = f"\n😴 Все бригады ({c.total}) дрыхнут на сене. Гони за ресурсами.\n"
 
     build_line = _build_line(player)
 
@@ -444,13 +447,22 @@ def storehouse_caption(player: Player, tavern: Tavern) -> str:
 
 
 def expedition_menu(player: Player) -> str:
-    level = player.tavern.level if player.tavern else 1
+    tavern = player.tavern
+    level = tavern.level if tavern else 1
     pay = balance.worker_pay(level)
+    c = logic.expedition_counts(player, tavern)
     return (
-        "⛏ <b>Куда гнать работников?</b>\n\n"
-        f"Ходка — {balance.EXPEDITION_HOURS} ч. Плата — {pay} 🪙 вперёд, "
-        "и попробуй не заплати.\n"
-        "Один ресурс за раз: жадность в Недоливске не лечится."
+        "⛏ <b>Бригады работников</b>\n"
+        f"Свободно: {c.free}/{c.total} · в пути: {c.out} · вернулись: {c.ready}\n\n"
+        f"Ходка — {balance.EXPEDITION_HOURS} ч, плата {pay} 🪙 за бригаду вперёд. "
+        "Гони сразу несколько — кто за чем."
+    )
+
+
+def expedition_no_slot() -> str:
+    return (
+        "Все бригады уже в деле. Больше работников нет — "
+        "расти таверну, наймёшь ещё."
     )
 
 
@@ -476,20 +488,19 @@ def expedition_in_progress(minutes: int) -> str:
     )
 
 
-def expedition_claimed(resource: str, amount: int, lucky: bool = False) -> str:
-    if lucky:
-        return (
-            f"🍀 <b>Счастливая вылазка!</b>\n\n"
-            f"Работники наткнулись на нетронутую делянку — "
-            f"добыча двойная!\n"
-            f"{RESOURCE_EMOJI[resource]} {RESOURCE_NAMES[resource]}: +{amount}\n\n"
-            "Сегодня даже крысы на складе аплодируют."
-        )
-    return (
-        f"🎒 <b>Добыча на складе!</b>\n\n"
-        f"{RESOURCE_EMOJI[resource]} {RESOURCE_NAMES[resource]}: +{amount}\n\n"
-        "Работники утёрли пот и ждут новых приказов."
-    )
+def expedition_claimed(claimed: list) -> str:
+    """claimed: [(ресурс, количество, удача)]."""
+    if not claimed:
+        return "Никто пока не вернулся."
+    lines = ["🎒 <b>Бригады вернулись с добычей!</b>\n"]
+    any_lucky = False
+    for resource, amount, lucky in claimed:
+        mark = " 🍀" if lucky else ""
+        any_lucky = any_lucky or lucky
+        lines.append(f"{RESOURCE_EMOJI[resource]} {RESOURCE_NAMES[resource]}: +{amount}{mark}")
+    if any_lucky:
+        lines.append("\n🍀 Кому-то улыбнулась удача — двойная добыча!")
+    return "\n".join(lines)
 
 
 RESOURCE_INSTRUMENTAL = {
@@ -506,10 +517,13 @@ RESOURCE_INSTRUMENTAL = {
 }
 
 
-def expedition_returned(resource: str) -> str:
+def expedition_returned(resources: list) -> str:
+    """resources: список ключей ресурсов вернувшихся бригад."""
+    names = ", ".join(
+        f"{RESOURCE_EMOJI[r]} {RESOURCE_INSTRUMENTAL[r]}" for r in resources
+    )
     return (
-        f"🔔 Работники приволокли {RESOURCE_EMOJI[resource]} "
-        f"{RESOURCE_INSTRUMENTAL[resource]}!\n"
+        f"🔔 Бригады вернулись с {names}!\n"
         "Забирай быстрее, пока крысы не растащили, а пьянь не спёрла."
     )
 
