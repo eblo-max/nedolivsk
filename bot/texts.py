@@ -189,6 +189,56 @@ def build_ready_notification(building) -> str:
     )
 
 
+# ===== Производство =====
+
+def production_screen(building, player: Player, tavern: Tavern) -> str:
+    from bot.game import production as prod
+
+    head = f"{building.emoji} <b>{building.name}</b>\n<i>{building.description}</i>\n"
+    if building.id == "mill":
+        malt = inventory.get(player, "malt")
+        level = tavern.level
+        cin = prod.mill_inputs(level)
+        out = prod.mill_output(level)
+        state, minutes = prod.state(tavern, "mill")
+        if state == "active":
+            status = f"⏳ Мелется — ещё {_fmt_minutes(minutes)}."
+        elif state == "ready":
+            status = "🌱 Солод готов — забирай!"
+        else:
+            status = "😴 Жернова простаивают."
+        return (
+            head +
+            f"\n🌱 Солод на складе: {malt}\n"
+            f"{status}\n\n"
+            f"Помол (ур. {level}): 🌾 {cin['grain']} → 🌱 {out} солода, "
+            f"{prod.MILL_MINUTES} мин\n"
+            f"В закромах: 🌾 {inventory.get(player, 'grain')}"
+        )
+    return head + "\nПроизводство этого здания — скоро."
+
+
+def mill_started(amount: int, minutes: int) -> str:
+    return (
+        f"🌾 Жернова закрутились. Будет ~{amount} 🌱 солода через "
+        f"{_fmt_minutes(minutes)}. Мельник уже тянется к кружке."
+    )
+
+
+def mill_not_enough(cin: dict) -> str:
+    return (
+        f"😕 Зерна мало: на помол нужно 🌾 {cin['grain']}. "
+        "Гони работников в поля."
+    )
+
+
+def malt_ready_notification() -> str:
+    return (
+        "🌱 <b>Солод смолот!</b> Забирай с мельницы — "
+        "и в пивоварню, пока мыши не добрались."
+    )
+
+
 def tavern_screen(player: Player, tavern: Tavern) -> str:
     region = balance.REGIONS.get(player.region, player.region)
     state, minutes = logic.expedition_state(player)

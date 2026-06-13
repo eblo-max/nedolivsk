@@ -75,6 +75,7 @@ class Tavern(Base):
 
     upgrades: Mapped[dict] = mapped_column(JSONB, default=dict)
     buildings: Mapped[list] = mapped_column(JSONB, default=list)
+    production: Mapped[dict] = mapped_column(JSONB, default=dict)  # партии зданий
 
     last_income_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     map_slot: Mapped[int | None] = mapped_column(unique=True)

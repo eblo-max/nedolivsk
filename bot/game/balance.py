@@ -22,6 +22,10 @@ RESOURCE_EMOJI = {
     "berries": "🍒", "game": "🥩", "ore": "⛏", "clay": "🪨", "herbs": "🌶",
 }
 
+# Полуфабрикаты/продукты (не добываются вылазками, но имеют имя и ценность)
+GOODS_NAMES = {"malt": "Солод"}
+GOODS_EMOJI = {"malt": "🌱"}
+
 # Стартовые запасы новой таверны
 STARTING_INVENTORY = {"wood": 10, "grain": 10, "hops": 5}
 
@@ -116,6 +120,8 @@ def reputation_for_upgrade(new_level: int) -> int:
 RESOURCE_PRICE = {
     "water": 1.0, "wood": 2.0, "clay": 2.0, "grain": 2.5, "berries": 3.0,
     "hops": 4.0, "herbs": 4.5, "honey": 6.0, "game": 6.5, "ore": 7.0,
+    # полуфабрикаты (для ВВП): солод дороже зерна, из которого смолот
+    "malt": 3.5,
 }
 
 

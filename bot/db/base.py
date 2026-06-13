@@ -83,3 +83,8 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS build_ends_at TIMESTAMPTZ"
         ))
+        # Производство на пристройках (партии зданий)
+        await conn.execute(text(
+            "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS "
+            "production JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))

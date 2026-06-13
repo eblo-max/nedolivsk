@@ -175,3 +175,18 @@ def buildings_notify_kb() -> InlineKeyboardMarkup:
     kb.button(text="🏠 К таверне", callback_data="tavern")
     kb.adjust(1)
     return kb.as_markup()
+
+
+def production_kb(player, tavern, building) -> InlineKeyboardMarkup:
+    from bot.game import production as prod
+
+    kb = InlineKeyboardBuilder()
+    state, _ = prod.state(tavern, building.id)
+    if building.id == "mill":
+        if state == "ready":
+            kb.button(text="🌱 Забрать солод", callback_data="prod_claim:mill")
+        elif state == "none":
+            kb.button(text="🌾 Молоть солод", callback_data="prod_make:mill")
+    kb.button(text="↩️ К пристройкам", callback_data="buildings")
+    kb.adjust(1)
+    return kb.as_markup()

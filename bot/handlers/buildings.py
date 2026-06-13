@@ -7,9 +7,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import buildings
+from bot.game import buildings, production
 from bot.handlers import common
 from bot.keyboards import inline as kb
+
+
+async def _show_production(callback: CallbackQuery, player: Player, building) -> None:
+    img = images.named_image(building.image) if building.image else None
+    await common.show_image_panel(
+        callback.message,
+        img,
+        texts.production_screen(building, player, player.tavern),
+        kb.production_kb(player, player.tavern, building),
+        callback.from_user.id,
+    )
 
 router = Router()
 
@@ -47,6 +58,11 @@ async def cb_build_open(callback: CallbackQuery, session: AsyncSession) -> None:
         return
     building = buildings.CATALOG.get(callback.data.split(":", 1)[1])
     if building is None:
+        await callback.answer()
+        return
+    # построенное здание с производством → сразу экран производства
+    if buildings.is_built(player.tavern, building.id) and building.id in production.PRODUCERS:
+        await _show_production(callback, player, building)
         await callback.answer()
         return
     img = images.named_image(building.image) if building.image else None
@@ -92,3 +108,50 @@ async def cb_build_make(callback: CallbackQuery, session: AsyncSession) -> None:
         kb.buildings_back_kb(),
     )
     await callback.answer("Заложили фундамент!")
+
+
+@router.callback_query(F.data.startswith("prod_make:"))
+async def cb_prod_make(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session, lock=True)
+    if player is None:
+        return
+    bid = callback.data.split(":", 1)[1]
+    if bid != "mill":
+        await callback.answer()
+        return
+    ok, reason, cin = production.start_mill(player, player.tavern)
+    if not ok:
+        if reason == "not_enough":
+            await callback.answer(texts.mill_not_enough(cin), show_alert=True)
+        else:
+            await callback.answer("Жернова уже крутятся.", show_alert=True)
+        return
+    building = buildings.CATALOG["mill"]
+    await common.caption_edit(
+        callback.message,
+        texts.production_screen(building, player, player.tavern),
+        kb.production_kb(player, player.tavern, building),
+    )
+    await callback.answer("Закрутились!")
+
+
+@router.callback_query(F.data.startswith("prod_claim:"))
+async def cb_prod_claim(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session, lock=True)
+    if player is None:
+        return
+    bid = callback.data.split(":", 1)[1]
+    if bid != "mill":
+        await callback.answer()
+        return
+    amount = production.claim_mill(player, player.tavern)
+    if amount <= 0:
+        await callback.answer("Солод ещё не готов.", show_alert=True)
+        return
+    building = buildings.CATALOG["mill"]
+    await common.caption_edit(
+        callback.message,
+        texts.production_screen(building, player, player.tavern),
+        kb.production_kb(player, player.tavern, building),
+    )
+    await callback.answer(f"🌱 +{amount} солода")
