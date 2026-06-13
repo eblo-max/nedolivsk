@@ -6,6 +6,7 @@ from aiogram.types import Message
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot import announce
 from bot.config import settings
 from bot.db import repo
 from bot.db.models import Player, Tavern
@@ -49,7 +50,10 @@ async def cmd_fair(message: Message, session: AsyncSession) -> None:
         return
     world = await repo.get_or_create_world(session)
     wld.open_fair(world)
+    await session.flush()  # зафиксировать состояние мира до рассылки
+    chat_ids = await repo.all_chat_ids(session)
+    await announce.broadcast_fair(message.bot, "open", chat_ids, world)
     await message.answer(
         f"🎪 Ярмарка открыта вручную на {balance.FAIR_DURATION_HOURS} ч. "
-        f"Спрос ×{balance.FAIR_DEMAND_MULT:g}."
+        f"Спрос ×{balance.FAIR_DEMAND_MULT:g}. Анонс ушёл в чаты: {len(chat_ids)}."
     )
