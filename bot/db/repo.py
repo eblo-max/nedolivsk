@@ -28,6 +28,13 @@ async def remember_chat(
         chat.title = title
 
 
+async def forget_chat(session: AsyncSession, chat_id: int) -> None:
+    """Забыть чат (бота выгнали/вышел) — чтобы не слать в пустоту."""
+    chat = await session.get(KnownChat, chat_id)
+    if chat is not None:
+        await session.delete(chat)
+
+
 async def all_chat_ids(session: AsyncSession) -> list[int]:
     """Все известные общие чаты — куда слать анонсы."""
     result = await session.execute(select(KnownChat.chat_id))

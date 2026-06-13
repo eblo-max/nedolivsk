@@ -6,7 +6,7 @@
 
 from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import ChatMemberUpdated, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import autoclean, texts
@@ -73,6 +73,20 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
         await common.open_forge(message, player, owner)
     else:  # tavern
         await common.open_tavern(message, player, owner)
+
+
+@router.my_chat_member(F.chat.type.in_({"group", "supergroup"}))
+async def track_bot_membership(
+    event: ChatMemberUpdated, session: AsyncSession
+) -> None:
+    """Авто-учёт чатов: бота добавили/повысили — запоминаем как адресата
+    анонсов; выгнали/вышел — забываем. remember_chat — идемпотентный upsert,
+    так что повторные апдейты безопасны."""
+    status = event.new_chat_member.status
+    if status in ("member", "administrator", "creator"):
+        await repo.remember_chat(session, event.chat.id, event.chat.title)
+    elif status in ("left", "kicked"):
+        await repo.forget_chat(session, event.chat.id)
 
 
 @router.message(Command("start", "tavern", "play"))
