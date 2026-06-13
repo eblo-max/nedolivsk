@@ -68,8 +68,12 @@ async def cb_exp_menu(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session)
     if player is None:
         return
-    await _safe_edit(
-        callback, texts.expedition_menu(player), kb.expedition_menu_kb(player)
+    await common.show_image_panel(
+        callback.message,
+        images.named_image("brigada"),
+        texts.expedition_menu(player),
+        kb.expedition_menu_kb(player),
+        callback.from_user.id,
     )
     await callback.answer()
 
