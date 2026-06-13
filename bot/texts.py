@@ -58,6 +58,8 @@ GROUP_HELP = (
     "• <b>гг кузница</b> — заказать снаряжение\n"
     "• <b>гг карта</b> — карта мира\n"
     "• <b>гг топ</b> — доска почёта\n"
+    "• <b>гг хроника</b> — летопись города\n"
+    "• <b>гг репутация</b> — как тебя знают горожане\n"
     "• <b>гг правила</b> — как вообще играть\n"
     "Кнопки чужой панели жать нельзя — только хозяин."
 )
@@ -123,6 +125,68 @@ RULES = (
 )
 
 ALREADY_REGISTERED = "У тебя уже есть кабак, забыл? Вот он:"
+
+
+def _rel_label(v: int) -> str:
+    if v >= 40:
+        return "души не чает ❤️"
+    if v >= 15:
+        return "уважает 🙂"
+    if v > 0:
+        return "приглядывается 👀"
+    if v > -15:
+        return "косится 😒"
+    if v > -40:
+        return "недоволен 😠"
+    return "люто ненавидит 😡"
+
+
+def _faction_label(v: int) -> str:
+    if v >= 50:
+        return "в доску свои 🤝"
+    if v >= 25:
+        return "благоволят 🙂"
+    if v > 0:
+        return "терпят 😐"
+    if v > -25:
+        return "косо смотрят 😒"
+    return "вне закона ☠️"
+
+
+def citizens_screen(player) -> str:
+    """Репутация игрока у горожан и фракций (видимая память)."""
+    from bot.game import factions, npc
+
+    st = player.story or {}
+    lines = ["👥 <b>Горожане Недоливска</b>", ""]
+
+    known = [(nid, v) for nid, v in st.get("npc_rel", {}).items() if v != 0]
+    if known:
+        lines.append("<b>Как к тебе относятся:</b>")
+        for nid, v in sorted(known, key=lambda x: -x[1]):
+            lines.append(f"{npc.label(nid)} — {_rel_label(v)}")
+    else:
+        lines.append("Тебя тут пока не знают. Поживёшь — приметят.")
+
+    facs = [(f, v) for f, v in st.get("faction", {}).items() if v != 0]
+    if facs:
+        lines += ["", "🏛 <b>Фракции:</b>"]
+        for f, v in sorted(facs, key=lambda x: -x[1]):
+            lines.append(f"{factions.name(f)} — {_faction_label(v)}")
+    return "\n".join(lines)
+
+
+def chronicle_screen(entries: list[str]) -> str:
+    """Летопись города — лента заметных событий."""
+    if not entries:
+        return (
+            "📜 <b>Хроники Недоливска</b>\n\n"
+            "Летопись чиста, как совесть младенца. Пока тут не стряслось "
+            "ничего, достойного пера."
+        )
+    # Экран персонажа — фото; подпись ≤1024, поэтому строки подрезаем.
+    body = "\n".join(f"• {e[:90]}" for e in entries[:10])
+    return f"📜 <b>Хроники Недоливска</b>\n\n{body}"
 
 
 def craft_line(player) -> str:

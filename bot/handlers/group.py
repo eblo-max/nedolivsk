@@ -29,6 +29,8 @@ SECTIONS = {
     "гг топ": "rating", "гг рейтинг": "rating",
     "гг помощь": "help", "гг команды": "help",
     "гг правила": "rules", "гг как играть": "rules",
+    "гг хроника": "chronicle", "гг летопись": "chronicle",
+    "гг репутация": "citizens", "гг горожане": "citizens",
 }
 
 
@@ -61,6 +63,10 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
     if section == "rating":
         autoclean.schedule_message(await show_rating(message, session))
         return
+    if section == "chronicle":
+        entries = await repo.recent_chronicle(session, message.chat.id, 10)
+        autoclean.schedule_message(await message.reply(texts.chronicle_screen(entries)))
+        return
 
     player = await repo.get_player(session, message.from_user.id)
     if not player or not player.tavern:
@@ -68,6 +74,10 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
         return
 
     player.chat_id = message.chat.id  # домашний чат — сюда шлём уведомления
+
+    if section == "citizens":
+        autoclean.schedule_message(await message.reply(texts.citizens_screen(player)))
+        return
 
     # панели сами планируют свою подчистку (см. common._register_panel)
     owner = message.from_user.id

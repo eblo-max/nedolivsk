@@ -7,13 +7,41 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import autoclean, panels
+from bot import autoclean, panels, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import story_engine, story_state
+from bot.handlers import common
 from bot.keyboards import inline as kb
 
 router = Router()
+
+
+@router.callback_query(F.data == "citizens")
+async def cb_citizens(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await repo.get_player(session, callback.from_user.id)
+    if player is None:
+        await callback.answer()
+        return
+    await common.caption_edit(
+        callback.message, texts.citizens_screen(player), kb.citizens_kb()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "chronicle")
+async def cb_chronicle(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await repo.get_player(session, callback.from_user.id)
+    if player is None:
+        await callback.answer()
+        return
+    entries: list[str] = []
+    if player.chat_id is not None:
+        entries = await repo.recent_chronicle(session, player.chat_id, 10)
+    await common.caption_edit(
+        callback.message, texts.chronicle_screen(entries), kb.chronicle_kb()
+    )
+    await callback.answer()
 
 
 async def deliver_pending(message: Message, player: Player, owner_id: int) -> None:

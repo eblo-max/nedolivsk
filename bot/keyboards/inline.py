@@ -107,7 +107,24 @@ def character_kb(craft_ready: bool = False) -> InlineKeyboardMarkup:
     if craft_ready:
         kb.button(text="🎁 Забрать у мастера", callback_data="craft_claim")
     kb.button(text="⚒ Кузница", callback_data="forge")
+    kb.button(text="👥 Горожане", callback_data="citizens")
     kb.button(text="🏠 К таверне", callback_data="tavern_new")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def citizens_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📜 Хроника города", callback_data="chronicle")
+    kb.button(text="🧍 Персонаж", callback_data="character")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def chronicle_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="👥 Горожане", callback_data="citizens")
+    kb.button(text="🏠 К таверне", callback_data="tavern")
     kb.adjust(1)
     return kb.as_markup()
 
