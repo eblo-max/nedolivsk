@@ -16,6 +16,31 @@ from bot.game.balance import RESOURCE_NAMES, RESOURCES
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
 BG_FILE = ASSETS_DIR / "tablica.png"
+RESURS_DIR = ASSETS_DIR / "resurs"
+
+# id ресурса -> имя файла иконки (assets/resurs/<name>.png, прозрачный фон)
+SPRITES = {
+    "wood": "derevo", "grain": "zerno", "hops": "xmel", "water": "voda",
+    "honey": "med", "berries": "yagodi", "game": "dich", "ore": "ruda",
+    "clay": "glina", "herbs": "trava",
+}
+_sprite_cache: dict[str, "Image.Image | None"] = {}
+
+
+def _sprite(res: str) -> "Image.Image | None":
+    """Иконка ресурса, обрезанная по непрозрачной области. Кэшируется."""
+    if res in _sprite_cache:
+        return _sprite_cache[res]
+    name = SPRITES.get(res)
+    p = RESURS_DIR / f"{name}.png" if name else None
+    img = None
+    if p and p.is_file():
+        im = Image.open(p).convert("RGBA")
+        solid = im.getchannel("A").point(lambda v: 255 if v > 40 else 0)
+        bbox = solid.getbbox()
+        img = im.crop(bbox) if bbox else im
+    _sprite_cache[res] = img
+    return img
 
 # Ячейки (x1, y1, x2, y2) на фоне 1024x1024 — сняты автодетектом по заливке.
 CELLS = {
@@ -78,16 +103,28 @@ def render(inventory: dict | None) -> bytes:
     for idx, res in enumerate(RESOURCES, 1):
         x1, y1, x2, y2 = CELLS[idx]
         cx, w, h = (x1 + x2) // 2, x2 - x1, y2 - y1
-        name = RESOURCE_NAMES[res]
         qty = str(int(inv.get(res, 0)))
 
-        nf = _fit_font(d, name, w - 4, 22, 11)
-        nw = d.textlength(name, font=nf)
-        d.text((cx - nw / 2, y1 + h * 0.28), name, font=nf, fill=NAME_COLOR)
+        sprite = _sprite(res)
+        if sprite is not None:
+            iw_max, ih_max = w - 8, int(h * 0.60)
+            scale = min(iw_max / sprite.width, ih_max / sprite.height)
+            sp = sprite.resize(
+                (max(1, int(sprite.width * scale)), max(1, int(sprite.height * scale))),
+                Image.LANCZOS,
+            )
+            px = x1 + (w - sp.width) // 2
+            py = y1 + 6 + (ih_max - sp.height) // 2
+            base.alpha_composite(sp, (px, py))
+        else:  # нет иконки — пишем название текстом
+            name = RESOURCE_NAMES[res]
+            nf = _fit_font(d, name, w - 4, 22, 11)
+            d.text((cx - d.textlength(name, font=nf) / 2, y1 + h * 0.28),
+                   name, font=nf, fill=NAME_COLOR)
 
-        qf = _fit_font(d, qty, w - 6, 42, 18, bold=True)
+        qf = _fit_font(d, qty, w - 6, 34, 16, bold=True)
         qw = d.textlength(qty, font=qf)
-        d.text((cx - qw / 2, y1 + h * 0.50), qty, font=qf, fill=QTY_COLOR)
+        d.text((cx - qw / 2, y1 + h * 0.66), qty, font=qf, fill=QTY_COLOR)
 
     out = io.BytesIO()
     base.convert("RGB").save(out, "JPEG", quality=88, optimize=True)
