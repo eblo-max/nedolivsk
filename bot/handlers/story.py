@@ -69,8 +69,13 @@ async def _edit(callback: CallbackQuery, text: str, markup) -> None:
 @router.callback_query(F.data == "event_open")
 async def cb_event_open(callback: CallbackQuery, session: AsyncSession) -> None:
     """Вернуться к незакрытому событию (кнопка «Тебя ждёт гость»)."""
-    player = await repo.get_player(session, callback.from_user.id)
-    if player is None or story_engine.pending_storylet(player) is None:
+    player = await repo.get_player(session, callback.from_user.id, for_update=True)
+    if player is None:
+        await callback.answer()
+        return
+    if story_engine.pending_storylet(player) is None:
+        if story_state.get_pending(player):  # висит несуществующий сторилет — снять
+            story_state.clear_pending(player)
         await callback.answer("Гость уже ушёл.", show_alert=True)
         return
     await deliver_pending(callback.message, player, callback.from_user.id)
@@ -87,6 +92,13 @@ async def cb_event(callback: CallbackQuery, session: AsyncSession) -> None:
     s = story_engine.pending_storylet(player)
     arg = callback.data.split(":", 1)[1]
 
+    if s is None:
+        # Нет события или висит исчезнувший между деплоями сторилет — снять.
+        if story_state.get_pending(player):
+            story_state.clear_pending(player)
+        await callback.answer("Событие уже отыграло.", show_alert=True)
+        return
+
     if arg == "skip":
         # Откладываем, не теряем: гость ждёт, вернуться можно кнопкой «🔔».
         await _edit(
@@ -97,9 +109,6 @@ async def cb_event(callback: CallbackQuery, session: AsyncSession) -> None:
         await callback.answer()
         return
 
-    if s is None:
-        await callback.answer("Событие уже отыграло.", show_alert=True)
-        return
     if not arg.isdigit() or int(arg) >= len(s.choices):
         await callback.answer()
         return
@@ -107,7 +116,7 @@ async def cb_event(callback: CallbackQuery, session: AsyncSession) -> None:
     now = datetime.now(timezone.utc)
     city = None
     if player.chat_id is not None:
-        city = await repo.get_or_create_city(session, player.chat_id)
+        city = await repo.get_or_create_city(session, player.chat_id, lock=True)
     shielded = story_state.is_shielded(player, now)
 
     outcome, ctx = story_engine.resolve(

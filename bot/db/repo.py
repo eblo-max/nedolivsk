@@ -43,9 +43,13 @@ async def all_chat_ids(session: AsyncSession) -> list[int]:
     return [row[0] for row in result.all()]
 
 
-async def get_or_create_city(session: AsyncSession, chat_id: int) -> CityState:
-    """Состояние живого города для конкретного чата (ленивое создание)."""
-    city = await session.get(CityState, chat_id)
+async def get_or_create_city(
+    session: AsyncSession, chat_id: int, *, lock: bool = False
+) -> CityState:
+    """Состояние живого города для конкретного чата (ленивое создание).
+    lock=True блокирует строку до конца транзакции — для безопасной правки
+    силы фракций при одновременных событиях."""
+    city = await session.get(CityState, chat_id, with_for_update=lock)
     if city is None:
         city = CityState(chat_id=chat_id)
         session.add(city)
