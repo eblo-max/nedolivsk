@@ -50,6 +50,6 @@ class PanelGuardMiddleware(BaseMiddleware):
                     "Не лапай чужой кабак! Открой свой: «гг таверна».", show_alert=True
                 )
                 return None
-            # владелец что-то нажал — продлеваем жизнь панели ещё на 30 сек
+            # владелец что-то нажал — продлеваем жизнь панели ещё на 2 минуты
             autoclean.schedule(msg.bot, msg.chat.id, msg.message_id)
         return await handler(event, data)
