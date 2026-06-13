@@ -1,13 +1,14 @@
 """Фоновые уведомления: работники вернулись с вылазки."""
 
 import asyncio
+import html
 import logging
 from datetime import datetime, timezone
 
 from aiogram import Bot
 from sqlalchemy import select
 
-from bot import announce, texts
+from bot import announce, panels, texts
 from bot.db import repo
 from bot.db.base import session_factory
 from bot.db.models import Player, Tavern
@@ -17,6 +18,28 @@ from bot.keyboards.inline import buildings_notify_kb, claim_kb, craft_claim_kb
 CHECK_INTERVAL_SECONDS = 60
 
 logger = logging.getLogger(__name__)
+
+
+async def _notify(bot: Bot, player: Player, text: str, markup) -> None:
+    """Уведомление игроку. Если известен «домашний» чат (заходил через «гг») —
+    постим туда с упоминанием и регистрируем сообщение как панель игрока, чтобы
+    к кнопке пускало только владельца (PanelGuard). Иначе или при сбое — в личку."""
+    if player.chat_id is not None:
+        name = html.escape(player.first_name or "Хозяин")
+        body = f'<a href="tg://user?id={player.id}">{name}</a>!\n{text}'
+        try:
+            msg = await bot.send_message(player.chat_id, body, reply_markup=markup)
+            panels.claim(msg, player.id)  # кнопку жмёт только владелец
+            return
+        except Exception:  # noqa: BLE001 — бота нет в чате/чат удалён
+            logger.warning(
+                "Увед. в чат %s игроку %s не ушло, шлю в личку",
+                player.chat_id, player.id,
+            )
+    try:
+        await bot.send_message(player.id, text, reply_markup=markup)
+    except Exception:  # noqa: BLE001 — заблокировал бота и т.п.
+        logger.warning("Уведомление игроку %s не доставлено", player.id)
 
 
 async def notifier_loop(bot: Bot) -> None:
@@ -55,14 +78,7 @@ async def _notify_returned(bot: Bot) -> None:
                     new_exps.append(e)
             if not newly:
                 continue
-            try:
-                await bot.send_message(
-                    player.id,
-                    texts.expedition_returned(newly),
-                    reply_markup=claim_kb(),
-                )
-            except Exception:  # заблокировал бота и т.п. — не повторяем
-                logger.warning("Не доставлено уведомление игроку %s", player.id)
+            await _notify(bot, player, texts.expedition_returned(newly), claim_kb())
             player.expeditions = new_exps
 
         result = await session.execute(
@@ -78,14 +94,10 @@ async def _notify_returned(bot: Bot) -> None:
             item_id, tier = parse_entry(player.craft_item)
             item = CATALOG.get(item_id)
             if item is not None:
-                try:
-                    await bot.send_message(
-                        player.id,
-                        texts.craft_ready_notification(item, tier),
-                        reply_markup=craft_claim_kb(),
-                    )
-                except Exception:
-                    logger.warning("Не доставлен крафт игроку %s", player.id)
+                await _notify(
+                    bot, player,
+                    texts.craft_ready_notification(item, tier), craft_claim_kb(),
+                )
             player.craft_notified = True
 
         from bot.game import buildings as bld
@@ -99,14 +111,10 @@ async def _notify_returned(bot: Bot) -> None:
             building = bld.finalize_build(player, player.tavern)  # завершаем стройку
             if building is None:
                 continue
-            try:
-                await bot.send_message(
-                    player.id,
-                    texts.build_ready_notification(building),
-                    reply_markup=buildings_notify_kb(),
-                )
-            except Exception:
-                logger.warning("Не доставлено о стройке игроку %s", player.id)
+            await _notify(
+                bot, player,
+                texts.build_ready_notification(building), buildings_notify_kb(),
+            )
 
         from bot.game import production as prod
 
@@ -129,12 +137,7 @@ async def _notify_returned(bot: Bot) -> None:
                         texts.brew_ready_notification(tier) if phase == "ready"
                         else texts.brew_aged_notification(tier)
                     )
-                    try:
-                        await bot.send_message(
-                            player.id, msg, reply_markup=buildings_notify_kb()
-                        )
-                    except Exception:
-                        logger.warning("Не доставлено о варке игроку %s", player.id)
+                    await _notify(bot, player, msg, buildings_notify_kb())
                     new = dict(tavern.production)
                     new["brewery"] = {**bbatch, "notified": stage}
                     tavern.production = new
@@ -143,13 +146,10 @@ async def _notify_returned(bot: Bot) -> None:
             if (mbatch and not mbatch.get("notified")
                     and prod.state(tavern, "meadery")[0] == "ready"):
                 recipe = mbatch.get("recipe", "mead")
-                try:
-                    await bot.send_message(
-                        player.id, texts.meadery_ready_notification(recipe),
-                        reply_markup=buildings_notify_kb(),
-                    )
-                except Exception:
-                    logger.warning("Не доставлено о медовухе игроку %s", player.id)
+                await _notify(
+                    bot, player,
+                    texts.meadery_ready_notification(recipe), buildings_notify_kb(),
+                )
                 new = dict(tavern.production)
                 new["meadery"] = {**mbatch, "notified": True}
                 tavern.production = new
@@ -157,13 +157,10 @@ async def _notify_returned(bot: Bot) -> None:
             kbatch = (tavern.production or {}).get("kitchen")
             if (kbatch and not kbatch.get("notified")
                     and prod.state(tavern, "kitchen")[0] == "ready"):
-                try:
-                    await bot.send_message(
-                        player.id, texts.kitchen_ready_notification(),
-                        reply_markup=buildings_notify_kb(),
-                    )
-                except Exception:
-                    logger.warning("Не доставлено о кухне игроку %s", player.id)
+                await _notify(
+                    bot, player,
+                    texts.kitchen_ready_notification(), buildings_notify_kb(),
+                )
                 new = dict(tavern.production)
                 new["kitchen"] = {**kbatch, "notified": True}
                 tavern.production = new
@@ -171,13 +168,10 @@ async def _notify_returned(bot: Bot) -> None:
             wbatch = (tavern.production or {}).get("winery")
             if (wbatch and not wbatch.get("notified")
                     and prod.state(tavern, "winery")[0] == "ready"):
-                try:
-                    await bot.send_message(
-                        player.id, texts.winery_ready_notification(),
-                        reply_markup=buildings_notify_kb(),
-                    )
-                except Exception:
-                    logger.warning("Не доставлено о вине игроку %s", player.id)
+                await _notify(
+                    bot, player,
+                    texts.winery_ready_notification(), buildings_notify_kb(),
+                )
                 new = dict(tavern.production)
                 new["winery"] = {**wbatch, "notified": True}
                 tavern.production = new

@@ -24,6 +24,9 @@ class Player(Base):
     reputation: Mapped[int] = mapped_column(default=0)
     region: Mapped[str] = mapped_column(String(32), default="")
     is_active: Mapped[bool] = mapped_column(default=True)
+    # «Домашний» общий чат игрока (где он играл через «гг») — туда шлём
+    # уведомления о готовности; None -> в личку.
+    chat_id: Mapped[int | None] = mapped_column(BigInteger)
 
     # Инвентарь сырья (Ярус 0): {id: количество}
     inventory: Mapped[dict] = mapped_column(JSONB, default=dict)

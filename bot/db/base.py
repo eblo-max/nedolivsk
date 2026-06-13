@@ -30,6 +30,9 @@ async def create_tables() -> None:
             "fair_pre_announced BOOLEAN NOT NULL DEFAULT FALSE"
         ))
         await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS chat_id BIGINT"
+        ))
+        await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "expedition_resource VARCHAR(16)"
         ))

@@ -63,6 +63,8 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
         autoclean.schedule_message(await _redirect_to_pm(message))
         return
 
+    player.chat_id = message.chat.id  # домашний чат — сюда шлём уведомления
+
     # панели сами планируют свою подчистку (см. common._register_panel)
     owner = message.from_user.id
     if section == "character":
@@ -97,4 +99,5 @@ async def group_start(message: Message, session: AsyncSession) -> None:
     if not player or not player.tavern:
         autoclean.schedule_message(await _redirect_to_pm(message))
         return
+    player.chat_id = message.chat.id  # домашний чат — сюда шлём уведомления
     await common.open_tavern(message, player, message.from_user.id)
