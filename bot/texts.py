@@ -4,6 +4,7 @@ from html import escape
 
 from bot.db.models import Player, Tavern
 from bot.game import balance, inventory, logic
+from bot.game import world as wld
 from bot.game.balance import RESOURCE_EMOJI, RESOURCE_NAMES
 
 WELCOME = (
@@ -453,6 +454,12 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
         exp_line = f"\n😴 Все бригады ({c.total}) дрыхнут на сене. Гони за ресурсами.\n"
 
     build_line = _build_line(player)
+    fair_line = ""
+    if wld.is_fair():
+        fair_line = (
+            f"🎪 <b>ЯРМАРКА!</b> Спрос ×{int(balance.FAIR_DEMAND_MULT)} — ещё "
+            f"{_fmt_minutes(wld.fair_minutes_left())}. Тащи бочки на продажу!\n"
+        )
 
     return (
         f"🏠 <b>{escape(tavern.name)}</b>\n"
@@ -460,7 +467,7 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
         f"Скрипят половицы, воняет элем и мокрой псиной. "
         f"За стойкой — {escape(player.first_name)}, "
         f"и спорить с хозяином тут не принято.\n"
-        f"{exp_line}{build_line}\n"
+        f"{exp_line}{build_line}{fair_line}\n"
         f"👥 Вместимость: {tavern.capacity}\n"
         f"✨ Комфорт: {tavern.comfort}\n"
         f"💰 Доход: {tavern.income_rate} 🪙/час\n"
@@ -608,6 +615,8 @@ def income_success(r) -> str:
         lines.append(f"Пассив {r.passive} + сбыт {r.sales} (раскуплено: {' · '.join(parts)}).")
     else:
         lines.append("Сбыта нет — только пассивный доход с заведения.")
+    if r.fair:
+        lines.append("🎪 Ярмарка! Гости валом — спрос вдвое. Куй железо!")
     if r.rep_gain:
         lines.append(f"⭐ +{r.rep_gain} к репутации за бойкую торговлю.")
     if r.premium_unsold:

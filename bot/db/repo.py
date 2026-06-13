@@ -3,8 +3,18 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.db.models import Player, Tavern
+from bot.db.models import Player, Tavern, WorldState
 from bot.game import balance
+
+
+async def get_or_create_world(session: AsyncSession) -> WorldState:
+    """Единственная строка состояния мира (id=1)."""
+    world = await session.get(WorldState, 1)
+    if world is None:
+        world = WorldState(id=1)
+        session.add(world)
+        await session.flush()
+    return world
 
 
 async def get_player(

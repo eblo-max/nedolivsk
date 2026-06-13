@@ -59,6 +59,16 @@ class Player(Base):
     )
 
 
+class WorldState(Base):
+    """Глобальное состояние мира (одна строка id=1): мировые события."""
+
+    __tablename__ = "world"
+
+    id: Mapped[int] = mapped_column(primary_key=True, default=1)
+    fair_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_fair_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Tavern(Base):
     """Таверна игрока (одна на игрока)."""
 

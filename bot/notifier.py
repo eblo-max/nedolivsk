@@ -8,8 +8,10 @@ from aiogram import Bot
 from sqlalchemy import select
 
 from bot import texts
+from bot.db import repo
 from bot.db.base import session_factory
 from bot.db.models import Player, Tavern
+from bot.game import world as wld
 from bot.keyboards.inline import buildings_notify_kb, claim_kb, craft_claim_kb
 
 CHECK_INTERVAL_SECONDS = 60
@@ -32,6 +34,10 @@ async def _notify_returned(bot: Bot) -> None:
 
     now = datetime.now(timezone.utc)
     async with session_factory() as session:
+        # Планировщик мира: открыть/закрыть ярмарку по расписанию.
+        world = await repo.get_or_create_world(session)
+        wld.advance(world)  # этап 2: вернёт 'open'/'close' для анонса в чат
+
         result = await session.execute(
             select(Player)
             .where(Player.expeditions != [])
@@ -176,3 +182,4 @@ async def _notify_returned(bot: Bot) -> None:
                 new["winery"] = {**wbatch, "notified": True}
                 tavern.production = new
         await session.commit()
+        wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода

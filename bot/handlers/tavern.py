@@ -9,6 +9,7 @@ from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import balance, logic
+from bot.game import world as wld
 from bot.handlers import common
 from bot.keyboards import inline as kb
 
@@ -128,7 +129,7 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         return
 
-    result = logic.collect_income(player, player.tavern)
+    result = logic.collect_income(player, player.tavern, demand_mult=wld.demand_mult())
     if not result.ok:
         await callback.answer(texts.income_empty(), show_alert=True)
         return

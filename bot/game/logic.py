@@ -114,12 +114,15 @@ class IncomeResult:
     sold: dict | None = None       # {ключ напитка: продано}
     rep_gain: int = 0
     premium_unsold: bool = False   # остался премиум — состоятельных мало
+    fair: bool = False             # доход собран во время ярмарки
 
 
-def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
-    """Гибрид: полный пассив + сбыт напитков. Спрос делится на два пула —
-    состоятельные (берут дороже-первым) и пьянь (дешевле-первым). Доля
-    состоятельных растёт с репутацией."""
+def collect_income(
+    player: Player, tavern: Tavern, demand_mult: float = 1.0
+) -> IncomeResult:
+    """Гибрид: полный пассив + сбыт напитков и еды. Спрос (жажда) делится на
+    два пула — состоятельные (дороже-первым) и пьянь (дешевле-первым); еда —
+    отдельный пул голода. demand_mult>1 — ярмарка (наплыв гостей)."""
     now = _now()
     since = tavern.last_income_at or now
     hours = min((now - since).total_seconds() / 3600, balance.INCOME_CAP_HOURS)
@@ -129,7 +132,7 @@ def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
     mult = items.income_multiplier(getattr(player, "equipment", None))
     passive = int(tavern.income_rate * hours * mult)
 
-    demand = int(tavern.capacity * balance.DEMAND_PER_CAPACITY * hours)
+    demand = int(tavern.capacity * balance.DEMAND_PER_CAPACITY * hours * demand_mult)
     share = min(balance.PREMIUM_SHARE_MAX, tavern.reputation / balance.PREMIUM_REP_DIV)
     premium_demand = int(demand * share)
     commoner_demand = demand - premium_demand
@@ -162,7 +165,7 @@ def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
         commoner_demand -= sell(key, commoner_demand)
 
     # Еда: отдельный пул (голод) — сытый гость доплачивает за блюдо.
-    hunger = int(tavern.capacity * balance.FOOD_DEMAND_PER_CAPACITY * hours)
+    hunger = int(tavern.capacity * balance.FOOD_DEMAND_PER_CAPACITY * hours * demand_mult)
     food_keys = sorted(
         (k for k in products if k in production.FOODS and products[k] > 0),
         key=lambda k: -production.FOODS[k].price,
@@ -193,6 +196,7 @@ def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
     return IncomeResult(
         ok=True, gold=gold, passive=passive, sales=sales,
         sold=sold, rep_gain=rep_gain, premium_unsold=premium_unsold,
+        fair=demand_mult > 1.0,
     )
 
 

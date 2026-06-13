@@ -7,7 +7,10 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config import settings
+from bot.db import repo
 from bot.db.models import Player, Tavern
+from bot.game import balance
+from bot.game import world as wld
 
 router = Router()
 
@@ -37,4 +40,16 @@ async def cmd_reset(
     await message.answer(
         f"🔥 Готово. Игрок {target_id} стёрт подчистую — таверна, золото, "
         "слот на карте. Пусть жмёт /start и начинает с нуля."
+    )
+
+
+@router.message(Command("fair"))
+async def cmd_fair(message: Message, session: AsyncSession) -> None:
+    if not _is_admin(message):
+        return
+    world = await repo.get_or_create_world(session)
+    wld.open_fair(world)
+    await message.answer(
+        f"🎪 Ярмарка открыта вручную на {balance.FAIR_DURATION_HOURS} ч. "
+        "Спрос ×{:.0f}.".format(balance.FAIR_DEMAND_MULT)
     )
