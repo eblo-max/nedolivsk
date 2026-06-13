@@ -1,10 +1,8 @@
 """Экран персонажа и кузница."""
 
-import asyncio
-
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import BufferedInputFile, CallbackQuery
+from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import texts
@@ -42,16 +40,17 @@ async def _show_character(callback: CallbackQuery, player: Player) -> None:
     state, _ = logic.craft_state(player)
     caption = texts.character_screen(player, texts.craft_line(player))
     markup = kb.character_kb(craft_ready=(state == "ready"))
-    if character.background_exists():
-        img = await asyncio.to_thread(character.render, player.equipment)
-        media = BufferedInputFile(img, filename="character.jpg")
-        await common.show_photo_panel(
-            callback.message, media, caption, markup, callback.from_user.id
-        )
-    else:
+    if not character.background_exists():
         await common.show_text_panel(
             callback.message, caption, markup, callback.from_user.id
         )
+        return
+    media, key, need_capture = await common.doll_media(player)
+    result = await common.show_photo_panel(
+        callback.message, media, caption, markup, callback.from_user.id
+    )
+    if need_capture:
+        common.remember_media(key, result)
 
 
 @router.callback_query(F.data == "character")
