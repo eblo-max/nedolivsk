@@ -98,6 +98,7 @@ async def cb_build_make(callback: CallbackQuery, session: AsyncSession) -> None:
                 "built": "Уже построено.",
                 "busy": "Другая стройка ещё идёт — артель одна.",
                 "requires": "Сначала построй, что требуется.",
+                "reputation": "Репутация низковата для этой постройки.",
             }.get(result.reason, "Не вышло.")
             await callback.answer(alert, show_alert=True)
         return
@@ -116,23 +117,28 @@ async def cb_prod_make(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         return
     bid = callback.data.split(":", 1)[1]
-    if bid != "mill":
+    if bid == "mill":
+        ok, reason, cin = production.start_mill(player, player.tavern)
+        not_enough_text, busy_text, toast = texts.mill_not_enough, "Жернова уже крутятся.", "Закрутились!"
+    elif bid == "meadery":
+        ok, reason, cin = production.start_mead(player, player.tavern)
+        not_enough_text, busy_text, toast = texts.mead_not_enough, "Котлы уже заняты.", "Забулькало!"
+    else:
         await callback.answer()
         return
-    ok, reason, cin = production.start_mill(player, player.tavern)
     if not ok:
         if reason == "not_enough":
-            await callback.answer(texts.mill_not_enough(cin), show_alert=True)
+            await callback.answer(not_enough_text(cin), show_alert=True)
         else:
-            await callback.answer("Жернова уже крутятся.", show_alert=True)
+            await callback.answer(busy_text, show_alert=True)
         return
-    building = buildings.CATALOG["mill"]
+    building = buildings.CATALOG[bid]
     await common.caption_edit(
         callback.message,
         texts.production_screen(building, player, player.tavern),
         kb.production_kb(player, player.tavern, building),
     )
-    await callback.answer("Закрутились!")
+    await callback.answer(toast)
 
 
 @router.callback_query(F.data.startswith("brew:"))
@@ -198,6 +204,19 @@ async def cb_prod_claim(callback: CallbackQuery, session: AsyncSession) -> None:
             kb.production_kb(player, player.tavern, building),
         )
         await callback.answer(f"🌱 +{amount} солода")
+        return
+    if bid == "meadery":
+        amount = production.claim_mead(player, player.tavern)
+        if amount <= 0:
+            await callback.answer("Медовуха ещё не готова.", show_alert=True)
+            return
+        building = buildings.CATALOG["meadery"]
+        await common.caption_edit(
+            callback.message,
+            texts.production_screen(building, player, player.tavern),
+            kb.production_kb(player, player.tavern, building),
+        )
+        await callback.answer(f"🍶 +{amount} медовухи в погреб")
         return
     if bid == "brewery":
         result = production.claim_brew(player, player.tavern)

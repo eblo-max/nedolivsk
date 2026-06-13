@@ -19,9 +19,10 @@ class Building:
     description: str       # жёсткий трактирный тон
     cost: dict             # gold + сырьё
     build_hours: int
-    requires: tuple = ()   # какие здания нужны сперва
-    unlocks: str = ""      # что откроет (для описания)
-    image: str = ""        # имя файла арта в assets/ (без .png)
+    requires: tuple = ()       # какие здания нужны сперва
+    req_reputation: int = 0    # минимальная репутация для постройки
+    unlocks: str = ""          # что откроет (для описания)
+    image: str = ""            # имя файла арта в assets/ (без .png)
 
 
 CATALOG: dict[str, Building] = {
@@ -39,8 +40,16 @@ CATALOG: dict[str, Building] = {
         cost={"gold": 700, "wood": 60, "ore": 40, "clay": 20},
         build_hours=2, requires=("mill",), unlocks="варка эля", image="pivovarnya",
     ),
+    "meadery": Building(
+        id="meadery", emoji="🍶", name="Медоварня",
+        description="Котлы с мёдом томятся и пузырятся. Сладкий хмельной дух "
+                    "влечёт публику почище, чем эль.",
+        cost={"gold": 600, "wood": 60, "clay": 30},
+        build_hours=2, req_reputation=40, unlocks="медовуха для состоятельных",
+        image="medovuxa",
+    ),
 }
-ORDER = ["mill", "brewery"]
+ORDER = ["mill", "brewery", "meadery"]
 
 
 def _now() -> datetime:
@@ -53,6 +62,14 @@ def is_built(tavern, building_id: str) -> bool:
 
 def missing_requirements(tavern, building: Building) -> list[Building]:
     return [CATALOG[r] for r in building.requires if not is_built(tavern, r)]
+
+
+def rep_locked(tavern, building: Building) -> bool:
+    return tavern.reputation < building.req_reputation
+
+
+def buildable(tavern, building: Building) -> bool:
+    return not missing_requirements(tavern, building) and not rep_locked(tavern, building)
 
 
 def build_state(player) -> tuple[str, int]:
@@ -84,6 +101,8 @@ def start_build(player, tavern, building_id: str) -> BuildStart:
         return BuildStart(ok=False, reason="busy", building=b)
     if missing_requirements(tavern, b):
         return BuildStart(ok=False, reason="requires", building=b)
+    if rep_locked(tavern, b):
+        return BuildStart(ok=False, reason="reputation", building=b)
     if not inventory.can_afford(player, b.cost):
         return BuildStart(ok=False, reason="not_enough", building=b,
                           cost=b.cost, hours=b.build_hours)

@@ -134,7 +134,7 @@ def buildings_kb(player, tavern) -> InlineKeyboardMarkup:
             mark = "✓"
         elif player.build_item == bid:
             mark = "🏗"
-        elif bld.missing_requirements(tavern, b):
+        elif bld.missing_requirements(tavern, b) or bld.rep_locked(tavern, b):
             mark = "🔒"
         else:
             mark = ""
@@ -152,7 +152,7 @@ def building_detail_kb(player, tavern, building) -> InlineKeyboardMarkup:
     can_build = (
         not bld.is_built(tavern, building.id)
         and bld.build_state(player)[0] == "none"
-        and not bld.missing_requirements(tavern, building)
+        and bld.buildable(tavern, building)
     )
     if can_build:
         kb.button(text="🏗 Построить", callback_data=f"build_make:{building.id}")
@@ -199,6 +199,11 @@ def production_kb(player, tavern, building) -> InlineKeyboardMarkup:
             kb.button(text="★ Эль", callback_data="brew:1")
             kb.button(text="★★ Светлое", callback_data="brew:2")
             kb.button(text="★★★ Праздничное", callback_data="brew:3")
+    elif building.id == "meadery":
+        if state == "ready":
+            kb.button(text="🍶 Разлить медовуху", callback_data="prod_claim:meadery")
+        elif state == "none":
+            kb.button(text="🍯 Варить медовуху", callback_data="prod_make:meadery")
     kb.button(text="↩️ К пристройкам", callback_data="buildings")
     kb.adjust(1)
     return kb.as_markup()

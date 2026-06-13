@@ -153,6 +153,12 @@ def building_detail(building, player: Player, tavern: Tavern) -> str:
         req = ", ".join(r.name for r in miss)
         return head + gives + f"\n🔒 Сначала построй: {req}."
 
+    if bld.rep_locked(tavern, building):
+        return head + gives + (
+            f"\n🔒 Нужна репутация {building.req_reputation} "
+            f"(у тебя {tavern.reputation}). Поднимай заведение."
+        )
+
     state, m = bld.build_state(player)
     if state != "none":
         return head + gives + (
@@ -255,7 +261,48 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
             f"★★★ то же + {12*level}🍯 — 12 ч\n"
             f"Есть: 🌱{inv('malt')} 🌿{inv('hops')} 💧{inv('water')} 🍯{inv('honey')}"
         )
+    if building.id == "meadery":
+        level = tavern.level
+        mead = (tavern.products or {}).get("mead", 0)
+        cin = prod.mead_inputs(level)
+        out = prod.mead_output(level)
+        state, minutes = prod.state(tavern, "meadery")
+        if state == "active":
+            status = f"⏳ Бродит — ещё {_fmt_minutes(minutes)}."
+        elif state == "ready":
+            status = "🍶 Медовуха готова — разливай в погреб!"
+        else:
+            status = "😴 Котлы остыли. Поставь медовуху."
+        return (
+            head +
+            f"\n🍶 Медовуха в погребе: {mead}\n{status}\n\n"
+            f"Рецепт (ур. {level}): 🍯 {cin['honey']} + 💧 {cin['water']} → "
+            f"🍶 {out}, {prod.MEAD_HOURS} ч\n"
+            f"Есть: 🍯 {inventory.get(player, 'honey')} · 💧 {inventory.get(player, 'water')}\n"
+            "<i>Берут состоятельные — чем выше репутация, тем больше спрос.</i>"
+        )
     return head + "\nПроизводство этого здания — скоро."
+
+
+def mead_started(amount: int) -> str:
+    return (
+        f"🍯 Котлы забулькали — будет ~{amount} 🍶 медовухи через "
+        f"{8} ч. Сладко запахло на всю округу."
+    )
+
+
+def mead_not_enough(cin: dict) -> str:
+    return (
+        f"😕 На медовуху мало: нужно 🍯 {cin['honey']} мёда и 💧 {cin['water']} воды. "
+        "Гони работников за мёдом."
+    )
+
+
+def mead_ready_notification() -> str:
+    return (
+        "🍶 <b>Медовуха дошла!</b> Разлей в погреб — "
+        "состоятельная публика уже облизывается."
+    )
 
 
 def brew_not_enough(tier: int, cin: dict) -> str:

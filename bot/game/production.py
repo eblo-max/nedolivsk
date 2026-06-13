@@ -15,11 +15,24 @@ from bot.game import inventory
 
 MATURE_CHANCE = 55  # % успеха выдержки (+1 ярус), иначе −1 ярус
 
-PRODUCERS = {"mill", "brewery"}  # здания с производством
+PRODUCERS = {"mill", "brewery", "meadery"}  # здания с производством
 
 MILL_MINUTES = 40
 MILL_GRAIN = 10   # зерна на 1 уровень
 MILL_MALT = 8     # солода на 1 уровень
+
+# Медоварня: мёд+вода → медовуха (паритет: 10×12L/8ч = 15L/ч)
+MEAD_HOURS = 8
+MEAD_IN = {"honey": 10, "water": 8}   # на 1 уровень
+MEAD_OUT = 12                          # кружек на 1 уровень
+
+
+def mead_inputs(level: int) -> dict:
+    return {k: v * level for k, v in MEAD_IN.items()}
+
+
+def mead_output(level: int) -> int:
+    return MEAD_OUT * level
 
 # Пивоварня: ярус -> (вход на 1 уровень, часы ферментации, выход кружек на уровень)
 BREW = {
@@ -46,6 +59,7 @@ DRINKS: dict[str, Drink] = {
     f"ale{t}": Drink(f"ale{t}", "🍺", f"Эль {ALE_STARS[t]}", ALE_PRICE[t])
     for t in (1, 2, 3)
 }
+DRINKS["mead"] = Drink("mead", "🍶", "Медовуха", 10)
 
 
 def ale_key(tier: int) -> str:
@@ -210,6 +224,35 @@ def claim_brew(player, tavern) -> tuple[str, int, int] | None:
 
     _set_batch(tavern, "brewery", None)
     return outcome, out_tier, qty
+
+
+def start_mead(player, tavern) -> tuple[bool, str, dict | None]:
+    """(ok, reason, inputs). reason: busy | not_enough."""
+    if state(tavern, "meadery")[0] != "none":
+        return False, "busy", None
+    level = tavern.level
+    cin = mead_inputs(level)
+    if not inventory.can_afford(player, cin):
+        return False, "not_enough", cin
+    inventory.pay(player, cin)
+    _set_batch(tavern, "meadery", {
+        "out_qty": mead_output(level),
+        "ready_at": (_now() + timedelta(hours=MEAD_HOURS)).isoformat(),
+    })
+    return True, "", cin
+
+
+def claim_mead(player, tavern) -> int:
+    """Разлить готовую медовуху в погреб. Возвращает количество (0 — нечего)."""
+    if state(tavern, "meadery")[0] != "ready":
+        return 0
+    batch = (tavern.production or {})["meadery"]
+    qty = int(batch.get("out_qty", 0))
+    products = dict(tavern.products or {})
+    products["mead"] = products.get("mead", 0) + qty
+    tavern.products = products
+    _set_batch(tavern, "meadery", None)
+    return qty
 
 
 def products_value(tavern) -> int:
