@@ -207,13 +207,16 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
             status = "🌱 Солод готов — забирай!"
         else:
             status = "😴 Жернова простаивают."
+        m_emoji = balance.GOODS_EMOJI["malt"]
+        m_name = balance.GOODS_NAMES["malt"]
+        g_emoji = RESOURCE_EMOJI["grain"]
         return (
             head +
-            f"\n🌱 Солод на складе: {malt}\n"
+            f"\n{m_emoji} {m_name} на складе: {malt}\n"
             f"{status}\n\n"
-            f"Помол (ур. {level}): 🌾 {cin['grain']} → 🌱 {out} солода, "
-            f"{prod.MILL_MINUTES} мин\n"
-            f"В закромах: 🌾 {inventory.get(player, 'grain')}"
+            f"Помол (ур. {level}): {g_emoji} {cin['grain']} → {m_emoji} {out} "
+            f"{m_name.lower()}, {prod.MILL_MINUTES} мин\n"
+            f"В закромах: {g_emoji} {inventory.get(player, 'grain')}"
         )
     return head + "\nПроизводство этого здания — скоро."
 
