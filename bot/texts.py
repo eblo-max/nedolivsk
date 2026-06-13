@@ -457,7 +457,7 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
     fair_line = ""
     if wld.is_fair():
         fair_line = (
-            f"🎪 <b>ЯРМАРКА!</b> Спрос ×{int(balance.FAIR_DEMAND_MULT)} — ещё "
+            f"🎪 <b>ЯРМАРКА!</b> Спрос ×{balance.FAIR_DEMAND_MULT:g} — ещё "
             f"{_fmt_minutes(wld.fair_minutes_left())}. Тащи бочки на продажу!\n"
         )
 

@@ -51,5 +51,5 @@ async def cmd_fair(message: Message, session: AsyncSession) -> None:
     wld.open_fair(world)
     await message.answer(
         f"🎪 Ярмарка открыта вручную на {balance.FAIR_DURATION_HOURS} ч. "
-        "Спрос ×{:.0f}.".format(balance.FAIR_DEMAND_MULT)
+        f"Спрос ×{balance.FAIR_DEMAND_MULT:g}."
     )

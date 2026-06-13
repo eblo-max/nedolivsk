@@ -64,6 +64,8 @@ def advance(world) -> str | None:
 
 
 def open_fair(world) -> None:
-    """Открыть ярмарку немедленно (админ-команда /fair)."""
+    """Открыть ярмарку немедленно (админ-команда /fair). Сдвигаем и плановую,
+    чтобы после ручной не открылась тут же ещё одна."""
     world.fair_until = _now() + timedelta(hours=balance.FAIR_DURATION_HOURS)
+    world.next_fair_at = _next_fair_time(world.fair_until)
     refresh_cache(world)
