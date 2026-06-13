@@ -116,16 +116,35 @@ async def show_tavern_panel(
     return result
 
 
+def _warehouse_img(player: Player) -> Path | None:
+    """Картинка склада, а если её нет — фон таверны."""
+    return images.warehouse_image() or images.tavern_image(player.tavern.level)
+
+
+async def show_warehouse_panel(
+    message: Message, player: Player, owner_id: int | None = None
+) -> Message:
+    """Склад в текущем окне: подменяем фото на складское (edit_media)."""
+    caption = texts.warehouse_screen(player, player.tavern)
+    markup = kb.back_kb()
+    img = _warehouse_img(player)
+    if img is None:
+        return await show_text_panel(message, caption, markup, owner_id)
+    result = await show_photo_panel(message, cached_media(img), caption, markup, owner_id)
+    remember_file_id(img, result)
+    return result
+
+
 async def open_tavern(message: Message, player: Player, owner_id: int) -> Message:
     """Открыть главный экран таверны новой панелью (для общего чата)."""
     return await send_tavern_screen(message, player, owner_id=owner_id)
 
 
 async def open_warehouse(message: Message, player: Player, owner_id: int) -> Message:
-    """Открыть склад отдельной панелью (фон — картинка таверны)."""
+    """Открыть склад отдельной панелью (своя картинка склада)."""
     caption = texts.warehouse_screen(player, player.tavern)
     markup = kb.back_kb()
-    img = images.tavern_image(player.tavern.level)
+    img = _warehouse_img(player)
     if img is not None:
         msg = await message.answer_photo(
             cached_media(img), caption=caption, reply_markup=markup

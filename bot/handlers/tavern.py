@@ -5,11 +5,11 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, FSInputFile, InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import images, panels, texts
+from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import balance, logic
-from bot.handlers.common import send_tavern_screen
+from bot.handlers import common
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -28,19 +28,11 @@ async def _safe_edit(callback: CallbackQuery, text: str, markup) -> None:
 
 
 async def _show_tavern(callback: CallbackQuery, player: Player) -> None:
-    """Экран таверны. Если текущее сообщение без фото (например, пришли из
-    уведомления) — заменяем его новым сообщением с картинкой уровня."""
-    if callback.message.photo:
-        await _safe_edit(
-            callback, texts.tavern_screen(player, player.tavern), kb.tavern_kb(player)
-        )
-        return
-    panels.release(callback.message)
-    try:
-        await callback.message.delete()
-    except TelegramBadRequest:
-        pass  # сообщение старше 48ч — Telegram не даст удалить
-    await send_tavern_screen(callback.message, player, owner_id=callback.from_user.id)
+    """Экран таверны в том же окне: возвращает картинку таверны (например,
+    после склада с его собственным фото). Если сообщение без фото — пересоздаёт."""
+    await common.show_tavern_panel(
+        callback.message, player, callback.from_user.id
+    )
 
 
 async def _get_player(
@@ -67,9 +59,7 @@ async def cb_warehouse(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session)
     if player is None:
         return
-    await _safe_edit(
-        callback, texts.warehouse_screen(player, player.tavern), kb.back_kb()
-    )
+    await common.show_warehouse_panel(callback.message, player, callback.from_user.id)
     await callback.answer()
 
 

@@ -19,3 +19,17 @@ def tavern_image(level: int) -> Path | None:
                 best = p
                 break
     return best
+
+
+def named_image(name: str) -> Path | None:
+    """Картинка раздела по имени файла: assets/<name>.{jpg,jpeg,png}."""
+    for ext in _EXTENSIONS:
+        p = ASSETS_DIR / f"{name}.{ext}"
+        if p.is_file():
+            return p
+    return None
+
+
+def warehouse_image() -> Path | None:
+    """Картинка склада: assets/sklad.{jpg,jpeg,png}, иначе None."""
+    return named_image("sklad")
