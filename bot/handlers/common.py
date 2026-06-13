@@ -111,6 +111,20 @@ async def caption_edit(message: Message, text: str, markup) -> None:
         pass  # не изменилось — Telegram не любит одинаковые правки
 
 
+async def show_image_panel(
+    message: Message, img_path: Path | None, caption: str, markup,
+    owner_id: int | None = None,
+) -> Message:
+    """Панель со статичной картинкой (по пути файла) в том же окне.
+    Нет картинки — правим только подпись/текст."""
+    if img_path is None:
+        await caption_edit(message, caption, markup)
+        return message
+    result = await show_photo_panel(message, cached_media(img_path), caption, markup, owner_id)
+    remember_file_id(img_path, result)
+    return result
+
+
 async def show_photo_panel(
     message: Message, media, caption: str, markup, owner_id: int | None = None
 ) -> Message:

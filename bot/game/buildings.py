@@ -21,6 +21,7 @@ class Building:
     build_hours: int
     requires: tuple = ()   # какие здания нужны сперва
     unlocks: str = ""      # что откроет (для описания)
+    image: str = ""        # имя файла арта в assets/ (без .png)
 
 
 CATALOG: dict[str, Building] = {
@@ -29,14 +30,14 @@ CATALOG: dict[str, Building] = {
         description="Жернова скрипят, мельник вечно под хмельком. "
                     "Зато зерно в солод мелет — что надо.",
         cost={"gold": 250, "wood": 80, "clay": 30},
-        build_hours=1, unlocks="солод из зерна",
+        build_hours=1, unlocks="солод из зерна", image="melnica",
     ),
     "brewery": Building(
         id="brewery", emoji="🍺", name="Пивоварня",
         description="Чаны, пар и дух, от которого слезятся глаза. "
                     "Тут из солода, хмеля и воды рождается эль.",
         cost={"gold": 700, "wood": 60, "ore": 40, "clay": 20},
-        build_hours=2, requires=("mill",), unlocks="варка эля",
+        build_hours=2, requires=("mill",), unlocks="варка эля", image="pivovarnya",
     ),
 }
 ORDER = ["mill", "brewery"]

@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import texts
+from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import buildings
@@ -30,10 +30,12 @@ async def cb_buildings(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         return
     done = buildings.finalize_build(player, player.tavern)  # ленивое завершение
-    await common.caption_edit(
+    await common.show_image_panel(
         callback.message,
+        images.tavern_image(player.tavern.level),  # список — на фоне таверны
         texts.buildings_screen(player, player.tavern),
         kb.buildings_kb(player, player.tavern),
+        callback.from_user.id,
     )
     await callback.answer(f"🏗 {done.name} достроена!" if done else None)
 
@@ -47,10 +49,13 @@ async def cb_build_open(callback: CallbackQuery, session: AsyncSession) -> None:
     if building is None:
         await callback.answer()
         return
-    await common.caption_edit(
+    img = images.named_image(building.image) if building.image else None
+    await common.show_image_panel(
         callback.message,
+        img,
         texts.building_detail(building, player, player.tavern),
         kb.building_detail_kb(player, player.tavern, building),
+        callback.from_user.id,
     )
     await callback.answer()
 
