@@ -7,9 +7,23 @@ REGIONS = {
     "red_wastes": "Красные пустоши",
 }
 
-# Ресурсы
-RESOURCE_NAMES = {"wood": "Древесина", "grain": "Зерно", "hops": "Хмель"}
-RESOURCE_EMOJI = {"wood": "🪵", "grain": "🌾", "hops": "🌿"}
+# Ресурсы (Ярус 0 — сырьё). Порядок = порядок кнопок в меню вылазок.
+RESOURCES = (
+    "wood", "grain", "hops", "water", "honey",
+    "berries", "game", "ore", "clay", "herbs",
+)
+RESOURCE_NAMES = {
+    "wood": "Древесина", "grain": "Зерно", "hops": "Хмель",
+    "water": "Вода", "honey": "Мёд", "berries": "Ягоды",
+    "game": "Дичь", "ore": "Руда", "clay": "Глина", "herbs": "Травы",
+}
+RESOURCE_EMOJI = {
+    "wood": "🪵", "grain": "🌾", "hops": "🌿", "water": "💧", "honey": "🍯",
+    "berries": "🍒", "game": "🥩", "ore": "⛏", "clay": "🪨", "herbs": "🌶",
+}
+
+# Стартовые запасы новой таверны
+STARTING_INVENTORY = {"wood": 10, "grain": 10, "hops": 5}
 
 # Вылазки работников: игрок отправляет их за ОДНИМ ресурсом на выбор
 EXPEDITION_HOURS = 2
@@ -17,21 +31,28 @@ EXPEDITION_YIELD = {  # (база на 1-м уровне, прирост за у
     "wood": (25, 6),
     "grain": (20, 5),
     "hops": (12, 3),
+    "water": (30, 7),
+    "honey": (10, 2),
+    "berries": (18, 4),
+    "game": (9, 2),
+    "ore": (8, 2),
+    "clay": (16, 4),
+    "herbs": (12, 3),
 }
 WORKER_PAY_PER_LEVEL = 5  # плата работникам за вылазку: 5 * уровень таверны
 
-# Специализация зон: свой ресурс +50%, чужой -25%, третий — как у всех.
-# Каждый ресурс ровно один раз усилен и один раз ослаблен — зоны равноценны,
-# различается стратегия, а не сложность.
+# Специализация зон: ресурсы зоны +50%, «чужие» -25%, прочие — как у всех.
+# Каждый ресурс ровно один раз усилен и один раз ослаблен — зоны равноценны.
+# Вода (water) нейтральна везде — основа любой варки.
 REGION_BONUS = {
-    "north_wilds": "wood",      # тайга
-    "green_valleys": "grain",   # пашни
-    "red_wastes": "hops",       # дикий степной хмель
+    "north_wilds": {"wood", "game", "ore"},       # тайга, охота, рудники
+    "green_valleys": {"grain", "honey", "berries"},  # пашни, пасеки, сады
+    "red_wastes": {"hops", "herbs", "clay"},       # степь, коренья, глина
 }
 REGION_PENALTY = {
-    "north_wilds": "hops",      # хмель не вызревает в холоде
-    "green_valleys": "wood",    # леса вырублены под поля
-    "red_wastes": "grain",      # зерно сохнет на жаре
+    "north_wilds": {"grain", "berries", "herbs"},  # мороз бьёт по посевам
+    "green_valleys": {"hops", "ore", "clay"},      # ни гор, ни карьеров
+    "red_wastes": {"wood", "game", "honey"},       # голо, зверья и цветов нет
 }
 BONUS_MULT = 1.5
 PENALTY_MULT = 0.75
@@ -56,9 +77,9 @@ MAX_LEVEL = 10
 def expedition_yield(resource: str, level: int, region: str) -> int:
     base, per_level = EXPEDITION_YIELD[resource]
     amount = base + per_level * (level - 1)
-    if REGION_BONUS.get(region) == resource:
+    if resource in REGION_BONUS.get(region, ()):
         return int(amount * BONUS_MULT)
-    if REGION_PENALTY.get(region) == resource:
+    if resource in REGION_PENALTY.get(region, ()):
         return max(1, int(amount * PENALTY_MULT))
     return amount
 
@@ -92,7 +113,10 @@ def reputation_for_upgrade(new_level: int) -> int:
 
 # ===== ВВП (валовый продукт таверны) =====
 # Рыночные цены ресурсов в золоте — обратно пропорциональны лёгкости добычи
-RESOURCE_PRICE = {"wood": 2.0, "grain": 2.5, "hops": 4.0}
+RESOURCE_PRICE = {
+    "water": 1.0, "wood": 2.0, "clay": 2.0, "grain": 2.5, "berries": 3.0,
+    "hops": 4.0, "herbs": 4.5, "honey": 6.0, "game": 6.5, "ore": 7.0,
+}
 
 
 def invested_value(level: int) -> float:
@@ -102,21 +126,17 @@ def invested_value(level: int) -> float:
         c = upgrade_cost(lvl)
         total += c["gold"]
         for res, price in RESOURCE_PRICE.items():
-            total += c[res] * price
+            total += c.get(res, 0) * price
     return total
 
 
 def tavern_gdp(
-    gold: int, wood: int, grain: int, hops: int,
-    level: int, income_rate: int, reputation: int,
+    inventory: dict, gold: int, level: int, income_rate: int, reputation: int,
 ) -> int:
     """ВВП таверны: активы + капитализация + дневной оборот + репутация."""
-    assets = (
-        gold
-        + wood * RESOURCE_PRICE["wood"]
-        + grain * RESOURCE_PRICE["grain"]
-        + hops * RESOURCE_PRICE["hops"]
-    )
+    assets = float(gold)
+    for res, qty in (inventory or {}).items():
+        assets += RESOURCE_PRICE.get(res, 0) * qty
     return int(
         assets
         + invested_value(level)

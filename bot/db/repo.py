@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import Player, Tavern
+from bot.game import balance
 
 
 async def get_player(
@@ -19,7 +20,12 @@ async def get_player(
 async def create_player(
     session: AsyncSession, telegram_id: int, username: str | None, first_name: str
 ) -> Player:
-    player = Player(id=telegram_id, username=username, first_name=first_name)
+    player = Player(
+        id=telegram_id,
+        username=username,
+        first_name=first_name,
+        inventory=dict(balance.STARTING_INVENTORY),
+    )
     session.add(player)
     await session.flush()
     return player

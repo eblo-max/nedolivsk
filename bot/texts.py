@@ -3,7 +3,7 @@
 from html import escape
 
 from bot.db.models import Player, Tavern
-from bot.game import balance, logic
+from bot.game import balance, inventory, logic
 from bot.game.balance import RESOURCE_EMOJI, RESOURCE_NAMES
 
 WELCOME = (
@@ -123,23 +123,40 @@ def warehouse_screen(player: Player, tavern: Tavern) -> str:
         "Темно, пыльно, по углам шуршат крысы. Вот что ещё не растащили:\n",
         f"🪙 Золото: {player.gold}\n",
         "<b>Запасы:</b>",
-        f"🪵 Древесина: {player.wood}",
-        f"🌾 Зерно: {player.grain}",
-        f"🌿 Хмель: {player.hops}",
     ]
+    for res in balance.RESOURCES:
+        lines.append(
+            f"{RESOURCE_EMOJI[res]} {RESOURCE_NAMES[res]}: {inventory.get(player, res)}"
+        )
     if tavern.level < balance.MAX_LEVEL:
         cost = balance.upgrade_cost(tavern.level)
-        have = {
-            "gold": player.gold,
-            "wood": player.wood,
-            "grain": player.grain,
-            "hops": player.hops,
-        }
         emoji = {"gold": "🪙", **RESOURCE_EMOJI}
         lines.append(f"\n<b>До перестройки (ур. {tavern.level + 1}):</b>")
         for key in ("gold", "wood", "grain", "hops"):
-            mark = "✅" if have[key] >= cost[key] else "❌"
-            lines.append(f"{emoji[key]} {have[key]} / {cost[key]} {mark}")
+            have = player.gold if key == "gold" else inventory.get(player, key)
+            mark = "✅" if have >= cost[key] else "❌"
+            lines.append(f"{emoji[key]} {have} / {cost[key]} {mark}")
+    else:
+        lines.append("\n🏆 Выше строить некуда — разве что до небес.")
+    return "\n".join(lines)
+
+
+def storehouse_caption(player: Player, tavern: Tavern) -> str:
+    """Короткая подпись к складской ведомости (ресурсы — на самой картинке)."""
+    lines = [
+        f"📦 <b>Складская ведомость «{escape(tavern.name)}»</b>",
+        f"🪙 Золото: {player.gold}",
+    ]
+    if tavern.level < balance.MAX_LEVEL:
+        cost = balance.upgrade_cost(tavern.level)
+        emoji = {"gold": "🪙", **RESOURCE_EMOJI}
+        parts = []
+        for key in ("gold", "wood", "grain", "hops"):
+            have = player.gold if key == "gold" else inventory.get(player, key)
+            mark = "✅" if have >= cost[key] else "❌"
+            parts.append(f"{emoji[key]} {have}/{cost[key]}{mark}")
+        lines.append(f"\n<b>До перестройки (ур. {tavern.level + 1}):</b>")
+        lines.append(" · ".join(parts))
     else:
         lines.append("\n🏆 Выше строить некуда — разве что до небес.")
     return "\n".join(lines)
@@ -198,6 +215,13 @@ RESOURCE_INSTRUMENTAL = {
     "wood": "древесиной",
     "grain": "зерном",
     "hops": "хмелем",
+    "water": "водой",
+    "honey": "мёдом",
+    "berries": "ягодами",
+    "game": "дичью",
+    "ore": "рудой",
+    "clay": "глиной",
+    "herbs": "травами",
 }
 
 
@@ -247,8 +271,8 @@ def upgrade_not_enough(cost: dict, player: Player) -> str:
         "😕 С такими запасами только сортир во дворе пристроить.\n\n"
         f"Надо: 🪙 {cost['gold']} · 🪵 {cost['wood']} · "
         f"🌾 {cost['grain']} · 🌿 {cost['hops']}\n"
-        f"У тебя: 🪙 {player.gold} · 🪵 {player.wood} · "
-        f"🌾 {player.grain} · 🌿 {player.hops}\n\n"
+        f"У тебя: 🪙 {player.gold} · 🪵 {inventory.get(player, 'wood')} · "
+        f"🌾 {inventory.get(player, 'grain')} · 🌿 {inventory.get(player, 'hops')}\n\n"
         "Иди работай."
     )
 
@@ -342,7 +366,8 @@ def forge_screen(player) -> str:
         "⚒ <b>Кузница Недоливска</b>\n"
         "Мастер плюёт на ладони и смотрит на твоё золото.\n"
         "Один заказ за раз. Деньги вперёд, претензии — никогда.\n\n"
-        f"🪙 {player.gold} · 🪵 {player.wood} · 🌾 {player.grain} · 🌿 {player.hops}"
+        f"🪙 {player.gold} · 🪵 {inventory.get(player, 'wood')} · "
+        f"🌾 {inventory.get(player, 'grain')} · 🌿 {inventory.get(player, 'hops')}"
     )
 
 
@@ -386,9 +411,9 @@ def forge_item_screen(item, player, cur_tier: int, next_tier: int) -> str:
         f"Будет давать: {_tier_bonus_line(item, next_tier)}\n"
         f"Ковать: {hours} ч\n\n"
         f"Цена: 🪙 {c.get('gold',0)} {have_mark('gold', player.gold)} · "
-        f"🪵 {c.get('wood',0)} {have_mark('wood', player.wood)} · "
-        f"🌾 {c.get('grain',0)} {have_mark('grain', player.grain)} · "
-        f"🌿 {c.get('hops',0)} {have_mark('hops', player.hops)}"
+        f"🪵 {c.get('wood',0)} {have_mark('wood', inventory.get(player, 'wood'))} · "
+        f"🌾 {c.get('grain',0)} {have_mark('grain', inventory.get(player, 'grain'))} · "
+        f"🌿 {c.get('hops',0)} {have_mark('hops', inventory.get(player, 'hops'))}"
     )
 
 

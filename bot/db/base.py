@@ -65,3 +65,14 @@ async def create_tables() -> None:
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "craft_notified BOOLEAN NOT NULL DEFAULT FALSE"
         ))
+        # Переход на единый инвентарь (Ярус 0). Колонка nullable: разовый
+        # перелив только для ещё не мигрированных строк (inventory IS NULL),
+        # чтобы опустошённый инвентарь не «возрождался» из старых колонок.
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS inventory JSONB"
+        ))
+        await conn.execute(text(
+            "UPDATE players SET inventory = jsonb_build_object("
+            "'wood', COALESCE(wood, 0), 'grain', COALESCE(grain, 0), "
+            "'hops', COALESCE(hops, 0)) WHERE inventory IS NULL"
+        ))

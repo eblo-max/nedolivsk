@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from bot.db.models import Player, Tavern
-from bot.game import balance, items
+from bot.game import balance, inventory, items
 
 
 def _now() -> datetime:
@@ -79,7 +79,7 @@ def claim_expedition(player: Player) -> ExpeditionClaim:
     if lucky:
         amount *= balance.LUCKY_MULT
 
-    setattr(player, resource, getattr(player, resource) + amount)
+    inventory.add(player, resource, amount)
     player.expedition_resource = None
     player.expedition_ends_at = None
     return ExpeditionClaim(ok=True, resource=resource, amount=amount, lucky=lucky)
@@ -121,18 +121,10 @@ def try_upgrade(player: Player, tavern: Tavern) -> UpgradeResult:
         return UpgradeResult(ok=False, reason="max_level")
 
     cost = balance.upgrade_cost(tavern.level)
-    if (
-        player.gold < cost["gold"]
-        or player.wood < cost["wood"]
-        or player.grain < cost["grain"]
-        or player.hops < cost["hops"]
-    ):
+    if not inventory.can_afford(player, cost):
         return UpgradeResult(ok=False, reason="not_enough", cost=cost)
 
-    player.gold -= cost["gold"]
-    player.wood -= cost["wood"]
-    player.grain -= cost["grain"]
-    player.hops -= cost["hops"]
+    inventory.pay(player, cost)
 
     tavern.level += 1
     stats = balance.stats_for_level(tavern.level)
@@ -189,15 +181,11 @@ def start_craft(player: Player, item_id: str) -> CraftStart:
 
     c = items.tier_cost(item, tier)
     hours = items.tier_hours(item, tier)
-    if (player.gold < c.get("gold", 0) or player.wood < c.get("wood", 0)
-            or player.grain < c.get("grain", 0) or player.hops < c.get("hops", 0)):
+    if not inventory.can_afford(player, c):
         return CraftStart(ok=False, reason="not_enough", item=item,
                           tier=tier, cost=c, hours=hours)
 
-    player.gold -= c.get("gold", 0)
-    player.wood -= c.get("wood", 0)
-    player.grain -= c.get("grain", 0)
-    player.hops -= c.get("hops", 0)
+    inventory.pay(player, c)
     player.craft_item = items.make_entry(item_id, tier)
     player.craft_ends_at = _now() + timedelta(hours=hours)
     player.craft_notified = False

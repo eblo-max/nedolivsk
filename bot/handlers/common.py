@@ -15,7 +15,7 @@ from aiogram.types import (
 from bot import autoclean, images, panels, texts
 from bot.db.models import Player
 from bot.game import character as char
-from bot.game import logic
+from bot.game import logic, storehouse
 from bot.keyboards import inline as kb
 
 # Кэш file_id: после первой отправки Telegram хранит файл у себя,
@@ -124,9 +124,15 @@ def _warehouse_img(player: Player) -> Path | None:
 async def show_warehouse_panel(
     message: Message, player: Player, owner_id: int | None = None
 ) -> Message:
-    """Склад в текущем окне: подменяем фото на складское (edit_media)."""
-    caption = texts.warehouse_screen(player, player.tavern)
+    """Склад в текущем окне: складская ведомость с ресурсами (edit_media)."""
     markup = kb.back_kb()
+    if storehouse.background_exists():
+        img = await asyncio.to_thread(storehouse.render, player.inventory)
+        media = BufferedInputFile(img, filename="sklad.jpg")
+        caption = texts.storehouse_caption(player, player.tavern)
+        return await show_photo_panel(message, media, caption, markup, owner_id)
+    # фолбэк: картинка-фон + полный текстовый список
+    caption = texts.warehouse_screen(player, player.tavern)
     img = _warehouse_img(player)
     if img is None:
         return await show_text_panel(message, caption, markup, owner_id)
@@ -141,9 +147,19 @@ async def open_tavern(message: Message, player: Player, owner_id: int) -> Messag
 
 
 async def open_warehouse(message: Message, player: Player, owner_id: int) -> Message:
-    """Открыть склад отдельной панелью (своя картинка склада)."""
-    caption = texts.warehouse_screen(player, player.tavern)
+    """Открыть склад новой панелью (складская ведомость с ресурсами)."""
     markup = kb.back_kb()
+    if storehouse.background_exists():
+        img = await asyncio.to_thread(storehouse.render, player.inventory)
+        msg = await message.answer_photo(
+            BufferedInputFile(img, filename="sklad.jpg"),
+            caption=texts.storehouse_caption(player, player.tavern),
+            reply_markup=markup,
+        )
+        _register_panel(msg, owner_id)
+        return msg
+    # фолбэк
+    caption = texts.warehouse_screen(player, player.tavern)
     img = _warehouse_img(player)
     if img is not None:
         msg = await message.answer_photo(

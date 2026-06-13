@@ -25,7 +25,11 @@ class Player(Base):
     region: Mapped[str] = mapped_column(String(32), default="")
     is_active: Mapped[bool] = mapped_column(default=True)
 
-    # Ресурсы
+    # Инвентарь сырья (Ярус 0): {id: количество}
+    inventory: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+    # DEPRECATED: данные перелиты в inventory (миграция в base.py).
+    # Колонки оставлены ради старых БД; в коде больше не используются.
     wood: Mapped[int] = mapped_column(default=10)
     grain: Mapped[int] = mapped_column(default=10)
     hops: Mapped[int] = mapped_column(default=5)

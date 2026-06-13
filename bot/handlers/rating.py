@@ -29,10 +29,8 @@ async def show_rating(message: Message, session: AsyncSession) -> Message:
     rated = []
     for tavern, player in rows:
         gdp = balance.tavern_gdp(
+            inventory=player.inventory,
             gold=player.gold,
-            wood=player.wood,
-            grain=player.grain,
-            hops=player.hops,
             level=tavern.level,
             income_rate=tavern.income_rate,
             reputation=tavern.reputation,

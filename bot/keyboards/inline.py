@@ -49,14 +49,14 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
 def expedition_menu_kb(player: Player) -> InlineKeyboardMarkup:
     level = player.tavern.level if player.tavern else 1
     kb = InlineKeyboardBuilder()
-    for res in ("wood", "grain", "hops"):
+    for res in balance.RESOURCES:
         amount = balance.expedition_yield(res, level, player.region)
         kb.button(
             text=f"{RESOURCE_EMOJI[res]} {RESOURCE_NAMES[res]} (+{amount})",
             callback_data=f"exp:{res}",
         )
     kb.button(text="↩️ Назад", callback_data="tavern")
-    kb.adjust(1)
+    kb.adjust(2)
     return kb.as_markup()
 
 
