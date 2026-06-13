@@ -8,9 +8,14 @@
 «протухают» (владелец неизвестен) — middleware попросит открыть заново.
 """
 
+from collections import OrderedDict
+
 from aiogram.types import Message
 
-_owners: dict[tuple[int, int], int] = {}
+# LRU: брошенные/старые панели вытесняются. При вытеснении кнопка ответит
+# «панель устарела» — игрок просто откроет заново. Память ограничена.
+_MAX_PANELS = 4000
+_owners: "OrderedDict[tuple[int, int], int]" = OrderedDict()
 
 
 def is_group(message: Message | None) -> bool:
@@ -20,7 +25,11 @@ def is_group(message: Message | None) -> bool:
 def claim(message: Message | None, owner_id: int | None) -> None:
     """Закрепить панель за владельцем (только в группе)."""
     if owner_id is not None and is_group(message):
-        _owners[(message.chat.id, message.message_id)] = owner_id
+        key = (message.chat.id, message.message_id)
+        _owners[key] = owner_id
+        _owners.move_to_end(key)
+        while len(_owners) > _MAX_PANELS:
+            _owners.popitem(last=False)
 
 
 def release(message: Message | None) -> None:
@@ -30,4 +39,8 @@ def release(message: Message | None) -> None:
 
 
 def owner_of(chat_id: int, message_id: int) -> int | None:
-    return _owners.get((chat_id, message_id))
+    key = (chat_id, message_id)
+    owner = _owners.get(key)
+    if owner is not None:
+        _owners.move_to_end(key)  # активная панель не вытесняется
+    return owner

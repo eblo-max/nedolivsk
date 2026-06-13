@@ -6,6 +6,8 @@
 """
 
 import io
+import threading
+from collections import OrderedDict
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -30,8 +32,11 @@ SLOT_BOXES = {
     "boots": (390, 720, 615, 875),  # прямо на ногах силуэта, без рамки
 }
 
-_cache_key: tuple | None = None
-_cache_bytes: bytes | None = None
+# Потокобезопасный LRU: render крутится в asyncio.to_thread, а в группе
+# рендерят сразу много игроков с разной экипировкой.
+_CACHE_MAX = 64
+_cache: "OrderedDict[tuple, bytes]" = OrderedDict()
+_cache_lock = threading.Lock()
 
 
 def background_exists() -> bool:
@@ -50,11 +55,13 @@ def _item_sprite(sprite_name: str) -> Image.Image | None:
 
 def render(equipment: dict | None) -> bytes:
     """Кукла с надетыми вещами. Кэш по составу экипировки."""
-    global _cache_key, _cache_bytes
     equipment = equipment or {}
     key = tuple(sorted(equipment.items()))
-    if key == _cache_key and _cache_bytes is not None:
-        return _cache_bytes
+    with _cache_lock:
+        hit = _cache.get(key)
+        if hit is not None:
+            _cache.move_to_end(key)
+            return hit
 
     from bot.game.items import CATALOG, parse_entry
 
@@ -90,5 +97,10 @@ def render(equipment: dict | None) -> bytes:
 
     out = io.BytesIO()
     base.convert("RGB").save(out, "JPEG", quality=88, optimize=True)
-    _cache_key, _cache_bytes = key, out.getvalue()
-    return _cache_bytes
+    data = out.getvalue()
+    with _cache_lock:
+        _cache[key] = data
+        _cache.move_to_end(key)
+        while len(_cache) > _CACHE_MAX:
+            _cache.popitem(last=False)
+    return data

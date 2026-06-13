@@ -3,7 +3,14 @@
 import asyncio
 from pathlib import Path
 
-from aiogram.types import BufferedInputFile, FSInputFile, InputFile, Message
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import (
+    BufferedInputFile,
+    FSInputFile,
+    InputFile,
+    InputMediaPhoto,
+    Message,
+)
 
 from bot import images, panels, texts
 from bot.db.models import Player
@@ -43,8 +50,68 @@ async def send_tavern_screen(
     return msg
 
 
+async def show_photo_panel(
+    message: Message, media, caption: str, markup, owner_id: int | None = None
+) -> Message:
+    """Переход в том же окне: подменяем фото панели (edit_media), не двигая
+    сообщение. Если оно не фото или правка не прошла — пересоздаём с переносом
+    владельца."""
+    if message.photo:
+        try:
+            return await message.edit_media(
+                InputMediaPhoto(media=media, caption=caption, parse_mode="HTML"),
+                reply_markup=markup,
+            )
+        except TelegramBadRequest as e:
+            if "not modified" in str(e).lower():
+                return message  # уже показано — панель не трогаем
+            # иначе сообщение нельзя редактировать (старое и т.п.) — пересоздаём
+    panels.release(message)
+    try:
+        await message.delete()
+    except TelegramBadRequest:
+        pass
+    msg = await message.answer_photo(media, caption=caption, reply_markup=markup)
+    panels.claim(msg, owner_id)
+    return msg
+
+
+async def show_text_panel(
+    message: Message, caption: str, markup, owner_id: int | None = None
+) -> Message:
+    """Текстовая панель в том же окне (когда нет фоновой картинки)."""
+    if message.photo:  # из фото в текст редактированием нельзя — пересоздаём
+        panels.release(message)
+        try:
+            await message.delete()
+        except TelegramBadRequest:
+            pass
+        msg = await message.answer(caption, reply_markup=markup)
+        panels.claim(msg, owner_id)
+        return msg
+    try:
+        await message.edit_text(caption, reply_markup=markup)
+    except TelegramBadRequest:
+        pass
+    return message
+
+
+async def show_tavern_panel(
+    message: Message, player: Player, owner_id: int | None = None
+) -> Message:
+    """Экран таверны в текущем окне (переход с куклы обратно к таверне)."""
+    caption = texts.tavern_screen(player, player.tavern)
+    markup = kb.tavern_kb(player)
+    img = images.tavern_image(player.tavern.level)
+    if img is None:
+        return await show_text_panel(message, caption, markup, owner_id)
+    result = await show_photo_panel(message, cached_media(img), caption, markup, owner_id)
+    remember_file_id(img, result)
+    return result
+
+
 async def open_tavern(message: Message, player: Player, owner_id: int) -> Message:
-    """Открыть главный экран таверны панелью (для общего чата)."""
+    """Открыть главный экран таверны новой панелью (для общего чата)."""
     return await send_tavern_screen(message, player, owner_id=owner_id)
 
 
