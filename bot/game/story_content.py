@@ -3,16 +3,21 @@
 свой говор. Цепочки задаются Schedule(...) + scheduled_only-звеном.
 """
 
+from bot.game import balance
 from bot.game.story_defs import (
     Choice, ClearFlag, Echo, FacRep, Faction, FactionPower, Gold, HasBuilding,
-    HasFlag, Chron, MinLevel, NotFlag, Outcome, Product, RelTo, Rep, Schedule,
-    SetFlag, Storylet,
+    HasFlag, Chron, MinLevel, NotFlag, NpcRel, Outcome, Product, RelTo, Rep,
+    Schedule, SetFlag, Storylet,
 )
+
+_FRIEND = balance.REL_FRIEND  # порог «свой» (40)
+_FOE = balance.REL_FOE        # порог «враг» (-40)
 
 _LIST = [
     # ── Сир Бухло: долг под «слово рыцаря» (+ цепочка возврата) ──────────
     Storylet(
         id="knight_debt", npc="buhlo", arc="buhlo", weight=12,
+        preconditions=(NpcRel("buhlo", at_most=_FRIEND - 1),),
         title="Рыцарь без гроша",
         text=("На пороге — Сир Бухло, гремит ржавыми латами и дышит перегаром "
               "на весь зал: «Налей бочку в долг, холоп! Слово рыцаря даю — "
@@ -339,6 +344,194 @@ _LIST = [
             Choice("🚪 Не по мне это", (
                 Outcome(1, "«Дело хозяйское. Но мы запомним отказ». Скупщик "
                            "растворился в тенях.", (FacRep("thieves", -10),)),
+            )),
+        ),
+    ),
+
+    # ════════════ ФАЗА 2: ЗНАКОМЫЕ ЛИЦА (реакция на отношения) ════════════
+
+    # Бухло-друг: вместо попрошайки приходит завсегдатай со знатными корешами.
+    Storylet(
+        id="buhlo_regular", npc="buhlo", arc="buhlo", weight=12,
+        preconditions=(NpcRel("buhlo", at_least=_FRIEND),),
+        title="Свой человек",
+        text=("Сир Бухло — уже завсегдатай — ввалился не один: «Привёл корешей "
+              "из благородных, трактирщик! Гуляем у тебя, я ж тут как дома!»"),
+        choices=(
+            Choice("🍷 Гулять так гулять!", (
+                Outcome(60, "Знать гудела до утра, сыпала золотом не считая. "
+                            "Лучшая ночь в истории кабака!",
+                        (Gold(tier="serious"), Rep(2),
+                         Echo("🍷 У {name} нынче кутила сама знать — Сир Бухло привёл!"))),
+                Outcome(40, "Гуляли знатно, хоть пару скамей и разнесли. "
+                            "Навар всё равно жирный.",
+                        (Gold(tier="minor"), Rep(1))),
+            )),
+            Choice("🤝 По-тихому, для своих", (
+                Outcome(1, "Посидели душевно, без буянства. Бухло проникся "
+                           "ещё больше — такой друг дорогого стоит.",
+                        (Gold(tier="minor"), RelTo("buhlo", 10))),
+            )),
+        ),
+    ),
+
+    # Лютик-друг: сочиняет гимн твоему кабаку — слава на весь Недоливск.
+    Storylet(
+        id="lutik_anthem", npc="lutik", arc="lutik", weight=9,
+        preconditions=(NpcRel("lutik", at_least=15), NotFlag("has_anthem")),
+        title="Гимн кабаку",
+        text=("Лютик подмигивает: «Слушай, хозяин, а сочиню-ка я твоему кабаку "
+              "гимн! Будут горланить во всех тавернах — слава, считай, в кармане»."),
+        choices=(
+            Choice("🎺 Заказать гимн", (
+                Outcome(1, "Через неделю гимн твоего кабака орали по всему "
+                           "Недоливску. Слава гремит!",
+                        (Gold(tier="minor", sign=-1), Rep(3), SetFlag("has_anthem"),
+                         RelTo("lutik", 5),
+                         Echo("🎺 Теперь у кабака {name} есть свой гимн — горланят повсюду!"),
+                         Chron("{name} заказал Лютику гимн — слава кабака гремит на весь город."))),
+            )),
+            Choice("🚪 Обойдусь без песен", (
+                Outcome(1, "«Ну и зря, искусство ты не ценишь». Лютик пожал "
+                           "плечами.", ()),
+            )),
+        ),
+    ),
+
+    # Стража-враг: капитан точит зуб за прошлые дерзости (реакция на репутацию).
+    Storylet(
+        id="watch_shakedown", npc="mzdoimov", arc="watch", weight=11,
+        preconditions=(Faction("watch", at_most=_FOE),),
+        title="Стража точит зуб",
+        text=("Мздоимов заявился с ухмылкой и тремя дубинами за спиной: «Ну "
+              "здравствуй, смутьян. Не забыл, как страже хамил? Самое время "
+              "вспомнить, кто тут власть»."),
+        choices=(
+            Choice("💰 Откупиться, сгладить", (
+                Outcome(1, "Сунул капитану кошель потолще. Тот подобрел: "
+                           "«Вот, другое дело. Будем считать, поладили».",
+                        (Gold(tier="minor", sign=-1), FacRep("watch", 15),
+                         Chron("{name} замирился со стражей — кошельком, как водится."))),
+            )),
+            Choice("😤 Терпеть произвол", (
+                Outcome(1, "Стража перевернула пол-кабака «в поисках "
+                           "контрабанды» и убралась. Убыток и унижение.",
+                        (Gold(tier="petty", sign=-1), Rep(-1))),
+            )),
+            Choice("🏛 Нажаловаться купцам", (
+                Outcome(1, "Купеческая лига надавила на капитана через "
+                           "магистрат — тот сдулся и отстал. Связи решают.",
+                        (FacRep("watch", 5),
+                         Chron("{name} осадил зарвавшуюся стражу через купеческую лигу."))),
+            ), requires=(Faction("merchants", at_least=25),)),
+        ),
+    ),
+
+    # ════════════ ФАЗА 2: АРКА «ЗАГОВОР В НЕДОЛИВСКЕ» (ветвящаяся) ════════════
+    # plot_rumor -> (гильдия | стража) -> налёт/облава -> итог города.
+
+    Storylet(
+        id="plot_rumor", npc="skupshik", arc="plot", weight=7,
+        preconditions=(MinLevel(3), NotFlag("plot_thieves"),
+                       NotFlag("plot_watch"), NotFlag("plot_done")),
+        title="Большое дело",
+        text=("Скупщик подсел вплотную, дышит перегаром: «Слышь, кабатчик. "
+              "Гильдия мутит большое дело — куш на весь город. Ты мужик "
+              "приметливый… с какой стороны встанешь?»"),
+        choices=(
+            Choice("🥷 Разнюхать для гильдии", (
+                Outcome(1, "Кивнул Скупщику. Теперь ты в курсе — и в деле. "
+                           "Жди весточки, когда время придёт.",
+                        (SetFlag("plot_thieves"), RelTo("skupshik", 10),
+                         FacRep("thieves", 5), Schedule("plot_thieves_step", 12))),
+            )),
+            Choice("👮 Донести страже", (
+                Outcome(1, "Шепнул капитану про затею гильдии. Мздоимов "
+                           "оживился: «Готовь кабак, будем брать с поличным».",
+                        (SetFlag("plot_watch"), FacRep("watch", 10),
+                         Schedule("plot_watch_step", 12))),
+            )),
+            Choice("🙊 Не лезть в это", (
+                Outcome(1, "«Как знаешь. Дело хозяйское». Скупщик растаял в "
+                           "тенях. Может, оно и к лучшему.", ()),
+            )),
+        ),
+    ),
+    Storylet(
+        id="plot_thieves_step", npc="skupshik", arc="plot", scheduled_only=True,
+        title="Ночь налёта",
+        text=("Скупщик возник на пороге в чёрном: «Пора, кабатчик. Дело "
+              "сегодня. Прикроешь нас — золотом не обидим. Ну, ты с нами?»"),
+        choices=(
+            Choice("🥷 В деле!", (
+                Outcome(1, "Кабак стал штабом налёта. Дело выгорело — твоя "
+                           "доля звенит в кармане. Гильдия тебя зауважала.",
+                        (Gold(tier="serious"), FacRep("thieves", 20),
+                         FacRep("watch", -15), FactionPower("thieves", 10),
+                         SetFlag("plot_done"), ClearFlag("plot_thieves"),
+                         Schedule("plot_aftermath_thieves", 24))),
+            )),
+            Choice("😰 Струсить в последний момент", (
+                Outcome(1, "В последний миг сдал назад. Гильдия плюнула тебе "
+                           "под ноги: «Слабак». Доверие подорвано.",
+                        (RelTo("skupshik", -20), FacRep("thieves", -10),
+                         ClearFlag("plot_thieves"))),
+            )),
+        ),
+    ),
+    Storylet(
+        id="plot_watch_step", npc="mzdoimov", arc="plot", scheduled_only=True,
+        title="Облава",
+        text=("Мздоимов с отрядом засел в твоём кабаке: «Гильдейские вот-вот "
+              "сунутся. Подыграешь — внакладе не останешься. По рукам?»"),
+        choices=(
+            Choice("👮 Помочь страже", (
+                Outcome(1, "Воров взяли с поличным прямо у тебя. Капитан жмёт "
+                           "руку, награда при тебе. Гильдия в ярости.",
+                        (Gold(tier="serious"), FacRep("watch", 20),
+                         FacRep("thieves", -15), FactionPower("watch", 10),
+                         SetFlag("plot_done"), ClearFlag("plot_watch"),
+                         Schedule("plot_aftermath_watch", 24))),
+            )),
+            Choice("🚪 Отказать в последний момент", (
+                Outcome(1, "Передумал лезть в это. Капитан скривился: «Зря, "
+                           "ох зря». Стража затаила обиду.",
+                        (FacRep("watch", -10), ClearFlag("plot_watch"))),
+            )),
+        ),
+    ),
+    Storylet(
+        id="plot_aftermath_thieves", npc="skupshik", arc="plot",
+        scheduled_only=True,
+        title="Воры в силе",
+        text=("Гильдия подмяла полгорода и не забыла, кто помогал. Скупщик "
+              "притащил тяжёлый мешок: «Твоя доля, братишка. Недоливск теперь наш»."),
+        choices=(
+            Choice("💰 Забрать долю", (
+                Outcome(1, "Золото оттянуло карман. В городе теперь правят "
+                           "тени — и ты среди своих.",
+                        (Gold(tier="major"), FacRep("thieves", 10),
+                         FactionPower("thieves", 10), SetFlag("city_thieves_rising"),
+                         Echo("🥷 {name} помог гильдии подмять Недоливск — теперь воры тут хозяева."),
+                         Chron("При участии {name} воровская гильдия взяла верх в Недоливске."))),
+            )),
+        ),
+    ),
+    Storylet(
+        id="plot_aftermath_watch", npc="mzdoimov", arc="plot",
+        scheduled_only=True,
+        title="Порядок наведён",
+        text=("Стража разгромила гильдию, и капитан не забыл твоей помощи. "
+              "Мздоимов лично занёс мешок с наградой: «Честный кабатчик — "
+              "опора короны. Уважаю»."),
+        choices=(
+            Choice("🛡 Принять благодарность", (
+                Outcome(1, "Награда увесиста, а кабак теперь под крылом стражи. "
+                           "В Недоливске стало потише.",
+                        (Gold(tier="major"), FacRep("watch", 10),
+                         FactionPower("watch", 10), SetFlag("city_order_rising"),
+                         Echo("🛡 {name} помог страже накрыть гильдию — в Недоливске стало потише."),
+                         Chron("При участии {name} стража навела порядок и осадила гильдию."))),
             )),
         ),
     ),
