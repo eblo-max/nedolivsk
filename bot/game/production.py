@@ -7,9 +7,12 @@
 Шаг 2a: мельница (зерно→солод). Пивоварня — следующим шагом.
 """
 
+import random
 from datetime import datetime, timedelta, timezone
 
 from bot.game import inventory
+
+MATURE_CHANCE = 55  # % успеха выдержки (+1 ярус), иначе −1 ярус
 
 PRODUCERS = {"mill", "brewery"}  # здания с производством
 
@@ -120,18 +123,72 @@ def start_brew(player, tavern, tier: int) -> tuple[bool, str, dict | None]:
     return True, "", cin
 
 
-def claim_brew(player, tavern) -> tuple[int, int] | None:
-    """Разлить готовый эль в погреб. Возвращает (ярус, количество) или None."""
-    if state(tavern, "brewery")[0] != "ready":
+def _brew_grace_minutes(tier: int) -> int:
+    """Окно безопасного разлива после созревания выдержки."""
+    return max(120, brew_hours(tier) * 60 // 2)
+
+
+def brew_phase(tavern) -> tuple[str, int]:
+    """Фаза пивоварни: empty|fermenting|ready|aging|ripe|overripe + минуты.
+    Для 'ripe' минуты — сколько осталось разлить до перекисания."""
+    batch = (tavern.production or {}).get("brewery")
+    if not batch:
+        return "empty", 0
+    ready = datetime.fromisoformat(batch["ready_at"])
+    left = (ready - _now()).total_seconds()
+    if batch.get("stage", "ferment") == "ferment":
+        return ("fermenting", int(left // 60) + 1) if left > 0 else ("ready", 0)
+    # выдержка
+    if left > 0:
+        return "aging", int(-(-left // 60))
+    over_min = (-left) / 60
+    grace = _brew_grace_minutes(int(batch["tier"]))
+    if over_min <= grace:
+        return "ripe", int(grace - over_min) + 1
+    return "overripe", 0
+
+
+def start_age(player, tavern) -> bool:
+    """Поставить готовый эль на выдержку (только если ярус < макс)."""
+    if brew_phase(tavern)[0] != "ready":
+        return False
+    batch = dict((tavern.production or {})["brewery"])
+    tier = int(batch["tier"])
+    if tier >= 3:
+        return False
+    batch["stage"] = "aging"
+    batch["ready_at"] = (_now() + timedelta(hours=brew_hours(tier))).isoformat()
+    batch.pop("notified", None)
+    _set_batch(tavern, "brewery", batch)
+    return True
+
+
+def claim_brew(player, tavern) -> tuple[str, int, int] | None:
+    """Разлить эль. Возвращает (исход, ярус, кол-во):
+    bottled | matured | soured | lost. None — ещё не готово."""
+    phase, _ = brew_phase(tavern)
+    batch = (tavern.production or {}).get("brewery")
+    if batch is None or phase in ("fermenting", "aging", "empty"):
         return None
-    batch = (tavern.production or {})["brewery"]
     tier = int(batch["tier"])
     qty = int(batch.get("out_qty", 0))
-    products = dict(tavern.products or {})
-    products[str(tier)] = products.get(str(tier), 0) + qty
-    tavern.products = products
+
+    if phase == "ready":
+        outcome, out_tier = "bottled", tier
+    elif phase == "ripe" and random.randint(1, 100) <= MATURE_CHANCE:
+        outcome, out_tier = "matured", min(3, tier + 1)
+    else:  # ripe-fail или overripe — скисло на ступень
+        outcome, out_tier = "soured", tier - 1
+
+    if out_tier >= 1 and qty > 0:
+        products = dict(tavern.products or {})
+        products[str(out_tier)] = products.get(str(out_tier), 0) + qty
+        tavern.products = products
+    else:
+        outcome, qty = "lost", 0
+
     _set_batch(tavern, "brewery", None)
-    return tier, qty
+    return outcome, out_tier, qty
 
 
 def products_value(tavern) -> int:

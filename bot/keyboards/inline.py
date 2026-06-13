@@ -188,9 +188,14 @@ def production_kb(player, tavern, building) -> InlineKeyboardMarkup:
         elif state == "none":
             kb.button(text="🌾 Молоть солод", callback_data="prod_make:mill")
     elif building.id == "brewery":
-        if state == "ready":
+        phase, _ = prod.brew_phase(tavern)
+        if phase == "ready":
             kb.button(text="🍺 Разлить в погреб", callback_data="prod_claim:brewery")
-        elif state == "none":
+            if int(tavern.production["brewery"]["tier"]) < 3:
+                kb.button(text="🛢 Выдержать (рискнуть)", callback_data="brew_age")
+        elif phase in ("ripe", "overripe"):
+            kb.button(text="🍺 Разлить выдержку", callback_data="prod_claim:brewery")
+        elif phase == "empty":
             kb.button(text="★ Эль", callback_data="brew:1")
             kb.button(text="★★ Светлое", callback_data="brew:2")
             kb.button(text="★★★ Праздничное", callback_data="brew:3")

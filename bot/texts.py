@@ -224,13 +224,25 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
         stock = " · ".join(
             f"{prod.ALE_STARS[t]} {prods.get(str(t), 0)}" for t in (1, 2, 3)
         )
-        state, minutes = prod.state(tavern, "brewery")
-        if state == "active":
-            t = int(tavern.production["brewery"]["tier"])
-            status = f"⏳ Бродит {prod.ALE_STARS[t]} — ещё {_fmt_minutes(minutes)}."
-        elif state == "ready":
-            t = int(tavern.production["brewery"]["tier"])
-            status = f"🍺 {prod.ALE_STARS[t]} готов — разливай в погреб!"
+        phase, minutes = prod.brew_phase(tavern)
+        bt = int(tavern.production["brewery"]["tier"]) if phase != "empty" else 0
+        if phase == "fermenting":
+            status = f"⏳ Бродит {prod.ALE_STARS[bt]} — ещё {_fmt_minutes(minutes)}."
+        elif phase == "ready":
+            extra = " или выдержи (риск +ярус)" if bt < 3 else ""
+            status = f"🍺 {prod.ALE_STARS[bt]} готов — разливай{extra}!"
+        elif phase == "aging":
+            status = (
+                f"🛢 Выдержка {prod.ALE_STARS[bt]} → {prod.ALE_STARS[min(3, bt+1)]}? "
+                f"— ещё {_fmt_minutes(minutes)}."
+            )
+        elif phase == "ripe":
+            status = (
+                f"⏰ Выдержка дошла! Разливай в течение {_fmt_minutes(minutes)} — "
+                "иначе перекиснет."
+            )
+        elif phase == "overripe":
+            status = "⚠️ Перекисает! Разливай немедля — ярус упадёт."
         else:
             status = "😴 Чаны пусты. Выбери, что варить."
         inv = lambda r: inventory.get(player, r)  # noqa: E731
@@ -259,8 +271,30 @@ def brew_ready_notification(tier: int) -> str:
 
     return (
         f"🍺 <b>Эль {prod.ALE_STARS[tier]} доварился!</b> "
-        "Разлей в погреб — кружки сами себя не нальют."
+        "Разлей в погреб — или поставь на выдержку, рискни поднять ярус."
     )
+
+
+def brew_aged_notification(tier: int) -> str:
+    from bot.game import production as prod
+
+    return (
+        f"⏰ <b>Выдержка {prod.ALE_STARS[tier]} дошла!</b> "
+        "Разливай скорее — передержишь, и бочка перекиснет."
+    )
+
+
+def brew_claimed(outcome: str, tier: int, qty: int) -> str:
+    from bot.game import production as prod
+
+    star = prod.ALE_STARS.get(tier, "")
+    if outcome == "matured":
+        return f"🍀 Выдержка удалась! Эль поднялся до {star}: +{qty} в погреб."
+    if outcome == "soured":
+        return f"😒 Перекисло — эль осел до {star}: +{qty} в погреб. Бывает."
+    if outcome == "lost":
+        return "💀 Прокисло вусмерть. Вся бочка коту под хвост — выдержка это риск."
+    return f"🍺 Разлито: {star} +{qty} в погреб."
 
 
 def mill_started(amount: int, minutes: int) -> str:

@@ -106,19 +106,26 @@ async def _notify_returned(bot: Bot) -> None:
         for player in result.scalars().all():
             tavern = player.tavern
             batch = (tavern.production or {}).get("brewery")
-            if not batch or batch.get("notified"):
+            if not batch:
                 continue
-            if prod.state(tavern, "brewery")[0] != "ready":
+            phase, _ = prod.brew_phase(tavern)
+            if phase not in ("ready", "ripe"):
                 continue
+            stage = batch.get("stage", "ferment")
+            if batch.get("notified") == stage:
+                continue
+            tier = int(batch["tier"])
+            msg = (
+                texts.brew_ready_notification(tier) if phase == "ready"
+                else texts.brew_aged_notification(tier)
+            )
             try:
                 await bot.send_message(
-                    player.id,
-                    texts.brew_ready_notification(int(batch["tier"])),
-                    reply_markup=buildings_notify_kb(),
+                    player.id, msg, reply_markup=buildings_notify_kb()
                 )
             except Exception:
                 logger.warning("Не доставлено о варке игроку %s", player.id)
             new = dict(tavern.production)
-            new["brewery"] = {**batch, "notified": True}
+            new["brewery"] = {**batch, "notified": stage}
             tavern.production = new
         await session.commit()

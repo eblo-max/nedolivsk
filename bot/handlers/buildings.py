@@ -163,6 +163,23 @@ async def cb_brew(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer("Заброжало!")
 
 
+@router.callback_query(F.data == "brew_age")
+async def cb_brew_age(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session, lock=True)
+    if player is None:
+        return
+    if not production.start_age(player, player.tavern):
+        await callback.answer("Выдержка сейчас невозможна.", show_alert=True)
+        return
+    building = buildings.CATALOG["brewery"]
+    await common.caption_edit(
+        callback.message,
+        texts.production_screen(building, player, player.tavern),
+        kb.production_kb(player, player.tavern, building),
+    )
+    await callback.answer("Поставили на выдержку — теперь не зевай!")
+
+
 @router.callback_query(F.data.startswith("prod_claim:"))
 async def cb_prod_claim(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session, lock=True)
@@ -175,21 +192,25 @@ async def cb_prod_claim(callback: CallbackQuery, session: AsyncSession) -> None:
             await callback.answer("Солод ещё не готов.", show_alert=True)
             return
         building = buildings.CATALOG["mill"]
-        toast = f"🌱 +{amount} солода"
-    elif bid == "brewery":
+        await common.caption_edit(
+            callback.message,
+            texts.production_screen(building, player, player.tavern),
+            kb.production_kb(player, player.tavern, building),
+        )
+        await callback.answer(f"🌱 +{amount} солода")
+        return
+    if bid == "brewery":
         result = production.claim_brew(player, player.tavern)
         if result is None:
-            await callback.answer("Эль ещё бродит.", show_alert=True)
+            await callback.answer("Эль ещё не готов.", show_alert=True)
             return
-        tier, qty = result
+        outcome, tier, qty = result
         building = buildings.CATALOG["brewery"]
-        toast = f"🍺 +{qty} {production.ALE_STARS[tier]} в погреб"
-    else:
-        await callback.answer()
+        await common.caption_edit(
+            callback.message,
+            texts.production_screen(building, player, player.tavern),
+            kb.production_kb(player, player.tavern, building),
+        )
+        await callback.answer(texts.brew_claimed(outcome, tier, qty), show_alert=True)
         return
-    await common.caption_edit(
-        callback.message,
-        texts.production_screen(building, player, player.tavern),
-        kb.production_kb(player, player.tavern, building),
-    )
-    await callback.answer(toast)
+    await callback.answer()
