@@ -15,11 +15,16 @@ from bot.game import inventory
 
 MATURE_CHANCE = 55  # % успеха выдержки (+1 ярус), иначе −1 ярус
 
-PRODUCERS = {"mill", "brewery", "meadery", "kitchen"}  # здания с производством
+PRODUCERS = {"mill", "brewery", "meadery", "kitchen", "winery"}
 
 # Кухня: рецепт -> (вход на 1 уровень, часы, выход порций на уровень)
 KITCHEN = {
     "roast": ({"game": 6, "grain": 6, "herbs": 4}, 6, 12),  # Жаркое
+}
+
+# Винокурня: рецепт -> (вход, часы, выход). Берри-тяжёлое премиум-вино.
+WINERY = {
+    "wine": ({"berries": 22, "honey": 6, "water": 6}, 12, 12),
 }
 
 MILL_MINUTES = 40
@@ -72,6 +77,7 @@ DRINKS: dict[str, Drink] = {
 }
 DRINKS["mead"] = Drink("mead", "🍶", "Медовуха", 10)
 DRINKS["sbiten"] = Drink("sbiten", "🌿", "Сбитень", 13)
+DRINKS["wine"] = Drink("wine", "🍷", "Вино", 15)
 
 # Еда (Кухня): отдельный пул спроса (голод), продаётся как напитки
 FOODS: dict[str, Drink] = {
@@ -319,6 +325,49 @@ def claim_kitchen(player, tavern) -> tuple[str, int] | None:
     products[recipe] = products.get(recipe, 0) + qty
     tavern.products = products
     _set_batch(tavern, "kitchen", None)
+    return recipe, qty
+
+
+def winery_inputs(recipe: str, level: int) -> dict:
+    return {k: v * level for k, v in WINERY[recipe][0].items()}
+
+
+def winery_hours(recipe: str) -> int:
+    return WINERY[recipe][1]
+
+
+def winery_output(recipe: str, level: int) -> int:
+    return WINERY[recipe][2] * level
+
+
+def start_winery(player, tavern, recipe: str) -> tuple[bool, str, dict | None]:
+    if recipe not in WINERY:
+        return False, "unknown", None
+    if state(tavern, "winery")[0] != "none":
+        return False, "busy", None
+    level = tavern.level
+    cin = winery_inputs(recipe, level)
+    if not inventory.can_afford(player, cin):
+        return False, "not_enough", cin
+    inventory.pay(player, cin)
+    _set_batch(tavern, "winery", {
+        "recipe": recipe,
+        "out_qty": winery_output(recipe, level),
+        "ready_at": (_now() + timedelta(hours=winery_hours(recipe))).isoformat(),
+    })
+    return True, "", cin
+
+
+def claim_winery(player, tavern) -> tuple[str, int] | None:
+    if state(tavern, "winery")[0] != "ready":
+        return None
+    batch = (tavern.production or {})["winery"]
+    recipe = batch.get("recipe", "wine")
+    qty = int(batch.get("out_qty", 0))
+    products = dict(tavern.products or {})
+    products[recipe] = products.get(recipe, 0) + qty
+    tavern.products = products
+    _set_batch(tavern, "winery", None)
     return recipe, qty
 
 

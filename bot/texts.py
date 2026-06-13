@@ -307,7 +307,41 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
             f"· 🌶 {inventory.get(player, 'herbs')}\n"
             "<i>Сытые гости платят за еду сверх выпивки (свой спрос).</i>"
         )
+    if building.id == "winery":
+        level = tavern.level
+        wine = (tavern.products or {}).get("wine", 0)
+        cin = prod.winery_inputs("wine", level)
+        out = prod.winery_output("wine", level)
+        state, minutes = prod.state(tavern, "winery")
+        if state == "active":
+            status = f"⏳ Бродит — ещё {_fmt_minutes(minutes)}."
+        elif state == "ready":
+            status = "🍷 Вино готово — разливай в погреб!"
+        else:
+            status = "😴 Бочки пусты. Поставь вино."
+        return (
+            head +
+            f"\n🍷 Вино в погребе: {wine}\n{status}\n\n"
+            f"Рецепт (ур. {level}): 🍒 {cin['berries']} 🍯 {cin['honey']} 💧 {cin['water']} → "
+            f"🍷 {out}, {prod.winery_hours('wine')} ч\n"
+            f"Есть: 🍒 {inventory.get(player, 'berries')} · 🍯 {inventory.get(player, 'honey')} "
+            f"· 💧 {inventory.get(player, 'water')}\n"
+            "<i>Самый дорогой напиток — берут только богачи (высокая репутация).</i>"
+        )
     return head + "\nПроизводство этого здания — скоро."
+
+
+def winery_not_enough(recipe: str, cin: dict) -> str:
+    ico = {**RESOURCE_EMOJI, **balance.GOODS_EMOJI}
+    need = " ".join(f"{ico.get(r, r)}{q}" for r, q in cin.items())
+    return f"😕 На вино не хватает: {need}. Шли бригаду за ягодами."
+
+
+def winery_ready_notification() -> str:
+    return (
+        "🍷 <b>Вино дошло!</b> Разлей в погреб — "
+        "богатая публика ценит хорошее вино."
+    )
 
 
 def kitchen_not_enough(recipe: str, cin: dict) -> str:

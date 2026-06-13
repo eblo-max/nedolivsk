@@ -161,4 +161,18 @@ async def _notify_returned(bot: Bot) -> None:
                 new = dict(tavern.production)
                 new["kitchen"] = {**kbatch, "notified": True}
                 tavern.production = new
+            # Винокурня (простая готовность)
+            wbatch = (tavern.production or {}).get("winery")
+            if (wbatch and not wbatch.get("notified")
+                    and prod.state(tavern, "winery")[0] == "ready"):
+                try:
+                    await bot.send_message(
+                        player.id, texts.winery_ready_notification(),
+                        reply_markup=buildings_notify_kb(),
+                    )
+                except Exception:
+                    logger.warning("Не доставлено о вине игроку %s", player.id)
+                new = dict(tavern.production)
+                new["winery"] = {**wbatch, "notified": True}
+                tavern.production = new
         await session.commit()
