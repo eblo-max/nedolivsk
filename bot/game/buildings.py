@@ -94,6 +94,21 @@ def start_build(player, tavern, building_id: str) -> BuildStart:
     return BuildStart(ok=True, building=b, cost=b.cost, hours=b.build_hours)
 
 
+def invested_value(tavern) -> int:
+    """Капитализация построенных пристроек (для ВВП): золото + сырьё в цене."""
+    from bot.game.balance import RESOURCE_PRICE
+
+    total = 0.0
+    for bid in (tavern.buildings or []):
+        b = CATALOG.get(bid)
+        if b is None:
+            continue
+        total += b.cost.get("gold", 0)
+        for res, price in RESOURCE_PRICE.items():
+            total += b.cost.get(res, 0) * price
+    return int(total)
+
+
 def finalize_build(player, tavern) -> Building | None:
     """Если стройка завершилась — заносим здание в таверну. Идемпотентно."""
     if build_state(player)[0] != "ready":
