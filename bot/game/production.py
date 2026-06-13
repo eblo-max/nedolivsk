@@ -21,18 +21,24 @@ MILL_MINUTES = 40
 MILL_GRAIN = 10   # зерна на 1 уровень
 MILL_MALT = 8     # солода на 1 уровень
 
-# Медоварня: мёд+вода → медовуха (паритет: 10×12L/8ч = 15L/ч)
-MEAD_HOURS = 8
-MEAD_IN = {"honey": 10, "water": 8}   # на 1 уровень
-MEAD_OUT = 12                          # кружек на 1 уровень
+# Медоварня: рецепт -> (вход на 1 уровень, часы, выход кружек на уровень).
+# Ключ рецепта = ключ напитка в погребе.
+MEADERY = {
+    "mead":   ({"honey": 10, "water": 8}, 8, 12),            # паритет 10×12/8=15/ч
+    "sbiten": ({"honey": 8, "herbs": 6, "water": 6}, 10, 12),  # пряный премиум, травы
+}
 
 
-def mead_inputs(level: int) -> dict:
-    return {k: v * level for k, v in MEAD_IN.items()}
+def meadery_inputs(recipe: str, level: int) -> dict:
+    return {k: v * level for k, v in MEADERY[recipe][0].items()}
 
 
-def mead_output(level: int) -> int:
-    return MEAD_OUT * level
+def meadery_hours(recipe: str) -> int:
+    return MEADERY[recipe][1]
+
+
+def meadery_output(recipe: str, level: int) -> int:
+    return MEADERY[recipe][2] * level
 
 # Пивоварня: ярус -> (вход на 1 уровень, часы ферментации, выход кружек на уровень)
 BREW = {
@@ -60,6 +66,7 @@ DRINKS: dict[str, Drink] = {
     for t in (1, 2, 3)
 }
 DRINKS["mead"] = Drink("mead", "🍶", "Медовуха", 10)
+DRINKS["sbiten"] = Drink("sbiten", "🌿", "Сбитень", 13)
 
 
 def ale_key(tier: int) -> str:
@@ -226,33 +233,37 @@ def claim_brew(player, tavern) -> tuple[str, int, int] | None:
     return outcome, out_tier, qty
 
 
-def start_mead(player, tavern) -> tuple[bool, str, dict | None]:
-    """(ok, reason, inputs). reason: busy | not_enough."""
+def start_meadery(player, tavern, recipe: str) -> tuple[bool, str, dict | None]:
+    """(ok, reason, inputs). reason: unknown | busy | not_enough."""
+    if recipe not in MEADERY:
+        return False, "unknown", None
     if state(tavern, "meadery")[0] != "none":
         return False, "busy", None
     level = tavern.level
-    cin = mead_inputs(level)
+    cin = meadery_inputs(recipe, level)
     if not inventory.can_afford(player, cin):
         return False, "not_enough", cin
     inventory.pay(player, cin)
     _set_batch(tavern, "meadery", {
-        "out_qty": mead_output(level),
-        "ready_at": (_now() + timedelta(hours=MEAD_HOURS)).isoformat(),
+        "recipe": recipe,
+        "out_qty": meadery_output(recipe, level),
+        "ready_at": (_now() + timedelta(hours=meadery_hours(recipe))).isoformat(),
     })
     return True, "", cin
 
 
-def claim_mead(player, tavern) -> int:
-    """Разлить готовую медовуху в погреб. Возвращает количество (0 — нечего)."""
+def claim_meadery(player, tavern) -> tuple[str, int] | None:
+    """Разлить готовый напиток медоварни. Возвращает (ключ, количество)."""
     if state(tavern, "meadery")[0] != "ready":
-        return 0
+        return None
     batch = (tavern.production or {})["meadery"]
+    recipe = batch.get("recipe", "mead")
     qty = int(batch.get("out_qty", 0))
     products = dict(tavern.products or {})
-    products["mead"] = products.get("mead", 0) + qty
+    products[recipe] = products.get(recipe, 0) + qty
     tavern.products = products
     _set_batch(tavern, "meadery", None)
-    return qty
+    return recipe, qty
 
 
 def products_value(tavern) -> int:

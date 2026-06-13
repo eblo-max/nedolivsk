@@ -263,44 +263,46 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
         )
     if building.id == "meadery":
         level = tavern.level
-        mead = (tavern.products or {}).get("mead", 0)
-        cin = prod.mead_inputs(level)
-        out = prod.mead_output(level)
+        prods = tavern.products or {}
+        stock = f"🍶 {prods.get('mead', 0)} · 🌿 {prods.get('sbiten', 0)}"
         state, minutes = prod.state(tavern, "meadery")
         if state == "active":
-            status = f"⏳ Бродит — ещё {_fmt_minutes(minutes)}."
+            rc = tavern.production["meadery"].get("recipe", "mead")
+            status = f"⏳ Готовится {prod.DRINKS[rc].name} — ещё {_fmt_minutes(minutes)}."
         elif state == "ready":
-            status = "🍶 Медовуха готова — разливай в погреб!"
+            status = "🍶 Готово — разливай в погреб!"
         else:
-            status = "😴 Котлы остыли. Поставь медовуху."
+            status = "😴 Котлы остыли. Выбери, что варить."
+        m = prod.meadery_inputs("mead", level)
+        s = prod.meadery_inputs("sbiten", level)
         return (
             head +
-            f"\n🍶 Медовуха в погребе: {mead}\n{status}\n\n"
-            f"Рецепт (ур. {level}): 🍯 {cin['honey']} + 💧 {cin['water']} → "
-            f"🍶 {out}, {prod.MEAD_HOURS} ч\n"
-            f"Есть: 🍯 {inventory.get(player, 'honey')} · 💧 {inventory.get(player, 'water')}\n"
-            "<i>Берут состоятельные — чем выше репутация, тем больше спрос.</i>"
+            f"\n🛢 Погреб: {stock}\n{status}\n\n"
+            f"Рецепты (ур. {level}):\n"
+            f"🍶 Медовуха: 🍯 {m['honey']} 💧 {m['water']} — {prod.meadery_hours('mead')} ч\n"
+            f"🌿 Сбитень: 🍯 {s['honey']} 🌶 {s['herbs']} 💧 {s['water']} — "
+            f"{prod.meadery_hours('sbiten')} ч\n"
+            f"Есть: 🍯 {inventory.get(player, 'honey')} · 🌶 {inventory.get(player, 'herbs')} "
+            f"· 💧 {inventory.get(player, 'water')}\n"
+            "<i>Берут состоятельные — репутация решает.</i>"
         )
     return head + "\nПроизводство этого здания — скоро."
 
 
-def mead_started(amount: int) -> str:
+def meadery_not_enough(recipe: str, cin: dict) -> str:
+    from bot.game import production as prod
+
+    ico = {**RESOURCE_EMOJI, **balance.GOODS_EMOJI}
+    need = " ".join(f"{ico.get(r, r)}{q}" for r, q in cin.items())
+    return f"😕 На «{prod.DRINKS[recipe].name}» не хватает: {need}. Доготовь сырьё."
+
+
+def meadery_ready_notification(recipe: str) -> str:
+    from bot.game import production as prod
+
+    d = prod.DRINKS[recipe]
     return (
-        f"🍯 Котлы забулькали — будет ~{amount} 🍶 медовухи через "
-        f"{8} ч. Сладко запахло на всю округу."
-    )
-
-
-def mead_not_enough(cin: dict) -> str:
-    return (
-        f"😕 На медовуху мало: нужно 🍯 {cin['honey']} мёда и 💧 {cin['water']} воды. "
-        "Гони работников за мёдом."
-    )
-
-
-def mead_ready_notification() -> str:
-    return (
-        "🍶 <b>Медовуха дошла!</b> Разлей в погреб — "
+        f"{d.emoji} <b>{d.name} готов(а)!</b> Разлей в погреб — "
         "состоятельная публика уже облизывается."
     )
 

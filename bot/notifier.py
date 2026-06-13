@@ -129,9 +129,10 @@ async def _notify_returned(bot: Bot) -> None:
             mbatch = (tavern.production or {}).get("meadery")
             if (mbatch and not mbatch.get("notified")
                     and prod.state(tavern, "meadery")[0] == "ready"):
+                recipe = mbatch.get("recipe", "mead")
                 try:
                     await bot.send_message(
-                        player.id, texts.mead_ready_notification(),
+                        player.id, texts.meadery_ready_notification(recipe),
                         reply_markup=buildings_notify_kb(),
                     )
                 except Exception:
