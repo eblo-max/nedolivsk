@@ -35,9 +35,14 @@ async def cb_chronicle(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         await callback.answer()
         return
+    # В группе — летопись текущего чата; в личке — домашнего города игрока.
+    if panels.is_group(callback.message):
+        chat_id = callback.message.chat.id
+    else:
+        chat_id = player.chat_id
     entries: list[str] = []
-    if player.chat_id is not None:
-        entries = await repo.recent_chronicle(session, player.chat_id, 10)
+    if chat_id is not None:
+        entries = await repo.recent_chronicle(session, chat_id, 10)
     await common.caption_edit(
         callback.message, texts.chronicle_screen(entries), kb.chronicle_kb()
     )
