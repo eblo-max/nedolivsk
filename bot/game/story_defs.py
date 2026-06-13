@@ -133,8 +133,17 @@ class RelTo:
 
 
 class FacRep:
+    """Личная репутация у фракции. Заодно ambient-перетоком двигает силу
+    фракции в городе (личное влияние складывается в общую судьбу)."""
     def __init__(self, fac, delta): self.fac, self.delta = fac, delta
-    def apply(self, ctx): story_state.adjust_faction(ctx.player, self.fac, self.delta)
+
+    def apply(self, ctx):
+        story_state.adjust_faction(ctx.player, self.fac, self.delta)
+        spill = int(round(self.delta * balance.CITY_POWER_FROM_REP))
+        if spill and ctx.city is not None:
+            fp = dict(ctx.city.faction_power or {})
+            fp[self.fac] = max(-100, min(100, fp.get(self.fac, 0) + spill))
+            ctx.city.faction_power = fp
 
 
 class SetFlag:

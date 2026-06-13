@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
@@ -66,9 +66,24 @@ async def all_cities(session: AsyncSession, *, lock: bool = False):
     return list(result.scalars().all())
 
 
-async def add_chronicle(session: AsyncSession, chat_id: int, text: str) -> None:
-    """Запись в летопись города."""
+async def add_chronicle(
+    session: AsyncSession, chat_id: int, text: str, keep: int = 60
+) -> None:
+    """Запись в летопись города (держим последние `keep` записей на чат)."""
     session.add(Chronicle(chat_id=chat_id, text=text[:256]))
+    await session.flush()
+    threshold = (await session.execute(
+        select(Chronicle.id)
+        .where(Chronicle.chat_id == chat_id)
+        .order_by(Chronicle.id.desc())
+        .limit(1).offset(keep)
+    )).scalar()
+    if threshold is not None:  # есть что подрезать
+        await session.execute(
+            delete(Chronicle).where(
+                Chronicle.chat_id == chat_id, Chronicle.id <= threshold
+            )
+        )
 
 
 async def recent_chronicle(

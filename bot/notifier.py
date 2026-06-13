@@ -63,6 +63,10 @@ async def _notify_returned(bot: Bot) -> None:
         world = await repo.get_or_create_world(session)
         fair_event = wld.advance(world)  # 'pre'|'open'|'close'|None — анонс в чаты
 
+        # Рассылку копим и шлём ПОСЛЕ коммита, чтобы не держать локи строк
+        # через сетевые вызовы Telegram (иначе клики игроков ждут весь тик).
+        outbox: list[tuple] = []  # (player, text, markup)
+
         # Живой город: доставка созревших отложенных событий (цепочки-истории).
         result = await session.execute(
             select(Player)
@@ -83,7 +87,7 @@ async def _notify_returned(bot: Bot) -> None:
                 continue
             story_state.set_pending(player, s.id, s.npc)
             text, markup = story_engine.present(s, player)
-            await _notify(bot, player, text, markup)
+            outbox.append((player, text, markup))
 
         result = await session.execute(
             select(Player)
@@ -102,7 +106,7 @@ async def _notify_returned(bot: Bot) -> None:
                     new_exps.append(e)
             if not newly:
                 continue
-            await _notify(bot, player, texts.expedition_returned(newly), claim_kb())
+            outbox.append((player, texts.expedition_returned(newly), claim_kb()))
             player.expeditions = new_exps
 
         result = await session.execute(
@@ -118,10 +122,10 @@ async def _notify_returned(bot: Bot) -> None:
             item_id, tier = parse_entry(player.craft_item)
             item = CATALOG.get(item_id)
             if item is not None:
-                await _notify(
-                    bot, player,
+                outbox.append((
+                    player,
                     texts.craft_ready_notification(item, tier), craft_claim_kb(),
-                )
+                ))
             player.craft_notified = True
 
         from bot.game import buildings as bld
@@ -135,10 +139,10 @@ async def _notify_returned(bot: Bot) -> None:
             building = bld.finalize_build(player, player.tavern)  # завершаем стройку
             if building is None:
                 continue
-            await _notify(
-                bot, player,
+            outbox.append((
+                player,
                 texts.build_ready_notification(building), buildings_notify_kb(),
-            )
+            ))
 
         from bot.game import production as prod
 
@@ -161,7 +165,7 @@ async def _notify_returned(bot: Bot) -> None:
                         texts.brew_ready_notification(tier) if phase == "ready"
                         else texts.brew_aged_notification(tier)
                     )
-                    await _notify(bot, player, msg, buildings_notify_kb())
+                    outbox.append((player, msg, buildings_notify_kb()))
                     new = dict(tavern.production)
                     new["brewery"] = {**bbatch, "notified": stage}
                     tavern.production = new
@@ -170,10 +174,10 @@ async def _notify_returned(bot: Bot) -> None:
             if (mbatch and not mbatch.get("notified")
                     and prod.state(tavern, "meadery")[0] == "ready"):
                 recipe = mbatch.get("recipe", "mead")
-                await _notify(
-                    bot, player,
+                outbox.append((
+                    player,
                     texts.meadery_ready_notification(recipe), buildings_notify_kb(),
-                )
+                ))
                 new = dict(tavern.production)
                 new["meadery"] = {**mbatch, "notified": True}
                 tavern.production = new
@@ -181,10 +185,10 @@ async def _notify_returned(bot: Bot) -> None:
             kbatch = (tavern.production or {}).get("kitchen")
             if (kbatch and not kbatch.get("notified")
                     and prod.state(tavern, "kitchen")[0] == "ready"):
-                await _notify(
-                    bot, player,
+                outbox.append((
+                    player,
                     texts.kitchen_ready_notification(), buildings_notify_kb(),
-                )
+                ))
                 new = dict(tavern.production)
                 new["kitchen"] = {**kbatch, "notified": True}
                 tavern.production = new
@@ -192,10 +196,10 @@ async def _notify_returned(bot: Bot) -> None:
             wbatch = (tavern.production or {}).get("winery")
             if (wbatch and not wbatch.get("notified")
                     and prod.state(tavern, "winery")[0] == "ready"):
-                await _notify(
-                    bot, player,
+                outbox.append((
+                    player,
                     texts.winery_ready_notification(), buildings_notify_kb(),
-                )
+                ))
                 new = dict(tavern.production)
                 new["winery"] = {**wbatch, "notified": True}
                 tavern.production = new
@@ -213,6 +217,10 @@ async def _notify_returned(bot: Bot) -> None:
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода
         for city in cities:
             citymod.refresh_cache(city, now)  # кэш ситуаций для экранов
+
+        # Персональные уведомления — после коммита (локи уже отпущены).
+        for player, text, markup in outbox:
+            await _notify(bot, player, text, markup)
 
         # Анонс мирового события в общие чаты (после коммита состояния).
         if fair_event:
