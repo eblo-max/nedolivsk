@@ -222,7 +222,7 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
         level = tavern.level
         prods = tavern.products or {}
         stock = " · ".join(
-            f"{prod.ALE_STARS[t]} {prods.get(str(t), 0)}" for t in (1, 2, 3)
+            f"{prod.ALE_STARS[t]} {prods.get(f'ale{t}', 0)}" for t in (1, 2, 3)
         )
         phase, minutes = prod.brew_phase(tavern)
         bt = int(tavern.production["brewery"]["tier"]) if phase != "empty" else 0
@@ -470,17 +470,17 @@ def income_success(r) -> str:
 
     lines = [f"💰 В кассе осело <b>{r.gold} 🪙</b>."]
     if r.sales > 0:
-        parts = [f"{prod.ALE_STARS[t]} {n}" for t, n in sorted(r.sold.items(), reverse=True)]
+        parts = [
+            f"{prod.DRINKS[k].name} {n}"
+            for k, n in sorted(r.sold.items(), key=lambda kv: -prod.DRINKS[kv[0]].price)
+        ]
         lines.append(f"Пассив {r.passive} + сбыт {r.sales} (раскуплено: {' · '.join(parts)}).")
-    elif not r.locked:
-        lines.append("Эля в погребе нет — только пассивный доход с заведения.")
     else:
-        lines.append("Сбыта не было — только пассивный доход.")
+        lines.append("Сбыта нет — только пассивный доход с заведения.")
     if r.rep_gain:
         lines.append(f"⭐ +{r.rep_gain} к репутации за бойкую торговлю.")
-    if r.locked:
-        names = ", ".join(prod.ALE_STARS[t] for t in sorted(r.locked, reverse=True))
-        lines.append(f"⚠️ {names} не берут — кишка тонка у твоей репутации.")
+    if r.premium_unsold:
+        lines.append("⚠️ Состоятельных гостей мало — дорогое не разбирают. Репутация решает.")
     return "\n".join(lines)
 
 

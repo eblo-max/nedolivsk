@@ -8,6 +8,7 @@
 """
 
 import random
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from bot.game import inventory
@@ -30,6 +31,25 @@ BREW = {
 # ярус — выбор по ВВП-марже / мёду / спросу, а не доминирование по золоту.
 ALE_PRICE = {1: 5, 2: 10, 3: 15}    # цена за кружку (доход и ВВП)
 ALE_STARS = {1: "★", 2: "★★", 3: "★★★"}
+
+
+@dataclass(frozen=True)
+class Drink:
+    key: str       # ключ в погребе (tavern.products)
+    emoji: str
+    name: str
+    price: int     # цена за кружку (доход + ВВП)
+
+
+# Единый реестр напитков. Эль — из ярусов; медовуха добавится в Медоварне.
+DRINKS: dict[str, Drink] = {
+    f"ale{t}": Drink(f"ale{t}", "🍺", f"Эль {ALE_STARS[t]}", ALE_PRICE[t])
+    for t in (1, 2, 3)
+}
+
+
+def ale_key(tier: int) -> str:
+    return f"ale{tier}"
 
 
 def brew_inputs(tier: int, level: int) -> dict:
@@ -181,8 +201,9 @@ def claim_brew(player, tavern) -> tuple[str, int, int] | None:
         outcome, out_tier = "soured", tier - 1
 
     if out_tier >= 1 and qty > 0:
+        key = ale_key(out_tier)
         products = dict(tavern.products or {})
-        products[str(out_tier)] = products.get(str(out_tier), 0) + qty
+        products[key] = products.get(key, 0) + qty
         tavern.products = products
     else:
         outcome, qty = "lost", 0
@@ -192,8 +213,10 @@ def claim_brew(player, tavern) -> tuple[str, int, int] | None:
 
 
 def products_value(tavern) -> int:
-    """Стоимость эля в погребе (для ВВП)."""
+    """Стоимость напитков в погребе (для ВВП)."""
     total = 0
-    for tier_s, qty in (tavern.products or {}).items():
-        total += ALE_PRICE.get(int(tier_s), 0) * qty
+    for key, qty in (tavern.products or {}).items():
+        d = DRINKS.get(key)
+        if d:
+            total += d.price * qty
     return int(total)

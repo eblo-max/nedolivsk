@@ -92,3 +92,11 @@ async def create_tables() -> None:
             "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS "
             "products JSONB NOT NULL DEFAULT '{}'::jsonb"
         ))
+        # Унификация ключей погреба: '1'/'2'/'3' эля -> 'ale1'/'ale2'/'ale3'
+        await conn.execute(text(
+            "UPDATE taverns SET products = (products - '1' - '2' - '3') "
+            "|| CASE WHEN products ? '1' THEN jsonb_build_object('ale1', products->'1') ELSE '{}'::jsonb END "
+            "|| CASE WHEN products ? '2' THEN jsonb_build_object('ale2', products->'2') ELSE '{}'::jsonb END "
+            "|| CASE WHEN products ? '3' THEN jsonb_build_object('ale3', products->'3') ELSE '{}'::jsonb END "
+            "WHERE products ?| array['1','2','3']"
+        ))

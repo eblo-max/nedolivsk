@@ -91,14 +91,15 @@ class IncomeResult:
     gold: int = 0
     passive: int = 0
     sales: int = 0
-    sold: dict | None = None       # {ярус: продано}
+    sold: dict | None = None       # {ключ напитка: продано}
     rep_gain: int = 0
-    locked: list | None = None     # ярусы со стоком, но недостаточной репутацией
+    premium_unsold: bool = False   # остался премиум — состоятельных мало
 
 
 def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
-    """Гибрид: полный пассив + сбыт эля гостям. Эль раскупается дороже-первым,
-    в пределах спроса (вместимость) и репутационных порогов яруса."""
+    """Гибрид: полный пассив + сбыт напитков. Спрос делится на два пула —
+    состоятельные (берут дороже-первым) и пьянь (дешевле-первым). Доля
+    состоятельных растёт с репутацией."""
     now = _now()
     since = tavern.last_income_at or now
     hours = min((now - since).total_seconds() / 3600, balance.INCOME_CAP_HOURS)
@@ -109,24 +110,40 @@ def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
     passive = int(tavern.income_rate * hours * mult)
 
     demand = int(tavern.capacity * balance.DEMAND_PER_CAPACITY * hours)
+    share = min(balance.PREMIUM_SHARE_MAX, tavern.reputation / balance.PREMIUM_REP_DIV)
+    premium_demand = int(demand * share)
+    commoner_demand = demand - premium_demand
+
     products = dict(tavern.products or {})
-    sold: dict[int, int] = {}
+    sold: dict[str, int] = {}
     sales = 0
-    locked: list[int] = []
-    for tier in (3, 2, 1):  # премиум-первым ради максимума золота
-        stock = products.get(str(tier), 0)
-        if stock <= 0:
-            continue
-        if tavern.reputation < balance.ALE_REP_GATE[tier]:
-            locked.append(tier)
-            continue
-        if demand <= 0:
-            continue
-        n = min(stock, demand)
-        sold[tier] = n
-        sales += n * production.ALE_PRICE[tier]
-        products[str(tier)] = stock - n
-        demand -= n
+
+    def sell(key: str, budget: int) -> int:
+        nonlocal sales
+        n = min(products.get(key, 0), budget)
+        if n > 0:
+            products[key] -= n
+            sold[key] = sold.get(key, 0) + n
+            sales += n * production.DRINKS[key].price
+        return n
+
+    keys = [k for k in products if k in production.DRINKS and products[k] > 0]
+    by_price = sorted(keys, key=lambda k: production.DRINKS[k].price)
+    for key in reversed(by_price):           # состоятельные — дороже-первым
+        if premium_demand <= 0:
+            break
+        premium_demand -= sell(key, premium_demand)
+    for key in by_price:                     # пьянь — дешевле-первым, без премиума
+        if commoner_demand <= 0:
+            break
+        if production.DRINKS[key].price > balance.COMMONER_MAX_PRICE:
+            break                            # дороже пьянь не пьёт (список по возр.)
+        commoner_demand -= sell(key, commoner_demand)
+
+    premium_unsold = any(
+        products.get(k, 0) > 0 and production.DRINKS[k].price >= 10
+        for k in keys
+    ) and share < 0.4
 
     total_sold = sum(sold.values())
     rep_gain = total_sold // balance.REP_PER_ALE_SOLD
@@ -143,7 +160,7 @@ def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
     tavern.last_income_at = now
     return IncomeResult(
         ok=True, gold=gold, passive=passive, sales=sales,
-        sold=sold, rep_gain=rep_gain, locked=locked,
+        sold=sold, rep_gain=rep_gain, premium_unsold=premium_unsold,
     )
 
 
