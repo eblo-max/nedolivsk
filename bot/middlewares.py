@@ -2,8 +2,9 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject
+from aiogram.types import CallbackQuery, TelegramObject
 
+from bot import panels
 from bot.db.base import session_factory
 
 
@@ -25,3 +26,28 @@ class DbSessionMiddleware(BaseMiddleware):
             except Exception:
                 await session.rollback()
                 raise
+
+
+class PanelGuardMiddleware(BaseMiddleware):
+    """В общих чатах к кнопкам панели пускает только её владельца."""
+
+    async def __call__(
+        self,
+        handler: Callable[[CallbackQuery, dict[str, Any]], Awaitable[Any]],
+        event: CallbackQuery,
+        data: dict[str, Any],
+    ) -> Any:
+        msg = event.message
+        if panels.is_group(msg):
+            owner = panels.owner_of(msg.chat.id, msg.message_id)
+            if owner is None:
+                await event.answer(
+                    "Панель устарела. Открой заново: «гг таверна».", show_alert=True
+                )
+                return None
+            if owner != event.from_user.id:
+                await event.answer(
+                    "Не лапай чужой кабак! Открой свой: «гг таверна».", show_alert=True
+                )
+                return None
+        return await handler(event, data)

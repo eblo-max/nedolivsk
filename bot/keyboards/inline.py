@@ -14,6 +14,13 @@ def create_tavern_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def pm_link_kb(username: str) -> InlineKeyboardMarkup:
+    """Кнопка-ссылка в личку бота (для регистрации из общего чата)."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🍺 Завести кабак в личке", url=f"https://t.me/{username}?start=play")
+    return kb.as_markup()
+
+
 def regions_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     for code, title in REGIONS.items():

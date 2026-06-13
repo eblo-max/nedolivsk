@@ -7,7 +7,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import BufferedInputFile, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import texts
+from bot import panels, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import character, items, logic
@@ -37,36 +37,26 @@ async def _caption_edit(callback: CallbackQuery, text: str, markup) -> None:
         pass
 
 
-def _craft_line(player: Player) -> str:
-    state, minutes = logic.craft_state(player)
-    if state == "active":
-        item_id, tier = items.parse_entry(player.craft_item)
-        item = items.CATALOG.get(item_id)
-        name = f"{item.name} {items.TIER_STARS[tier]}" if item else "вещь"
-        return f"⚒ Мастер куёт «{name}» — ещё {minutes // 60} ч {minutes % 60} мин."
-    if state == "ready":
-        return "🎁 Мастер закончил заказ — забери вещь!"
-    return ""
-
-
 async def _show_character(callback: CallbackQuery, player: Player) -> None:
     """Всегда свежее фото куклы (старое сообщение убираем)."""
     state, _ = logic.craft_state(player)
-    caption = texts.character_screen(player, _craft_line(player))
+    caption = texts.character_screen(player, texts.craft_line(player))
     markup = kb.character_kb(craft_ready=(state == "ready"))
+    panels.release(callback.message)  # старая панель уходит вместе с сообщением
     try:
         await callback.message.delete()
     except TelegramBadRequest:
         pass
     if character.background_exists():
         img = await asyncio.to_thread(character.render, player.equipment)
-        await callback.message.answer_photo(
+        msg = await callback.message.answer_photo(
             BufferedInputFile(img, filename="character.jpg"),
             caption=caption,
             reply_markup=markup,
         )
     else:
-        await callback.message.answer(caption, reply_markup=markup)
+        msg = await callback.message.answer(caption, reply_markup=markup)
+    panels.claim(msg, callback.from_user.id)
 
 
 @router.callback_query(F.data == "character")
@@ -83,11 +73,12 @@ async def cb_tavern_new(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session)
     if player is None:
         return
+    panels.release(callback.message)
     try:
         await callback.message.delete()
     except TelegramBadRequest:
         pass
-    await send_tavern_screen(callback.message, player)
+    await send_tavern_screen(callback.message, player, owner_id=callback.from_user.id)
     await callback.answer()
 
 

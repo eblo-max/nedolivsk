@@ -16,7 +16,7 @@ from bot.handlers import (
     tavern,
     worldmap_cmd,
 )
-from bot.middlewares import DbSessionMiddleware
+from bot.middlewares import DbSessionMiddleware, PanelGuardMiddleware
 from bot.notifier import notifier_loop
 
 
@@ -32,6 +32,7 @@ async def main() -> None:
     dp = Dispatcher()
 
     dp.update.middleware(DbSessionMiddleware())
+    dp.callback_query.outer_middleware(PanelGuardMiddleware())
     dp.include_routers(
         admin.router, worldmap_cmd.router, rating.router, character.router,
         start.router, tavern.router, group.router

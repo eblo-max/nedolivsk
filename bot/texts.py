@@ -43,7 +43,40 @@ GROUP_HINT = (
     "Стучись к боту напрямую — здесь только языками чешут."
 )
 
+GROUP_NEED_TAVERN = (
+    "🍺 А кабака-то у тебя ещё нет, мил человек.\n"
+    "Завести можно только в личке — назвать да место выбрать. "
+    "Жми кнопку, а как обзаведёшься — рули прямо отсюда: «гг таверна»."
+)
+
+GROUP_HELP = (
+    "🍺 <b>Недоливск — командуй прямо в чате:</b>\n"
+    "• <b>гг</b> или <b>гг таверна</b> — твой кабак\n"
+    "• <b>гг перс</b> — персонаж и кузница\n"
+    "• <b>гг склад</b> — запасы\n"
+    "• <b>гг кузница</b> — заказать снаряжение\n"
+    "• <b>гг карта</b> — карта мира\n"
+    "• <b>гг топ</b> — доска почёта\n"
+    "Кнопки чужой панели жать нельзя — только хозяин."
+)
+
 ALREADY_REGISTERED = "У тебя уже есть кабак, забыл? Вот он:"
+
+
+def craft_line(player) -> str:
+    """Строка о состоянии заказа в кузнице для экрана персонажа."""
+    from bot.game import items as it
+    from bot.game import logic
+
+    state, minutes = logic.craft_state(player)
+    if state == "active":
+        item_id, tier = it.parse_entry(player.craft_item)
+        item = it.CATALOG.get(item_id)
+        name = f"{item.name} {it.TIER_STARS[tier]}" if item else "вещь"
+        return f"⚒ Мастер куёт «{name}» — ещё {minutes // 60} ч {minutes % 60} мин."
+    if state == "ready":
+        return "🎁 Мастер закончил заказ — забери вещь!"
+    return ""
 
 
 def _fmt_minutes(minutes: int) -> str:

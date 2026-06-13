@@ -5,7 +5,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, FSInputFile, InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import images, texts
+from bot import images, panels, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import balance, logic
@@ -35,11 +35,12 @@ async def _show_tavern(callback: CallbackQuery, player: Player) -> None:
             callback, texts.tavern_screen(player, player.tavern), kb.tavern_kb(player)
         )
         return
+    panels.release(callback.message)
     try:
         await callback.message.delete()
     except TelegramBadRequest:
         pass  # сообщение старше 48ч — Telegram не даст удалить
-    await send_tavern_screen(callback.message, player)
+    await send_tavern_screen(callback.message, player, owner_id=callback.from_user.id)
 
 
 async def _get_player(
