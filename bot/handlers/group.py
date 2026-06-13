@@ -46,6 +46,7 @@ async def _redirect_to_pm(message: Message) -> Message:
 async def gg_command(message: Message, session: AsyncSession) -> None:
     section = _section(message.text)
     autoclean.schedule_message(message)  # подчистить сам триггер «гг …»
+    await repo.remember_chat(session, message.chat.id, message.chat.title)
 
     if section == "help":
         autoclean.schedule_message(await message.reply(texts.GROUP_HELP))
@@ -77,6 +78,7 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
 @router.message(Command("start", "tavern", "play"))
 async def group_start(message: Message, session: AsyncSession) -> None:
     autoclean.schedule_message(message)
+    await repo.remember_chat(session, message.chat.id, message.chat.title)
     player = await repo.get_player(session, message.from_user.id)
     if not player or not player.tavern:
         autoclean.schedule_message(await _redirect_to_pm(message))

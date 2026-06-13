@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.db.models import Player, Tavern, WorldState
+from bot.db.models import KnownChat, Player, Tavern, WorldState
 from bot.game import balance
 
 
@@ -15,6 +15,23 @@ async def get_or_create_world(session: AsyncSession) -> WorldState:
         session.add(world)
         await session.flush()
     return world
+
+
+async def remember_chat(
+    session: AsyncSession, chat_id: int, title: str | None
+) -> None:
+    """Запомнить общий чат как адресата анонсов мировых событий."""
+    chat = await session.get(KnownChat, chat_id)
+    if chat is None:
+        session.add(KnownChat(chat_id=chat_id, title=title))
+    elif title and chat.title != title:
+        chat.title = title
+
+
+async def all_chat_ids(session: AsyncSession) -> list[int]:
+    """Все известные общие чаты — куда слать анонсы."""
+    result = await session.execute(select(KnownChat.chat_id))
+    return [row[0] for row in result.all()]
 
 
 async def get_player(

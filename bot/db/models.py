@@ -67,6 +67,20 @@ class WorldState(Base):
     id: Mapped[int] = mapped_column(primary_key=True, default=1)
     fair_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_fair_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Анонс ближайшей ярмарки уже отправлен в чаты (сброс при её открытии).
+    fair_pre_announced: Mapped[bool] = mapped_column(default=False)
+
+
+class KnownChat(Base):
+    """Общий чат, где бот замечен в деле, — адресат анонсов мировых событий."""
+
+    __tablename__ = "chats"
+
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    title: Mapped[str | None] = mapped_column(String(128))
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class Tavern(Base):

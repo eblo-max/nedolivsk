@@ -48,10 +48,12 @@ def _next_fair_time(after: datetime) -> datetime:
 
 def advance(world) -> str | None:
     """Двигает расписание ярмарки по строке мира. Возвращает событие для
-    анонса: 'open' | 'close' | None. Мутирует world, кэш — снаружи."""
+    анонса в чат: 'pre' | 'open' | 'close' | None. Мутирует world, кэш —
+    снаружи. За тик отдаём максимум одно событие (они разнесены во времени)."""
     now = _now()
     if world.next_fair_at is None:
         world.next_fair_at = _next_fair_time(now)
+        world.fair_pre_announced = False
         return None
     if world.fair_until is not None and world.fair_until <= now:
         world.fair_until = None
@@ -59,13 +61,19 @@ def advance(world) -> str | None:
     if world.fair_until is None and now >= world.next_fair_at:
         world.fair_until = now + timedelta(hours=balance.FAIR_DURATION_HOURS)
         world.next_fair_at = _next_fair_time(world.fair_until)
+        world.fair_pre_announced = False  # анонс для следующей ярмарки
         return "open"
+    pre_at = world.next_fair_at - timedelta(hours=balance.FAIR_PRE_HOURS)
+    if world.fair_until is None and not world.fair_pre_announced and now >= pre_at:
+        world.fair_pre_announced = True
+        return "pre"
     return None
 
 
 def open_fair(world) -> None:
-    """Открыть ярмарку немедленно (админ-команда /fair). Сдвигаем и плановую,
-    чтобы после ручной не открылась тут же ещё одна."""
+    """Открыть ярмарку немедленно (админ-команда /fair). Сдвигаем плановую и
+    сбрасываем флаг анонса, чтобы её предупреждение пришло как обычно."""
     world.fair_until = _now() + timedelta(hours=balance.FAIR_DURATION_HOURS)
     world.next_fair_at = _next_fair_time(world.fair_until)
+    world.fair_pre_announced = False
     refresh_cache(world)

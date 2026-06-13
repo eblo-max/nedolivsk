@@ -5,9 +5,10 @@ import logging
 from datetime import datetime, timezone
 
 from aiogram import Bot
+from aiogram.types import FSInputFile
 from sqlalchemy import select
 
-from bot import texts
+from bot import images, texts
 from bot.db import repo
 from bot.db.base import session_factory
 from bot.db.models import Player, Tavern
@@ -36,7 +37,7 @@ async def _notify_returned(bot: Bot) -> None:
     async with session_factory() as session:
         # Планировщик мира: открыть/закрыть ярмарку по расписанию.
         world = await repo.get_or_create_world(session)
-        wld.advance(world)  # этап 2: вернёт 'open'/'close' для анонса в чат
+        fair_event = wld.advance(world)  # 'pre'|'open'|'close'|None — анонс в чаты
 
         result = await session.execute(
             select(Player)
@@ -183,3 +184,36 @@ async def _notify_returned(bot: Bot) -> None:
                 tavern.production = new
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода
+
+        # Анонс мирового события в общие чаты (после коммита состояния).
+        if fair_event:
+            chat_ids = await repo.all_chat_ids(session)
+            await _broadcast_fair(bot, fair_event, chat_ids, world)
+
+
+async def _broadcast_fair(bot: Bot, event: str, chat_ids: list[int], world) -> None:
+    """Рассылает анонс ярмарки во все известные чаты. Открытие — с картинкой,
+    file_id переиспользуется между чатами (одна загрузка)."""
+    now = datetime.now(timezone.utc)
+    media = None
+    if event == "pre":
+        left = int((world.next_fair_at - now).total_seconds() // 60)
+        text = texts.fair_pre_announce(max(1, left))
+    elif event == "open":
+        text = texts.fair_open_announce()
+        img = images.named_image("yarmarka")
+        media = FSInputFile(img) if img is not None else None
+    elif event == "close":
+        text = texts.fair_close_announce()
+    else:
+        return
+
+    for chat_id in chat_ids:
+        try:
+            if media is not None:
+                sent = await bot.send_photo(chat_id, media, caption=text)
+                media = sent.photo[-1].file_id  # дальше шлём по file_id
+            else:
+                await bot.send_message(chat_id, text)
+        except Exception:  # noqa: BLE001 — чат удалён/бот выгнан и т.п.
+            logger.warning("Анонс ярмарки не доставлен в чат %s", chat_id)
