@@ -57,6 +57,10 @@ class Player(Base):
     build_item: Mapped[str | None] = mapped_column(String(32))
     build_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Живой город: память игрока — флаги-факты, отношения с NPC, репутация
+    # фракций, текущее событие на решении (pending) и очередь отложенных (queue).
+    story: Mapped[dict] = mapped_column(JSONB, default=dict)
+
     tavern: Mapped["Tavern | None"] = relationship(
         back_populates="player", uselist=False, lazy="selectin"
     )
@@ -84,6 +88,33 @@ class KnownChat(Base):
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class CityState(Base):
+    """Живой город — свой на каждый Telegram-чат (общий мир его участников)."""
+
+    __tablename__ = "cities"
+
+    chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    mood: Mapped[int] = mapped_column(default=0)            # настроение города
+    faction_power: Mapped[dict] = mapped_column(JSONB, default=dict)  # {фракция: сила}
+    situations: Mapped[list] = mapped_column(JSONB, default=list)     # [{id, until}]
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Chronicle(Base):
+    """Летопись города: лента заметных событий для экрана «Хроника»."""
+
+    __tablename__ = "chronicle"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    text: Mapped[str] = mapped_column(String(256))
 
 
 class Tavern(Base):

@@ -1,5 +1,7 @@
 """Экран таверны и действия игрока."""
 
+from datetime import datetime, timezone
+
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, FSInputFile, InputMediaPhoto
@@ -8,9 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import autoclean, images, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import balance, logic
+from bot.game import balance, logic, story_engine
 from bot.game import world as wld
-from bot.handlers import common
+from bot.handlers import common, story
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -144,6 +146,14 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
 
     await _safe_edit(callback, texts.income_success(result), kb.back_kb())
     await callback.answer(f"+{result.gold} 🪙")
+
+    # Живой город: иногда на сбор дохода заглядывает «гость» с событием.
+    now = datetime.now(timezone.utc)
+    city = None
+    if player.chat_id is not None:
+        city = await repo.get_or_create_city(session, player.chat_id)
+    if story_engine.maybe_spawn(player, city, now) is not None:
+        await story.deliver_pending(callback.message, player, callback.from_user.id)
 
 
 @router.callback_query(F.data == "upgrade")

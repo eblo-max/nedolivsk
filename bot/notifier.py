@@ -6,12 +6,13 @@ import logging
 from datetime import datetime, timezone
 
 from aiogram import Bot
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from bot import announce, panels, texts
 from bot.db import repo
 from bot.db.base import session_factory
 from bot.db.models import Player, Tavern
+from bot.game import story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import buildings_notify_kb, claim_kb, craft_claim_kb
 
@@ -60,6 +61,28 @@ async def _notify_returned(bot: Bot) -> None:
         # Планировщик мира: открыть/закрыть ярмарку по расписанию.
         world = await repo.get_or_create_world(session)
         fair_event = wld.advance(world)  # 'pre'|'open'|'close'|None — анонс в чаты
+
+        # Живой город: доставка созревших отложенных событий (цепочки-истории).
+        result = await session.execute(
+            select(Player)
+            .where(func.coalesce(
+                func.jsonb_array_length(Player.story["queue"]), 0) > 0)
+            .with_for_update(skip_locked=True)
+        )
+        for player in result.scalars().all():
+            if story_state.get_pending(player):
+                continue
+            due = story_state.queue_pop_due(player, now)
+            if not due:
+                continue
+            for extra in due[1:]:
+                story_state.queue_push(player, extra, 0.02)  # вернём в очередь
+            s = story_engine.get(due[0])
+            if s is None:
+                continue
+            story_state.set_pending(player, s.id, s.npc)
+            text, markup = story_engine.present(s, player)
+            await _notify(bot, player, text, markup)
 
         result = await session.execute(
             select(Player)

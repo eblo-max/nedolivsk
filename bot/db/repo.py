@@ -3,7 +3,9 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.db.models import KnownChat, Player, Tavern, WorldState
+from bot.db.models import (
+    Chronicle, CityState, KnownChat, Player, Tavern, WorldState,
+)
 from bot.game import balance
 
 
@@ -38,6 +40,34 @@ async def forget_chat(session: AsyncSession, chat_id: int) -> None:
 async def all_chat_ids(session: AsyncSession) -> list[int]:
     """Все известные общие чаты — куда слать анонсы."""
     result = await session.execute(select(KnownChat.chat_id))
+    return [row[0] for row in result.all()]
+
+
+async def get_or_create_city(session: AsyncSession, chat_id: int) -> CityState:
+    """Состояние живого города для конкретного чата (ленивое создание)."""
+    city = await session.get(CityState, chat_id)
+    if city is None:
+        city = CityState(chat_id=chat_id)
+        session.add(city)
+        await session.flush()
+    return city
+
+
+async def add_chronicle(session: AsyncSession, chat_id: int, text: str) -> None:
+    """Запись в летопись города."""
+    session.add(Chronicle(chat_id=chat_id, text=text[:256]))
+
+
+async def recent_chronicle(
+    session: AsyncSession, chat_id: int, limit: int = 10
+) -> list[str]:
+    """Последние записи летописи (свежие сверху)."""
+    result = await session.execute(
+        select(Chronicle.text)
+        .where(Chronicle.chat_id == chat_id)
+        .order_by(Chronicle.id.desc())
+        .limit(limit)
+    )
     return [row[0] for row in result.all()]
 
 
