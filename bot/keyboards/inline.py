@@ -123,7 +123,16 @@ def citizens_kb() -> InlineKeyboardMarkup:
 
 def chronicle_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    kb.button(text="🏛 Расклад сил", callback_data="city")
     kb.button(text="👥 Горожане", callback_data="citizens")
+    kb.button(text="🏠 К таверне", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def city_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📜 Хроника города", callback_data="chronicle")
     kb.button(text="🏠 К таверне", callback_data="tavern")
     kb.adjust(1)
     return kb.as_markup()

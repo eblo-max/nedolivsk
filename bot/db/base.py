@@ -37,6 +37,10 @@ async def create_tables() -> None:
             "story JSONB NOT NULL DEFAULT '{}'::jsonb"
         ))
         await conn.execute(text(
+            "ALTER TABLE cities ADD COLUMN IF NOT EXISTS "
+            "last_situation_end TIMESTAMPTZ"
+        ))
+        await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "expedition_resource VARCHAR(16)"
         ))

@@ -115,6 +115,8 @@ class IncomeResult:
     rep_gain: int = 0
     premium_unsold: bool = False   # остался премиум — состоятельных мало
     fair: bool = False             # доход собран во время ярмарки
+    skim: int = 0                  # доля, утекшая из-за городской ситуации
+    city_label: str = ""           # активная городская ситуация (для показа)
 
 
 def collect_income(

@@ -29,6 +29,22 @@ async def cb_citizens(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "city")
+async def cb_city(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await repo.get_player(session, callback.from_user.id)
+    if player is None:
+        await callback.answer()
+        return
+    chat_id = callback.message.chat.id if panels.is_group(callback.message) \
+        else player.chat_id
+    if chat_id is None:
+        await callback.answer("Ты ещё не прибился ни к одному городу.", show_alert=True)
+        return
+    city = await repo.get_or_create_city(session, chat_id)
+    await common.caption_edit(callback.message, texts.city_screen(city), kb.city_kb())
+    await callback.answer()
+
+
 @router.callback_query(F.data == "chronicle")
 async def cb_chronicle(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await repo.get_player(session, callback.from_user.id)

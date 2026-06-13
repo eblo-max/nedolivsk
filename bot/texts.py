@@ -59,6 +59,7 @@ GROUP_HELP = (
     "• <b>гг карта</b> — карта мира\n"
     "• <b>гг топ</b> — доска почёта\n"
     "• <b>гг хроника</b> — летопись города\n"
+    "• <b>гг город</b> — расклад сил фракций\n"
     "• <b>гг репутация</b> — как тебя знают горожане\n"
     "• <b>гг правила</b> — как вообще играть\n"
     "Кнопки чужой панели жать нельзя — только хозяин."
@@ -173,6 +174,33 @@ def citizens_screen(player) -> str:
         lines += ["", "🏛 <b>Фракции:</b>"]
         for f, v in sorted(facs, key=lambda x: -x[1]):
             lines.append(f"{factions.name(f)} — {_faction_label(v)}")
+    return "\n".join(lines)
+
+
+def _power_bar(v: int) -> str:
+    fill = min(5, abs(v) // 20)
+    return ("▰" * fill + "▱" * (5 - fill))
+
+
+def city_screen(city) -> str:
+    """Расклад сил фракций и текущая городская ситуация."""
+    from bot.game import city as citymod
+    from bot.game import factions
+
+    lines = ["🏛 <b>Недоливск сегодня</b>", ""]
+    sit = citymod.current(city)
+    if sit is not None:
+        lines.append(f"{sit.emoji} <b>{sit.label}</b> — в самом разгаре.")
+        lines.append("")
+    fp = {f: v for f, v in (city.faction_power or {}).items() if v}
+    if fp:
+        lines.append("<b>Расклад сил:</b>")
+        for f, v in sorted(fp.items(), key=lambda x: -x[1]):
+            lines.append(f"{factions.name(f)}: {_power_bar(v)} {v}")
+        lines.append("")
+        lines.append("<i>Кто заберёт власть — решают ваши дела в городе.</i>")
+    else:
+        lines.append("Тишь да гладь — фракции дремлют. Пока.")
     return "\n".join(lines)
 
 
@@ -640,13 +668,17 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
             f"{_fmt_minutes(wld.fair_minutes_left())}. Тащи бочки на продажу!\n"
         )
 
+    from bot.game import city as citymod
+    clabel = citymod.cached_label(getattr(player, "chat_id", None))
+    city_line = f"{clabel} — отражается на торговле.\n" if clabel else ""
+
     return (
         f"🏠 <b>{escape(tavern.name)}</b>\n"
         f"📍 {region} · Уровень {tavern.level}\n\n"
         f"Скрипят половицы, воняет элем и мокрой псиной. "
         f"За стойкой — {escape(player.first_name)}, "
         f"и спорить с хозяином тут не принято.\n"
-        f"{exp_line}{build_line}{fair_line}\n"
+        f"{exp_line}{build_line}{fair_line}{city_line}\n"
         f"👥 Вместимость: {tavern.capacity}\n"
         f"✨ Комфорт: {tavern.comfort}\n"
         f"💰 Доход: {tavern.income_rate} 🪙/час\n"
@@ -796,6 +828,13 @@ def income_success(r) -> str:
         lines.append("Сбыта нет — только пассивный доход с заведения.")
     if r.fair:
         lines.append("🎪 Ярмарка! Гости валом — спрос вдвое. Куй железо!")
+    if r.city_label and r.skim:
+        lines.append(
+            f"{r.city_label}: с выручки утекло <b>{r.skim} 🪙</b> "
+            f"(в кассе осталось {r.gold - r.skim})."
+        )
+    elif r.city_label:
+        lines.append(f"{r.city_label} — сказывается на сбыте в городе.")
     if r.rep_gain:
         lines.append(f"⭐ +{r.rep_gain} к репутации за бойкую торговлю.")
     if r.premium_unsold:

@@ -12,6 +12,7 @@ from bot import announce, panels, texts
 from bot.db import repo
 from bot.db.base import session_factory
 from bot.db.models import Player, Tavern
+from bot.game import city as citymod
 from bot.game import story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import buildings_notify_kb, claim_kb, craft_claim_kb
@@ -198,10 +199,28 @@ async def _notify_returned(bot: Bot) -> None:
                 new = dict(tavern.production)
                 new["winery"] = {**wbatch, "notified": True}
                 tavern.production = new
+        # Живой город: симуляция фракций — дрейф силы, старт/конец ситуаций.
+        cities = await repo.all_cities(session, lock=True)
+        city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
+        for city in cities:
+            for kind, sit in citymod.advance(city, now):
+                text = sit.activate_text if kind == "activate" else sit.expire_text
+                city_events.append((city.chat_id, text))
+                if kind == "activate":
+                    await repo.add_chronicle(session, city.chat_id, sit.chron)
+
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода
+        for city in cities:
+            citymod.refresh_cache(city, now)  # кэш ситуаций для экранов
 
         # Анонс мирового события в общие чаты (после коммита состояния).
         if fair_event:
             chat_ids = await repo.all_chat_ids(session)
             await announce.broadcast_fair(bot, fair_event, chat_ids, world)
+        # Анонсы городских ситуаций (после коммита).
+        for chat_id, text in city_events:
+            try:
+                await bot.send_message(chat_id, text)
+            except Exception:  # noqa: BLE001 — бота нет в чате и т.п.
+                logger.warning("Анонс ситуации не доставлен в чат %s", chat_id)

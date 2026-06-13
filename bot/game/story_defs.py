@@ -65,6 +65,22 @@ class HasBuilding:
         return self.bid in (getattr(ctx.player.tavern, "buildings", None) or [])
 
 
+class CitySituation:
+    """Активна ли в городе указанная ситуация (для эмерджентных событий)."""
+    def __init__(self, sid): self.sid = sid
+
+    def check(self, ctx):
+        from datetime import datetime, timezone
+        city = ctx.city
+        if city is None:
+            return False
+        now = datetime.now(timezone.utc)
+        for s in (city.situations or []):
+            if s.get("id") == self.sid and datetime.fromisoformat(s["until"]) > now:
+                return True
+        return False
+
+
 # ─────────────────────────── ЭФФЕКТЫ ──────────────────────────────────
 def _income_rate(player: Player) -> int:
     return getattr(player.tavern, "income_rate", 0) or 10

@@ -11,6 +11,7 @@ from bot import autoclean, images, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import balance, logic, story_engine
+from bot.game import city as citymod
 from bot.game import world as wld
 from bot.handlers import common, story
 from bot.keyboards import inline as kb
@@ -139,19 +140,29 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         return
 
-    result = logic.collect_income(player, player.tavern, demand_mult=wld.demand_mult())
-    if not result.ok:
-        await callback.answer(texts.income_empty(), show_alert=True)
-        return
-
-    await _safe_edit(callback, texts.income_success(result), kb.back_kb())
-    await callback.answer(f"+{result.gold} 🪙")
-
-    # Живой город: иногда на сбор дохода заглядывает «гость» с событием.
     now = datetime.now(timezone.utc)
     city = None
     if player.chat_id is not None:
         city = await repo.get_or_create_city(session, player.chat_id)
+    ce = citymod.effects(city, player, now)  # эффект городской ситуации
+
+    result = logic.collect_income(
+        player, player.tavern, demand_mult=wld.demand_mult() * ce.demand_mult
+    )
+    if not result.ok:
+        await callback.answer(texts.income_empty(), show_alert=True)
+        return
+
+    result.fair = wld.is_fair()
+    result.city_label = ce.label
+    if ce.skim_pct and result.gold > 0:  # воры/корона снимают долю с выручки
+        result.skim = int(result.gold * ce.skim_pct)
+        player.gold -= result.skim
+
+    await _safe_edit(callback, texts.income_success(result), kb.back_kb())
+    await callback.answer(f"+{result.gold - result.skim} 🪙")
+
+    # Живой город: иногда на сбор дохода заглядывает «гость» с событием.
     if story_engine.maybe_spawn(player, city, now) is not None:
         await story.deliver_pending(callback.message, player, callback.from_user.id)
 

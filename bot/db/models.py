@@ -98,7 +98,10 @@ class CityState(Base):
     chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     mood: Mapped[int] = mapped_column(default=0)            # настроение города
     faction_power: Mapped[dict] = mapped_column(JSONB, default=dict)  # {фракция: сила}
-    situations: Mapped[list] = mapped_column(JSONB, default=list)     # [{id, until}]
+    situations: Mapped[list] = mapped_column(JSONB, default=list)     # [{id, faction, until}]
+    last_situation_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

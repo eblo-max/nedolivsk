@@ -5,9 +5,9 @@
 
 from bot.game import balance
 from bot.game.story_defs import (
-    Choice, ClearFlag, Echo, FacRep, Faction, FactionPower, Gold, HasBuilding,
-    HasFlag, Chron, MinLevel, NotFlag, NpcRel, Outcome, Product, RelTo, Rep,
-    Schedule, SetFlag, Storylet,
+    Choice, CitySituation, ClearFlag, Echo, FacRep, Faction, FactionPower, Gold,
+    HasBuilding, HasFlag, Chron, MinLevel, NotFlag, NpcRel, Outcome, Product,
+    RelTo, Rep, Schedule, SetFlag, Storylet,
 )
 
 _FRIEND = balance.REL_FRIEND  # порог «свой» (40)
@@ -517,6 +517,34 @@ _LIST = [
             )),
         ),
     ),
+    # ── Эмерджентное событие: только во время воровского беспредела ──────
+    Storylet(
+        id="rampage_offer", npc="skupshik", arc="thieves", weight=14,
+        preconditions=(CitySituation("thieves_rampant"),),
+        title="Доля от беспредела",
+        text=("Пока город трясёт от воровского беспредела, Скупщик заявился с "
+              "ухмылкой: «Раз такое дело — навару всем хватит. Прикроешь наших "
+              "на ночь — отсыплю долю. Ну, или геройствуй, дело твоё»."),
+        choices=(
+            Choice("🥷 Урвать свою долю", (
+                Outcome(1, "Прикрыл воров — и карман потяжелел. Гильдия "
+                           "беспредельничает дальше, с твоей лёгкой руки.",
+                        (Gold(tier="serious"), FacRep("thieves", 10),
+                         FactionPower("thieves", 8))),
+            )),
+            Choice("🛡 Дать отпор ворью", (
+                Outcome(55, "Выставил ворью от ворот поворот. Народ зауважал, "
+                            "стража одобрительно кивнула.",
+                        (Rep(2), FacRep("watch", 10), FacRep("thieves", -10),
+                         FactionPower("thieves", -8),
+                         Echo("🛡 {name} не пустил ворьё на порог в самый беспредел — кремень!"))),
+                Outcome(45, "Ворьё огрызнулось и подпалило тебе вывеску. "
+                            "Себе дороже вышло.",
+                        (Gold(tier="minor", sign=-1), FacRep("thieves", -10))),
+            )),
+        ),
+    ),
+
     Storylet(
         id="plot_aftermath_watch", npc="mzdoimov", arc="plot",
         scheduled_only=True,
