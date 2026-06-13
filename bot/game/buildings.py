@@ -48,8 +48,16 @@ CATALOG: dict[str, Building] = {
         build_hours=2, req_reputation=40, unlocks="медовуха для состоятельных",
         image="medovuxa",
     ),
+    "kitchen": Building(
+        id="kitchen", emoji="🍖", name="Кухня",
+        description="Вертел скрипит, жир капает в огонь. Сытый гость пьёт "
+                    "дольше и платит охотнее.",
+        cost={"gold": 500, "wood": 60, "clay": 30},
+        build_hours=2, unlocks="блюда — отдельный спрос на сытость",
+        image="kuhnya",
+    ),
 }
-ORDER = ["mill", "brewery", "meadery"]
+ORDER = ["mill", "brewery", "meadery", "kitchen"]
 
 
 def _now() -> datetime:

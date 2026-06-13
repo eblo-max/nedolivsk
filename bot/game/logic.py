@@ -144,21 +144,33 @@ def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
         if n > 0:
             products[key] -= n
             sold[key] = sold.get(key, 0) + n
-            sales += n * production.DRINKS[key].price
+            sales += n * production.GOODS[key].price
         return n
 
+    # Напитки: два пула (жажда). Состоятельные — дороже-первым, пьянь — дешёвое.
     keys = [k for k in products if k in production.DRINKS and products[k] > 0]
     by_price = sorted(keys, key=lambda k: production.DRINKS[k].price)
-    for key in reversed(by_price):           # состоятельные — дороже-первым
+    for key in reversed(by_price):
         if premium_demand <= 0:
             break
         premium_demand -= sell(key, premium_demand)
-    for key in by_price:                     # пьянь — дешевле-первым, без премиума
+    for key in by_price:
         if commoner_demand <= 0:
             break
         if production.DRINKS[key].price > balance.COMMONER_MAX_PRICE:
-            break                            # дороже пьянь не пьёт (список по возр.)
+            break
         commoner_demand -= sell(key, commoner_demand)
+
+    # Еда: отдельный пул (голод) — сытый гость доплачивает за блюдо.
+    hunger = int(tavern.capacity * balance.FOOD_DEMAND_PER_CAPACITY * hours)
+    food_keys = sorted(
+        (k for k in products if k in production.FOODS and products[k] > 0),
+        key=lambda k: -production.FOODS[k].price,
+    )
+    for key in food_keys:
+        if hunger <= 0:
+            break
+        hunger -= sell(key, hunger)
 
     premium_unsold = any(
         products.get(k, 0) > 0 and production.DRINKS[k].price >= 10

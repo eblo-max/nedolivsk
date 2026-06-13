@@ -15,7 +15,12 @@ from bot.game import inventory
 
 MATURE_CHANCE = 55  # % успеха выдержки (+1 ярус), иначе −1 ярус
 
-PRODUCERS = {"mill", "brewery", "meadery"}  # здания с производством
+PRODUCERS = {"mill", "brewery", "meadery", "kitchen"}  # здания с производством
+
+# Кухня: рецепт -> (вход на 1 уровень, часы, выход порций на уровень)
+KITCHEN = {
+    "roast": ({"game": 6, "grain": 6, "herbs": 4}, 6, 12),  # Жаркое
+}
 
 MILL_MINUTES = 40
 MILL_GRAIN = 10   # зерна на 1 уровень
@@ -67,6 +72,14 @@ DRINKS: dict[str, Drink] = {
 }
 DRINKS["mead"] = Drink("mead", "🍶", "Медовуха", 10)
 DRINKS["sbiten"] = Drink("sbiten", "🌿", "Сбитень", 13)
+
+# Еда (Кухня): отдельный пул спроса (голод), продаётся как напитки
+FOODS: dict[str, Drink] = {
+    "roast": Drink("roast", "🍖", "Жаркое", 8),
+}
+
+# Всё, что лежит в погребе/кладовой (для ВВП и названий при сбыте)
+GOODS: dict[str, Drink] = {**DRINKS, **FOODS}
 
 
 def ale_key(tier: int) -> str:
@@ -266,11 +279,54 @@ def claim_meadery(player, tavern) -> tuple[str, int] | None:
     return recipe, qty
 
 
+def kitchen_inputs(recipe: str, level: int) -> dict:
+    return {k: v * level for k, v in KITCHEN[recipe][0].items()}
+
+
+def kitchen_hours(recipe: str) -> int:
+    return KITCHEN[recipe][1]
+
+
+def kitchen_output(recipe: str, level: int) -> int:
+    return KITCHEN[recipe][2] * level
+
+
+def start_kitchen(player, tavern, recipe: str) -> tuple[bool, str, dict | None]:
+    if recipe not in KITCHEN:
+        return False, "unknown", None
+    if state(tavern, "kitchen")[0] != "none":
+        return False, "busy", None
+    level = tavern.level
+    cin = kitchen_inputs(recipe, level)
+    if not inventory.can_afford(player, cin):
+        return False, "not_enough", cin
+    inventory.pay(player, cin)
+    _set_batch(tavern, "kitchen", {
+        "recipe": recipe,
+        "out_qty": kitchen_output(recipe, level),
+        "ready_at": (_now() + timedelta(hours=kitchen_hours(recipe))).isoformat(),
+    })
+    return True, "", cin
+
+
+def claim_kitchen(player, tavern) -> tuple[str, int] | None:
+    if state(tavern, "kitchen")[0] != "ready":
+        return None
+    batch = (tavern.production or {})["kitchen"]
+    recipe = batch.get("recipe", "roast")
+    qty = int(batch.get("out_qty", 0))
+    products = dict(tavern.products or {})
+    products[recipe] = products.get(recipe, 0) + qty
+    tavern.products = products
+    _set_batch(tavern, "kitchen", None)
+    return recipe, qty
+
+
 def products_value(tavern) -> int:
-    """Стоимость напитков в погребе (для ВВП)."""
+    """Стоимость напитков и еды в погребе/кладовой (для ВВП)."""
     total = 0
     for key, qty in (tavern.products or {}).items():
-        d = DRINKS.get(key)
-        if d:
-            total += d.price * qty
+        g = GOODS.get(key)
+        if g:
+            total += g.price * qty
     return int(total)

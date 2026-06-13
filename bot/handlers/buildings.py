@@ -205,6 +205,30 @@ async def cb_brew_age(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer("Поставили на выдержку — теперь не зевай!")
 
 
+@router.callback_query(F.data.startswith("kitchen:"))
+async def cb_kitchen(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session, lock=True)
+    if player is None:
+        return
+    recipe = callback.data.split(":", 1)[1]
+    ok, reason, cin = production.start_kitchen(player, player.tavern, recipe)
+    if not ok:
+        if reason == "not_enough":
+            await callback.answer(texts.kitchen_not_enough(recipe, cin), show_alert=True)
+        elif reason == "busy":
+            await callback.answer("Очаг уже занят.", show_alert=True)
+        else:
+            await callback.answer()
+        return
+    building = buildings.CATALOG["kitchen"]
+    await common.caption_edit(
+        callback.message,
+        texts.production_screen(building, player, player.tavern),
+        kb.production_kb(player, player.tavern, building),
+    )
+    await callback.answer("На огонь!")
+
+
 @router.callback_query(F.data.startswith("prod_claim:"))
 async def cb_prod_claim(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session, lock=True)
@@ -224,20 +248,21 @@ async def cb_prod_claim(callback: CallbackQuery, session: AsyncSession) -> None:
         )
         await callback.answer(f"🌱 +{amount} солода")
         return
-    if bid == "meadery":
-        result = production.claim_meadery(player, player.tavern)
+    if bid in ("meadery", "kitchen"):
+        result = (production.claim_meadery if bid == "meadery"
+                  else production.claim_kitchen)(player, player.tavern)
         if result is None:
-            await callback.answer("Напиток ещё не готов.", show_alert=True)
+            await callback.answer("Ещё не готово.", show_alert=True)
             return
         recipe, qty = result
-        drink = production.DRINKS[recipe]
-        building = buildings.CATALOG["meadery"]
+        good = production.GOODS[recipe]
+        building = buildings.CATALOG[bid]
         await common.caption_edit(
             callback.message,
             texts.production_screen(building, player, player.tavern),
             kb.production_kb(player, player.tavern, building),
         )
-        await callback.answer(f"{drink.emoji} +{qty} {drink.name} в погреб")
+        await callback.answer(f"{good.emoji} +{qty} {good.name}")
         return
     if bid == "brewery":
         result = production.claim_brew(player, player.tavern)

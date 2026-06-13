@@ -286,7 +286,41 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
             f"· 💧 {inventory.get(player, 'water')}\n"
             "<i>Берут состоятельные — репутация решает.</i>"
         )
+    if building.id == "kitchen":
+        level = tavern.level
+        food = (tavern.products or {}).get("roast", 0)
+        cin = prod.kitchen_inputs("roast", level)
+        out = prod.kitchen_output("roast", level)
+        state, minutes = prod.state(tavern, "kitchen")
+        if state == "active":
+            status = f"⏳ На вертеле — ещё {_fmt_minutes(minutes)}."
+        elif state == "ready":
+            status = "🍖 Жаркое готово — в кладовую!"
+        else:
+            status = "😴 Очаг остыл. Поставь готовить."
+        return (
+            head +
+            f"\n🍖 Жаркое в кладовой: {food}\n{status}\n\n"
+            f"Рецепт (ур. {level}): 🥩 {cin['game']} 🌾 {cin['grain']} 🌶 {cin['herbs']} → "
+            f"🍖 {out}, {prod.kitchen_hours('roast')} ч\n"
+            f"Есть: 🥩 {inventory.get(player, 'game')} · 🌾 {inventory.get(player, 'grain')} "
+            f"· 🌶 {inventory.get(player, 'herbs')}\n"
+            "<i>Сытые гости платят за еду сверх выпивки (свой спрос).</i>"
+        )
     return head + "\nПроизводство этого здания — скоро."
+
+
+def kitchen_not_enough(recipe: str, cin: dict) -> str:
+    ico = {**RESOURCE_EMOJI, **balance.GOODS_EMOJI}
+    need = " ".join(f"{ico.get(r, r)}{q}" for r, q in cin.items())
+    return f"😕 На блюдо не хватает: {need}. Пошли бригаду на охоту."
+
+
+def kitchen_ready_notification() -> str:
+    return (
+        "🍖 <b>Жаркое готово!</b> Неси в кладовую — "
+        "голодные гости уже принюхиваются."
+    )
 
 
 def meadery_not_enough(recipe: str, cin: dict) -> str:
@@ -534,8 +568,8 @@ def income_success(r) -> str:
     lines = [f"💰 В кассе осело <b>{r.gold} 🪙</b>."]
     if r.sales > 0:
         parts = [
-            f"{prod.DRINKS[k].name} {n}"
-            for k, n in sorted(r.sold.items(), key=lambda kv: -prod.DRINKS[kv[0]].price)
+            f"{prod.GOODS[k].name} {n}"
+            for k, n in sorted(r.sold.items(), key=lambda kv: -prod.GOODS[kv[0]].price)
         ]
         lines.append(f"Пассив {r.passive} + сбыт {r.sales} (раскуплено: {' · '.join(parts)}).")
     else:
