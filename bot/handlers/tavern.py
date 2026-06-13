@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import autoclean, images, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import balance, logic, story_engine
+from bot.game import balance, logic, perks, story_engine
 from bot.game import city as citymod
 from bot.game import world as wld
 from bot.handlers import common, story
@@ -147,7 +147,8 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     ce = citymod.effects(city, player, now)  # эффект городской ситуации
 
     result = logic.collect_income(
-        player, player.tavern, demand_mult=wld.demand_mult() * ce.demand_mult
+        player, player.tavern,
+        demand_mult=wld.demand_mult() * ce.demand_mult * perks.demand_bonus(player),
     )
     if not result.ok:
         await callback.answer(texts.income_empty(), show_alert=True)

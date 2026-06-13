@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from bot.db.models import Player, Tavern
-from bot.game import balance, inventory, items, production
+from bot.game import balance, inventory, items, perks, production
 
 
 def _now() -> datetime:
@@ -66,7 +66,8 @@ def start_expedition(player: Player, tavern: Tavern, resource: str) -> Expeditio
 
     level = tavern.level if tavern else 1
     equipment = getattr(player, "equipment", None)
-    pay = max(1, int(balance.worker_pay(level) * items.pay_multiplier(equipment)))
+    pay = max(1, int(balance.worker_pay(level) * items.pay_multiplier(equipment)
+                     * perks.expedition_pay_mult(player)))
     if player.gold < pay:
         return ExpeditionStart(ok=False, reason="no_gold", pay=pay)
 

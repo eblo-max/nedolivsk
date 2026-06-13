@@ -174,6 +174,12 @@ def citizens_screen(player) -> str:
         lines += ["", "🏛 <b>Фракции:</b>"]
         for f, v in sorted(facs, key=lambda x: -x[1]):
             lines.append(f"{factions.name(f)} — {_faction_label(v)}")
+
+    from bot.game import perks
+    active = perks.active_perks(player)
+    if active:
+        lines += ["", "🎁 <b>Привилегии:</b>"]
+        lines += active
     return "\n".join(lines)
 
 

@@ -10,7 +10,7 @@ FactionPower в событиях) и медленно дрейфует к нул
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from bot.game import balance, story_state
+from bot.game import balance, perks, story_state
 
 
 @dataclass(frozen=True)
@@ -140,10 +140,18 @@ def effects(city, player, now: datetime | None = None) -> CityEffects:
     if sit.negative and story_state.is_shielded(player, now):
         return _NEUTRAL  # новичков негатив города не трогает
     skim = sit.skim_pct
-    if sit.id == "thieves_rampant" and story_state.has_flag(player, "guild_member"):
-        skim = 0.0  # свои гильдии воры не обирают
+    demand = sit.demand_mult
+    # Перки за стояние у фракций гасят профильный негатив ситуации.
+    if sit.id == "thieves_rampant" and perks.thieves_skim_immune(player):
+        skim = 0.0
+    elif sit.id == "crown_taxes" and perks.crown_tax_immune(player):
+        skim = 0.0
+    elif sit.id == "temperance" and perks.temperance_immune(player):
+        demand = 1.0
+    elif sit.id == "curfew" and perks.curfew_immune(player):
+        demand = 1.0
     return CityEffects(
-        demand_mult=sit.demand_mult, skim_pct=skim,
+        demand_mult=demand, skim_pct=skim,
         label=f"{sit.emoji} {sit.label}", negative=sit.negative,
     )
 
