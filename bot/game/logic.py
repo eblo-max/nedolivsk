@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from bot.db.models import Player, Tavern
-from bot.game import balance, inventory, items
+from bot.game import balance, inventory, items, production
 
 
 def _now() -> datetime:
@@ -89,22 +89,62 @@ def claim_expedition(player: Player) -> ExpeditionClaim:
 class IncomeResult:
     ok: bool
     gold: int = 0
+    passive: int = 0
+    sales: int = 0
+    sold: dict | None = None       # {ярус: продано}
+    rep_gain: int = 0
+    locked: list | None = None     # ярусы со стоком, но недостаточной репутацией
 
 
 def collect_income(player: Player, tavern: Tavern) -> IncomeResult:
-    """Пассивный доход: копится со времени последнего сбора, с потолком."""
+    """Гибрид: полный пассив + сбыт эля гостям. Эль раскупается дороже-первым,
+    в пределах спроса (вместимость) и репутационных порогов яруса."""
     now = _now()
     since = tavern.last_income_at or now
-    hours = (now - since).total_seconds() / 3600
-    hours = min(hours, balance.INCOME_CAP_HOURS)
+    hours = min((now - since).total_seconds() / 3600, balance.INCOME_CAP_HOURS)
+    if hours <= 0:
+        return IncomeResult(ok=False)
+
     mult = items.income_multiplier(getattr(player, "equipment", None))
-    gold = int(tavern.income_rate * hours * mult)
-    if gold <= 0:
+    passive = int(tavern.income_rate * hours * mult)
+
+    demand = int(tavern.capacity * balance.DEMAND_PER_CAPACITY * hours)
+    products = dict(tavern.products or {})
+    sold: dict[int, int] = {}
+    sales = 0
+    locked: list[int] = []
+    for tier in (3, 2, 1):  # премиум-первым ради максимума золота
+        stock = products.get(str(tier), 0)
+        if stock <= 0:
+            continue
+        if tavern.reputation < balance.ALE_REP_GATE[tier]:
+            locked.append(tier)
+            continue
+        if demand <= 0:
+            continue
+        n = min(stock, demand)
+        sold[tier] = n
+        sales += n * production.ALE_PRICE[tier]
+        products[str(tier)] = stock - n
+        demand -= n
+
+    total_sold = sum(sold.values())
+    rep_gain = total_sold // balance.REP_PER_ALE_SOLD
+    gold = passive + sales
+    if gold <= 0 and rep_gain == 0:
         return IncomeResult(ok=False)
 
     player.gold += gold
+    if total_sold:
+        tavern.products = products
+    if rep_gain:
+        tavern.reputation += rep_gain
+        player.reputation += rep_gain
     tavern.last_income_at = now
-    return IncomeResult(ok=True, gold=gold)
+    return IncomeResult(
+        ok=True, gold=gold, passive=passive, sales=sales,
+        sold=sold, rep_gain=rep_gain, locked=locked,
+    )
 
 
 @dataclass

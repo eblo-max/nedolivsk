@@ -465,11 +465,23 @@ def expedition_returned(resource: str) -> str:
     )
 
 
-def income_success(gold: int) -> str:
-    return (
-        f"💰 Пьянь оставила в кассе <b>{gold} 🪙</b>. "
-        "Половина монет липкие, но золото есть золото."
-    )
+def income_success(r) -> str:
+    from bot.game import production as prod
+
+    lines = [f"💰 В кассе осело <b>{r.gold} 🪙</b>."]
+    if r.sales > 0:
+        parts = [f"{prod.ALE_STARS[t]} {n}" for t, n in sorted(r.sold.items(), reverse=True)]
+        lines.append(f"Пассив {r.passive} + сбыт {r.sales} (раскуплено: {' · '.join(parts)}).")
+    elif not r.locked:
+        lines.append("Эля в погребе нет — только пассивный доход с заведения.")
+    else:
+        lines.append("Сбыта не было — только пассивный доход.")
+    if r.rep_gain:
+        lines.append(f"⭐ +{r.rep_gain} к репутации за бойкую торговлю.")
+    if r.locked:
+        names = ", ".join(prod.ALE_STARS[t] for t in sorted(r.locked, reverse=True))
+        lines.append(f"⚠️ {names} не берут — кишка тонка у твоей репутации.")
+    return "\n".join(lines)
 
 
 def income_empty() -> str:

@@ -158,7 +158,7 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
         await callback.answer(texts.income_empty(), show_alert=True)
         return
 
-    await _safe_edit(callback, texts.income_success(result.gold), kb.back_kb())
+    await _safe_edit(callback, texts.income_success(result), kb.back_kb())
     await callback.answer(f"+{result.gold} 🪙")
 
 
