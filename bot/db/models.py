@@ -47,6 +47,10 @@ class Player(Base):
     craft_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     craft_notified: Mapped[bool] = mapped_column(default=False)
 
+    # Стройка пристройки (один слот за раз)
+    build_item: Mapped[str | None] = mapped_column(String(32))
+    build_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     tavern: Mapped["Tavern | None"] = relationship(
         back_populates="player", uselist=False, lazy="selectin"
     )

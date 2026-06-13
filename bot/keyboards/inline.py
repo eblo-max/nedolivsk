@@ -41,8 +41,9 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     kb.button(text="💰 Собрать доход", callback_data="income")
     kb.button(text="📦 Склад", callback_data="warehouse")
     kb.button(text="🧍 Персонаж", callback_data="character")
+    kb.button(text="🏗 Пристройки", callback_data="buildings")
     kb.button(text="🔨 Улучшить таверну", callback_data="upgrade")
-    kb.adjust(1, 2, 2)
+    kb.adjust(1, 2, 2, 1)
     return kb.as_markup()
 
 
@@ -119,5 +120,58 @@ def craft_claim_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="🎁 Забрать вещь", callback_data="craft_claim")
     kb.button(text="🧍 Персонаж", callback_data="character")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def buildings_kb(player, tavern) -> InlineKeyboardMarkup:
+    from bot.game import buildings as bld
+
+    kb = InlineKeyboardBuilder()
+    for bid in bld.ORDER:
+        b = bld.CATALOG[bid]
+        if bld.is_built(tavern, bid):
+            mark = "✓"
+        elif player.build_item == bid:
+            mark = "🏗"
+        elif bld.missing_requirements(tavern, b):
+            mark = "🔒"
+        else:
+            mark = ""
+        label = f"{b.emoji} {b.name} {mark}".strip()
+        kb.button(text=label, callback_data=f"build_open:{bid}")
+    kb.button(text="↩️ К таверне", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def building_detail_kb(player, tavern, building) -> InlineKeyboardMarkup:
+    from bot.game import buildings as bld
+
+    kb = InlineKeyboardBuilder()
+    can_build = (
+        not bld.is_built(tavern, building.id)
+        and bld.build_state(player)[0] == "none"
+        and not bld.missing_requirements(tavern, building)
+    )
+    if can_build:
+        kb.button(text="🏗 Построить", callback_data=f"build_make:{building.id}")
+    kb.button(text="↩️ Назад", callback_data="buildings")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def buildings_back_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏗 К пристройкам", callback_data="buildings")
+    kb.button(text="🏠 К таверне", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def buildings_notify_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏗 Пристройки", callback_data="buildings")
+    kb.button(text="🏠 К таверне", callback_data="tavern")
     kb.adjust(1)
     return kb.as_markup()

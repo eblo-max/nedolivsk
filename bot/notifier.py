@@ -10,7 +10,7 @@ from sqlalchemy import select
 from bot import texts
 from bot.db.base import session_factory
 from bot.db.models import Player
-from bot.keyboards.inline import claim_kb, craft_claim_kb
+from bot.keyboards.inline import buildings_notify_kb, claim_kb, craft_claim_kb
 
 CHECK_INTERVAL_SECONDS = 60
 
@@ -74,4 +74,24 @@ async def _notify_returned(bot: Bot) -> None:
                 except Exception:
                     logger.warning("Не доставлен крафт игроку %s", player.id)
             player.craft_notified = True
+
+        from bot.game import buildings as bld
+
+        result = await session.execute(
+            select(Player)
+            .where(Player.build_item.is_not(None), Player.build_ends_at <= now)
+            .with_for_update(skip_locked=True)
+        )
+        for player in result.scalars().all():
+            building = bld.finalize_build(player, player.tavern)  # завершаем стройку
+            if building is None:
+                continue
+            try:
+                await bot.send_message(
+                    player.id,
+                    texts.build_ready_notification(building),
+                    reply_markup=buildings_notify_kb(),
+                )
+            except Exception:
+                logger.warning("Не доставлено о стройке игроку %s", player.id)
         await session.commit()

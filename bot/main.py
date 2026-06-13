@@ -9,6 +9,7 @@ from bot.config import settings
 from bot.db.base import create_tables, engine
 from bot.handlers import (
     admin,
+    buildings,
     character,
     group,
     rating,
@@ -35,7 +36,7 @@ async def main() -> None:
     dp.callback_query.outer_middleware(PanelGuardMiddleware())
     dp.include_routers(
         admin.router, worldmap_cmd.router, rating.router, character.router,
-        start.router, tavern.router, group.router
+        buildings.router, start.router, tavern.router, group.router
     )
 
     notifier_task = asyncio.create_task(notifier_loop(bot))

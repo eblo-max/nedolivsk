@@ -76,3 +76,10 @@ async def create_tables() -> None:
             "'wood', COALESCE(wood, 0), 'grain', COALESCE(grain, 0), "
             "'hops', COALESCE(hops, 0)) WHERE inventory IS NULL"
         ))
+        # Слот стройки пристроек
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS build_item VARCHAR(32)"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS build_ends_at TIMESTAMPTZ"
+        ))

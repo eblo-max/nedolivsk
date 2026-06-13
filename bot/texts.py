@@ -88,6 +88,107 @@ def _fmt_minutes(minutes: int) -> str:
     return f"{m} мин"
 
 
+def _build_line(player: Player) -> str:
+    """Строка о текущей стройке для экрана таверны."""
+    from bot.game import buildings as bld
+
+    state, minutes = bld.build_state(player)
+    if state == "active":
+        b = bld.CATALOG.get(player.build_item)
+        name = b.name if b else "пристройка"
+        return f"🏗 Строится {name} — ещё {_fmt_minutes(minutes)}.\n"
+    if state == "ready":
+        b = bld.CATALOG.get(player.build_item)
+        return f"🏗 {b.name if b else 'Пристройка'} достроена — загляни в Пристройки!\n"
+    return ""
+
+
+def _cost_line(cost: dict, player: Player) -> str:
+    """🪙/🪵/… N ✅/❌ — по содержимому словаря стоимости."""
+    emoji = {"gold": "🪙", **RESOURCE_EMOJI}
+    parts = []
+    for key, need in cost.items():
+        if not need:
+            continue
+        have = player.gold if key == "gold" else inventory.get(player, key)
+        mark = "✅" if have >= need else "❌"
+        parts.append(f"{emoji.get(key, key)} {need} {mark}")
+    return " · ".join(parts)
+
+
+def buildings_screen(player: Player, tavern: Tavern) -> str:
+    from bot.game import buildings as bld
+
+    lines = [
+        "🏗 <b>Пристройки</b>",
+        "Каждая открывает своё производство. Деньги и сырьё — вперёд.\n",
+    ]
+    for bid in bld.ORDER:
+        b = bld.CATALOG[bid]
+        if bld.is_built(tavern, bid):
+            status = "✓ построено"
+        elif player.build_item == bid:
+            _, m = bld.build_state(player)
+            status = f"🏗 строится, ещё {_fmt_minutes(m)}"
+        elif bld.missing_requirements(tavern, b):
+            req = ", ".join(r.name for r in bld.missing_requirements(tavern, b))
+            status = f"🔒 нужна: {req}"
+        else:
+            status = "доступна к стройке"
+        lines.append(f"{b.emoji} <b>{b.name}</b> — {status}")
+    return "\n".join(lines)
+
+
+def building_detail(building, player: Player, tavern: Tavern) -> str:
+    from bot.game import buildings as bld
+
+    head = f"{building.emoji} <b>{building.name}</b>\n<i>{building.description}</i>\n"
+    gives = f"Откроет: {building.unlocks}\n" if building.unlocks else ""
+
+    if bld.is_built(tavern, building.id):
+        return head + gives + "\n✓ Уже построено. Работает."
+
+    miss = bld.missing_requirements(tavern, building)
+    if miss:
+        req = ", ".join(r.name for r in miss)
+        return head + gives + f"\n🔒 Сначала построй: {req}."
+
+    state, m = bld.build_state(player)
+    if state != "none":
+        return head + gives + (
+            "\n🏗 Сейчас уже идёт другая стройка — одна за раз. "
+            f"Освободятся работники через {_fmt_minutes(m)}."
+        )
+
+    return (
+        head + gives +
+        f"\nСтройка: {building.build_hours} ч\n"
+        f"Цена: {_cost_line(building.cost, player)}"
+    )
+
+
+def build_started(building, hours: int) -> str:
+    return (
+        f"🏗 Заложили фундамент под <b>{building.name}</b>. "
+        f"Артель обещает управиться за {hours} ч — и не факт, что не соврёт."
+    )
+
+
+def build_not_enough(building, player: Player) -> str:
+    return (
+        f"😕 На <b>{building.name}</b> не хватает.\n"
+        f"Надо: {_cost_line(building.cost, player)}\n"
+        "Гони работников за сырьём и возвращайся."
+    )
+
+
+def build_ready_notification(building) -> str:
+    return (
+        f"🏗 <b>{building.name}</b> достроена! {building.description}\n"
+        "Загляни в Пристройки — пора пускать в дело."
+    )
+
+
 def tavern_screen(player: Player, tavern: Tavern) -> str:
     region = balance.REGIONS.get(player.region, player.region)
     state, minutes = logic.expedition_state(player)
@@ -102,13 +203,15 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
     else:
         exp_line = "\n😴 Работники дрыхнут на сене. Пни их — пусть пользу приносят.\n"
 
+    build_line = _build_line(player)
+
     return (
         f"🏠 <b>{escape(tavern.name)}</b>\n"
         f"📍 {region} · Уровень {tavern.level}\n\n"
         f"Скрипят половицы, воняет элем и мокрой псиной. "
         f"За стойкой — {escape(player.first_name)}, "
         f"и спорить с хозяином тут не принято.\n"
-        f"{exp_line}\n"
+        f"{exp_line}{build_line}\n"
         f"👥 Вместимость: {tavern.capacity}\n"
         f"✨ Комфорт: {tavern.comfort}\n"
         f"💰 Доход: {tavern.income_rate} 🪙/час\n"

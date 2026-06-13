@@ -100,6 +100,17 @@ async def send_tavern_screen(
     return msg
 
 
+async def caption_edit(message: Message, text: str, markup) -> None:
+    """Правит подпись к фото или текст сообщения — что есть."""
+    try:
+        if message.photo:
+            await message.edit_caption(caption=text, reply_markup=markup)
+        else:
+            await message.edit_text(text, reply_markup=markup)
+    except TelegramBadRequest:
+        pass  # не изменилось — Telegram не любит одинаковые правки
+
+
 async def show_photo_panel(
     message: Message, media, caption: str, markup, owner_id: int | None = None
 ) -> Message:
