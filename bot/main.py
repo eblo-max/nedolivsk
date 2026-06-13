@@ -4,6 +4,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import BotCommand
 
 from bot.config import settings
 from bot.db.base import create_tables, engine
@@ -40,6 +41,11 @@ async def main() -> None:
     )
 
     notifier_task = asyncio.create_task(notifier_loop(bot))
+
+    await bot.set_my_commands([
+        BotCommand(command="start", description="🍺 Открыть таверну"),
+        BotCommand(command="help", description="❓ Как играть / правила"),
+    ])
 
     await bot.delete_webhook(drop_pending_updates=True)
     try:

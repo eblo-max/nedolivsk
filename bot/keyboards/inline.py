@@ -44,7 +44,8 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     kb.button(text="🧍 Персонаж", callback_data="character")
     kb.button(text="🏗 Пристройки", callback_data="buildings")
     kb.button(text="🔨 Улучшить таверну", callback_data="upgrade")
-    kb.adjust(1, 2, 2, 1)
+    kb.button(text="❓ Как играть", callback_data="help")
+    kb.adjust(1, 2, 2, 1, 1)
     return kb.as_markup()
 
 

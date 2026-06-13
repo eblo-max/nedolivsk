@@ -3,7 +3,7 @@
 from html import escape
 
 from aiogram import F, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
@@ -40,6 +40,11 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
             message.from_user.first_name,
         )
     await message.answer(texts.WELCOME, reply_markup=kb.create_tavern_kb())
+
+
+@router.message(Command("help", "rules"))
+async def cmd_help(message: Message) -> None:
+    await message.answer(texts.RULES)
 
 
 @router.callback_query(F.data == "create_tavern")

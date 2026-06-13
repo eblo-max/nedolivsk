@@ -28,6 +28,7 @@ SECTIONS = {
     "гг карта": "map", "гг мир": "map",
     "гг топ": "rating", "гг рейтинг": "rating",
     "гг помощь": "help", "гг команды": "help",
+    "гг правила": "rules", "гг как играть": "rules",
 }
 
 
@@ -50,6 +51,9 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
 
     if section == "help":
         autoclean.schedule_message(await message.reply(texts.GROUP_HELP))
+        return
+    if section == "rules":
+        autoclean.schedule_message(await message.reply(texts.RULES))
         return
     if section == "map":
         autoclean.schedule_message(await cmd_map(message, session))
