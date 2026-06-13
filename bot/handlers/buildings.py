@@ -135,23 +135,61 @@ async def cb_prod_make(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer("Закрутились!")
 
 
+@router.callback_query(F.data.startswith("brew:"))
+async def cb_brew(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session, lock=True)
+    if player is None:
+        return
+    try:
+        tier = int(callback.data.split(":", 1)[1])
+    except ValueError:
+        await callback.answer()
+        return
+    ok, reason, cin = production.start_brew(player, player.tavern, tier)
+    if not ok:
+        if reason == "not_enough":
+            await callback.answer(texts.brew_not_enough(tier, cin), show_alert=True)
+        elif reason == "busy":
+            await callback.answer("Чаны заняты — варка идёт.", show_alert=True)
+        else:
+            await callback.answer()
+        return
+    building = buildings.CATALOG["brewery"]
+    await common.caption_edit(
+        callback.message,
+        texts.production_screen(building, player, player.tavern),
+        kb.production_kb(player, player.tavern, building),
+    )
+    await callback.answer("Заброжало!")
+
+
 @router.callback_query(F.data.startswith("prod_claim:"))
 async def cb_prod_claim(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session, lock=True)
     if player is None:
         return
     bid = callback.data.split(":", 1)[1]
-    if bid != "mill":
+    if bid == "mill":
+        amount = production.claim_mill(player, player.tavern)
+        if amount <= 0:
+            await callback.answer("Солод ещё не готов.", show_alert=True)
+            return
+        building = buildings.CATALOG["mill"]
+        toast = f"🌱 +{amount} солода"
+    elif bid == "brewery":
+        result = production.claim_brew(player, player.tavern)
+        if result is None:
+            await callback.answer("Эль ещё бродит.", show_alert=True)
+            return
+        tier, qty = result
+        building = buildings.CATALOG["brewery"]
+        toast = f"🍺 +{qty} {production.ALE_STARS[tier]} в погреб"
+    else:
         await callback.answer()
         return
-    amount = production.claim_mill(player, player.tavern)
-    if amount <= 0:
-        await callback.answer("Солод ещё не готов.", show_alert=True)
-        return
-    building = buildings.CATALOG["mill"]
     await common.caption_edit(
         callback.message,
         texts.production_screen(building, player, player.tavern),
         kb.production_kb(player, player.tavern, building),
     )
-    await callback.answer(f"🌱 +{amount} солода")
+    await callback.answer(toast)

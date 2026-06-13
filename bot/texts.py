@@ -218,7 +218,49 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
             f"{m_name.lower()}, {prod.MILL_MINUTES} мин\n"
             f"В закромах: {g_emoji} {inventory.get(player, 'grain')}"
         )
+    if building.id == "brewery":
+        level = tavern.level
+        prods = tavern.products or {}
+        stock = " · ".join(
+            f"{prod.ALE_STARS[t]} {prods.get(str(t), 0)}" for t in (1, 2, 3)
+        )
+        state, minutes = prod.state(tavern, "brewery")
+        if state == "active":
+            t = int(tavern.production["brewery"]["tier"])
+            status = f"⏳ Бродит {prod.ALE_STARS[t]} — ещё {_fmt_minutes(minutes)}."
+        elif state == "ready":
+            t = int(tavern.production["brewery"]["tier"])
+            status = f"🍺 {prod.ALE_STARS[t]} готов — разливай в погреб!"
+        else:
+            status = "😴 Чаны пусты. Выбери, что варить."
+        inv = lambda r: inventory.get(player, r)  # noqa: E731
+        return (
+            head +
+            f"\n🛢 Погреб: {stock}\n{status}\n\n"
+            f"Рецепты (ур. {level}, выход {12 * level} кружек):\n"
+            f"★ {8*level}🌱 {5*level}🌿 {6*level}💧 — 4 ч\n"
+            f"★★ то же + {6*level}🍯 — 8 ч\n"
+            f"★★★ то же + {12*level}🍯 — 12 ч\n"
+            f"Есть: 🌱{inv('malt')} 🌿{inv('hops')} 💧{inv('water')} 🍯{inv('honey')}"
+        )
     return head + "\nПроизводство этого здания — скоро."
+
+
+def brew_not_enough(tier: int, cin: dict) -> str:
+    from bot.game import production as prod
+
+    ico = {**RESOURCE_EMOJI, **balance.GOODS_EMOJI}
+    need = " ".join(f"{ico.get(r, r)}{q}" for r, q in cin.items())
+    return f"😕 На {prod.ALE_STARS[tier]} не хватает: {need}. Доготовь сырьё."
+
+
+def brew_ready_notification(tier: int) -> str:
+    from bot.game import production as prod
+
+    return (
+        f"🍺 <b>Эль {prod.ALE_STARS[tier]} доварился!</b> "
+        "Разлей в погреб — кружки сами себя не нальют."
+    )
 
 
 def mill_started(amount: int, minutes: int) -> str:

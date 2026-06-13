@@ -88,3 +88,7 @@ async def create_tables() -> None:
             "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS "
             "production JSONB NOT NULL DEFAULT '{}'::jsonb"
         ))
+        await conn.execute(text(
+            "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS "
+            "products JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))

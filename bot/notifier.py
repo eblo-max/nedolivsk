@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from bot import texts
 from bot.db.base import session_factory
-from bot.db.models import Player
+from bot.db.models import Player, Tavern
 from bot.keyboards.inline import buildings_notify_kb, claim_kb, craft_claim_kb
 
 CHECK_INTERVAL_SECONDS = 60
@@ -94,4 +94,31 @@ async def _notify_returned(bot: Bot) -> None:
                 )
             except Exception:
                 logger.warning("Не доставлено о стройке игроку %s", player.id)
+
+        from bot.game import production as prod
+
+        result = await session.execute(
+            select(Player)
+            .join(Tavern, Tavern.player_id == Player.id)
+            .where(Tavern.production != {})
+            .with_for_update(of=Player, skip_locked=True)
+        )
+        for player in result.scalars().all():
+            tavern = player.tavern
+            batch = (tavern.production or {}).get("brewery")
+            if not batch or batch.get("notified"):
+                continue
+            if prod.state(tavern, "brewery")[0] != "ready":
+                continue
+            try:
+                await bot.send_message(
+                    player.id,
+                    texts.brew_ready_notification(int(batch["tier"])),
+                    reply_markup=buildings_notify_kb(),
+                )
+            except Exception:
+                logger.warning("Не доставлено о варке игроку %s", player.id)
+            new = dict(tavern.production)
+            new["brewery"] = {**batch, "notified": True}
+            tavern.production = new
         await session.commit()
