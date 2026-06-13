@@ -44,3 +44,8 @@ def owner_of(chat_id: int, message_id: int) -> int | None:
     if owner is not None:
         _owners.move_to_end(key)  # активная панель не вытесняется
     return owner
+
+
+def forget(chat_id: int, message_id: int) -> None:
+    """Снять владельца по id (после авто-удаления сообщения)."""
+    _owners.pop((chat_id, message_id), None)

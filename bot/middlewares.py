@@ -4,7 +4,7 @@ from typing import Any
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, TelegramObject
 
-from bot import panels
+from bot import autoclean, panels
 from bot.db.base import session_factory
 
 
@@ -50,4 +50,6 @@ class PanelGuardMiddleware(BaseMiddleware):
                     "Не лапай чужой кабак! Открой свой: «гг таверна».", show_alert=True
                 )
                 return None
+            # владелец что-то нажал — продлеваем жизнь панели ещё на 30 сек
+            autoclean.schedule(msg.bot, msg.chat.id, msg.message_id)
         return await handler(event, data)

@@ -38,6 +38,6 @@ async def cmd_map(message: Message, session: AsyncSession) -> None:
         caption += "\n⛺ Ждут места: " + ", ".join(
             escape(n) for n in homeless[:5]
         )
-    await message.answer_photo(
+    return await message.answer_photo(
         BufferedInputFile(img, filename="nedolivsk_map.jpg"), caption=caption
     )

@@ -9,7 +9,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import texts
+from bot import autoclean, texts
 from bot.db import repo
 from bot.handlers import common
 from bot.handlers.rating import show_rating
@@ -35,9 +35,9 @@ def _section(text: str | None) -> str | None:
     return SECTIONS.get(text.strip().lower()) if text else None
 
 
-async def _redirect_to_pm(message: Message) -> None:
+async def _redirect_to_pm(message: Message) -> Message:
     me = await message.bot.me()
-    await message.reply(
+    return await message.reply(
         texts.GROUP_NEED_TAVERN, reply_markup=kb.pm_link_kb(me.username)
     )
 
@@ -45,22 +45,24 @@ async def _redirect_to_pm(message: Message) -> None:
 @router.message(F.text.func(lambda t: _section(t) is not None))
 async def gg_command(message: Message, session: AsyncSession) -> None:
     section = _section(message.text)
+    autoclean.schedule_message(message)  # подчистить сам триггер «гг …»
 
     if section == "help":
-        await message.reply(texts.GROUP_HELP)
+        autoclean.schedule_message(await message.reply(texts.GROUP_HELP))
         return
     if section == "map":
-        await cmd_map(message, session)
+        autoclean.schedule_message(await cmd_map(message, session))
         return
     if section == "rating":
-        await show_rating(message, session)
+        autoclean.schedule_message(await show_rating(message, session))
         return
 
     player = await repo.get_player(session, message.from_user.id)
     if not player or not player.tavern:
-        await _redirect_to_pm(message)
+        autoclean.schedule_message(await _redirect_to_pm(message))
         return
 
+    # панели сами планируют свою подчистку (см. common._register_panel)
     owner = message.from_user.id
     if section == "character":
         await common.open_character(message, player, owner)
@@ -74,8 +76,9 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
 
 @router.message(Command("start", "tavern", "play"))
 async def group_start(message: Message, session: AsyncSession) -> None:
+    autoclean.schedule_message(message)
     player = await repo.get_player(session, message.from_user.id)
     if not player or not player.tavern:
-        await _redirect_to_pm(message)
+        autoclean.schedule_message(await _redirect_to_pm(message))
         return
     await common.open_tavern(message, player, message.from_user.id)

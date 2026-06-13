@@ -12,7 +12,7 @@ from aiogram.types import (
     Message,
 )
 
-from bot import images, panels, texts
+from bot import autoclean, images, panels, texts
 from bot.db.models import Player
 from bot.game import character as char
 from bot.game import logic
@@ -21,6 +21,12 @@ from bot.keyboards import inline as kb
 # Кэш file_id: после первой отправки Telegram хранит файл у себя,
 # и дальше фото уходит мгновенно, без повторной загрузки.
 _file_id_cache: dict[str, str] = {}
+
+
+def _register_panel(msg: Message, owner_id: int | None) -> None:
+    """Закрепить владельца и (в группе) запланировать авто-подчистку."""
+    panels.claim(msg, owner_id)
+    autoclean.schedule_message(msg)
 
 
 def cached_media(img: Path) -> str | InputFile:
@@ -46,7 +52,7 @@ async def send_tavern_screen(
         remember_file_id(img, msg)
     else:
         msg = await message.answer(caption, reply_markup=markup)
-    panels.claim(msg, owner_id)
+    _register_panel(msg, owner_id)
     return msg
 
 
@@ -72,7 +78,7 @@ async def show_photo_panel(
     except TelegramBadRequest:
         pass
     msg = await message.answer_photo(media, caption=caption, reply_markup=markup)
-    panels.claim(msg, owner_id)
+    _register_panel(msg, owner_id)
     return msg
 
 
@@ -87,7 +93,7 @@ async def show_text_panel(
         except TelegramBadRequest:
             pass
         msg = await message.answer(caption, reply_markup=markup)
-        panels.claim(msg, owner_id)
+        _register_panel(msg, owner_id)
         return msg
     try:
         await message.edit_text(caption, reply_markup=markup)
@@ -127,7 +133,7 @@ async def open_warehouse(message: Message, player: Player, owner_id: int) -> Mes
         remember_file_id(img, msg)
     else:
         msg = await message.answer(caption, reply_markup=markup)
-    panels.claim(msg, owner_id)
+    _register_panel(msg, owner_id)
     return msg
 
 
@@ -143,7 +149,7 @@ async def _send_character_panel(
         )
     else:
         msg = await message.answer(caption, reply_markup=markup)
-    panels.claim(msg, owner_id)
+    _register_panel(msg, owner_id)
     return msg
 
 

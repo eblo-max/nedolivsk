@@ -19,13 +19,12 @@ def _is_trigger(text: str | None) -> bool:
 
 
 @router.message(StateFilter(None), F.text.func(_is_trigger))
-async def show_rating(message: Message, session: AsyncSession) -> None:
+async def show_rating(message: Message, session: AsyncSession) -> Message:
     rows = await repo.get_map_taverns(session)  # все таверны с владельцами
     if not rows:
-        await message.answer(
+        return await message.answer(
             "В Недоливске пока ни одного кабака. Город трезвенников, тоска."
         )
-        return
 
     rated = []
     for tavern, player in rows:
@@ -48,4 +47,4 @@ async def show_rating(message: Message, session: AsyncSession) -> None:
         (i, t.name, p.first_name, t.level, p.region, gdp, t.reputation)
         for i, (gdp, t, p) in enumerate(rated[:10], 1)
     ]
-    await message.answer(texts.rating_screen(top, total_gdp, len(rated)))
+    return await message.answer(texts.rating_screen(top, total_gdp, len(rated)))
