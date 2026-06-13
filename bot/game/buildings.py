@@ -62,7 +62,7 @@ CATALOG: dict[str, Building] = {
                     "разборчивых и богатых гостей.",
         cost={"gold": 700, "wood": 60, "clay": 30},
         build_hours=2, req_reputation=80, unlocks="вино из ягод для богачей",
-        image="vinokurnya",
+        image="vinodelnya",
     ),
 }
 ORDER = ["mill", "brewery", "meadery", "kitchen", "winery"]
