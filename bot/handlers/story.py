@@ -33,6 +33,17 @@ async def _edit(callback: CallbackQuery, text: str, markup) -> None:
         pass
 
 
+@router.callback_query(F.data == "event_open")
+async def cb_event_open(callback: CallbackQuery, session: AsyncSession) -> None:
+    """Вернуться к незакрытому событию (кнопка «Тебя ждёт гость»)."""
+    player = await repo.get_player(session, callback.from_user.id)
+    if player is None or story_engine.pending_storylet(player) is None:
+        await callback.answer("Гость уже ушёл.", show_alert=True)
+        return
+    await deliver_pending(callback.message, player, callback.from_user.id)
+    await callback.answer()
+
+
 @router.callback_query(F.data.startswith("ev:"))
 async def cb_event(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await repo.get_player(session, callback.from_user.id, for_update=True)
@@ -44,8 +55,12 @@ async def cb_event(callback: CallbackQuery, session: AsyncSession) -> None:
     arg = callback.data.split(":", 1)[1]
 
     if arg == "skip":
-        story_state.clear_pending(player)
-        await _edit(callback, "Ну, как-нибудь в другой раз.", kb.back_kb())
+        # Откладываем, не теряем: гость ждёт, вернуться можно кнопкой «🔔».
+        await _edit(
+            callback,
+            "Гость обождёт у стойки. Надумаешь — жми «🔔 Тебя ждёт гость».",
+            kb.back_kb(),
+        )
         await callback.answer()
         return
 

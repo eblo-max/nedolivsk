@@ -30,7 +30,15 @@ def regions_kb() -> InlineKeyboardMarkup:
 
 
 def tavern_kb(player: Player) -> InlineKeyboardMarkup:
+    from bot.game import story_state
+
     kb = InlineKeyboardBuilder()
+    sizes: list[int] = []
+
+    if story_state.get_pending(player):  # незакрытое событие — даём вернуться к нему
+        kb.button(text="🔔 Тебя ждёт гость!", callback_data="event_open")
+        sizes.append(1)
+
     c = logic.expedition_counts(player, player.tavern)
     if c.ready:
         exp_label = f"🎒 Бригады вернулись ({c.ready})"
@@ -45,7 +53,7 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     kb.button(text="🏗 Пристройки", callback_data="buildings")
     kb.button(text="🔨 Улучшить таверну", callback_data="upgrade")
     kb.button(text="❓ Как играть", callback_data="help")
-    kb.adjust(1, 2, 2, 1, 1)
+    kb.adjust(*sizes, 1, 2, 2, 1, 1)
     return kb.as_markup()
 
 
