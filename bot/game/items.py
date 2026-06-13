@@ -16,6 +16,7 @@ class Item:
     description: str        # жёсткий трактирный тон
     cost: dict              # gold/wood/grain/hops
     craft_hours: int
+    sprite: str = ""        # имя файла арта в assets/items (без .png); "" = по id
     # экономика
     income_pct: int = 0         # +% к доходу таверны
     yield_pct: int = 0          # +% к добыче вылазок (все ресурсы)
@@ -45,7 +46,7 @@ SLOTS = {
 
 # ВРЕМЕННО для теста: вещи бесплатны и куются мгновенно.
 # Перед боевым запуском поставить False!
-TEST_FREE_CRAFT = True
+TEST_FREE_CRAFT = False
 
 # ===== Ярусы качества =====
 TIER_MAX = 3
@@ -102,13 +103,13 @@ CATALOG: dict[str, Item] = {
             id="leather_cap", slot="head", name="Шапка трактирщика",
             description="Скрывает похмелье и лысину. Постояльцы доверяют.",
             cost={"gold": 300, "wood": 0, "grain": 30, "hops": 10},
-            craft_hours=2, income_pct=5, armor=2,
+            craft_hours=2, income_pct=5, armor=2, sprite="shapka",
         ),
         Item(
             id="fartuk", slot="chest", name="Фартук трактирщика",
             description="Пятна эля, жира и чьей-то крови. В основном эля.",
             cost={"gold": 700, "wood": 20, "grain": 40, "hops": 0},
-            craft_hours=4, yield_pct=5, armor=8,
+            craft_hours=4, yield_pct=5, armor=8, sprite="bronya",
         ),
         Item(
             id="oak_shield", slot="left_hand", name="Щит дубовый",
@@ -126,7 +127,7 @@ CATALOG: dict[str, Item] = {
             id="kovsh", slot="weapon", name="Ковш боевой",
             description="Черпает эль, проламывает черепа. Шипы — для убедительности.",
             cost={"gold": 1200, "wood": 30, "grain": 0, "hops": 20},
-            craft_hours=6, yield_pct=10, damage=14, crit=7,
+            craft_hours=6, yield_pct=10, damage=14, crit=7, sprite="oruzhie",
         ),
         Item(
             id="poyas", slot="belt", name="Пояс мастеровой",
@@ -150,7 +151,7 @@ CATALOG: dict[str, Item] = {
             id="kruzhka", slot="amulet", name="Последняя капля",
             description="Кружка-оберег. Последняя капля из неё не прольётся никогда.",
             cost={"gold": 1000, "wood": 0, "grain": 20, "hops": 40},
-            craft_hours=5, income_pct=10, luck=3,
+            craft_hours=5, income_pct=10, luck=3, sprite="amulet",
         ),
         Item(
             id="rooster_talisman", slot="talisman", name="Талисман петуха",

@@ -14,19 +14,20 @@ ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
 BG_FILE = ASSETS_DIR / "character.png"
 ITEMS_DIR = ASSETS_DIR / "items"
 
-# Слот -> рамка (x1, y1, x2, y2) на фоне 1024x1024
+# Слот -> рамка (x1, y1, x2, y2) на фоне 1024x1024.
+# Координаты сняты автодетектом по внутреннему краю деревянных рамок.
 SLOT_BOXES = {
-    "head": (133, 142, 255, 263),
-    "left_hand": (133, 320, 255, 442),
-    "belt": (133, 543, 252, 662),
-    "legs": (128, 752, 250, 870),
-    "chest": (455, 315, 577, 442),
-    "amulet": (623, 142, 744, 262),
-    "talisman": (758, 142, 880, 262),
-    "right_hand": (760, 318, 882, 440),
-    "weapon": (760, 543, 882, 662),
-    "bag": (760, 752, 882, 870),
-    "boots": (390, 720, 615, 875),  # прямо на ногах силуэта
+    "head": (138, 141, 254, 256),
+    "left_hand": (137, 325, 254, 439),
+    "belt": (137, 558, 254, 666),
+    "legs": (137, 746, 254, 861),
+    "chest": (454, 319, 570, 432),
+    "amulet": (626, 141, 742, 256),
+    "talisman": (754, 141, 881, 256),
+    "right_hand": (771, 325, 876, 439),
+    "weapon": (770, 558, 876, 666),
+    "bag": (770, 746, 880, 861),
+    "boots": (390, 720, 615, 875),  # прямо на ногах силуэта, без рамки
 }
 
 _cache_key: tuple | None = None
@@ -37,8 +38,8 @@ def background_exists() -> bool:
     return BG_FILE.is_file()
 
 
-def _item_sprite(item_id: str) -> Image.Image | None:
-    p = ITEMS_DIR / f"{item_id}.png"
+def _item_sprite(sprite_name: str) -> Image.Image | None:
+    p = ITEMS_DIR / f"{sprite_name}.png"
     if not p.is_file():
         return None
     img = Image.open(p).convert("RGBA")
@@ -55,7 +56,7 @@ def render(equipment: dict | None) -> bytes:
     if key == _cache_key and _cache_bytes is not None:
         return _cache_bytes
 
-    from bot.game.items import parse_entry
+    from bot.game.items import CATALOG, parse_entry
 
     TIER_FRAME = {2: (170, 175, 190, 255), 3: (212, 168, 50, 255)}  # серебро/золото
 
@@ -66,7 +67,9 @@ def render(equipment: dict | None) -> bytes:
         if box is None:
             continue
         item_id, tier = parse_entry(entry)
-        sprite = _item_sprite(item_id)
+        item = CATALOG.get(item_id)
+        sprite_name = (item.sprite or item_id) if item else item_id
+        sprite = _item_sprite(sprite_name)
         if sprite is None:
             continue
         x1, y1, x2, y2 = box
