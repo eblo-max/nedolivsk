@@ -1030,7 +1030,7 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
             f"⭐ Репутация — {tavern.reputation}",
         ]),
         "",
-        *_branch("ДЕРЕВНЯ", [
+        *_branch("ЗАВЕДЕНИЕ", [
             f"👥 Места — {tavern.capacity}",
             f"✨ Уют — {tavern.comfort}",
             f"🍀 Удача — {luck_pct}%",
@@ -1229,6 +1229,12 @@ def income_success(r) -> str:
         tail.append(f"⭐ +{r.rep_gain} к репутации за бойкую торговлю")
     if r.premium_unsold:
         tail.append("⚠️ Состоятельных мало — дорогое не разбирают")
+    if r.spoiled:
+        lost = " · ".join(
+            f"{prod.GOODS[k].name} −{n}"
+            for k, n in sorted(r.spoiled.items(), key=lambda kv: -kv[1])
+        )
+        tail.append(f"🐀 Погреб переполнен — прокисло: {lost}")
     if tail:
         parts += ["", *tail]
     return "\n".join(parts)
@@ -1241,21 +1247,27 @@ def _good_name(key: str) -> str:
 
 
 def trade_offer(offer: dict) -> str:
+    want = [
+        f"🛢 {_good_name(offer['good'])} — до {offer['qty']} шт",
+        f"💰 Рыночная цена ~{int(offer['fv'])} 🪙/шт",
+    ]
+    mkt = offer.get("mkt", 1.0)
+    if mkt <= 0.85:
+        want.append(f"📉 Рынок завален — цена просела ({round((1 - mkt) * 100)}%)")
     return "\n".join([
         f"{offer['emoji']} <b>{offer['name'].upper()}</b>",
-        f"«{offer['desc']}»",
+        f"<i>{offer['intro']}</i>",
         "",
-        *_branch("ХОЧЕТ КУПИТЬ", [
-            f"🛢 {_good_name(offer['good'])} — до {offer['qty']} шт",
-            f"💰 Рыночная цена ~{int(offer['fv'])} 🪙/шт",
-        ]),
+        *_branch("ХОЧЕТ КУПИТЬ", want),
         "",
         "За сколько отдашь штуку, кабатчик?",
     ])
 
 
-def trade_sold(offer: dict, qty: int, unit: int, gold: int) -> str:
+def trade_sold(offer: dict, qty: int, unit: int, gold: int, react: str) -> str:
     return "\n".join([
+        f"{offer['emoji']} <i>{react}</i>",
+        "",
         "🤝 <b>ПО РУКАМ!</b>",
         "",
         *_branch("СДЕЛКА", [
@@ -1266,18 +1278,18 @@ def trade_sold(offer: dict, qty: int, unit: int, gold: int) -> str:
     ])
 
 
-def trade_counter(offer: dict, counter: int) -> str:
+def trade_counter(offer: dict, react: str) -> str:
     return "\n".join([
         f"{offer['emoji']} <b>{offer['name'].upper()}</b>",
         "",
-        f"«Дороговато! Больше {counter} 🪙 за штуку не дам. Идёт?»",
+        f"<i>{react}</i>",
     ])
 
 
-def trade_walked(offer: dict) -> str:
+def trade_walked(offer: dict, react: str) -> str:
     return (
-        f"{offer['emoji']} {offer['name']} сплюнул, буркнул «грабёж» — "
-        "и уковылял восвояси. Товар при тебе."
+        f"{offer['emoji']} <b>{offer['name']}</b>\n\n"
+        f"<i>{react}</i>\n\nТовар при тебе — поищет другого дурака."
     )
 
 

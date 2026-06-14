@@ -13,6 +13,7 @@ from bot.db import repo
 from bot.db.base import session_factory
 from bot.db.models import Player, Tavern
 from bot.game import city as citymod
+from bot.game import market as marketmod
 from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import buildings_notify_kb, claim_kb, craft_claim_kb
@@ -217,6 +218,7 @@ async def _notify_returned(bot: Bot) -> None:
         cities = await repo.all_cities(session, lock=True)
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
         for city in cities:
+            marketmod.decay(city, now)  # рынок впитывает излишки сбыта
             for kind, sit in citymod.advance(city, now):
                 text = sit.activate_text if kind == "activate" else sit.expire_text
                 city_events.append((city.chat_id, text))

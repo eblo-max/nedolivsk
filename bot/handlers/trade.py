@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import panels, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import story_state, trade
+from bot.game import market, story_state, trade
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -31,7 +31,7 @@ async def _edit(callback: CallbackQuery, text: str, markup=None) -> None:
 
 
 def _sell(player: Player, offer: dict, unit: int) -> tuple[int, int]:
-    """Применить продажу: вернуть (qty, gold). Списывает товар, добавляет золото."""
+    """Применить продажу: (qty, gold). Списывает товар, золото, растит имя торговца."""
     tavern = player.tavern
     stock = int((tavern.products or {}).get(offer["good"], 0))
     qty = min(trade._qty_affordable(offer, unit), stock)
@@ -42,7 +42,24 @@ def _sell(player: Player, offer: dict, unit: int) -> tuple[int, int]:
     prods[offer["good"]] = stock - qty
     tavern.products = prods
     player.gold += gold
+    story_state.adjust_faction(player, "merchants", 1)  # доброе имя у купцов
     return qty, gold
+
+
+async def _finish_sale(callback: CallbackQuery, player: Player, offer: dict,
+                       unit: int, kind: str, city=None) -> None:
+    qty, gold = _sell(player, offer, unit)
+    story_state.set_trade(player, None)
+    if qty:
+        market.add_supply(city, offer["good"], qty)  # партия давит рынок
+        react = trade.reaction(offer, kind)
+        await _edit(callback, texts.trade_sold(offer, qty, unit, gold, react),
+                    kb.back_kb())
+        await callback.answer(f"+{gold} 🪙")
+    else:
+        await _edit(callback, texts.trade_walked(offer, trade.reaction(offer, "walk")),
+                    kb.back_kb())
+        await callback.answer()
 
 
 @router.callback_query(F.data == "trade_open")
@@ -67,6 +84,10 @@ async def cb_trade(callback: CallbackQuery, session: AsyncSession) -> None:
         await callback.answer("Купец уже ушёл.", show_alert=True)
         return
 
+    city = None
+    if player.chat_id is not None:
+        city = await repo.get_or_create_city(session, player.chat_id)
+
     arg = callback.data.split(":", 1)[1]
 
     if arg == "no":
@@ -77,14 +98,24 @@ async def cb_trade(callback: CallbackQuery, session: AsyncSession) -> None:
 
     if arg == "ok":  # согласие на контр-цену
         unit = int(offer.get("counter", offer["max_unit"]))
-        qty, gold = _sell(player, offer, unit)
-        story_state.set_trade(player, None)
-        if qty:
-            await _edit(callback, texts.trade_sold(offer, qty, unit, gold), kb.back_kb())
-            await callback.answer(f"+{gold} 🪙")
-        else:
-            await _edit(callback, texts.trade_walked(offer), kb.back_kb())
-            await callback.answer()
+        kind = "accept_high" if unit >= offer["fv"] * 1.15 else "accept"
+        await _finish_sale(callback, player, offer, unit, kind, city)
+        return
+
+    if arg == "push":  # дожать контр-цену
+        decision, price = trade.push(offer)
+        if decision == "walk":
+            story_state.set_trade(player, None)
+            await _edit(callback,
+                        texts.trade_walked(offer, trade.reaction(offer, "walk")),
+                        kb.back_kb())
+        else:  # concede | hold
+            offer["counter"] = price
+            story_state.set_trade(player, offer)
+            react = trade.reaction(offer, decision, price)
+            await _edit(callback, texts.trade_counter(offer, react),
+                        kb.trade_counter_kb(price))
+        await callback.answer()
         return
 
     if not arg.isdigit() or int(arg) >= len(offer["prices"]):
@@ -94,21 +125,18 @@ async def cb_trade(callback: CallbackQuery, session: AsyncSession) -> None:
     unit = offer["prices"][int(arg)]
     decision, price = trade.evaluate(offer, unit)
     if decision == "accept":
-        qty, gold = _sell(player, offer, price)
-        story_state.set_trade(player, None)
-        if qty:
-            await _edit(callback, texts.trade_sold(offer, qty, price, gold), kb.back_kb())
-            await callback.answer(f"+{gold} 🪙")
-        else:
-            await _edit(callback, texts.trade_walked(offer), kb.back_kb())
-            await callback.answer()
+        kind = "accept_high" if unit >= offer["fv"] * 1.15 else "accept"
+        await _finish_sale(callback, player, offer, unit, kind, city)
     elif decision == "counter":
         offer["counter"] = price
         story_state.set_trade(player, offer)
-        await _edit(callback, texts.trade_counter(offer, price),
+        react = trade.reaction(offer, "counter", price)
+        await _edit(callback, texts.trade_counter(offer, react),
                     kb.trade_counter_kb(price))
         await callback.answer()
     else:  # walk
         story_state.set_trade(player, None)
-        await _edit(callback, texts.trade_walked(offer), kb.back_kb())
+        await _edit(callback,
+                    texts.trade_walked(offer, trade.reaction(offer, "walk")),
+                    kb.back_kb())
         await callback.answer()

@@ -41,6 +41,10 @@ async def create_tables() -> None:
             "last_situation_end TIMESTAMPTZ"
         ))
         await conn.execute(text(
+            "ALTER TABLE cities ADD COLUMN IF NOT EXISTS "
+            "market JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))
+        await conn.execute(text(
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS "
             "season INTEGER NOT NULL DEFAULT -1"
         ))

@@ -13,6 +13,7 @@ from bot.db import repo
 from bot.db.models import Player
 from bot.game import balance, logic, perks, season, story_engine, story_state
 from bot.game import city as citymod
+from bot.game import market as marketmod
 from bot.game import trade as trademod
 from bot.game import world as wld
 from bot.handlers import common, story
@@ -170,6 +171,10 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     await _safe_edit(callback, texts.income_success(result), kb.back_kb())
     await callback.answer(f"+{result.gold - result.skim} 🪙")
 
+    # Розничный сбыт гостям тоже выбрасывает товар на общий рынок чата.
+    for good, qty in (result.sold or {}).items():
+        marketmod.add_supply(city, good, qty)
+
     owner = callback.from_user.id
     busy = story_state.get_pending(player) or story_state.get_trade(player)
 
@@ -178,7 +183,8 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
         chance = (balance.TRADE_FAIR_CHANCE if wld.is_fair()
                   else balance.TRADE_CHANCE)
         if random.random() < chance:
-            offer = trademod.make_offer(player.tavern, player, wld.is_fair())
+            offer = trademod.make_offer(
+                player.tavern, player, wld.is_fair(), city=city)
             if offer is not None:
                 story_state.set_trade(player, offer)
                 await trade_h.deliver_trade(callback.message, player, owner)

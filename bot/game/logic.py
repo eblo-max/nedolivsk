@@ -114,6 +114,7 @@ class IncomeResult:
     passive: int = 0
     sales: int = 0
     sold: dict | None = None       # {ключ напитка: продано}
+    spoiled: dict | None = None    # {ключ: скисло} — излишек погреба прокис
     rep_gain: int = 0
     premium_unsold: bool = False   # остался премиум — состоятельных мало
     fair: bool = False             # доход собран во время ярмарки
@@ -189,16 +190,19 @@ def collect_income(
         for k in keys
     ) and share < 0.4
 
+    # Порча: непроданный излишек сверх вместимости погреба киснет за период.
+    spoiled = _spoilage(tavern, products, hours)
+
     total_sold = sum(sold.values())
     rep_gain = total_sold // balance.REP_PER_ALE_SOLD
     if total_sold and perks.has_fame(player):  # знаменитый кабак — слава со сбыта
         rep_gain += 1
     gold = passive + sales
-    if gold <= 0 and rep_gain == 0:
+    if gold <= 0 and rep_gain == 0 and not spoiled:
         return IncomeResult(ok=False)
 
     player.gold += gold
-    if total_sold:
+    if total_sold or spoiled:
         tavern.products = products
     if rep_gain:
         tavern.reputation += rep_gain
@@ -206,9 +210,30 @@ def collect_income(
     tavern.last_income_at = now
     return IncomeResult(
         ok=True, gold=gold, passive=passive, sales=sales,
-        sold=sold, rep_gain=rep_gain, premium_unsold=premium_unsold,
-        fair=demand_mult > 1.0,
+        sold=sold, spoiled=spoiled or None, rep_gain=rep_gain,
+        premium_unsold=premium_unsold, fair=demand_mult > 1.0,
     )
+
+
+def _spoilage(tavern: Tavern, products: dict, hours: float) -> dict:
+    """Излишек товара сверх вместимости погреба киснет. Мутирует products,
+    возвращает {ключ: скисло}. Бьёт пропорционально по запасам."""
+    goods = [k for k in production.GOODS if products.get(k, 0) > 0]
+    total = sum(products[k] for k in goods)
+    cap = balance.cellar_capacity(tavern.capacity)
+    if total <= cap:
+        return {}
+    excess = total - cap
+    spoil_total = int(excess * balance.SPOIL_PCT_PER_DAY * hours / 24)
+    if spoil_total <= 0:
+        return {}
+    spoiled: dict[str, int] = {}
+    for k in sorted(goods, key=lambda x: -products[x]):
+        s = min(products[k], int(round(spoil_total * products[k] / total)))
+        if s > 0:
+            products[k] -= s
+            spoiled[k] = s
+    return spoiled
 
 
 @dataclass

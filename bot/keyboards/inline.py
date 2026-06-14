@@ -152,6 +152,7 @@ def trade_kb(offer: dict) -> InlineKeyboardMarkup:
 def trade_counter_kb(counter: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text=f"🤝 Идёт · {counter}/шт", callback_data="trd:ok")
+    kb.button(text="💬 Дожать ещё", callback_data="trd:push")
     kb.button(text="🚪 Послать", callback_data="trd:no")
     kb.adjust(1)
     return kb.as_markup()

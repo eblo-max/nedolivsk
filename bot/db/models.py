@@ -102,6 +102,9 @@ class CityState(Base):
     mood: Mapped[int] = mapped_column(default=0)            # настроение города
     faction_power: Mapped[dict] = mapped_column(JSONB, default=dict)  # {фракция: сила}
     situations: Mapped[list] = mapped_column(JSONB, default=list)     # [{id, faction, until}]
+    # Динамический рынок: {товар: завал, '_t': метка распада} — оптовая цена
+    # проседает от сбыта и впитывается спросом со временем.
+    market: Mapped[dict] = mapped_column(JSONB, default=dict)
     last_situation_end: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
