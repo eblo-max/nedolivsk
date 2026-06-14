@@ -1549,7 +1549,7 @@ def hunt_menu(player) -> str:
         parts += ["", f"🤕 Не оклемался — в строй через {_fmt_minutes(mins)}"]
     prey = []
     for e in combat.ENEMIES:
-        wp, _ = combat.forecast(st, e, 60)
+        wp, _ = combat.forecast(st, e, 120)   # стабильный цвет-индикатор
         tcol, _lbl = combat.threat(wp)
         prey.append(f"{tcol} {e.emoji} {e.name} — ❤{e.hp}")
     parts += ["", *_branch("ЗВЕРЬЁ (цвет — твои шансы)", prey)]

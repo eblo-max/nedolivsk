@@ -43,8 +43,10 @@ async def _render(callback: CallbackQuery, caption: str, markup,
                     reply_markup=markup)
                 common.remember_file_id(path, res)
                 return
-            except TelegramBadRequest:
-                pass
+            except TelegramBadRequest as e:
+                if "not modified" in str(e).lower():
+                    return                   # уже показано — не дёргаем панель
+                # иначе сообщение не редактируется (старое и т.п.) — пересоздаём
         panels.release(msg)                  # из текста / правка не прошла — пересоздаём
         try:
             await msg.delete()
