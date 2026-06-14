@@ -7,11 +7,18 @@
 Шаг 2a: мельница (зерно→солод). Пивоварня — следующим шагом.
 """
 
+import math
 import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from bot.game import inventory
+from bot.game import balance, inventory
+
+
+def _scaled_inputs(base: dict, level: int) -> dict:
+    """Вход рецепта × уровень × множитель затрат (вариант B). Округление вверх."""
+    m = balance.PRODUCTION_INPUT_MULT
+    return {k: math.ceil(v * level * m) for k, v in base.items()}
 
 MATURE_CHANCE = 55  # % успеха выдержки (+1 ярус), иначе −1 ярус
 
@@ -40,7 +47,7 @@ MEADERY = {
 
 
 def meadery_inputs(recipe: str, level: int) -> dict:
-    return {k: v * level for k, v in MEADERY[recipe][0].items()}
+    return _scaled_inputs(MEADERY[recipe][0], level)
 
 
 def meadery_hours(recipe: str) -> int:
@@ -93,7 +100,7 @@ def ale_key(tier: int) -> str:
 
 
 def brew_inputs(tier: int, level: int) -> dict:
-    return {k: v * level for k, v in BREW[tier][0].items()}
+    return _scaled_inputs(BREW[tier][0], level)
 
 
 def brew_hours(tier: int) -> int:
@@ -286,7 +293,7 @@ def claim_meadery(player, tavern) -> tuple[str, int] | None:
 
 
 def kitchen_inputs(recipe: str, level: int) -> dict:
-    return {k: v * level for k, v in KITCHEN[recipe][0].items()}
+    return _scaled_inputs(KITCHEN[recipe][0], level)
 
 
 def kitchen_hours(recipe: str) -> int:
@@ -329,7 +336,7 @@ def claim_kitchen(player, tavern) -> tuple[str, int] | None:
 
 
 def winery_inputs(recipe: str, level: int) -> dict:
-    return {k: v * level for k, v in WINERY[recipe][0].items()}
+    return _scaled_inputs(WINERY[recipe][0], level)
 
 
 def winery_hours(recipe: str) -> int:

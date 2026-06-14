@@ -30,21 +30,21 @@ CATALOG: dict[str, Building] = {
         id="mill", emoji="🌾", name="Мельница",
         description="Жернова скрипят, мельник вечно под хмельком. "
                     "Зато зерно в солод мелет — что надо.",
-        cost={"gold": 250, "wood": 80, "clay": 30},
+        cost={"gold": 500, "wood": 160, "clay": 60},
         build_hours=1, unlocks="солод из зерна", image="melnica",
     ),
     "brewery": Building(
         id="brewery", emoji="🍺", name="Пивоварня",
         description="Чаны, пар и дух, от которого слезятся глаза. "
                     "Тут из солода, хмеля и воды рождается эль.",
-        cost={"gold": 700, "wood": 60, "ore": 40, "clay": 20},
+        cost={"gold": 1400, "wood": 120, "ore": 80, "clay": 40},
         build_hours=2, requires=("mill",), unlocks="варка эля", image="pivovarnya",
     ),
     "meadery": Building(
         id="meadery", emoji="🍶", name="Медоварня",
         description="Котлы с мёдом томятся и пузырятся. Сладкий хмельной дух "
                     "влечёт публику почище, чем эль.",
-        cost={"gold": 600, "wood": 60, "clay": 30},
+        cost={"gold": 1200, "wood": 120, "clay": 60},
         build_hours=2, req_reputation=40, unlocks="медовуха для состоятельных",
         image="medovuxa",
     ),
@@ -52,7 +52,7 @@ CATALOG: dict[str, Building] = {
         id="kitchen", emoji="🍖", name="Кухня",
         description="Вертел скрипит, жир капает в огонь. Сытый гость пьёт "
                     "дольше и платит охотнее.",
-        cost={"gold": 500, "wood": 60, "clay": 30},
+        cost={"gold": 1000, "wood": 120, "clay": 60},
         build_hours=2, unlocks="блюда — отдельный спрос на сытость",
         image="kyxnya",
     ),
@@ -60,7 +60,7 @@ CATALOG: dict[str, Building] = {
         id="winery", emoji="🍷", name="Винокурня",
         description="Дубовые бочки, тягучий ягодный дух. Вино — для самых "
                     "разборчивых и богатых гостей.",
-        cost={"gold": 700, "wood": 60, "clay": 30},
+        cost={"gold": 1400, "wood": 120, "clay": 60},
         build_hours=2, req_reputation=80, unlocks="вино из ягод для богачей",
         image="vinodelnya",
     ),
