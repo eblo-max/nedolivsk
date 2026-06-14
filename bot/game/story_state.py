@@ -5,6 +5,7 @@
 dict (иначе SQLAlchemy не заметит). Хелперы делают это сами.
 """
 
+import random
 from datetime import datetime, timedelta, timezone
 
 from bot.db.models import Player
@@ -115,21 +116,31 @@ def queue_pop_due(player: Player, now: datetime) -> list[str]:
 
 
 # ── Кулдаун и щит новичка ──────────────────────────────────────────────
+def _random_cooldown_hours() -> float:
+    """Случайный кулдаун: иногда всплеск (густо), иначе обычный/затишье."""
+    if random.random() < balance.EVENT_BURST_CHANCE:
+        return random.uniform(
+            balance.EVENT_COOLDOWN_MIN_HOURS, balance.EVENT_BURST_MAX_HOURS)
+    return random.uniform(
+        balance.EVENT_BURST_MAX_HOURS, balance.EVENT_COOLDOWN_MAX_HOURS)
+
+
 def set_last_event(player: Player, now: datetime) -> None:
+    """Событие отыграло — назначаем СЛУЧАЙНЫЙ срок следующего (то густо, то пусто)."""
     st = _st(player)
-    st["last_event_at"] = now.isoformat()
+    nxt = now + timedelta(hours=_random_cooldown_hours())
+    st["next_event_at"] = nxt.isoformat()
+    st.pop("last_event_at", None)  # старый ключ больше не нужен
     _save(player, st)
 
 
 def can_spawn(player: Player, now: datetime) -> bool:
-    """Можно ли подкинуть новое личное событие (кулдаун + нет активного)."""
+    """Можно ли подкинуть новое личное событие (случайный кулдаун + нет активного)."""
     if get_pending(player):
         return False
-    le = (player.story or {}).get("last_event_at")
-    if le:
-        last = datetime.fromisoformat(le)
-        if now - last < timedelta(hours=balance.EVENT_COOLDOWN_HOURS):
-            return False
+    nxt = (player.story or {}).get("next_event_at")
+    if nxt and datetime.fromisoformat(nxt) > now:
+        return False
     return True
 
 
