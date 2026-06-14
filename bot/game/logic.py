@@ -199,13 +199,23 @@ def _retail_demand(
             break
         commoner -= take(key, commoner)
 
+    # Еда: тот же принцип сегментации, что и у напитков. Состоятельные едоки
+    # берут дорогое (пирог/сыр), простой люд — дешёвое (хлеб) — чтобы дешёвая
+    # еда не простаивала вечно за спиной дорогой.
     hunger = int(tavern.capacity * balance.FOOD_DEMAND_PER_CAPACITY * hours
                  * demand_mult * food_mult)
-    for key in sorted((k for k in products if k in production.FOODS and products[k] > 0),
-                      key=lambda k: -production.FOODS[k].price):
-        if hunger <= 0:
+    foods = [k for k in products if k in production.FOODS and products[k] > 0]
+    by_food_price = sorted(foods, key=lambda k: production.FOODS[k].price)
+    food_premium = int(hunger * share)
+    food_common = hunger - food_premium
+    for key in reversed(by_food_price):   # состоятельные — дорогое первым
+        if food_premium <= 0:
             break
-        hunger -= take(key, hunger)
+        food_premium -= take(key, food_premium)
+    for key in by_food_price:             # простой люд — дешёвое первым
+        if food_common <= 0:
+            break
+        food_common -= take(key, food_common)
 
     premium_unsold = any(
         avail.get(k, 0) > 0 and production.DRINKS[k].price >= 10 for k in keys
