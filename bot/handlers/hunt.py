@@ -11,7 +11,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, InputMediaVideo
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import images, panels, texts
+from bot import effects, images, panels, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import combat
@@ -149,4 +149,22 @@ async def cb_hunt_fight(callback: CallbackQuery, session: AsyncSession) -> None:
     for fr in frames[:-1]:
         await _set_caption(callback.message, fr, None)
         await asyncio.sleep(0.9)
-    await _set_caption(callback.message, frames[-1], kb.hunt_after_kb())
+    await _finish(callback, frames[-1], res.fight.win)
+
+
+async def _finish(callback: CallbackQuery, text: str, win: bool) -> None:
+    """Итог боя. В личке — свежая карточка с анимэффектом (🎉/💩); в группе
+    эффекты недоступны, потому правим панель на месте."""
+    msg = callback.message
+    markup = kb.hunt_after_kb()
+    fx = effects.for_private(msg.chat, effects.FX_PARTY if win else effects.FX_POOP)
+    if fx is None:
+        await _set_caption(msg, text, markup)
+        return
+    panels.release(msg)
+    try:
+        await msg.delete()  # гасим видео-панель, чтобы итог «выстрелил» эффектом
+    except TelegramBadRequest:
+        pass
+    sent = await msg.answer(text, reply_markup=markup, message_effect_id=fx)
+    panels.claim(sent, callback.from_user.id)

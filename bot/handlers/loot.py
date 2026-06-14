@@ -9,7 +9,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import texts
+from bot import effects, texts
 from bot.db import repo
 from bot.game import inventory, loot
 from bot.keyboards import inline as kb
@@ -45,6 +45,7 @@ async def cb_loot(callback: CallbackQuery, session: AsyncSession) -> None:
                                           reply_markup=None)
     except TelegramBadRequest:
         pass
+    await effects.react_msg(callback.message, "🔥")  # 👀 → 🔥: добычу урвали
 
     if out["kind"] == "resource" and stored:
         await callback.answer(f"+{out['qty']} на склад!")

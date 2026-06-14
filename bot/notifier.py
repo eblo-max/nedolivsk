@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from aiogram import Bot
 from sqlalchemy import func, select
 
-from bot import announce, panels, texts
+from bot import announce, effects, panels, texts
 from bot.db import repo
 from bot.db.base import session_factory
 from bot.db.models import Player, Tavern
@@ -316,22 +316,25 @@ async def _notify_returned(bot: Bot) -> None:
             for chat_id in chat_ids:
                 for text in season_msgs:
                     try:
-                        await bot.send_message(chat_id, text)
+                        msg = await bot.send_message(chat_id, text)
+                        await effects.react_msg(msg, "🎉")  # праздничный бейдж
                     except Exception:  # noqa: BLE001
                         logger.warning("Анонс сезона не доставлен в чат %s", chat_id)
         # Анонсы городских ситуаций (после коммита).
         for chat_id, text in city_events:
             try:
-                await bot.send_message(chat_id, text)
+                msg = await bot.send_message(chat_id, text)
+                await effects.react_msg(msg, "🔥")  # «жизнь» городу
             except Exception:  # noqa: BLE001 — бота нет в чате и т.п.
                 logger.warning("Анонс ситуации не доставлен в чат %s", chat_id)
         # Подкидыш — постим после коммита (строка уже сохранена, id известен).
         orphaned: list[int] = []
         for chat_id, drop_id in loot_to_post:
             try:
-                await bot.send_message(
+                msg = await bot.send_message(
                     chat_id, texts.loot_drop(loot.flavor()),
                     reply_markup=loot_kb(drop_id))
+                await effects.react_msg(msg, "👀")  # «ой, что-то упало» — привлечь глаз
             except Exception:  # noqa: BLE001 — бота нет в чате и т.п.
                 logger.warning("Подкидыш не доставлен в чат %s", chat_id)
                 orphaned.append(drop_id)  # не блокируем чат осиротевшей строкой
