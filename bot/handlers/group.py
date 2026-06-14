@@ -53,7 +53,7 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
     await repo.remember_chat(session, message.chat.id, message.chat.title)
 
     if section == "help":
-        autoclean.schedule_message(await message.reply(texts.GROUP_HELP))
+        autoclean.schedule_message(await message.reply(texts.COMMANDS_SCREEN))
         return
     if section == "rules":
         autoclean.schedule_message(await message.reply(texts.RULES))

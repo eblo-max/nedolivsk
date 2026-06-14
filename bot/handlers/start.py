@@ -9,9 +9,10 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import texts
+from bot import images, texts
 from bot.db import repo
 from bot.game.balance import REGIONS
+from bot.handlers import common
 from bot.handlers.common import send_tavern_screen
 from bot.keyboards import inline as kb
 
@@ -39,7 +40,15 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
             message.from_user.username,
             message.from_user.first_name,
         )
-    await message.answer(texts.WELCOME, reply_markup=kb.create_tavern_kb())
+    img = images.named_image("welcome")
+    if img is not None:
+        msg = await message.answer_photo(
+            common.cached_media(img), caption=texts.WELCOME,
+            reply_markup=kb.welcome_kb(),
+        )
+        common.remember_file_id(img, msg)
+    else:
+        await message.answer(texts.WELCOME, reply_markup=kb.welcome_kb())
 
 
 @router.message(Command("help", "rules"))

@@ -14,6 +14,43 @@ def create_tavern_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def welcome_kb() -> InlineKeyboardMarkup:
+    """Хаб на приветственном экране: завести кабак + разделы инфо."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏗 Завести кабак", callback_data="create_tavern")
+    kb.button(text="📖 Как играть", callback_data="how_play")
+    kb.button(text="🏰 Живой город", callback_data="living_city")
+    kb.button(text="👥 Затащить в чат", callback_data="add_chat")
+    kb.button(text="⌨️ Команды", callback_data="commands")
+    kb.adjust(1, 2, 2)
+    return kb.as_markup()
+
+
+def info_nav_kb() -> InlineKeyboardMarkup:
+    """Навигация между разделами инфо-хаба."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📖 Как играть", callback_data="how_play")
+    kb.button(text="🏰 Живой город", callback_data="living_city")
+    kb.button(text="👥 Затащить в чат", callback_data="add_chat")
+    kb.button(text="⌨️ Команды", callback_data="commands")
+    kb.adjust(2, 2)
+    return kb.as_markup()
+
+
+def add_chat_kb(username: str) -> InlineKeyboardMarkup:
+    """Раздел «в чат»: кнопка-ссылка добавления + навигация."""
+    kb = InlineKeyboardBuilder()
+    kb.button(
+        text="➕ Добавить в беседу",
+        url=f"https://t.me/{username}?startgroup=play",
+    )
+    kb.button(text="📖 Как играть", callback_data="how_play")
+    kb.button(text="🏰 Живой город", callback_data="living_city")
+    kb.button(text="⌨️ Команды", callback_data="commands")
+    kb.adjust(1, 2, 1)
+    return kb.as_markup()
+
+
 def pm_link_kb(username: str) -> InlineKeyboardMarkup:
     """Кнопка-ссылка в личку бота (для регистрации из общего чата)."""
     kb = InlineKeyboardBuilder()
@@ -52,7 +89,7 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     kb.button(text="🧍 Персонаж", callback_data="character")
     kb.button(text="🏗 Пристройки", callback_data="buildings")
     kb.button(text="🔨 Улучшить таверну", callback_data="upgrade")
-    kb.button(text="❓ Как играть", callback_data="help")
+    kb.button(text="ℹ️ О игре", callback_data="info")
     kb.adjust(*sizes, 1, 2, 2, 1, 1)
     return kb.as_markup()
 

@@ -7,7 +7,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, FSInputFile, InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import autoclean, images, texts
+from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import balance, logic, perks, story_engine
@@ -47,14 +47,6 @@ async def _get_player(
         await callback.answer("Сначала обзаведись кабаком: /start", show_alert=True)
         return None
     return player
-
-
-@router.callback_query(F.data == "help")
-async def cb_help(callback: CallbackQuery) -> None:
-    # Правила длиннее лимита подписи к фото — шлём отдельным сообщением.
-    msg = await callback.message.answer(texts.RULES)
-    autoclean.schedule_message(msg)  # в группе подчистится, в личке останется
-    await callback.answer()
 
 
 @router.callback_query(F.data == "tavern")
