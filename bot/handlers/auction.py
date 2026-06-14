@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import panels, texts
+from bot import images, panels, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import auction, balance
@@ -35,9 +35,10 @@ async def cb_auction(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         return
     city = await _city(callback, session, player)
-    await common.caption_edit(
-        callback.message, texts.auction_screen(player.tavern, city),
-        kb.auction_kb(player.tavern))
+    await common.show_image_panel(
+        callback.message, images.named_image("auction"),
+        texts.auction_screen(player.tavern, city),
+        kb.auction_kb(player.tavern), callback.from_user.id)
     await callback.answer()
 
 

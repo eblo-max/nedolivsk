@@ -35,6 +35,13 @@ async def _safe_edit(callback: CallbackQuery, text: str, markup) -> None:
         pass
 
 
+async def _kassa(callback: CallbackQuery, text: str, markup) -> None:
+    """Экран кассы/сбора дохода на картинке dohod_sobrat (морфит панель)."""
+    await common.show_image_panel(
+        callback.message, images.named_image("dohod_sobrat"),
+        text, markup, callback.from_user.id)
+
+
 async def _show_tavern(callback: CallbackQuery, player: Player) -> None:
     """Экран таверны в том же окне: возвращает картинку таверны (например,
     после склада с его собственным фото). Если сообщение без фото — пересоздаёт."""
@@ -138,8 +145,8 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
 
     pending = story_state.get_retail(player)
     if pending:  # уже висит нерешённый заказ — сперва реши его (не копим заново)
-        await _safe_edit(callback, texts.retail_prompt(pending),
-                         kb.retail_kb(logic.retail_total(pending)))
+        await _kassa(callback, texts.retail_prompt(pending),
+                     kb.retail_kb(logic.retail_total(pending)))
         await callback.answer()
         return
 
@@ -178,12 +185,12 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     # Сбыт гостям — на ПОДТВЕРЖДЕНИЕ: показываем заказ, игрок решает наливать ли.
     if result.order:
         story_state.set_retail(player, result.order)
-        await _safe_edit(callback, texts.income_success(result),
-                         kb.retail_kb(logic.retail_total(result.order)))
+        await _kassa(callback, texts.income_success(result),
+                     kb.retail_kb(logic.retail_total(result.order)))
         await callback.answer(f"Пассив +{result.gold - result.skim} 🪙")
         return
 
-    await _safe_edit(callback, texts.income_success(result), kb.back_kb())
+    await _kassa(callback, texts.income_success(result), kb.back_kb())
     await callback.answer(f"+{result.gold - result.skim} 🪙")
 
     owner = callback.from_user.id

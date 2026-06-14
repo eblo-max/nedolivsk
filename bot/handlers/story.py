@@ -7,7 +7,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import autoclean, panels, texts
+from bot import autoclean, images, panels, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import story_engine, story_state
@@ -55,7 +55,9 @@ async def cb_market(callback: CallbackQuery, session: AsyncSession) -> None:
         else player.chat_id
     city = (await repo.get_or_create_city(session, chat_id)
             if chat_id is not None else None)
-    await common.caption_edit(callback.message, texts.market_screen(city), kb.market_kb())
+    await common.show_image_panel(
+        callback.message, images.named_image("rinok"),
+        texts.market_screen(city), kb.market_kb(), callback.from_user.id)
     await callback.answer()
 
 

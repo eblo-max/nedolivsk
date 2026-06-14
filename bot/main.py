@@ -66,6 +66,33 @@ async def _setup_commands(bot: Bot) -> None:
         )
 
 
+async def _prewarm_videos(bot: Bot) -> None:
+    """Прогрев видео: грузим в Telegram на старте и кэшируем file_id, чтобы
+    первый показ игроку был мгновенным (FS Railway эфемерна — кэш в процессе)."""
+    if not settings.admin_id:
+        return
+    from bot import images
+    from bot.game import combat
+    from bot.handlers import common
+
+    seen: set[str] = set()
+    for enemy in combat.ENEMIES:
+        if not enemy.video or enemy.video in seen:
+            continue
+        seen.add(enemy.video)
+        path = images.named_video(enemy.video)
+        if path is None:
+            continue
+        try:
+            msg = await bot.send_video(
+                settings.admin_id, common.cached_media(path),
+                disable_notification=True)
+            common.remember_file_id(path, msg)
+            await bot.delete_message(settings.admin_id, msg.message_id)
+        except Exception:  # noqa: BLE001 — нет доступа к админ-чату и т.п.
+            logging.getLogger(__name__).warning("Прогрев видео %s не удался", enemy.video)
+
+
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
 
@@ -89,6 +116,7 @@ async def main() -> None:
     notifier_task = asyncio.create_task(notifier_loop(bot))
 
     await _setup_commands(bot)
+    await _prewarm_videos(bot)  # прогрев видео-кэша — первый показ без задержки
 
     await bot.delete_webhook(drop_pending_updates=True)
     try:
