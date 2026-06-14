@@ -825,14 +825,14 @@ def _section(label: str) -> str:
 
 def _mood_short(v: int) -> str:
     if v >= 40:
-        return "😀 город гуляет"
+        return "😀 Город гуляет"
     if v >= 10:
-        return "🙂 настроение доброе"
+        return "🙂 Настроение доброе"
     if v > -10:
-        return "😐 настроение обычное"
+        return "😐 Настроение обычное"
     if v > -40:
-        return "😟 город хмур"
-    return "😠 город мрачен"
+        return "😟 Город хмур"
+    return "😠 Город мрачен"
 
 
 def _flavor_line(player, tavern, chat_id, seasonmod, citymod) -> str:
@@ -903,17 +903,15 @@ def _world_lines(chat_id, seasonmod, citymod) -> list[str]:
         w1 = f"{s.emoji} {s.name}, спрос ниже"
     else:
         w1 = f"{s.emoji} {s.name}"
-    line1 = [w1]
+    out = [w1]
     if wld.is_fair():
-        line1.append(f"🎪 Ярмарка — ещё {_fmt_minutes(wld.fair_minutes_left())}")
-
-    line2 = []
+        out.append(f"🎪 Ярмарка — ещё {_fmt_minutes(wld.fair_minutes_left())}")
     mood = citymod.cached_mood(chat_id)
     if mood is not None:
-        line2.append(_mood_short(mood))
+        out.append(_mood_short(mood))
     clabel = citymod.cached_label(chat_id)
-    line2.append(clabel if clabel else "🏛 в городе тихо")
-    return [" · ".join(line1), " · ".join(line2)]
+    out.append(clabel if clabel else "🏛 В городе тихо")
+    return out
 
 
 def _upgrade_progress(player: Player, tavern: Tavern) -> str:
@@ -927,8 +925,8 @@ def _upgrade_progress(player: Player, tavern: Tavern) -> str:
         pcts.append(min(1.0, have / need) if need else 1.0)
     pct = sum(pcts) / len(pcts)
     filled = round(pct * 10)
-    bar = "▰" * filled + "▱" * (10 - filled)
-    return f"🔨 До перестройки {bar} {round(pct * 100)}%"
+    bar = "▓" * filled + "░" * (10 - filled)
+    return f"🔨 Перестройка {bar} {round(pct * 100)}%"
 
 
 def _pending_income(tavern: Tavern) -> int:
@@ -946,9 +944,9 @@ def _pending_income(tavern: Tavern) -> int:
 
 def _storage_line(player: Player) -> str:
     inv = player.inventory or {}
-    parts = [f"{RESOURCE_EMOJI[r]} {inv[r]}"
+    parts = [f"{RESOURCE_EMOJI[r]}{inv[r]}"
              for r in balance.RESOURCES if inv.get(r, 0) > 0]
-    return " · ".join(parts[:6]) if parts else "пусто"
+    return "  ".join(parts[:6]) if parts else "пусто"
 
 
 def _cellar_line(tavern: Tavern) -> str:
@@ -959,9 +957,12 @@ def _cellar_line(tavern: Tavern) -> str:
     return " · ".join(parts) if parts else "пусто"
 
 
-def _quote(lines: list[str]) -> str:
-    """Секция отступом-цитатой (с полоской слева), без заголовка."""
-    return "<blockquote>" + "\n".join(lines) + "</blockquote>"
+_RULE = "─" * 18
+
+
+def _branch(label: str, lines: list[str]) -> list[str]:
+    """Секция: эмодзи-заголовок + строки с веткой └."""
+    return [label] + [f"└ {ln}" for ln in lines]
 
 
 def tavern_screen(player: Player, tavern: Tavern) -> str:
@@ -971,55 +972,50 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
 
     chat_id = getattr(player, "chat_id", None)
     region = balance.REGIONS.get(player.region, player.region)
-    remoji = ZONE_EMOJI.get(player.region, "📍")
     flavor = _flavor_line(player, tavern, chat_id, seasonmod, citymod)
 
-    # бригады
+    # бригады (эмодзи ⛏ — в заголовке секции)
     c = logic.expedition_counts(player, tavern)
     if c.ready and c.out:
-        exp = f"⛏ Бригады — {c.ready} вернулись, {c.out} в пути"
+        br = f"Бригады — {c.ready} вернулись, {c.out} в пути"
     elif c.ready:
-        exp = f"⛏ Бригады вернулись ({c.ready}) — забирай!"
+        br = f"Бригады вернулись ({c.ready}) — забирай!"
     elif c.out:
-        exp = f"⛏ Бригады {c.out}/{c.total} в пути — ещё {_fmt_minutes(c.next_minutes)}"
+        br = f"Бригады {c.out}/{c.total} · вернутся через {_fmt_minutes(c.next_minutes)}"
     else:
-        exp = "⛏ Бригады свободны — гони за добром"
-    deeds = [exp] + _production_lines(tavern)
+        br = "Бригады свободны — гони за добром"
+    deeds = [br] + _production_lines(tavern)
     bl = _build_line(player)
     if bl:
         deeds.append(bl)
 
-    # снаряга и удача
     eq = getattr(player, "equipment", None) or {}
     luck_pct = balance.lucky_chance(it.combat_stats(eq)["luck"])
 
-    pending = _pending_income(tavern)
-    income_line = f"💰 Доход — {tavern.income_rate}/ч"
-    if pending:
-        income_line += f"  ·  💵 к сбору ~{pending}"
-
     head = [
-        f"🏠 <b>{escape(tavern.name)}</b>",
-        f"{remoji} {region} · уровень {tavern.level}",
+        f"🏡 <b>{escape(tavern.name)}</b> · ур. {tavern.level}",
+        region,
         "",
-        f"<i>«{flavor}»</i>",
+        f"❝ {flavor} ❞",
         "",
-        f"🪙 Золото — <b>{player.gold}</b>",
-        income_line,
-        f"⭐ Репутация — {tavern.reputation}",
-        f"👥 Места — {tavern.capacity} · ✨ Уют — {tavern.comfort}",
-        f"🎽 Снаряга — {len(eq)}/{len(it.SLOTS)} · 🍀 Удача {luck_pct}%",
+        _RULE,
+        f"🪙 <b>{player.gold}</b> • 💰 {tavern.income_rate}/ч • ⭐ {tavern.reputation}",
+        f"👥 {tavern.capacity} мест • ✨ Уют {tavern.comfort} • 🍀 Удача {luck_pct}%",
+        f"🎒 Снаряга {len(eq)}/{len(it.SLOTS)}",
         _upgrade_progress(player, tavern),
+        _RULE,
     ]
-    blocks = [
-        _quote(deeds),
-        _quote([
-            f"📦 Склад — {_storage_line(player)}",
-            f"🛢 Погреб — {_cellar_line(tavern)}",
-        ]),
-        _quote(_world_lines(chat_id, seasonmod, citymod)),
-    ]
-    return "\n".join(head) + "\n\n" + "\n\n".join(blocks)
+    sections = (
+        _branch("⛏ <b>ДЕЛА</b>", deeds)
+        + [""]
+        + _branch("📦 <b>СКЛАД</b>", [
+            _storage_line(player),
+            f"Погреб — {_cellar_line(tavern)}",
+        ])
+        + [""]
+        + _branch("🌍 <b>МИР</b>", _world_lines(chat_id, seasonmod, citymod))
+    )
+    return "\n".join(head) + "\n\n" + "\n".join(sections)
 
 
 def _upgrade_need_block(player: Player, tavern: Tavern) -> list[str]:
