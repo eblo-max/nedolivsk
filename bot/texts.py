@@ -819,7 +819,8 @@ _FLAVOR = {
 
 
 def _section(label: str) -> str:
-    return f"──────── <b>{label}</b> ────────"
+    # Левый заголовок без длинных дашей — на узком экране не «съезжает».
+    return f"<b>{label}</b>"
 
 
 def _mood_short(v: int) -> str:
@@ -927,7 +928,7 @@ def _upgrade_progress(player: Player, tavern: Tavern) -> str:
     pct = sum(pcts) / len(pcts)
     filled = round(pct * 5)
     bar = "▰" * filled + "▱" * (5 - filled)
-    return f"🔨 До перестройки <code>{bar}</code> {round(pct * 100)}%"
+    return f"🔨 До перестройки {bar} {round(pct * 100)}%"
 
 
 def tavern_screen(player: Player, tavern: Tavern) -> str:
@@ -959,14 +960,14 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
         "",
         f"<i>{flavor}</i>",
         "",
-        f"🪙 <b>{player.gold}</b> · ⭐ {tavern.reputation} · 👥 {tavern.capacity} "
-        f"· ✨ {tavern.comfort} · 💰 {tavern.income_rate}/ч",
+        f"🪙 <b>{player.gold}</b> · ⭐ {tavern.reputation} · 💰 {tavern.income_rate}/ч",
+        f"👥 {tavern.capacity} мест · ✨ {tavern.comfort} уют",
         _upgrade_progress(player, tavern),
         "",
-        _section("ДЕЛА"),
+        _section("⚒ ДЕЛА"),
         *deeds,
         "",
-        _section("МИР"),
+        _section("🌍 МИР"),
         *_world_lines(chat_id, seasonmod, citymod),
     ]
     return "\n".join(parts)
