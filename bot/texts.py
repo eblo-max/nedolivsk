@@ -855,6 +855,20 @@ def income_success(r) -> str:
         )
     elif r.city_label:
         lines.append(f"{r.city_label} — сказывается на сбыте в городе.")
+    if r.perk_demand > 1.0:
+        lines.append(
+            f"💰 Купеческая протекция: +{round((r.perk_demand - 1) * 100)}% к сбыту."
+        )
+    if r.mood_factor >= 1.02:
+        lines.append(
+            f"😀 Город в приподнятом духе — спрос выше на "
+            f"{round((r.mood_factor - 1) * 100)}%."
+        )
+    elif r.mood_factor <= 0.98:
+        lines.append(
+            f"😟 Город хмур — гуляют вяло, спрос ниже на "
+            f"{round((1 - r.mood_factor) * 100)}%."
+        )
     if r.rep_gain:
         lines.append(f"⭐ +{r.rep_gain} к репутации за бойкую торговлю.")
     if r.premium_unsold:

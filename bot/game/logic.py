@@ -118,6 +118,8 @@ class IncomeResult:
     fair: bool = False             # доход собран во время ярмарки
     skim: int = 0                  # доля, утекшая из-за городской ситуации
     city_label: str = ""           # активная городская ситуация (для показа)
+    perk_demand: float = 1.0       # множитель сбыта от перка (купеческая протекция)
+    mood_factor: float = 1.0       # множитель спроса от настроения города
 
 
 def collect_income(

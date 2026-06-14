@@ -145,11 +145,12 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     if player.chat_id is not None:
         city = await repo.get_or_create_city(session, player.chat_id)
     ce = citymod.effects(city, player, now)  # эффект городской ситуации
+    perk_demand = perks.demand_bonus(player)
+    mood_factor = citymod.mood_factor(city)
 
     result = logic.collect_income(
         player, player.tavern,
-        demand_mult=(wld.demand_mult() * ce.demand_mult
-                     * perks.demand_bonus(player) * citymod.mood_factor(city)),
+        demand_mult=wld.demand_mult() * ce.demand_mult * perk_demand * mood_factor,
     )
     if not result.ok:
         await callback.answer(texts.income_empty(), show_alert=True)
@@ -157,6 +158,8 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
 
     result.fair = wld.is_fair()
     result.city_label = ce.label
+    result.perk_demand = perk_demand
+    result.mood_factor = mood_factor
     if ce.skim_pct and result.gold > 0:  # воры/корона снимают долю с выручки
         result.skim = int(result.gold * ce.skim_pct)
         player.gold -= result.skim
