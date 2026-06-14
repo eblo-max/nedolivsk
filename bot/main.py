@@ -15,6 +15,7 @@ from bot.config import settings
 from bot.db.base import create_tables, engine
 from bot.handlers import (
     admin,
+    admin_panel,
     auction,
     bonus,
     buildings,
@@ -61,6 +62,7 @@ async def _setup_commands(bot: Bot) -> None:
     if settings.admin_id:
         await bot.set_my_commands(
             public + [
+                BotCommand(command="admin", description="🛠 Админ-панель"),
                 BotCommand(command="fair", description="🎪 Запустить ярмарку (админ)"),
                 BotCommand(command="reset", description="🔥 Сбросить игрока (админ)"),
             ],
@@ -109,7 +111,8 @@ async def main() -> None:
     dp.update.middleware(DbSessionMiddleware())
     dp.callback_query.outer_middleware(PanelGuardMiddleware())
     dp.include_routers(
-        admin.router, worldmap_cmd.router, rating.router, character.router,
+        admin.router, admin_panel.router, worldmap_cmd.router, rating.router,
+        character.router,
         buildings.router, start.router, tavern.router, story.router,
         trade.router, auction.router, commands.router, loot.router,
         hunt.router, bonus.router, hub.router, group.router
