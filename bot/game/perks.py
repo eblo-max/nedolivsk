@@ -92,8 +92,10 @@ def active_perks(player: Player) -> list[str]:
         out.append("💰 Купеческая протекция: +15% к сбыту")
     if _friend(player, "watch"):
         out.append("👮 Под крылом стражи: ни воров, ни комендантского часа")
-    if _friend(player, "thieves") or is_guild(player):
-        out.append("🥷 Свой в гильдии: деньги не отнять, бригады дешевле")
+    if _has(player, "made_man"):
+        out.append("🥷 Верхушка гильдии: деньги не отнять, наём −25%")
+    elif _friend(player, "thieves") or is_guild(player):
+        out.append("🥷 Свои у воров: деньги не отнять, наём −15%")
     if _friend(player, "crown"):
         out.append("👑 Королевская грамота: поборы не страшны")
     if _friend(player, "church"):
@@ -105,10 +107,10 @@ def active_perks(player: Player) -> list[str]:
         out.append("🎻 Знаменитый кабак: слава капает репутацией со сбыта")
     if _has(player, "home_cooking"):
         out.append("🧹 Домашняя кухня: +10% к продаже еды")
-    if _has(player, "made_man"):
-        out.append("🥷 Свой в гильдии: бригады дешевле некуда (−25%)")
     if _has(player, "lucky_charm"):
         out.append("⚗️ Талисман удачи: счастливые вылазки чаще")
     if _has(player, "law_friend"):
         out.append("👮 Грамота доверия: комендантский час нипочём")
+    if _has(player, "trade_partner"):
+        out.append("💰 Совладелец торгового дома: купеческая лига за спиной")
     return out
