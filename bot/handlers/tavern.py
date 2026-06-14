@@ -164,16 +164,20 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
         f"{hol.emoji} {hol.name}" if hol
         else f"{season.current().emoji} {season.current().name}"
     )
-    if ce.skim_pct and result.gold > 0:  # воры/корона снимают долю с выручки
+    if ce.skim_pct and result.gold > 0:  # воры/корона снимают долю с пассива
         result.skim = int(result.gold * ce.skim_pct)
         player.gold -= result.skim
 
+    # Сбыт гостям — на ПОДТВЕРЖДЕНИЕ: показываем заказ, игрок решает наливать ли.
+    if result.order:
+        story_state.set_retail(player, result.order)
+        await _safe_edit(callback, texts.income_success(result),
+                         kb.retail_kb(logic.retail_total(result.order)))
+        await callback.answer(f"Пассив +{result.gold - result.skim} 🪙")
+        return
+
     await _safe_edit(callback, texts.income_success(result), kb.back_kb())
     await callback.answer(f"+{result.gold - result.skim} 🪙")
-
-    # Розничный сбыт гостям — слабый сигнал изобилия товара на рынке чата.
-    for good, qty in (result.sold or {}).items():
-        marketmod.nudge(city, good, qty * balance.MARKET_RETAIL_WEIGHT)
 
     owner = callback.from_user.id
     busy = story_state.get_pending(player) or story_state.get_trade(player)
@@ -193,6 +197,62 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     # Живой город: иначе иногда заглядывает «гость» с событием.
     if not busy and story_engine.maybe_spawn(player, city, now) is not None:
         await story.deliver_pending(callback.message, player, owner)
+
+
+@router.callback_query(F.data == "retail_open")
+async def cb_retail_open(callback: CallbackQuery, session: AsyncSession) -> None:
+    """Вернуться к заказу гостей (кнопка «Гости ждут заказ»)."""
+    player = await _get_player(callback, session)
+    if player is None:
+        return
+    want = story_state.get_retail(player)
+    if not want:
+        await callback.answer("Гости уже разошлись.", show_alert=True)
+        return
+    await _safe_edit(callback, texts.retail_prompt(want),
+                     kb.retail_kb(logic.retail_total(want)))
+    await callback.answer()
+
+
+@router.callback_query(F.data == "retail_sell")
+async def cb_retail_sell(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session, lock=True)
+    if player is None:
+        return
+    want = story_state.get_retail(player)
+    if not want:
+        await callback.answer("Гости уже разошлись.", show_alert=True)
+        return
+    now = datetime.now(timezone.utc)
+    city = None
+    if player.chat_id is not None:
+        city = await repo.get_or_create_city(session, player.chat_id)
+    sold, gold, rep = logic.apply_retail(player, player.tavern, want)
+    story_state.set_retail(player, None)
+    if not sold:
+        await _safe_edit(callback, texts.retail_held(), kb.back_kb())
+        await callback.answer("Товар разошёлся или скис.")
+        return
+    skim = 0
+    ce = citymod.effects(city, player, now)
+    if ce.skim_pct and gold > 0:  # воры/корона снимают долю и со сбыта
+        skim = int(gold * ce.skim_pct)
+        player.gold -= skim
+    # Розничный сбыт — слабый сигнал изобилия товара на рынке чата.
+    for good, qty in sold.items():
+        marketmod.nudge(city, good, qty * balance.MARKET_RETAIL_WEIGHT)
+    await _safe_edit(callback, texts.retail_sold(sold, gold, rep, skim), kb.back_kb())
+    await callback.answer(f"+{gold - skim} 🪙")
+
+
+@router.callback_query(F.data == "retail_hold")
+async def cb_retail_hold(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session, lock=True)
+    if player is None:
+        return
+    story_state.set_retail(player, None)
+    await _safe_edit(callback, texts.retail_held(), kb.back_kb())
+    await callback.answer()
 
 
 @router.callback_query(F.data == "upgrade")

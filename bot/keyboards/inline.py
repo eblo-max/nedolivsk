@@ -72,6 +72,9 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     sizes: list[int] = []
 
+    if story_state.get_retail(player):  # гости ждут решения по сбыту
+        kb.button(text="🍺 Гости ждут заказ!", callback_data="retail_open")
+        sizes.append(1)
     if story_state.get_trade(player):  # купец ждёт ответа по цене
         kb.button(text="🤝 Купец торгуется!", callback_data="trade_open")
         sizes.append(1)
@@ -171,6 +174,15 @@ def trade_counter_kb(counter: int) -> InlineKeyboardMarkup:
 def back_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="↩️ К таверне", callback_data="tavern")
+    return kb.as_markup()
+
+
+def retail_kb(total: int) -> InlineKeyboardMarkup:
+    """Подтверждение сбыта гостям: налить (продать) или придержать товар."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text=f"🍺 Налить гостям · +{total} 🪙", callback_data="retail_sell")
+    kb.button(text="🤚 Придержать товар", callback_data="retail_hold")
+    kb.adjust(1)
     return kb.as_markup()
 
 

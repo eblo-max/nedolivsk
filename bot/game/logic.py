@@ -114,6 +114,7 @@ class IncomeResult:
     passive: int = 0
     sales: int = 0
     sold: dict | None = None       # {ключ напитка: продано}
+    order: dict | None = None      # {ключ: сколько ХОТЯТ выкупить} — на подтверждение
     spoiled: dict | None = None    # {ключ: скисло} — излишек погреба прокис
     rep_gain: int = 0
     premium_unsold: bool = False   # остался премиум — состоятельных мало
@@ -129,9 +130,9 @@ class IncomeResult:
 def collect_income(
     player: Player, tavern: Tavern, demand_mult: float = 1.0
 ) -> IncomeResult:
-    """Гибрид: полный пассив + сбыт напитков и еды. Спрос (жажда) делится на
-    два пула — состоятельные (дороже-первым) и пьянь (дешевле-первым); еда —
-    отдельный пул голода. demand_mult>1 — ярмарка (наплыв гостей)."""
+    """Пассив капает сразу; СБЫТ гостям — на подтверждение (order). Порча
+    погреба идёт независимо от продажи. Спрос гостей считается, но не
+    исполняется — игрок сам решает, наливать ли (см. apply_retail)."""
     now = _now()
     since = tavern.last_income_at or now
     hours = min((now - since).total_seconds() / 3600, balance.INCOME_CAP_HOURS)
@@ -141,78 +142,106 @@ def collect_income(
     mult = items.income_multiplier(getattr(player, "equipment", None))
     passive = int(tavern.income_rate * hours * mult * perks.passive_mult(player))
 
-    demand = int(tavern.capacity * balance.DEMAND_PER_CAPACITY * hours * demand_mult)
-    share = min(balance.PREMIUM_SHARE_MAX, tavern.reputation / balance.PREMIUM_REP_DIV)
-    premium_demand = int(demand * share)
-    commoner_demand = demand - premium_demand
+    order, premium_unsold = _retail_demand(
+        tavern, hours, demand_mult, perks.food_mult(player))
 
+    # Порча: излишек сверх вместимости киснет за период (независимо от продажи).
     products = dict(tavern.products or {})
-    sold: dict[str, int] = {}
-    sales = 0
+    spoiled = _spoilage(tavern, products, hours)
+    if spoiled:
+        tavern.products = products
 
-    def sell(key: str, budget: int) -> int:
-        nonlocal sales
-        n = min(products.get(key, 0), budget)
+    if passive <= 0 and not order and not spoiled:
+        return IncomeResult(ok=False)
+
+    player.gold += passive  # пассив — сразу, без подтверждения
+    tavern.last_income_at = now
+    return IncomeResult(
+        ok=True, gold=passive, passive=passive, order=order or None,
+        spoiled=spoiled or None, premium_unsold=premium_unsold,
+    )
+
+
+def _retail_demand(
+    tavern: Tavern, hours: float, demand_mult: float, food_mult: float
+) -> tuple[dict, bool]:
+    """Что гости ХОТЯТ выкупить (без исполнения): (want{ключ:кол}, premium_unsold).
+    Состоятельные — дороже-первым, пьянь — дешёвое (≤порога), еда — пул голода."""
+    products = tavern.products or {}
+    avail = {k: int(v) for k, v in products.items() if v > 0}
+    want: dict[str, int] = {}
+
+    def take(key: str, budget: int) -> int:
+        n = min(avail.get(key, 0), budget)
         if n > 0:
-            products[key] -= n
-            sold[key] = sold.get(key, 0) + n
-            sales += n * production.GOODS[key].price
+            avail[key] -= n
+            want[key] = want.get(key, 0) + n
         return n
 
-    # Напитки: два пула (жажда). Состоятельные — дороже-первым, пьянь — дешёвое.
+    demand = int(tavern.capacity * balance.DEMAND_PER_CAPACITY * hours * demand_mult)
+    share = min(balance.PREMIUM_SHARE_MAX, tavern.reputation / balance.PREMIUM_REP_DIV)
+    premium = int(demand * share)
+    commoner = demand - premium
+
     keys = [k for k in products if k in production.DRINKS and products[k] > 0]
     by_price = sorted(keys, key=lambda k: production.DRINKS[k].price)
     for key in reversed(by_price):
-        if premium_demand <= 0:
+        if premium <= 0:
             break
-        premium_demand -= sell(key, premium_demand)
+        premium -= take(key, premium)
     for key in by_price:
-        if commoner_demand <= 0:
+        if commoner <= 0:
             break
         if production.DRINKS[key].price > balance.COMMONER_MAX_PRICE:
             break
-        commoner_demand -= sell(key, commoner_demand)
+        commoner -= take(key, commoner)
 
-    # Еда: отдельный пул (голод) — сытый гость доплачивает за блюдо.
     hunger = int(tavern.capacity * balance.FOOD_DEMAND_PER_CAPACITY * hours
-                 * demand_mult * perks.food_mult(player))
-    food_keys = sorted(
-        (k for k in products if k in production.FOODS and products[k] > 0),
-        key=lambda k: -production.FOODS[k].price,
-    )
-    for key in food_keys:
+                 * demand_mult * food_mult)
+    for key in sorted((k for k in products if k in production.FOODS and products[k] > 0),
+                      key=lambda k: -production.FOODS[k].price):
         if hunger <= 0:
             break
-        hunger -= sell(key, hunger)
+        hunger -= take(key, hunger)
 
     premium_unsold = any(
-        products.get(k, 0) > 0 and production.DRINKS[k].price >= 10
-        for k in keys
+        avail.get(k, 0) > 0 and production.DRINKS[k].price >= 10 for k in keys
     ) and share < 0.4
+    return want, premium_unsold
 
-    # Порча: непроданный излишек сверх вместимости погреба киснет за период.
-    spoiled = _spoilage(tavern, products, hours)
 
-    total_sold = sum(sold.values())
-    rep_gain = total_sold // balance.REP_PER_ALE_SOLD
-    if total_sold and perks.has_fame(player):  # знаменитый кабак — слава со сбыта
-        rep_gain += 1
-    gold = passive + sales
-    if gold <= 0 and rep_gain == 0 and not spoiled:
-        return IncomeResult(ok=False)
+def retail_total(want: dict | None) -> int:
+    """Выручка от сбыта по фиксированным ценам (для показа на подтверждении)."""
+    return sum(int(q) * production.GOODS[k].price
+               for k, q in (want or {}).items() if k in production.GOODS)
 
+
+def apply_retail(player: Player, tavern: Tavern, want: dict | None):
+    """Исполнить подтверждённый сбыт гостям. Возвращает (sold{}, gold, rep_gain).
+    Перепроверяет наличие — продаёт не больше, чем сейчас в погребе."""
+    products = dict(tavern.products or {})
+    sold: dict[str, int] = {}
+    gold = 0
+    for key, qty in (want or {}).items():
+        if key not in production.GOODS:
+            continue
+        n = min(int(qty), products.get(key, 0))
+        if n > 0:
+            products[key] -= n
+            sold[key] = n
+            gold += n * production.GOODS[key].price
+    if not sold:
+        return {}, 0, 0
+    tavern.products = products
     player.gold += gold
-    if total_sold or spoiled:
-        tavern.products = products
+    total = sum(sold.values())
+    rep_gain = total // balance.REP_PER_ALE_SOLD
+    if perks.has_fame(player):  # знаменитый кабак — слава со сбыта
+        rep_gain += 1
     if rep_gain:
         tavern.reputation += rep_gain
         player.reputation += rep_gain
-    tavern.last_income_at = now
-    return IncomeResult(
-        ok=True, gold=gold, passive=passive, sales=sales,
-        sold=sold, spoiled=spoiled or None, rep_gain=rep_gain,
-        premium_unsold=premium_unsold,  # fair проставляет хендлер из wld.is_fair()
-    )
+    return sold, gold, rep_gain
 
 
 def _spoilage(tavern: Tavern, products: dict, hours: float) -> dict:

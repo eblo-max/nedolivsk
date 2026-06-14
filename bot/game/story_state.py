@@ -82,6 +82,20 @@ def set_trade(player: Player, offer: dict | None) -> None:
     _save(player, st)
 
 
+def get_retail(player: Player) -> dict | None:
+    """Заказ гостей на подтверждение: {ключ: сколько хотят выкупить}."""
+    return (player.story or {}).get("retail")
+
+
+def set_retail(player: Player, want: dict | None) -> None:
+    st = _st(player)
+    if want:
+        st["retail"] = want
+    else:
+        st.pop("retail", None)
+    _save(player, st)
+
+
 def get_pending(player: Player) -> dict | None:
     return (player.story or {}).get("pending")
 

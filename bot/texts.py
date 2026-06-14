@@ -1252,18 +1252,31 @@ def expedition_returned(resources: list) -> str:
 
 
 def income_success(r) -> str:
+    from bot.game import logic
     from bot.game import production as prod
 
-    income = [f"Пассив — {r.passive}"]
-    if r.sales > 0:
-        parts = [
-            f"{prod.GOODS[k].name} {n}"
-            for k, n in sorted(r.sold.items(), key=lambda kv: -prod.GOODS[kv[0]].price)
+    parts = [
+        "💰 <b>КАССА</b>",
+        "",
+        f"«В кассе осело {r.gold} 🪙 пассива»",
+        "",
+        *_branch("ПАССИВ", [f"🪙 {r.passive} за простой кабака"]),
+    ]
+    if r.order:
+        total = logic.retail_total(r.order)
+        items = [
+            f"{prod.GOODS[k].emoji} {prod.GOODS[k].name} — {n} × {prod.GOODS[k].price}"
+            f" = {n * prod.GOODS[k].price} 🪙"
+            for k, n in sorted(r.order.items(), key=lambda kv: -prod.GOODS[kv[0]].price)
         ]
-        income.append(f"Сбыт — {r.sales}")
-        income.append(f"🍺 Раскуплено: {' · '.join(parts)}")
+        parts += [
+            "",
+            *_branch("ГОСТИ ХОТЯТ ВЫКУПИТЬ", items),
+            "",
+            f"Налить гостям на <b>{total} 🪙</b>?",
+        ]
     else:
-        income.append("Сбыта нет — только пассив")
+        parts += ["", "<i>Гостей на твой товар нет — только пассив.</i>"]
 
     mods = []
     if r.fair:
@@ -1285,18 +1298,9 @@ def income_success(r) -> str:
     elif r.season_demand <= 0.98:
         mods.append(f"{r.season_label} — −{round((1 - r.season_demand) * 100)}% спрос")
 
-    parts = [
-        "💰 <b>КАССА</b>",
-        "",
-        f"«В кассе осело {r.gold} 🪙»",
-        "",
-        *_branch("ДОХОД", income),
-    ]
     if mods:
         parts += ["", *_branch("ОБСТАНОВКА", mods)]
     tail = []
-    if r.rep_gain:
-        tail.append(f"⭐ +{r.rep_gain} к репутации за бойкую торговлю")
     if r.premium_unsold:
         tail.append("⚠️ Состоятельных мало — дорогое не разбирают")
     if r.spoiled:
@@ -1308,6 +1312,49 @@ def income_success(r) -> str:
     if tail:
         parts += ["", *tail]
     return "\n".join(parts)
+
+
+def retail_sold(sold: dict, gold: int, rep: int, skim: int = 0) -> str:
+    from bot.game import production as prod
+    items = [
+        f"{prod.GOODS[k].emoji} {prod.GOODS[k].name} — {n} × {prod.GOODS[k].price}"
+        for k, n in sorted(sold.items(), key=lambda kv: -prod.GOODS[kv[0]].price)
+    ]
+    parts = [
+        "🍺 <b>НАЛИТО ГОСТЯМ!</b>",
+        "",
+        *_branch("СБЫТ", items),
+        "",
+        f"🪙 Выручка — +{gold}",
+    ]
+    if skim:
+        parts.append(f"🥷 Утекло на сторону — −{skim}")
+    if rep:
+        parts.append(f"⭐ +{rep} к репутации за бойкую торговлю")
+    return "\n".join(parts)
+
+
+def retail_held() -> str:
+    return ("🤚 Придержал товар — гости разошлись несолоно хлебавши. "
+            "Полежит в погребе (только гляди, чтоб не скисло).")
+
+
+def retail_prompt(want: dict) -> str:
+    from bot.game import logic
+    from bot.game import production as prod
+    total = logic.retail_total(want)
+    items = [
+        f"{prod.GOODS[k].emoji} {prod.GOODS[k].name} — {n} × {prod.GOODS[k].price}"
+        f" = {n * prod.GOODS[k].price} 🪙"
+        for k, n in sorted(want.items(), key=lambda kv: -prod.GOODS[kv[0]].price)
+    ]
+    return "\n".join([
+        "🍺 <b>ГОСТИ ЖДУТ ЗАКАЗ</b>",
+        "",
+        *_branch("ХОТЯТ ВЫКУПИТЬ", items),
+        "",
+        f"Налить гостям на <b>{total} 🪙</b>?",
+    ])
 
 
 def _good_name(key: str) -> str:
