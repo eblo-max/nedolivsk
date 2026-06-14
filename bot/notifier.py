@@ -271,15 +271,17 @@ async def _notify_returned(bot: Bot) -> None:
                 if kind == "activate":
                     await repo.add_chronicle(session, city.chat_id, sit.chron)
 
-        # Подкидыш: иногда в случайном чате «что-то теряется» — кто первый, тот подобрал.
+        # Подкидыш: в каждом чате независимо ~раз в час «что-то теряется».
+        # Не множим, пока висит неподобранный (анти-навал).
         await repo.cleanup_loot(session)
         loot_to_post: list[tuple[int, int]] = []
-        if random.random() < balance.LOOT_DROP_CHANCE:
-            chat_ids = await repo.all_chat_ids(session)
-            if chat_ids:
-                target = random.choice(chat_ids)
-                drop = await repo.create_loot(session, target)
-                loot_to_post.append((target, drop.id))
+        for chat_id in await repo.all_chat_ids(session):
+            if random.random() >= balance.LOOT_DROP_CHANCE:
+                continue
+            if await repo.has_active_loot(session, chat_id):
+                continue
+            drop = await repo.create_loot(session, chat_id)
+            loot_to_post.append((chat_id, drop.id))
 
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода

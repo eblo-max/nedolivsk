@@ -108,6 +108,20 @@ async def claim_loot(session: AsyncSession, drop_id: int, user_id: int) -> bool:
     return result.rowcount == 1
 
 
+async def has_active_loot(session: AsyncSession, chat_id: int) -> bool:
+    """Есть ли в чате неподобранный, ещё не сгнивший подкидыш (анти-навал)."""
+    cutoff = datetime.now(timezone.utc) - timedelta(
+        minutes=balance.LOOT_EXPIRE_MINUTES)
+    result = await session.execute(
+        select(LootDrop.id).where(
+            LootDrop.chat_id == chat_id,
+            LootDrop.claimed_by.is_(None),
+            LootDrop.created_at >= cutoff,
+        ).limit(1)
+    )
+    return result.first() is not None
+
+
 async def cleanup_loot(session: AsyncSession) -> None:
     """Подчистить старые подкидыши (день и старше), чтобы таблица не пухла."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=1)
