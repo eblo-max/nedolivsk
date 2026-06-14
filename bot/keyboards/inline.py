@@ -88,12 +88,13 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
         exp_label = "⛏ Отправить бригады"
     kb.button(text=exp_label, callback_data="exp_menu")
     kb.button(text="💰 Собрать доход", callback_data="income")
+    kb.button(text="🏪 Рынок", callback_data="market")
     kb.button(text="📦 Склад", callback_data="warehouse")
     kb.button(text="🧍 Персонаж", callback_data="character")
     kb.button(text="🏗 Пристройки", callback_data="buildings")
     kb.button(text="🔨 Улучшить таверну", callback_data="upgrade")
     kb.button(text="ℹ️ О игре", callback_data="info")
-    kb.adjust(*sizes, 1, 2, 2, 1, 1)
+    kb.adjust(*sizes, 1, 2, 2, 2, 1)
     return kb.as_markup()
 
 
@@ -185,6 +186,7 @@ def citizens_kb() -> InlineKeyboardMarkup:
 
 def chronicle_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    kb.button(text="🏪 Рынок", callback_data="market")
     kb.button(text="🏛 Расклад сил", callback_data="city")
     kb.button(text="👥 Горожане", callback_data="citizens")
     kb.button(text="🏠 К таверне", callback_data="tavern")
@@ -194,6 +196,16 @@ def chronicle_kb() -> InlineKeyboardMarkup:
 
 def city_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    kb.button(text="🏪 Рынок", callback_data="market")
+    kb.button(text="📜 Хроника города", callback_data="chronicle")
+    kb.button(text="🏠 К таверне", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def market_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏛 Расклад сил", callback_data="city")
     kb.button(text="📜 Хроника города", callback_data="chronicle")
     kb.button(text="🏠 К таверне", callback_data="tavern")
     kb.adjust(1)

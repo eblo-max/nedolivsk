@@ -32,6 +32,7 @@ SECTIONS = {
     "гг хроника": "chronicle", "гг летопись": "chronicle",
     "гг репутация": "citizens", "гг горожане": "citizens",
     "гг город": "city", "гг площадь": "city",
+    "гг рынок": "market", "гг базар": "market", "гг цены": "market",
 }
 
 
@@ -71,6 +72,10 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
     if section == "city":
         city = await repo.get_or_create_city(session, message.chat.id)
         autoclean.schedule_message(await message.reply(texts.city_screen(city)))
+        return
+    if section == "market":
+        city = await repo.get_or_create_city(session, message.chat.id)
+        autoclean.schedule_message(await message.reply(texts.market_screen(city)))
         return
 
     player = await repo.get_player(session, message.from_user.id)

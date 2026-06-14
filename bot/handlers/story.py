@@ -45,6 +45,20 @@ async def cb_city(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "market")
+async def cb_market(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await repo.get_player(session, callback.from_user.id)
+    if player is None:
+        await callback.answer()
+        return
+    chat_id = callback.message.chat.id if panels.is_group(callback.message) \
+        else player.chat_id
+    city = (await repo.get_or_create_city(session, chat_id)
+            if chat_id is not None else None)
+    await common.caption_edit(callback.message, texts.market_screen(city), kb.market_kb())
+    await callback.answer()
+
+
 @router.callback_query(F.data == "chronicle")
 async def cb_chronicle(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await repo.get_player(session, callback.from_user.id)

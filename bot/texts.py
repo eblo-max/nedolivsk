@@ -301,6 +301,54 @@ def city_screen(city) -> str:
     return "\n".join(parts)
 
 
+def _market_flavor(hi: float, lo: float, fair: bool) -> str:
+    if fair:
+        return "Ярмарка гудит — гости при деньгах, товар расхватывают"
+    if hi >= 0.12:
+        return "Купцы рыщут — на что-то взлетел спрос, дерут втридорога"
+    if lo <= -0.12:
+        return "Лавки ломятся товаром — оптовики воротят нос и сбивают цену"
+    if hi >= 0.05 or lo <= -0.05:
+        return "Рынок шевелится — где-то цены дрогнули, торг пошёл живее"
+    return "На базаре спокойно — цены держатся, торг идёт неспешно"
+
+
+def market_screen(city) -> str:
+    """Живой опт: текущие цены по товарам с трендом (завал/дефицит) и ярмаркой."""
+    from bot.game import market as marketmod
+    from bot.game import production as prod
+    from bot.game import world as wld
+
+    fair = wld.is_fair()
+    fairmult = balance.TRADE_FAIR_FV_MULT if fair else 1.0
+    rows, devs = [], []
+    for key, g in sorted(prod.GOODS.items(), key=lambda kv: kv[1].price):
+        f = marketmod.factor(city, key)
+        price = max(1, int(round(g.price * fairmult * f)))
+        dev = price / g.price - 1
+        devs.append(dev)
+        if dev > 0.05:
+            arrow = f"📈 +{round(dev * 100)}%"
+        elif dev < -0.05:
+            arrow = f"📉 −{round(-dev * 100)}%"
+        else:
+            arrow = "➖ ровно"
+        rows.append(f"{g.emoji} {g.name} — {price} 🪙 · {arrow}")
+
+    flavor = _market_flavor(max(devs), min(devs), fair)
+    parts = ["🏪 <b>БАЗАР НЕДОЛИВСКА</b>", "", f"«{flavor}»", ""]
+    if fair:
+        parts += ["🎪 Ярмарка: опт +20%, купцы съезжаются", ""]
+    parts += _branch("ОПТОВЫЕ ЦЕНЫ", rows)
+    tail = ("<i>Купцы заходят на «Собрать доход» — лови и торгуйся. "
+            "Кто качнул цены — гляди в Хронике.</i>")
+    if city is None:
+        tail = ("<i>Это базовые цены. Прибейся к городу (играй через «гг» в общем "
+                "чате) — и рынок оживёт: спрос, завалы, дефицит.</i>")
+    parts += ["", tail]
+    return "\n".join(parts)
+
+
 def chronicle_screen(entries: list[str]) -> str:
     """Летопись города — лента заметных событий."""
     if not entries:
