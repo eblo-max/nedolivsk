@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import balance, logic, perks, story_engine
+from bot.game import balance, logic, perks, season, story_engine
 from bot.game import city as citymod
 from bot.game import world as wld
 from bot.handlers import common, story
@@ -139,10 +139,12 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     ce = citymod.effects(city, player, now)  # эффект городской ситуации
     perk_demand = perks.demand_bonus(player)
     mood_factor = citymod.mood_factor(city)
+    season_demand = season.demand_mult()
 
     result = logic.collect_income(
         player, player.tavern,
-        demand_mult=wld.demand_mult() * ce.demand_mult * perk_demand * mood_factor,
+        demand_mult=(wld.demand_mult() * ce.demand_mult * perk_demand
+                     * mood_factor * season_demand),
     )
     if not result.ok:
         await callback.answer(texts.income_empty(), show_alert=True)
@@ -152,6 +154,12 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     result.city_label = ce.label
     result.perk_demand = perk_demand
     result.mood_factor = mood_factor
+    result.season_demand = season_demand
+    hol = season.holiday()
+    result.season_label = (
+        f"{hol.emoji} {hol.name}" if hol
+        else f"{season.current().emoji} {season.current().name}"
+    )
     if ce.skim_pct and result.gold > 0:  # воры/корона снимают долю с выручки
         result.skim = int(result.gold * ce.skim_pct)
         player.gold -= result.skim

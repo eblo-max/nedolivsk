@@ -76,6 +76,9 @@ class WorldState(Base):
     next_fair_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Анонс ближайшей ярмарки уже отправлен в чаты (сброс при её открытии).
     fair_pre_announced: Mapped[bool] = mapped_column(default=False)
+    # Последний анонсированный сезон/праздник (дедуп рассылки смены).
+    season: Mapped[int] = mapped_column(default=-1)
+    holiday: Mapped[str | None] = mapped_column(String(48))
 
 
 class KnownChat(Base):

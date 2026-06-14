@@ -41,6 +41,13 @@ async def create_tables() -> None:
             "last_situation_end TIMESTAMPTZ"
         ))
         await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS "
+            "season INTEGER NOT NULL DEFAULT -1"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS holiday VARCHAR(48)"
+        ))
+        await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "expedition_resource VARCHAR(16)"
         ))

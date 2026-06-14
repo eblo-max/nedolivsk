@@ -7,7 +7,7 @@ from bot.game import balance
 from bot.game.story_defs import (
     Choice, CitySituation, ClearFlag, Echo, FacRep, Faction, FactionPower, Gold,
     HasBuilding, HasFlag, Chron, MinLevel, Mood, NotFlag, NpcRel, Outcome,
-    Product, RelTo, Rep, Res, Schedule, SetFlag, Storylet,
+    Product, RelTo, Rep, Res, Schedule, SeasonIs, SetFlag, Storylet,
 )
 
 _FRIEND = balance.REL_FRIEND  # порог «свой» (40)
@@ -1159,6 +1159,61 @@ _LIST = [
                 Outcome(1, "Слух оказался золотым — подвернулась выгодная "
                            "сделка. Связи в лиге дорогого стоят.",
                         (Gold(tier="petty"), FacRep("merchants", 4))),
+            )),
+        ),
+    ),
+
+    # ═══════════ ФАЗА 4c: ТЕМАТИЧЕСКИЕ СЕЗОННЫЕ СОБЫТИЯ ═════════════════
+    Storylet(
+        id="winter_blizzard", npc=None, arc="season", weight=10,
+        preconditions=(SeasonIs("winter"),),
+        title="Метель загнала путников",
+        text=("Лютая метель замела тракт, и в кабак ввалилась толпа "
+              "продрогших путников: «Пусти погреться, хозяин, заплатим не "
+              "скупясь!»"),
+        choices=(
+            Choice("🔥 Пустить к очагу, напоить", (
+                Outcome(1, "Отогрел замёрзших, влил в них горячего — те "
+                           "отвалили щедро да ещё и нахваливали. Зима кормит "
+                           "запасливых.",
+                        (Gold(tier="minor"), Rep(1))),
+            )),
+            Choice("🚪 Мест нет, валите", (
+                Outcome(1, "Выставил путников в метель. Молва пошла, что "
+                           "кабатчик — бессердечная скотина. Минус доброе имя.",
+                        (Rep(-1),)),
+            )),
+        ),
+    ),
+    Storylet(
+        id="autumn_harvest", npc="paraska", arc="season", weight=10,
+        preconditions=(SeasonIs("autumn"),),
+        title="Урожайная щедрость",
+        text=("Осень, закрома ломятся. Вдова Параска привезла телегу свежих "
+              "припасов: «Урожай нынче знатный, бери задёшево, родимый!»"),
+        choices=(
+            Choice("🌾 Закупиться впрок", (
+                Outcome(1, "Набрал припасов по осенней дешёвке — кладовая "
+                           "полна. Зимой спасибо скажешь.",
+                        (Res("grain", 10), Res("berries", 6))),
+            )),
+            Choice("🚪 И так добра хватает", (
+                Outcome(1, "Отмахнулся от выгоды. «Ну, дело хозяйское», — "
+                           "пожала плечами Параска.", ()),
+            )),
+        ),
+    ),
+    Storylet(
+        id="summer_heat", npc=None, arc="season", weight=10,
+        preconditions=(SeasonIs("summer"),),
+        title="Жара лютая",
+        text=("Солнце шпарит немилосердно, весь город изнывает от жажды и "
+              "ломится в кабаки за чем-нибудь холодненьким. Очередь до улицы."),
+        choices=(
+            Choice("🍺 Отпускать без передыху", (
+                Outcome(1, "Поил жаждущих весь день без роздыху — касса "
+                           "трещит от монет. Жара — друг кабатчика.",
+                        (Gold(tier="minor"),)),
             )),
         ),
     ),

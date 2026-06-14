@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from bot.db.models import Player, Tavern
-from bot.game import balance, inventory, items, perks, production
+from bot.game import balance, inventory, items, perks, production, season
 
 
 def _now() -> datetime:
@@ -95,7 +95,8 @@ def claim_expeditions(player: Player) -> list[tuple[str, int, bool]]:
             continue
         resource = e["resource"]
         amount = balance.expedition_yield(resource, level, player.region)
-        amount = int(amount * items.yield_multiplier(equipment, resource))
+        amount = int(amount * items.yield_multiplier(equipment, resource)
+                     * season.yield_mult(resource))
         luck = items.combat_stats(equipment)["luck"] + perks.luck_bonus(player)
         lucky = random.randint(1, 100) <= balance.lucky_chance(luck)
         if lucky:
@@ -120,6 +121,8 @@ class IncomeResult:
     city_label: str = ""           # активная городская ситуация (для показа)
     perk_demand: float = 1.0       # множитель сбыта от перка (купеческая протекция)
     mood_factor: float = 1.0       # множитель спроса от настроения города
+    season_demand: float = 1.0     # множитель спроса от сезона/праздника
+    season_label: str = ""         # подпись сезона/праздника (для показа)
 
 
 def collect_income(

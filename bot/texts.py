@@ -368,6 +368,24 @@ def fair_open_announce() -> str:
     )
 
 
+def season_announce(s) -> str:
+    """Анонс смены сезона в чат."""
+    return (
+        f"{s.emoji} <b>{s.name.upper()} ПРИШЛА В НЕДОЛИВСК</b>\n\n"
+        f"{s.blurb[0].upper()}{s.blurb[1:]}.\n"
+        "Подстраивай дела под погоду, кабатчик, — кто не чешется, тот и пролетает."
+    )
+
+
+def holiday_announce(h) -> str:
+    """Анонс праздника в чат."""
+    return (
+        f"{h.emoji} <b>{h.name.upper()}!</b>\n\n"
+        f"{h.blurb[0].upper()}{h.blurb[1:]}! Спрос нынче бешеный — тащи всё "
+        "пойло на продажу, второго такого дня ждать целый год."
+    )
+
+
 def fair_close_announce() -> str:
     """Анонс закрытия ярмарки — итог и зацепка на следующую."""
     return (
@@ -757,8 +775,16 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
         )
 
     from bot.game import city as citymod
+    from bot.game import season as seasonmod
     clabel = citymod.cached_label(getattr(player, "chat_id", None))
     city_line = f"{clabel} — отражается на торговле.\n" if clabel else ""
+
+    _hol = seasonmod.holiday()
+    if _hol is not None:
+        season_line = f"{_hol.emoji} <b>{_hol.name}!</b> {_hol.blurb}.\n"
+    else:
+        _s = seasonmod.current()
+        season_line = f"{_s.emoji} {_s.name} — {_s.blurb}.\n"
 
     return (
         f"🏠 <b>{escape(tavern.name)}</b>\n"
@@ -766,7 +792,7 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
         f"Скрипят половицы, воняет элем и мокрой псиной. "
         f"За стойкой — {escape(player.first_name)}, "
         f"и спорить с хозяином тут не принято.\n"
-        f"{exp_line}{build_line}{fair_line}{city_line}\n"
+        f"{exp_line}{build_line}{fair_line}{city_line}{season_line}\n"
         f"👥 Вместимость: {tavern.capacity}\n"
         f"✨ Комфорт: {tavern.comfort}\n"
         f"💰 Доход: {tavern.income_rate} 🪙/час\n"
@@ -936,6 +962,20 @@ def income_success(r) -> str:
         lines.append(
             f"😟 Город хмур — гуляют вяло, спрос ниже на "
             f"{round((1 - r.mood_factor) * 100)}%."
+        )
+    if r.season_demand >= 1.4:
+        lines.append(
+            f"{r.season_label} — гуляет весь город, спрос "
+            f"×{r.season_demand:g}! Лови момент."
+        )
+    elif r.season_demand >= 1.02:
+        lines.append(
+            f"{r.season_label}: спрос выше на {round((r.season_demand - 1) * 100)}%."
+        )
+    elif r.season_demand <= 0.98:
+        lines.append(
+            f"{r.season_label}: народ по домам, спрос ниже на "
+            f"{round((1 - r.season_demand) * 100)}%."
         )
     if r.rep_gain:
         lines.append(f"⭐ +{r.rep_gain} к репутации за бойкую торговлю.")

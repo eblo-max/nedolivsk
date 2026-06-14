@@ -81,6 +81,15 @@ class CitySituation:
         return False
 
 
+class SeasonIs:
+    """Сейчас указанный сезон (для тематических событий)."""
+    def __init__(self, season_id): self.sid = season_id
+
+    def check(self, ctx):
+        from bot.game import season
+        return season.current().id == self.sid
+
+
 # ─────────────────────────── ЭФФЕКТЫ ──────────────────────────────────
 def _income_rate(player: Player) -> int:
     return getattr(player.tavern, "income_rate", 0) or 10

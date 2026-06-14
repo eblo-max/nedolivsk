@@ -104,8 +104,10 @@ def expedition_menu_kb(player: Player) -> InlineKeyboardMarkup:
         kb.button(text=f"🎒 Забрать вернувшихся ({c.ready})", callback_data="exp_claim")
         sizes.append(1)
     if c.free > 0:
+        from bot.game import season
         for res in balance.RESOURCES:
-            amount = balance.expedition_yield(res, level, player.region)
+            amount = int(balance.expedition_yield(res, level, player.region)
+                         * season.yield_mult(res))
             kb.button(
                 text=f"{RESOURCE_EMOJI[res]} {RESOURCE_NAMES[res]} (+{amount})",
                 callback_data=f"exp:{res}",

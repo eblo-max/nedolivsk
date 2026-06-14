@@ -13,7 +13,7 @@ from bot.db import repo
 from bot.db.base import session_factory
 from bot.db.models import Player, Tavern
 from bot.game import city as citymod
-from bot.game import story_engine, story_state
+from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import buildings_notify_kb, claim_kb, craft_claim_kb
 
@@ -62,6 +62,16 @@ async def _notify_returned(bot: Bot) -> None:
         # Планировщик мира: открыть/закрыть ярмарку по расписанию.
         world = await repo.get_or_create_world(session)
         fair_event = wld.advance(world)  # 'pre'|'open'|'close'|None — анонс в чаты
+
+        # Сезоны/праздники: детект смены для анонса (глобально, по дате).
+        cur_season = season.season_index(now)
+        season_changed = world.season != cur_season
+        world.season = cur_season
+        hol = season.holiday(now)
+        hol_token = f"{hol.id}:{now.date().isoformat()}" if hol else None
+        holiday_new = hol is not None and world.holiday != hol_token
+        if hol is not None:
+            world.holiday = hol_token
 
         # Рассылку копим и шлём ПОСЛЕ коммита, чтобы не держать локи строк
         # через сетевые вызовы Telegram (иначе клики игроков ждут весь тик).
@@ -222,10 +232,22 @@ async def _notify_returned(bot: Bot) -> None:
         for player, text, markup in outbox:
             await _notify(bot, player, text, markup)
 
-        # Анонс мирового события в общие чаты (после коммита состояния).
-        if fair_event:
+        # Анонсы мировых событий в общие чаты (после коммита состояния).
+        if fair_event or season_changed or holiday_new:
             chat_ids = await repo.all_chat_ids(session)
-            await announce.broadcast_fair(bot, fair_event, chat_ids, world)
+            if fair_event:
+                await announce.broadcast_fair(bot, fair_event, chat_ids, world)
+            season_msgs = []
+            if season_changed:
+                season_msgs.append(texts.season_announce(season.SEASONS[cur_season]))
+            if holiday_new:
+                season_msgs.append(texts.holiday_announce(hol))
+            for chat_id in chat_ids:
+                for text in season_msgs:
+                    try:
+                        await bot.send_message(chat_id, text)
+                    except Exception:  # noqa: BLE001
+                        logger.warning("Анонс сезона не доставлен в чат %s", chat_id)
         # Анонсы городских ситуаций (после коммита).
         for chat_id, text in city_events:
             try:
