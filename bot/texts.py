@@ -1524,12 +1524,16 @@ def market_pulse_chron(cit) -> str:
     return f"{cit.name} {verb}."
 
 
-def hunt_menu(player) -> str:
+def _hunter_stats(player):
     from bot.game import combat, items
-
     st = items.combat_stats(getattr(player, "equipment", None))
     dmg = balance.BASE_DAMAGE + st["damage"]
     crit = min(balance.HUNT_CRIT_CAP, st["crit"] + st["luck"] // 2)
+    return st, dmg, crit, combat
+
+
+def hunt_menu(player) -> str:
+    st, dmg, crit, combat = _hunter_stats(player)
     parts = [
         "🏹 <b>ОХОТА</b>",
         "",
@@ -1545,11 +1549,53 @@ def hunt_menu(player) -> str:
         parts += ["", f"🤕 Не оклемался — в строй через {_fmt_minutes(mins)}"]
     prey = []
     for e in combat.ENEMIES:
-        arm = f" 🛡{e.armor}" if e.armor else ""
-        prey.append(f"{e.emoji} {e.name} — ❤{e.hp} ⚔{e.attack}{arm}")
-    parts += ["", *_branch("ДОБЫЧА В ЛЕСУ", prey)]
-    parts += ["", "<i>Сильнее зверь — жирнее добыча и злее раны. "
-                  "Без снаряги — только заяц.</i>"]
+        wp, _ = combat.forecast(st, e, 60)
+        tcol, _lbl = combat.threat(wp)
+        prey.append(f"{tcol} {e.emoji} {e.name} — ❤{e.hp}")
+    parts += ["", *_branch("ЗВЕРЬЁ (цвет — твои шансы)", prey)]
+    parts += ["", "<i>Жми на зверя — покажу расклад по твоим статам и добычу.</i>"]
+    return "\n".join(parts)
+
+
+def hunt_detail(player, enemy) -> str:
+    st, _dmg, _crit, combat = _hunter_stats(player)
+    wp, avg = combat.forecast(st, enemy, 200)
+    tcol, lbl = combat.threat(wp)
+
+    guar, rare = [], []
+    for d in enemy.drops:
+        if d.res:
+            nm = f"{RESOURCE_EMOJI.get(d.res, '📦')} {RESOURCE_NAMES.get(d.res, d.res)}"
+            rng_s = f"{d.lo}" if d.lo == d.hi else f"{d.lo}–{d.hi}"
+            line = f"{nm} {rng_s}"
+        else:
+            line = d.label
+        (guar if d.chance >= 100 else rare).append((line, d.chance))
+
+    g = [ln for ln, _ in guar] + [f"🪙 Золото {enemy.gold[0]}–{enemy.gold[1]}"]
+    if enemy.rep:
+        g.append(f"⭐ Репутация +{enemy.rep}")
+    odds = [f"{tcol} {lbl}", f"🎯 Победа ~{wp}%"]
+    if wp > 0:
+        odds.append(f"❤ Останется ~{avg}/{balance.BASE_HP}")
+
+    parts = [
+        f"🏹 <b>{enemy.emoji} {enemy.name.upper()}</b>",
+        "",
+        f"«{enemy.blurb}»",
+        "",
+        *_branch("ЗВЕРЬ", [
+            f"❤ HP — {enemy.hp}",
+            f"⚔ Атака — {enemy.attack}",
+            f"🛡 Броня — {enemy.armor}",
+        ]),
+        "",
+        *_branch("ТВОЙ РАСКЛАД", odds),
+        "",
+        *_branch("ГАРАНТИРОВАННО", g),
+    ]
+    if rare:
+        parts += ["", *_branch("РЕДКОЕ", [f"{ln} — {c}%" for ln, c in rare])]
     return "\n".join(parts)
 
 
@@ -1566,8 +1612,8 @@ def hunt_result(res) -> str:
             detail.append(f"{RESOURCE_EMOJI.get(r, '📦')} {RESOURCE_NAMES.get(r, r)} — +{q}")
         if loot["rep"]:
             detail.append(f"⭐ Репутация — +{loot['rep']}")
-        if loot["rare"]:
-            detail.append(f"🏆 {loot['rare']}")
+        for t in loot["trophies"]:
+            detail.append(f"🏆 {t}")
         return "\n".join([
             f"🏹 <b>{e.emoji} {e.name.upper()} ПОВЕРЖЕН!</b>",
             "", body, "", *_branch("ДОБЫЧА", detail),

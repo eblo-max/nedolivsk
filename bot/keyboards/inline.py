@@ -209,9 +209,20 @@ def hunt_menu_kb(player) -> InlineKeyboardMarkup:
     from bot.game import combat
     kb = InlineKeyboardBuilder()
     for e in combat.ENEMIES:
-        kb.button(text=f"{e.emoji} {e.name}", callback_data=f"hunt:{e.id}")
+        kb.button(text=f"{e.emoji} {e.name}", callback_data=f"hbeast:{e.id}")
     kb.button(text="🧍 К персонажу", callback_data="character")
-    kb.adjust(2, 2, 2, 1)
+    rows = [2] * (len(combat.ENEMIES) // 2)
+    if len(combat.ENEMIES) % 2:
+        rows.append(1)
+    kb.adjust(*rows, 1)
+    return kb.as_markup()
+
+
+def hunt_detail_kb(enemy_id: str) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⚔️ Охотиться!", callback_data=f"hfight:{enemy_id}")
+    kb.button(text="↩️ К зверью", callback_data="hunt")
+    kb.adjust(1)
     return kb.as_markup()
 
 

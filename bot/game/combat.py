@@ -1,8 +1,9 @@
-"""Охота и бой: снаряга наконец работает.
+"""Охота и бой: снаряга наконец работает. Модель — как в Monster Hunter:
 
-Мгновенный бой по статам (items.combat_stats): урон×(крит ×2) против HP зверя,
-его атака против твоей брони. Победа → добыча; поражение → раны (кулдаун).
-Голыми руками одолеешь только мелочь; на атамана идёт только мастер в железе.
+выбираешь зверя → видишь бриф (HP + ТВОЙ расклад по статам: шанс победы,
+сколько HP останется) и таблицу добычи (что выпадет точно + редкое с %),
+потом идёшь в бой. Бой мгновенный по статам (items.combat_stats): урон×(крит
+×2) против HP зверя, его атака против брони. Победа — добыча; поражение — раны.
 """
 
 import random
@@ -13,6 +14,17 @@ from bot.game import balance, inventory, items
 
 
 @dataclass(frozen=True)
+class Drop:
+    """Добыча. chance=100 — гарантированно; <100 — редкое. res='' — трофей
+    (без инвентаря, чисто похвальба в чате/на экране)."""
+    res: str
+    lo: int = 1
+    hi: int = 1
+    chance: int = 100
+    label: str = ""          # для трофея (res='')
+
+
+@dataclass(frozen=True)
 class Enemy:
     id: str
     emoji: str
@@ -20,35 +32,50 @@ class Enemy:
     hp: int
     attack: int
     armor: int
-    gold: tuple                 # (мин, макс) золота
-    loot: tuple = ()            # ((ресурс, мин, макс), ...)
-    rep: int = 0                # +репутация за добычу
-    rare: str = ""              # редкий трофей (флавор-строка) при удаче
-    blurb: str = ""             # чем грозит / на кого идти
+    gold: tuple                  # (мин, макс) золота — гарантированно
+    drops: tuple = ()            # tuple[Drop]
+    rep: int = 0
+    blurb: str = ""              # чем грозит / на кого идти
 
 
-# От мелочи (голыми руками) до атамана (только топ-снаряга).
+# Бестиарий: от мелочи (голыми руками) до атамана (только топ-снаряга).
+# game=дичь(кухня), honey(медоварня), herbs(сбитень/кухня), berries(вино),
+# ore(кузня/стройка), clay(стройка) — добыча кормит производство.
 ENEMIES = [
-    Enemy("zayac", "🐰", "Заяц", hp=10, attack=1, armor=0,
-          gold=(3, 12), loot=(("game", 2, 4),),
+    Enemy("zayac", "🐰", "Заяц", 10, 1, 0, (3, 12),
+          (Drop("game", 2, 4),),
           blurb="Можно и голыми руками, если не жалко гордости."),
-    Enemy("volk", "🐺", "Волк", hp=30, attack=6, armor=0,
-          gold=(12, 28), loot=(("game", 4, 7),),
+    Enemy("lisa", "🦊", "Лиса", 18, 3, 0, (10, 22),
+          (Drop("game", 2, 4), Drop("herbs", 2, 3, 22)),
+          blurb="Юркая, но кусачая. Шкурка ценится."),
+    Enemy("gadyuka", "🐍", "Гадюка", 24, 9, 0, (15, 30),
+          (Drop("herbs", 3, 6), Drop("game", 2, 3, 12)),
+          blurb="Бьёт больно и метко — броня спасает слабо. Яд идёт в зелья."),
+    Enemy("olen", "🦌", "Олень", 38, 4, 0, (18, 34),
+          (Drop("game", 6, 10), Drop("herbs", 3, 5, 25)),
+          blurb="Мяса много, отпор слабый. Добрая дичь к столу."),
+    Enemy("volk", "🐺", "Волк", 30, 6, 0, (12, 28),
+          (Drop("game", 4, 7), Drop("herbs", 2, 4, 15)),
           blurb="Кусается. Без оружия лучше не лезть."),
-    Enemy("kaban", "🐗", "Кабан", hp=55, attack=10, armor=2,
-          gold=(25, 50), loot=(("game", 7, 12),),
+    Enemy("vozhak", "🐺", "Вожак стаи", 72, 14, 3, (40, 75),
+          (Drop("game", 8, 14), Drop("ore", 3, 5, 18),
+           Drop("", chance=8, label="🦷 клык вожака на ремень")),
+          rep=1, blurb="Матёрый, со стаей за спиной. Нужна снаряга."),
+    Enemy("kaban", "🐗", "Кабан", 55, 10, 2, (25, 50),
+          (Drop("game", 7, 12), Drop("herbs", 3, 5, 20)),
           blurb="Клыки. Нужен топор и хоть какая броня."),
-    Enemy("medved", "🐻", "Медведь", hp=95, attack=17, armor=5,
-          gold=(45, 90), loot=(("game", 10, 16), ("herbs", 3, 6)),
+    Enemy("medved", "🐻", "Медведь", 95, 17, 5, (45, 90),
+          (Drop("game", 10, 16), Drop("honey", 3, 6),
+           Drop("herbs", 4, 8, 25)),
           rep=1, blurb="Задерёт неподготовленного. Броня обязательна."),
-    Enemy("razboy", "🗡", "Разбойник", hp=85, attack=22, armor=8,
-          gold=(90, 170), loot=(("ore", 4, 8), ("herbs", 4, 8)),
-          rep=2, rare="🗡 трофейный кинжал разбойника",
-          blurb="С оружием и злой. Только для крепкого бойца."),
-    Enemy("ataman", "👹", "Атаман", hp=160, attack=30, armor=12,
-          gold=(180, 340), loot=(("ore", 8, 14),),
-          rep=4, rare="👑 перстень атамана (хвастать в чате)",
-          blurb="Гроза тракта. Идут только мастера в полном железе."),
+    Enemy("razboy", "🗡", "Разбойник", 85, 22, 8, (90, 170),
+          (Drop("ore", 4, 8), Drop("herbs", 4, 8),
+           Drop("", chance=15, label="🗡 трофейный кинжал разбойника")),
+          rep=2, blurb="С оружием и злой. Только для крепкого бойца."),
+    Enemy("ataman", "👹", "Атаман", 160, 30, 12, (180, 340),
+          (Drop("ore", 8, 14), Drop("clay", 6, 10, 40),
+           Drop("", chance=12, label="👑 перстень атамана (хвастать в чате)")),
+          rep=4, blurb="Гроза тракта. Идут только мастера в полном железе."),
 ]
 ENEMY = {e.id: e for e in ENEMIES}
 
@@ -58,20 +85,23 @@ class Fight:
     win: bool
     rounds: int
     crits: int
-    dealt: int               # суммарно нанесено зверю
-    hp_left: int             # сколько здоровья осталось у охотника
-    overwhelmed: bool        # не уложился в раунды (зверь слишком толст)
+    dealt: int
+    hp_left: int
+    overwhelmed: bool
+
+
+def _player_offense(stats: dict) -> tuple[int, int, int]:
+    dmg = balance.BASE_DAMAGE + stats.get("damage", 0)
+    crit_pct = min(balance.HUNT_CRIT_CAP,
+                   stats.get("crit", 0) + stats.get("luck", 0) // 2)
+    return dmg, crit_pct, stats.get("armor", 0)
 
 
 def resolve(stats: dict, enemy: Enemy, rng: random.Random | None = None) -> Fight:
     """Прогон боя по статам снаряги. stats — items.combat_stats(equipment)."""
     rng = rng or random
+    dmg, crit_pct, parmor = _player_offense(stats)
     php = balance.BASE_HP
-    dmg = balance.BASE_DAMAGE + stats.get("damage", 0)
-    crit_pct = min(balance.HUNT_CRIT_CAP,
-                   stats.get("crit", 0) + stats.get("luck", 0) // 2)
-    parmor = stats.get("armor", 0)
-
     ehp = enemy.hp
     rounds = crits = dealt = 0
     while ehp > 0 and php > 0 and rounds < balance.HUNT_MAX_ROUNDS:
@@ -85,23 +115,53 @@ def resolve(stats: dict, enemy: Enemy, rng: random.Random | None = None) -> Figh
         if ehp <= 0:
             break
         php -= max(1, enemy.attack - parmor // balance.ARMOR_DR_DIV)
-
     win = ehp <= 0 and php > 0
     overwhelmed = ehp > 0 and rounds >= balance.HUNT_MAX_ROUNDS
-    return Fight(win=win, rounds=rounds, crits=crits, dealt=dealt,
-                 hp_left=max(0, php), overwhelmed=overwhelmed)
+    return Fight(win, rounds, crits, dealt, max(0, php), overwhelmed)
+
+
+def forecast(stats: dict, enemy: Enemy, n: int = 160,
+             rng: random.Random | None = None) -> tuple[int, int]:
+    """Прогноз исхода по статам: (шанс победы %, средне-остаточное HP при победе)."""
+    rng = rng or random
+    wins = hp_sum = 0
+    for _ in range(n):
+        f = resolve(stats, enemy, rng)
+        if f.win:
+            wins += 1
+            hp_sum += f.hp_left
+    return round(wins * 100 / n), (round(hp_sum / wins) if wins else 0)
+
+
+def threat(win_pct: int) -> tuple[str, str]:
+    """Цвет-метка угрозы по шансу победы (как threat level в hunt-играх)."""
+    if win_pct >= 95:
+        return "🟢", "лёгкая добыча"
+    if win_pct >= 70:
+        return "🟢", "уверенно"
+    if win_pct >= 40:
+        return "🟡", "рискованно"
+    if win_pct >= 10:
+        return "🟠", "опасно"
+    return "🔴", "верная смерть"
 
 
 def roll_loot(enemy: Enemy, luck: int, rng: random.Random | None = None) -> dict:
-    """Добыча с победы: {gold, res{}, rep, rare|None}. Удача чуть щедрит."""
+    """Добыча с победы: {gold, res{}, trophies[], rep}. Удача щедрит и редкое."""
     rng = rng or random
-    bonus = 1.0 + min(0.3, luck / 100)  # удача до +30% к количеству
+    bonus = 1.0 + min(0.3, luck / 100)
     gold = int(rng.randint(*enemy.gold) * bonus)
-    res = {}
-    for r, lo, hi in enemy.loot:
-        res[r] = int(rng.randint(lo, hi) * bonus)
-    rare = enemy.rare if (enemy.rare and rng.randint(1, 100) <= 10 + luck) else None
-    return {"gold": gold, "res": res, "rep": enemy.rep, "rare": rare}
+    res: dict[str, int] = {}
+    trophies: list[str] = []
+    for d in enemy.drops:
+        chance = d.chance + (luck if d.chance < 100 else 0)
+        if rng.randint(1, 100) > min(100, chance):
+            continue
+        if d.res:
+            res[d.res] = res.get(d.res, 0) + max(1, int(rng.randint(d.lo, d.hi) * bonus))
+        else:
+            trophies.append(d.label)
+    return {"gold": gold, "res": res, "trophies": trophies, "rep": enemy.rep}
 
 
 # ── Оркестрация охоты (кулдаун, добыча, раны) ──────────────────────────

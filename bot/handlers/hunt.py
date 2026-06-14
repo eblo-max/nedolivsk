@@ -34,7 +34,23 @@ async def cb_hunt(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("hunt:"))
+@router.callback_query(F.data.startswith("hbeast:"))
+async def cb_hunt_beast(callback: CallbackQuery, session: AsyncSession) -> None:
+    """Бриф зверя: HP, расклад по статам, таблица добычи."""
+    player = await _player(callback, session)
+    if player is None:
+        return
+    enemy = combat.ENEMY.get(callback.data.split(":", 1)[1])
+    if enemy is None:
+        await callback.answer()
+        return
+    await common.caption_edit(
+        callback.message, texts.hunt_detail(player, enemy),
+        kb.hunt_detail_kb(enemy.id))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("hfight:"))
 async def cb_hunt_fight(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _player(callback, session, lock=True)
     if player is None:
