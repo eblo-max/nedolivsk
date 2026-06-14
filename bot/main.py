@@ -18,6 +18,7 @@ from bot.handlers import (
     auction,
     buildings,
     character,
+    commands,
     group,
     hub,
     rating,
@@ -34,16 +35,21 @@ from bot.notifier import notifier_loop
 async def _setup_commands(bot: Bot) -> None:
     """Меню команд (всплывает на «/»): публичные — всем, /tavern — в группах,
     админские — только в личке админа."""
-    public = [
-        BotCommand(command="start", description="🍺 Открыть таверну"),
+    sections = [
+        BotCommand(command="market", description="🏪 Базар — цены в реальном времени"),
+        BotCommand(command="auction", description="🔨 Аукцион — выставить лот"),
+        BotCommand(command="top", description="🏆 Рейтинг таверн"),
+        BotCommand(command="city", description="🏛 Расклад фракций"),
+        BotCommand(command="citizens", description="👥 Горожане и репутация"),
+        BotCommand(command="chronicle", description="📜 Летопись города"),
         BotCommand(command="map", description="🗺 Карта мира"),
         BotCommand(command="help", description="❓ Правила и помощь"),
     ]
+    public = [BotCommand(command="start", description="🍺 Открыть таверну"), *sections]
     in_group = [
         BotCommand(command="start", description="🍺 Открыть таверну"),
         BotCommand(command="tavern", description="🏠 Мой кабак прямо в чате"),
-        BotCommand(command="map", description="🗺 Карта мира"),
-        BotCommand(command="help", description="❓ Правила и помощь"),
+        *sections,
     ]
     await bot.set_my_commands(public, scope=BotCommandScopeDefault())
     await bot.set_my_commands(in_group, scope=BotCommandScopeAllGroupChats())
@@ -73,7 +79,7 @@ async def main() -> None:
     dp.include_routers(
         admin.router, worldmap_cmd.router, rating.router, character.router,
         buildings.router, start.router, tavern.router, story.router,
-        trade.router, auction.router, hub.router, group.router
+        trade.router, auction.router, commands.router, hub.router, group.router
     )
 
     notifier_task = asyncio.create_task(notifier_loop(bot))
