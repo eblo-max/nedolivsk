@@ -1302,6 +1302,101 @@ def _good_name(key: str) -> str:
     return g.name if g else key
 
 
+def auction_screen(tavern, city) -> str:
+    """Аукцион: статус активного лота или приглашение выставить товар."""
+    from bot.game import auction as auc
+    from bot.game import npc
+    from bot.game import production as prod
+
+    lot = tavern.auction or None
+    if not lot:
+        return "\n".join([
+            "🔨 <b>АУКЦИОН НЕДОЛИВСКА</b>",
+            "",
+            "«Выставь товар на торги — и горожане сами набегут перебивать цену. "
+            "Кто в духе да при деньгах — отвалит щедро»",
+            "",
+            "<i>Лот висит 6 часов. Заломишь цену — могут и не взять. "
+            "Товар на торгах заморожен.</i>",
+        ])
+    g = prod.GOODS[lot["good"]]
+    left = auc.time_left_minutes(lot)
+    top = lot.get("top_bid")
+    lines = [
+        f"📦 Лот — {lot['qty']} × {g.emoji} {g.name}",
+        f"🏷 Резерв — {lot['unit_min']} 🪙/шт",
+        f"⏳ Осталось — {_fmt_minutes(left)}",
+    ]
+    if top:
+        lines.append(f"🔝 Ставка — {top} 🪙/шт · {npc.label(lot['top_bidder'])}")
+        lines.append(f"🪙 Светит куш — {top * lot['qty']}")
+    else:
+        lines.append("🤷 Ставок пока нет — ждём покупателей")
+    parts = ["🔨 <b>ТОРГИ ИДУТ</b>", "", *_branch("ЛОТ", lines)]
+    hist = lot.get("history", [])
+    if len(hist) > 1:
+        parts += ["", *_branch("СТАВКИ", [
+            f"{npc.label(h['npc'])} — {h['unit']} 🪙" for h in reversed(hist)
+        ])]
+    return "\n".join(parts)
+
+
+def auction_pick_qty(good: str, stock: int, city) -> str:
+    from bot.game import auction as auc
+    from bot.game import production as prod
+    g = prod.GOODS[good]
+    fv = int(round(auc.fair_value(city, good)))
+    return "\n".join([
+        f"🔨 <b>ВЫСТАВИТЬ: {g.name.upper()}</b>",
+        "",
+        *_branch("ТОВАР", [
+            f"{g.emoji} На складе — {stock} шт",
+            f"💰 Рыночная цена ~{fv} 🪙/шт",
+        ]),
+        "",
+        "Сколько штук выставить на торги?",
+    ])
+
+
+def auction_pick_price(good: str, qty: int, city) -> str:
+    from bot.game import auction as auc
+    from bot.game import production as prod
+    g = prod.GOODS[good]
+    fv = int(round(auc.fair_value(city, good)))
+    return "\n".join([
+        f"🔨 <b>ЛОТ: {qty} × {g.name.upper()}</b>",
+        "",
+        f"💰 Рыночная цена ~{fv} 🪙/шт",
+        "",
+        "Какую стартовую (резервную) цену поставить?",
+        "<i>Чем жаднее — тем выше куш, но и риск, что не возьмут.</i>",
+    ])
+
+
+def auction_settled(res: dict) -> str:
+    from bot.game import npc
+    from bot.game import production as prod
+    g = prod.GOODS[res["good"]]
+    if res["sold"]:
+        return "\n".join([
+            f"🔨 <b>ЛОТ УШЁЛ!</b>",
+            "",
+            f"{npc.label(res['npc'])} забрал лот.",
+            "",
+            *_branch("СДЕЛКА", [
+                f"📦 Продано — {res['qty']} × {g.emoji} {g.name}",
+                f"💰 Цена — {res['unit']} 🪙/шт",
+                f"🪙 Выручка — +{res['gold']}",
+            ]),
+        ])
+    return "\n".join([
+        "🔨 <b>ТОРГИ ОКОНЧЕНЫ</b>",
+        "",
+        f"«Никто не дал твоей цены за {g.name} — лот снят, "
+        f"{res['qty']} шт вернулись в погреб»",
+    ])
+
+
 def trade_offer(offer: dict) -> str:
     want = [
         f"🛢 {_good_name(offer['good'])} — до {offer['qty']} шт",

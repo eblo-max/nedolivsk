@@ -129,6 +129,10 @@ async def create_tables() -> None:
             "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS "
             "products JSONB NOT NULL DEFAULT '{}'::jsonb"
         ))
+        await conn.execute(text(
+            "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS "
+            "auction JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))
         # Унификация ключей погреба: '1'/'2'/'3' эля -> 'ale1'/'ale2'/'ale3'
         await conn.execute(text(
             "UPDATE taverns SET products = (products - '1' - '2' - '3') "

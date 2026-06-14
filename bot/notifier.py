@@ -13,6 +13,7 @@ from bot import announce, panels, texts
 from bot.db import repo
 from bot.db.base import session_factory
 from bot.db.models import Player, Tavern
+from bot.game import auction as auctionmod
 from bot.game import balance
 from bot.game import city as citymod
 from bot.game import market as marketmod
@@ -217,8 +218,38 @@ async def _notify_returned(bot: Bot) -> None:
                 new = dict(tavern.production)
                 new["winery"] = {**wbatch, "notified": True}
                 tavern.production = new
-        # Живой город: симуляция фракций — дрейф силы, старт/конец ситуаций.
+        # Живой город: блокируем города ПЕРВЫМИ (FOR UPDATE), чтобы аукцион,
+        # читающий/пишущий market, не словил гонку с правкой faction_power.
         cities = await repo.all_cities(session, lock=True)
+        city_by_id = {c.chat_id: c for c in cities}
+
+        # Аукцион: горожане перебивают ставки по активным лотам; закрытие — продажа.
+        result = await session.execute(
+            select(Player)
+            .join(Tavern, Tavern.player_id == Player.id)
+            .where(Tavern.auction != {})
+            .with_for_update(of=Player, skip_locked=True)
+        )
+        for player in result.scalars().all():
+            tavern = player.tavern
+            city = city_by_id.get(player.chat_id) if player.chat_id else None
+            if city is None and player.chat_id is not None:  # чат без CityState
+                city = await repo.get_or_create_city(session, player.chat_id, lock=True)
+                city_by_id[player.chat_id] = city
+                cities.append(city)
+            if auctionmod.is_due(tavern, now):
+                res = auctionmod.settle(player, tavern, city)
+                if res is not None:
+                    outbox.append((
+                        player, texts.auction_settled(res),
+                        buildings_notify_kb()))
+                continue
+            chance = balance.AUCTION_BID_CHANCE * (
+                balance.AUCTION_FAIR_BID_MULT if wld.is_fair() else 1.0)
+            if random.random() < chance:
+                auctionmod.try_bid(tavern, city)  # ставка тихо, итог — при закрытии
+
+        # Симуляция фракций — дрейф силы, рынок, пульс, старт/конец ситуаций.
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
         for city in cities:
             marketmod.decay(city, now)  # рынок впитывает перекос

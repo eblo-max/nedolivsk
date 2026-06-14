@@ -167,7 +167,7 @@ def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
     prices = [max(1, int(round(fv * t))) for t in balance.TRADE_PRICE_TIERS]
     return {
         "good": good, "qty": qty, "arch": cit.arch, "emoji": cit.emoji,
-        "name": cit.name, "intro": cit.blurb,
+        "name": cit.name, "intro": cit.blurb, "estate": cit.estate,
         "fv": round(fv, 2), "max_unit": round(max_unit, 2), "wealth": wealth,
         "greed": round(greed, 3), "prices": prices, "mkt": round(mkt, 3),
     }

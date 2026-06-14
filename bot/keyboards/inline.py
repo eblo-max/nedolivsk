@@ -86,9 +86,18 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
         exp_label = f"⏳ Бригады в пути ({c.out}/{c.total})"
     else:
         exp_label = "⛏ Отправить бригады"
+    auc = player.tavern.auction or None
+    if auc and auc.get("top_bid"):
+        auc_label = f"🔨 Торги: {auc['top_bid']}🪙!"
+    elif auc:
+        auc_label = "🔨 Торги идут"
+    else:
+        auc_label = "🔨 Аукцион"
+
     kb.button(text=exp_label, callback_data="exp_menu")
     kb.button(text="💰 Собрать доход", callback_data="income")
     kb.button(text="🏪 Рынок", callback_data="market")
+    kb.button(text=auc_label, callback_data="auction")
     kb.button(text="📦 Склад", callback_data="warehouse")
     kb.button(text="🧍 Персонаж", callback_data="character")
     kb.button(text="🏗 Пристройки", callback_data="buildings")
@@ -205,9 +214,62 @@ def city_kb() -> InlineKeyboardMarkup:
 
 def market_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    kb.button(text="🔨 Аукцион", callback_data="auction")
     kb.button(text="🏛 Расклад сил", callback_data="city")
     kb.button(text="📜 Хроника города", callback_data="chronicle")
     kb.button(text="🏠 К таверне", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def auction_kb(tavern) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    if tavern.auction:
+        kb.button(text="🔄 Обновить торги", callback_data="auction")
+        kb.button(text="🚫 Снять лот", callback_data="auc_cancel")
+    else:
+        kb.button(text="🛒 Выставить лот", callback_data="auc_new")
+    kb.button(text="🏪 Рынок", callback_data="market")
+    kb.button(text="🏠 К таверне", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def auction_goods_kb(tavern) -> InlineKeyboardMarkup:
+    from bot.game import auction as auc
+    from bot.game import production as prod
+    kb = InlineKeyboardBuilder()
+    for good in auc.sellable_goods(tavern):
+        g = prod.GOODS[good]
+        stock = (tavern.products or {}).get(good, 0)
+        kb.button(text=f"{g.emoji} {g.name} ({stock})", callback_data=f"aucg:{good}")
+    kb.button(text="↩️ Назад", callback_data="auction")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def auction_qty_kb(good: str, stock: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    seen = set()
+    for n in balance.AUCTION_QTY_PRESETS:
+        q = min(n, stock, balance.AUCTION_QTY_MAX)
+        if q > 0 and q not in seen:
+            seen.add(q)
+            kb.button(text=f"{q} шт", callback_data=f"aucq:{good}:{q}")
+    allq = min(stock, balance.AUCTION_QTY_MAX)
+    if allq not in seen:
+        kb.button(text=f"Всё ({allq})", callback_data=f"aucq:{good}:{allq}")
+    kb.button(text="↩️ Назад", callback_data="auc_new")
+    kb.adjust(2)
+    return kb.as_markup()
+
+
+def auction_price_kb(good: str, qty: int, prices: list[int]) -> InlineKeyboardMarkup:
+    labels = ("По рынку", "Бодрее", "Дорого")
+    kb = InlineKeyboardBuilder()
+    for idx, (lab, p) in enumerate(zip(labels, prices)):
+        kb.button(text=f"{lab} · {p} 🪙/шт", callback_data=f"aucp:{good}:{qty}:{idx}")
+    kb.button(text="↩️ Назад", callback_data=f"aucg:{good}")
     kb.adjust(1)
     return kb.as_markup()
 

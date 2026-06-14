@@ -147,6 +147,9 @@ class Tavern(Base):
     buildings: Mapped[list] = mapped_column(JSONB, default=list)
     production: Mapped[dict] = mapped_column(JSONB, default=dict)  # партии зданий
     products: Mapped[dict] = mapped_column(JSONB, default=dict)    # погреб: {ярус: эль}
+    # Аукцион: один активный лот {good, qty, unit_min, ends_at, top_bid,
+    # top_bidder, bids, history} — товар заморожен в лоте.
+    auction: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     last_income_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     map_slot: Mapped[int | None] = mapped_column(unique=True)

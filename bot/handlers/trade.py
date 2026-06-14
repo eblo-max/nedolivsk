@@ -1,17 +1,27 @@
 """Торг с заезжими купцами: показ предложения и резолв сделки."""
 
 from aiogram import F, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import panels, texts
+from bot import images, panels, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import balance, market, story_state, trade
+from bot.handlers import common
 from bot.keyboards import inline as kb
 
 router = Router()
+
+
+def _trade_image(offer: dict):
+    """Картинка торга: портрет по сословию → общий фон торга → ярмарка.
+    Чтобы оживить визуал, клади в assets: torg_<сословие>.png, torg.png."""
+    for name in (f"torg_{offer.get('estate', '')}", "torg", "yarmarka"):
+        p = images.named_image(name)
+        if p is not None:
+            return p
+    return None
 
 
 async def deliver_trade(message: Message, player: Player, owner_id: int) -> None:
@@ -19,15 +29,21 @@ async def deliver_trade(message: Message, player: Player, owner_id: int) -> None
     offer = story_state.get_trade(player)
     if offer is None:
         return
-    msg = await message.answer(texts.trade_offer(offer), reply_markup=kb.trade_kb(offer))
+    text = texts.trade_offer(offer)
+    markup = kb.trade_kb(offer)
+    img = _trade_image(offer)
+    if img is not None:
+        msg = await message.answer_photo(
+            common.cached_media(img), caption=text, reply_markup=markup)
+        common.remember_file_id(img, msg)
+    else:
+        msg = await message.answer(text, reply_markup=markup)
     panels.claim(msg, owner_id)
 
 
 async def _edit(callback: CallbackQuery, text: str, markup=None) -> None:
-    try:
-        await callback.message.edit_text(text, reply_markup=markup)
-    except TelegramBadRequest:
-        pass
+    """Правит подпись к фото или текст — смотря чем доставлен торг."""
+    await common.caption_edit(callback.message, text, markup)
 
 
 def _sell(player: Player, offer: dict, unit: int) -> tuple[int, int]:
