@@ -11,20 +11,24 @@ REGIONS = {
 RESOURCES = (
     "wood", "grain", "hops", "water", "honey",
     "berries", "game", "ore", "clay", "herbs",
+    "salt", "fish", "milk",
 )
 RESOURCE_NAMES = {
     "wood": "Древесина", "grain": "Зерно", "hops": "Хмель",
     "water": "Вода", "honey": "Мёд", "berries": "Ягоды",
     "game": "Дичь", "ore": "Руда", "clay": "Глина", "herbs": "Травы",
+    "salt": "Соль", "fish": "Рыба", "milk": "Молоко",
 }
 RESOURCE_EMOJI = {
     "wood": "🪵", "grain": "🌾", "hops": "🌿", "water": "💧", "honey": "🍯",
     "berries": "🍒", "game": "🥩", "ore": "⛏", "clay": "🪨", "herbs": "🌶",
+    "salt": "🧂", "fish": "🐟", "milk": "🥛",
 }
 
-# Полуфабрикаты/продукты (не добываются вылазками, но имеют имя и ценность)
-GOODS_NAMES = {"malt": "Солод"}
-GOODS_EMOJI = {"malt": "🌱"}
+# Полуфабрикаты (не добываются вылазками, но имеют имя и ценность):
+# солод (мельница), мука (мельница), слиток (горн).
+GOODS_NAMES = {"malt": "Солод", "flour": "Мука", "ingot": "Слиток"}
+GOODS_EMOJI = {"malt": "🌱", "flour": "🥣", "ingot": "🔩"}
 
 # Стартовые запасы новой таверны
 STARTING_INVENTORY = {"wood": 10, "grain": 10, "hops": 5}
@@ -42,6 +46,9 @@ EXPEDITION_YIELD = {  # (база на 1-м уровне, прирост за у
     "ore": (8, 2),
     "clay": (16, 4),
     "herbs": (12, 3),
+    "salt": (10, 2),
+    "fish": (14, 3),
+    "milk": (12, 3),
 }
 WORKER_PAY_PER_LEVEL = 10  # плата работникам за вылазку: 10 * уровень таверны
 
@@ -49,14 +56,14 @@ WORKER_PAY_PER_LEVEL = 10  # плата работникам за вылазку
 # Каждый ресурс ровно один раз усилен и один раз ослаблен — зоны равноценны.
 # Вода (water) нейтральна везде — основа любой варки.
 REGION_BONUS = {
-    "north_wilds": {"wood", "game", "ore"},       # тайга, охота, рудники
-    "green_valleys": {"grain", "honey", "berries"},  # пашни, пасеки, сады
-    "red_wastes": {"hops", "herbs", "clay"},       # степь, коренья, глина
+    "north_wilds": {"wood", "game", "ore", "fish"},       # тайга, охота, рудники, студёные реки
+    "green_valleys": {"grain", "honey", "berries", "milk"},  # пашни, пасеки, сады, выпасы
+    "red_wastes": {"hops", "herbs", "clay", "salt"},       # степь, коренья, глина, солончаки
 }
 REGION_PENALTY = {
-    "north_wilds": {"grain", "berries", "herbs"},  # мороз бьёт по посевам
-    "green_valleys": {"hops", "ore", "clay"},      # ни гор, ни карьеров
-    "red_wastes": {"wood", "game", "honey"},       # голо, зверья и цветов нет
+    "north_wilds": {"grain", "berries", "herbs", "milk"},  # мороз бьёт по посевам и выпасам
+    "green_valleys": {"hops", "ore", "clay", "salt"},      # ни гор, ни карьеров, сыро для соли
+    "red_wastes": {"wood", "game", "honey", "fish"},       # голо, зверья и воды нет
 }
 BONUS_MULT = 1.5
 PENALTY_MULT = 0.75
@@ -286,10 +293,13 @@ def reputation_for_upgrade(new_level: int) -> int:
 # Рыночные цены ресурсов в золоте — обратно пропорциональны лёгкости добычи
 RESOURCE_PRICE = {
     "water": 1.0, "wood": 2.0, "clay": 2.0, "grain": 2.5, "berries": 3.0,
-    "hops": 4.0, "herbs": 4.5, "honey": 6.0, "game": 6.5, "ore": 7.0,
-    # полуфабрикаты (для ВВП): солод ≈ зерну, из которого смолот (10🌾→8 солода,
-    # 10×2.5/8≈3.1) — помол не создаёт богатства, его создаёт только продажа эля
-    "malt": 3.1,
+    "milk": 3.0, "fish": 4.0, "hops": 4.0, "herbs": 4.5, "salt": 5.0,
+    "honey": 6.0, "game": 6.5, "ore": 7.0,
+    # полуфабрикаты (для ВВП): передел не создаёт богатства сам по себе —
+    # его создаёт только продажа готового товара.
+    "malt": 3.1,    # 10🌾→8 солода: 10×2.5/8 ≈ 3.1
+    "flour": 3.1,   # та же мельница из зерна
+    "ingot": 10.5,  # 6⛏→4 слитка: 6×7.0/4 ≈ 10.5
 }
 
 

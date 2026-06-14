@@ -22,7 +22,37 @@ def _scaled_inputs(base: dict, level: int) -> dict:
 
 MATURE_CHANCE = 55  # % успеха выдержки (+1 ярус), иначе −1 ярус
 
-PRODUCERS = {"mill", "brewery", "meadery", "kitchen", "winery"}
+# Грайндеры: сырьё → полуфабрикат в ИНВЕНТАРЬ (как мельница). Вход НЕ ×INPUT_MULT
+# (передел сырья, а не товара). building -> recipe -> (вход/уровень, минуты, выход/уровень).
+GRIND = {
+    "mill": {
+        "malt":  ({"grain": 10}, 40, 8),   # зерно → солод (для эля)
+        "flour": ({"grain": 10}, 40, 8),   # зерно → мука (для выпечки)
+    },
+    "smelter": {
+        "ingot": ({"ore": 6}, 90, 4),      # руда → слиток (для снаряги)
+    },
+}
+
+# Рецептурные пристройки: вход → товар в ПОГРЕБ/кладовую (как кухня).
+# Вход ×INPUT_MULT. building -> recipe(=ключ товара) -> (вход/уровень, часы, выход/уровень).
+RECIPES = {
+    "bakery": {
+        "bread": ({"flour": 8, "water": 6}, 4, 12),
+        "pie":   ({"flour": 8, "berries": 6, "honey": 4}, 6, 10),
+    },
+    "smokehouse": {
+        "cured":       ({"game": 8, "salt": 4}, 6, 12),
+        "smoked_fish": ({"fish": 10, "salt": 4}, 5, 12),
+    },
+    "dairy": {
+        "cheese": ({"milk": 12, "salt": 3}, 8, 12),
+        "butter": ({"milk": 14, "salt": 2}, 6, 12),
+    },
+}
+
+PRODUCERS = ({"mill", "brewery", "meadery", "kitchen", "winery", "smelter"}
+             | set(RECIPES))
 
 # Кухня: рецепт -> (вход на 1 уровень, часы, выход порций на уровень)
 KITCHEN = {
@@ -33,10 +63,6 @@ KITCHEN = {
 WINERY = {
     "wine": ({"berries": 22, "honey": 6, "water": 6}, 12, 12),
 }
-
-MILL_MINUTES = 40
-MILL_GRAIN = 10   # зерна на 1 уровень
-MILL_MALT = 8     # солода на 1 уровень
 
 # Медоварня: рецепт -> (вход на 1 уровень, часы, выход кружек на уровень).
 # Ключ рецепта = ключ напитка в погребе.
@@ -86,9 +112,15 @@ DRINKS["mead"] = Drink("mead", "🍶", "Медовуха", 10)
 DRINKS["sbiten"] = Drink("sbiten", "🌿", "Сбитень", 13)
 DRINKS["wine"] = Drink("wine", "🍷", "Вино", 15)
 
-# Еда (Кухня): отдельный пул спроса (голод), продаётся как напитки
+# Еда (Кухня/Пекарня/Коптильня/Сыроварня): отдельный пул спроса (голод).
 FOODS: dict[str, Drink] = {
     "roast": Drink("roast", "🍖", "Жаркое", 8),
+    "bread": Drink("bread", "🥖", "Хлеб", 6),
+    "pie": Drink("pie", "🥧", "Пирог", 12),
+    "cured": Drink("cured", "🥓", "Солонина", 10),
+    "smoked_fish": Drink("smoked_fish", "🐠", "Копчёная рыба", 9),
+    "cheese": Drink("cheese", "🧀", "Сыр", 12),
+    "butter": Drink("butter", "🧈", "Масло", 10),
 }
 
 # Всё, что лежит в погребе/кладовой (для ВВП и названий при сбыте)
@@ -121,12 +153,96 @@ def _ready_at(player, *, hours: float = 0, minutes: float = 0) -> str:
     return (_now() + timedelta(hours=hours * m, minutes=minutes * m)).isoformat()
 
 
-def mill_inputs(level: int) -> dict:
-    return {"grain": MILL_GRAIN * level}
+# ── Грайндеры (мельница/горн): сырьё → полуфабрикат в инвентарь ───────────
+def grind_inputs(building: str, recipe: str, level: int) -> dict:
+    return {k: v * level for k, v in GRIND[building][recipe][0].items()}
 
 
-def mill_output(level: int) -> int:
-    return MILL_MALT * level
+def grind_minutes(building: str, recipe: str) -> int:
+    return GRIND[building][recipe][1]
+
+
+def grind_output(building: str, recipe: str, level: int) -> int:
+    return GRIND[building][recipe][2] * level
+
+
+def start_grind(player, tavern, building: str, recipe: str
+                ) -> tuple[bool, str, dict | None]:
+    """(ok, reason, inputs). reason: unknown | busy | not_enough."""
+    if building not in GRIND or recipe not in GRIND[building]:
+        return False, "unknown", None
+    if state(tavern, building)[0] != "none":
+        return False, "busy", None
+    level = tavern.level
+    cin = grind_inputs(building, recipe, level)
+    if not inventory.can_afford(player, cin):
+        return False, "not_enough", cin
+    inventory.pay(player, cin)
+    _set_batch(tavern, building, {
+        "out_res": recipe,  # ключ полуфабриката = ключ рецепта (malt/flour/ingot)
+        "out_qty": grind_output(building, recipe, level),
+        "ready_at": _ready_at(player, minutes=grind_minutes(building, recipe)),
+    })
+    return True, "", cin
+
+
+def claim_grind(player, tavern, building: str) -> tuple[str, int] | None:
+    """Забрать готовый полуфабрикат в инвентарь. (ресурс, кол-во) или None."""
+    if state(tavern, building)[0] != "ready":
+        return None
+    batch = (tavern.production or {})[building]
+    res = batch.get("out_res", "malt")
+    qty = int(batch.get("out_qty", 0))
+    inventory.add(player, res, qty)
+    _set_batch(tavern, building, None)
+    return res, qty
+
+
+# ── Рецептурные пристройки (пекарня/коптильня/сыроварня): вход → товар ─────
+def recipe_inputs(building: str, recipe: str, level: int) -> dict:
+    return _scaled_inputs(RECIPES[building][recipe][0], level)
+
+
+def recipe_hours(building: str, recipe: str) -> int:
+    return RECIPES[building][recipe][1]
+
+
+def recipe_output(building: str, recipe: str, level: int) -> int:
+    return RECIPES[building][recipe][2] * level
+
+
+def start_recipe(player, tavern, building: str, recipe: str
+                 ) -> tuple[bool, str, dict | None]:
+    """(ok, reason, inputs). reason: unknown | busy | not_enough."""
+    if building not in RECIPES or recipe not in RECIPES[building]:
+        return False, "unknown", None
+    if state(tavern, building)[0] != "none":
+        return False, "busy", None
+    level = tavern.level
+    cin = recipe_inputs(building, recipe, level)
+    if not inventory.can_afford(player, cin):
+        return False, "not_enough", cin
+    inventory.pay(player, cin)
+    _set_batch(tavern, building, {
+        "recipe": recipe,
+        "out_qty": recipe_output(building, recipe, level),
+        "ready_at": _ready_at(player, hours=recipe_hours(building, recipe)),
+    })
+    return True, "", cin
+
+
+def claim_recipe(player, tavern, building: str) -> tuple[str, int] | None:
+    """Разлить/забрать готовый товар в погреб. (ключ товара, кол-во) или None."""
+    if state(tavern, building)[0] != "ready":
+        return None
+    batch = (tavern.production or {})[building]
+    recipe = batch.get("recipe")
+    qty = int(batch.get("out_qty", 0))
+    products = dict(tavern.products or {})
+    products[recipe] = products.get(recipe, 0) + qty
+    tavern.products = products
+    _set_batch(tavern, building, None)
+    return recipe, qty
 
 
 def state(tavern, building: str) -> tuple[str, int]:
@@ -147,34 +263,6 @@ def _set_batch(tavern, building: str, batch: dict | None) -> None:
     else:
         prod[building] = batch
     tavern.production = prod  # переприсваивание — чтобы JSONB заметил
-
-
-def start_mill(player, tavern) -> tuple[bool, str, dict | None]:
-    """(ok, reason, inputs). reason: busy | not_enough."""
-    if state(tavern, "mill")[0] != "none":
-        return False, "busy", None
-    level = tavern.level
-    cin = mill_inputs(level)
-    if not inventory.can_afford(player, cin):
-        return False, "not_enough", cin
-    inventory.pay(player, cin)
-    _set_batch(tavern, "mill", {
-        "out_res": "malt",
-        "out_qty": mill_output(level),
-        "ready_at": _ready_at(player, minutes=MILL_MINUTES),
-    })
-    return True, "", cin
-
-
-def claim_mill(player, tavern) -> int:
-    """Забрать готовый солод в инвентарь. Возвращает количество (0 — нечего)."""
-    if state(tavern, "mill")[0] != "ready":
-        return 0
-    batch = (tavern.production or {})["mill"]
-    qty = int(batch.get("out_qty", 0))
-    inventory.add(player, batch.get("out_res", "malt"), qty)
-    _set_batch(tavern, "mill", None)
-    return qty
 
 
 def start_brew(player, tavern, tier: int) -> tuple[bool, str, dict | None]:

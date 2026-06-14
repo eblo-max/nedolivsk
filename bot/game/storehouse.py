@@ -49,6 +49,10 @@ CELLS = {
     6: (210, 590, 288, 695), 7: (336, 590, 423, 695), 8: (468, 590, 552, 695),
     9: (600, 590, 687, 695), 10: (738, 590, 812, 695),
 }
+# На картинке-ведомости только len(CELLS) ячеек. Ресурсы сверх — показываем
+# текстом в подписи к складу (см. texts.storehouse_caption).
+SHOWN_RESOURCES = RESOURCES[:len(CELLS)]
+OVERFLOW_RESOURCES = RESOURCES[len(CELLS):]
 
 NAME_COLOR = (70, 40, 12)
 QTY_COLOR = (120, 45, 18)
@@ -100,7 +104,7 @@ def render(inventory: dict | None) -> bytes:
 
     base = Image.open(BG_FILE).convert("RGBA")
     d = ImageDraw.Draw(base)
-    for idx, res in enumerate(RESOURCES, 1):
+    for idx, res in enumerate(SHOWN_RESOURCES, 1):
         x1, y1, x2, y2 = CELLS[idx]
         cx, w, h = (x1 + x2) // 2, x2 - x1, y2 - y1
         qty = str(int(inv.get(res, 0)))

@@ -232,6 +232,19 @@ async def _notify_returned(bot: Bot) -> None:
                 new = dict(tavern.production)
                 new["winery"] = {**wbatch, "notified": True}
                 tavern.production = new
+            # Рецептурные пристройки (пекарня/коптильня/сыроварня) — обобщённо
+            for bname in prod.RECIPES:
+                rbatch = (tavern.production or {}).get(bname)
+                if (rbatch and not rbatch.get("notified")
+                        and prod.state(tavern, bname)[0] == "ready"):
+                    outbox.append((
+                        player,
+                        texts.recipe_ready_notification(rbatch.get("recipe")),
+                        buildings_notify_kb(),
+                    ))
+                    new = dict(tavern.production)
+                    new[bname] = {**rbatch, "notified": True}
+                    tavern.production = new
         # Живой город: блокируем города ПЕРВЫМИ (FOR UPDATE), чтобы аукцион,
         # читающий/пишущий market, не словил гонку с правкой faction_power.
         cities = await repo.all_cities(session, lock=True)

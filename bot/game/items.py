@@ -113,20 +113,21 @@ CATALOG: dict[str, Item] = {
         ),
         Item(
             id="oak_shield", slot="left_hand", name="Щит дубовый",
-            description="Им можно прикрыться, а можно подать на нём жаркое.",
-            cost={"gold": 500, "wood": 80, "grain": 0, "hops": 0},
+            description="Им можно прикрыться, а можно подать на нём жаркое. "
+                        "Окован железом — для крепости.",
+            cost={"gold": 480, "wood": 40, "ingot": 8},
             craft_hours=3, pay_discount_pct=5, armor=10,
         ),
         Item(
             id="master_axe", slot="right_hand", name="Топор хозяйский",
             description="Дрова, разделка туш и последний аргумент в споре.",
-            cost={"gold": 600, "wood": 50, "grain": 0, "hops": 0},
+            cost={"gold": 540, "wood": 30, "ingot": 8},
             craft_hours=3, yield_wood_pct=10, damage=8,
         ),
         Item(
             id="kovsh", slot="weapon", name="Ковш боевой",
             description="Черпает эль, проламывает черепа. Шипы — для убедительности.",
-            cost={"gold": 1200, "wood": 30, "grain": 0, "hops": 20},
+            cost={"gold": 1100, "wood": 20, "hops": 20, "ingot": 12},
             craft_hours=6, yield_pct=10, damage=14, crit=7, sprite="oruzhie",
         ),
         Item(

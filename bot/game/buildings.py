@@ -64,8 +64,40 @@ CATALOG: dict[str, Building] = {
         build_hours=2, req_reputation=80, unlocks="вино из ягод для богачей",
         image="vinodelnya",
     ),
+    "smelter": Building(
+        id="smelter", emoji="🔩", name="Горн",
+        description="Угли пышут, меха хрипят. Руда плавится в слитки — "
+                    "из них кузнец и куёт доброе железо.",
+        cost={"gold": 900, "wood": 100, "clay": 100},
+        build_hours=2, unlocks="слитки из руды (дешевле снаряга)", image="gorn",
+    ),
+    "bakery": Building(
+        id="bakery", emoji="🥖", name="Пекарня",
+        description="Печь дышит жаром, пахнет хлебом на всю улицу. "
+                    "Из муки — хлеб да пироги, и гость сыт.",
+        cost={"gold": 1000, "wood": 120, "clay": 80},
+        build_hours=2, requires=("mill",), unlocks="хлеб и пироги из муки",
+        image="pekarnya",
+    ),
+    "smokehouse": Building(
+        id="smokehouse", emoji="💨", name="Коптильня",
+        description="Дым да соль — и дичь с рыбой лежат месяцами. "
+                    "Солонина и копчёности всегда в цене.",
+        cost={"gold": 900, "wood": 140, "clay": 40},
+        build_hours=2, req_reputation=30, unlocks="солонина и копчёная рыба",
+        image="koptilnya",
+    ),
+    "dairy": Building(
+        id="dairy", emoji="🧀", name="Сыроварня",
+        description="Чаны с молоком, головы сыра под прессом. "
+                    "Сыр да масло — закуска для состоятельных.",
+        cost={"gold": 1100, "wood": 120, "clay": 60},
+        build_hours=2, req_reputation=50, unlocks="сыр и масло из молока",
+        image="syrovarnya",
+    ),
 }
-ORDER = ["mill", "brewery", "meadery", "kitchen", "winery"]
+ORDER = ["mill", "brewery", "meadery", "kitchen", "winery",
+         "smelter", "bakery", "smokehouse", "dairy"]
 
 
 def _now() -> datetime:

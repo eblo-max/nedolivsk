@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import buildings, production
+from bot.game import balance, buildings, production
 from bot.handlers import common
 from bot.keyboards import inline as kb
 
@@ -111,29 +111,56 @@ async def cb_build_make(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer("Заложили фундамент!")
 
 
-@router.callback_query(F.data.startswith("prod_make:"))
-async def cb_prod_make(callback: CallbackQuery, session: AsyncSession) -> None:
+@router.callback_query(F.data.startswith("grind:"))
+async def cb_grind(callback: CallbackQuery, session: AsyncSession) -> None:
+    """Грайндеры (мельница/горн): сырьё → полуфабрикат."""
     player = await _get_player(callback, session, lock=True)
     if player is None:
         return
-    bid = callback.data.split(":", 1)[1]
-    if bid != "mill":
-        await callback.answer()
-        return
-    ok, reason, cin = production.start_mill(player, player.tavern)
+    _, _, rest = callback.data.partition(":")
+    building, _, recipe = rest.partition(":")
+    ok, reason, cin = production.start_grind(player, player.tavern, building, recipe)
     if not ok:
         if reason == "not_enough":
-            await callback.answer(texts.mill_not_enough(cin), show_alert=True)
+            await callback.answer(texts.recipe_not_enough(recipe, cin), show_alert=True)
+        elif reason == "busy":
+            await callback.answer("Уже работает — дождись.", show_alert=True)
         else:
-            await callback.answer("Жернова уже крутятся.", show_alert=True)
+            await callback.answer()
         return
-    building = buildings.CATALOG["mill"]
+    b = buildings.CATALOG[building]
     await common.caption_edit(
         callback.message,
-        texts.production_screen(building, player, player.tavern),
-        kb.production_kb(player, player.tavern, building),
+        texts.production_screen(b, player, player.tavern),
+        kb.production_kb(player, player.tavern, b),
     )
-    await callback.answer("Закрутились!")
+    await callback.answer("Закрутилось!")
+
+
+@router.callback_query(F.data.startswith("rcp:"))
+async def cb_recipe(callback: CallbackQuery, session: AsyncSession) -> None:
+    """Рецептурные пристройки (пекарня/коптильня/сыроварня): вход → товар."""
+    player = await _get_player(callback, session, lock=True)
+    if player is None:
+        return
+    _, _, rest = callback.data.partition(":")
+    building, _, recipe = rest.partition(":")
+    ok, reason, cin = production.start_recipe(player, player.tavern, building, recipe)
+    if not ok:
+        if reason == "not_enough":
+            await callback.answer(texts.recipe_not_enough(recipe, cin), show_alert=True)
+        elif reason == "busy":
+            await callback.answer("Уже занято — дождись.", show_alert=True)
+        else:
+            await callback.answer()
+        return
+    b = buildings.CATALOG[building]
+    await common.caption_edit(
+        callback.message,
+        texts.production_screen(b, player, player.tavern),
+        kb.production_kb(player, player.tavern, b),
+    )
+    await callback.answer("Готовится!")
 
 
 @router.callback_query(F.data.startswith("meadery:"))
@@ -259,18 +286,35 @@ async def cb_prod_claim(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         return
     bid = callback.data.split(":", 1)[1]
-    if bid == "mill":
-        amount = production.claim_mill(player, player.tavern)
-        if amount <= 0:
-            await callback.answer("Солод ещё не готов.", show_alert=True)
+    if bid in production.GRIND:  # мельница/горн → полуфабрикат в инвентарь
+        res = production.claim_grind(player, player.tavern, bid)
+        if res is None:
+            await callback.answer("Ещё не готово.", show_alert=True)
             return
-        building = buildings.CATALOG["mill"]
+        r, qty = res
+        building = buildings.CATALOG[bid]
         await common.caption_edit(
             callback.message,
             texts.production_screen(building, player, player.tavern),
             kb.production_kb(player, player.tavern, building),
         )
-        await callback.answer(f"🌱 +{amount} солода")
+        await callback.answer(
+            f"{balance.GOODS_EMOJI.get(r, '📦')} +{qty} {balance.GOODS_NAMES.get(r, r)}")
+        return
+    if bid in production.RECIPES:  # пекарня/коптильня/сыроварня → товар в погреб
+        res = production.claim_recipe(player, player.tavern, bid)
+        if res is None:
+            await callback.answer("Ещё не готово.", show_alert=True)
+            return
+        recipe, qty = res
+        good = production.GOODS[recipe]
+        building = buildings.CATALOG[bid]
+        await common.caption_edit(
+            callback.message,
+            texts.production_screen(building, player, player.tavern),
+            kb.production_kb(player, player.tavern, building),
+        )
+        await callback.answer(f"{good.emoji} +{qty} {good.name}")
         return
     if bid in ("meadery", "kitchen", "winery"):
         claim = {"meadery": production.claim_meadery,

@@ -460,13 +460,31 @@ def production_kb(player, tavern, building) -> InlineKeyboardMarkup:
 
     kb = InlineKeyboardBuilder()
     state, _ = prod.state(tavern, building.id)
-    if building.id == "mill":
+    bid = building.id
+    if bid in prod.GRIND:  # мельница/горн: сырьё → полуфабрикат в инвентарь
         if state == "ready":
-            kb.button(text="🌱 Забрать солод", callback_data="prod_claim:mill",
+            kb.button(text="📦 Забрать", callback_data=f"prod_claim:{bid}",
                       style="success")
         elif state == "none":
-            kb.button(text="🌾 Молоть солод", callback_data="prod_make:mill")
-    elif building.id == "brewery":
+            for recipe in prod.GRIND[bid]:
+                kb.button(
+                    text=f"{balance.GOODS_EMOJI[recipe]} {balance.GOODS_NAMES[recipe]}",
+                    callback_data=f"grind:{bid}:{recipe}")
+        kb.button(text="↩️ К пристройкам", callback_data="buildings")
+        kb.adjust(1)
+        return kb.as_markup()
+    if bid in prod.RECIPES:  # пекарня/коптильня/сыроварня: вход → товар в погреб
+        if state == "ready":
+            kb.button(text="🍽 Забрать в погреб", callback_data=f"prod_claim:{bid}",
+                      style="success")
+        elif state == "none":
+            for recipe in prod.RECIPES[bid]:
+                g = prod.GOODS[recipe]
+                kb.button(text=f"{g.emoji} {g.name}", callback_data=f"rcp:{bid}:{recipe}")
+        kb.button(text="↩️ К пристройкам", callback_data="buildings")
+        kb.adjust(1)
+        return kb.as_markup()
+    if building.id == "brewery":
         phase, _ = prod.brew_phase(tavern)
         if phase == "ready":
             kb.button(text="🍺 Разлить в погреб", callback_data="prod_claim:brewery",

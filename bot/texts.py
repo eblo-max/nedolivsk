@@ -152,14 +152,19 @@ RULES = (
     "<i>Чем выше уровень таверны, тем больше бригад уходит разом.</i>\n\n"
 
     "<b>🏗 2. Производство — пристройки</b>\n"
-    "Сырьё само по себе не продать — его надо переработать. Строишь пристройки "
-    "(раздел «Пристройки»), и они делают товар:\n"
-    "<code>зерно → солод</code> — Мельница\n"
+    "Сырьё само по себе не продать — его надо переработать. Часть пристроек "
+    "делает <u>полуфабрикаты</u> на склад, часть — готовый <u>товар</u> в погреб:\n"
+    "<code>зерно → солод / мука</code> — Мельница\n"
+    "<code>руда → слиток</code> — Горн (идёт на снарягу в кузнице)\n"
     "<code>солод + хмель → эль</code> — Пивоварня\n"
     "<code>мёд → медовуха / сбитень</code> — Медоварня\n"
-    "<code>припасы → жаркое</code> — Кухня\n"
+    "<code>мука → хлеб / пирог</code> — Пекарня\n"
+    "<code>дичь/рыба + соль → солонина / копчёности</code> — Коптильня\n"
+    "<code>молоко + соль → сыр / масло</code> — Сыроварня\n"
+    "<code>дичь + припасы → жаркое</code> — Кухня\n"
     "<code>ягоды → вино</code> — Винодельня\n"
-    "<i>Часть пристроек открывается, когда поднимешь репутацию.</i>\n\n"
+    "<i>Одно сырьё кормит разные цепочки (зерно → и солод, и мука). Часть "
+    "пристроек открывается с репутацией.</i>\n\n"
 
     "<b>🍺 3. Варка и погреб</b>\n"
     "В пристройке запускаешь партию, ждёшь готовности (придёт уведомление) и "
@@ -522,7 +527,7 @@ def _build_line(player: Player) -> str:
 
 def _cost_line(cost: dict, player: Player) -> str:
     """🪙/🪵/… N ✅/❌ — по содержимому словаря стоимости."""
-    emoji = {"gold": "🪙", **RESOURCE_EMOJI}
+    emoji = {"gold": "🪙", **RESOURCE_EMOJI, **balance.GOODS_EMOJI}
     parts = []
     for key, need in cost.items():
         if not need:
@@ -621,29 +626,60 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
     from bot.game import production as prod
 
     head = f"{building.emoji} <b>{building.name}</b>\n<i>{building.description}</i>\n"
-    if building.id == "mill":
-        malt = inventory.get(player, "malt")
+    ico = {**RESOURCE_EMOJI, **balance.GOODS_EMOJI}
+    if building.id in prod.GRIND:  # мельница/горн: сырьё → полуфабрикат
         level = tavern.level
-        cin = prod.mill_inputs(level)
-        out = prod.mill_output(level)
-        state, minutes = prod.state(tavern, "mill")
+        state, minutes = prod.state(tavern, building.id)
         if state == "active":
-            status = f"⏳ Мелется — ещё {_fmt_minutes(minutes)}."
+            status = f"⏳ Работает — ещё {_fmt_minutes(minutes)}."
         elif state == "ready":
-            status = "🌱 Солод готов — забирай!"
+            status = "📦 Готово — забирай на склад!"
         else:
-            status = "😴 Жернова простаивают."
-        m_emoji = balance.GOODS_EMOJI["malt"]
-        m_name = balance.GOODS_NAMES["malt"]
-        g_emoji = RESOURCE_EMOJI["grain"]
-        return (
-            head +
-            f"\n{m_emoji} {m_name} на складе: {malt}\n"
-            f"{status}\n\n"
-            f"Помол (ур. {level}): {g_emoji} {cin['grain']} → {m_emoji} {out} "
-            f"{m_name.lower()}, {prod.MILL_MINUTES} мин\n"
-            f"В закромах: {g_emoji} {inventory.get(player, 'grain')}"
-        )
+            status = "😴 Простаивает."
+        lines = [head, "", status, "", f"Передел (ур. {level}):"]
+        src_keys: set[str] = set()
+        for recipe, (inp, mins, _o) in prod.GRIND[building.id].items():
+            cin = prod.grind_inputs(building.id, recipe, level)
+            out = prod.grind_output(building.id, recipe, level)
+            src = " ".join(f"{ico.get(r, r)}{q}" for r, q in cin.items())
+            lines.append(
+                f"{src} → {ico.get(recipe, recipe)}{out} "
+                f"{balance.GOODS_NAMES.get(recipe, recipe).lower()}, {mins} мин")
+            src_keys |= set(cin)
+        made = " · ".join(
+            f"{ico.get(rc, rc)} {inventory.get(player, rc)}" for rc in prod.GRIND[building.id])
+        have = " · ".join(
+            f"{ico.get(r, r)} {inventory.get(player, r)}" for r in sorted(src_keys))
+        lines += ["", f"На складе: {made}", f"Сырьё: {have}"]
+        return "\n".join(lines)
+    if building.id in prod.RECIPES:  # пекарня/коптильня/сыроварня: вход → товар
+        level = tavern.level
+        prods = tavern.products or {}
+        state, minutes = prod.state(tavern, building.id)
+        if state == "active":
+            rc = (tavern.production.get(building.id) or {}).get("recipe")
+            nm = prod.GOODS[rc].name if rc in prod.GOODS else "товар"
+            status = f"⏳ Готовится {nm} — ещё {_fmt_minutes(minutes)}."
+        elif state == "ready":
+            status = "🍽 Готово — забирай в погреб!"
+        else:
+            status = "😴 Простаивает. Выбери, что делать."
+        stock = " · ".join(
+            f"{prod.GOODS[rc].emoji} {prods.get(rc, 0)}" for rc in prod.RECIPES[building.id])
+        lines = [head, "", f"🛢 В погребе: {stock}", status, "", f"Рецепты (ур. {level}):"]
+        src_keys = set()
+        for recipe in prod.RECIPES[building.id]:
+            cin = prod.recipe_inputs(building.id, recipe, level)
+            out = prod.recipe_output(building.id, recipe, level)
+            g = prod.GOODS[recipe]
+            src = " ".join(f"{ico.get(r, r)}{q}" for r, q in cin.items())
+            lines.append(
+                f"{g.emoji} {g.name}: {src} → {out}, {prod.recipe_hours(building.id, recipe)} ч")
+            src_keys |= set(cin)
+        have = " · ".join(
+            f"{ico.get(r, r)} {inventory.get(player, r)}" for r in sorted(src_keys))
+        lines += [f"Есть: {have}"]
+        return "\n".join(lines)
     if building.id == "brewery":
         level = tavern.level
         prods = tavern.products or {}
@@ -855,6 +891,25 @@ def malt_ready_notification() -> str:
     )
 
 
+def recipe_not_enough(recipe: str, cin: dict) -> str:
+    """Универсальное «не хватает сырья» для грайндеров и рецептурных пристроек."""
+    from bot.game import production as prod
+    ico = {**RESOURCE_EMOJI, **balance.GOODS_EMOJI}
+    need = " ".join(f"{ico.get(r, r)}{q}" for r, q in (cin or {}).items())
+    name = prod.GOODS[recipe].name if recipe in prod.GOODS else \
+        balance.GOODS_NAMES.get(recipe, recipe)
+    return f"😕 На «{name}» не хватает: {need}. Шли бригаду за сырьём."
+
+
+def recipe_ready_notification(recipe: str) -> str:
+    """Универсальное «готово» для пекарни/коптильни/сыроварни."""
+    from bot.game import production as prod
+    g = prod.GOODS.get(recipe)
+    if g is None:
+        return "🍽 <b>Готово!</b> Забирай в погреб."
+    return f"{g.emoji} <b>{g.name} готово!</b> Неси в погреб — гости проголодались."
+
+
 # Реактивная атмосфера: сочные строки под текущее состояние кабака и города.
 _FLAVOR = {
     "fair": [
@@ -974,22 +1029,24 @@ def _production_lines(tavern: Tavern) -> list[str]:
             out.append(f"🛢 Эль {st} на выдержке — {_fmt_minutes(m)}")
         elif phase in ("ripe", "overripe"):
             out.append(f"🛢 Эль {st} дошёл — разливай скорей!")
-    meadery_name = (
-        "Сбитень" if (p.get("meadery") or {}).get("recipe") == "sbiten"
-        else "Медовуха")
-    simple = [
-        ("mill", "🌱", "Солод", "мелется"),
-        ("meadery", "🍶", meadery_name, "зреет"),
-        ("kitchen", "🍖", "Жаркое", "готовится"),
-        ("winery", "🍷", "Вино", "бродит"),
-    ]
-    for bid, emoji, name, verb in simple:
-        if bid not in p:
+    # Остальные пристройки — обобщённо (грайндеры → полуфабрикат, рецептурные → товар)
+    for bid, batch in p.items():
+        if bid == "brewery" or bid not in prod.PRODUCERS:
             continue
         s, m = prod.state(tavern, bid)
+        if s not in ("active", "ready"):
+            continue
+        if bid in prod.GRIND:
+            key = (batch or {}).get("out_res", "")
+            emoji = balance.GOODS_EMOJI.get(key, "📦")
+            name = balance.GOODS_NAMES.get(key, key or "Передел")
+        else:
+            key = (batch or {}).get("recipe", "")
+            g = prod.GOODS.get(key)
+            emoji, name = (g.emoji, g.name) if g else ("🍽", "Товар")
         if s == "active":
-            out.append(f"{emoji} {name} {verb} — {_fmt_minutes(m)}")
-        elif s == "ready":
+            out.append(f"{emoji} {name} — {_fmt_minutes(m)}")
+        else:
             out.append(f"{emoji} {name} готово — забирай!")
     return out
 
@@ -1188,14 +1245,22 @@ def warehouse_screen(player: Player, tavern: Tavern) -> str:
 
 
 def storehouse_caption(player: Player, tavern: Tavern) -> str:
-    """Короткая подпись к складской ведомости (ресурсы — на самой картинке)."""
+    """Короткая подпись к складской ведомости (ресурсы — на самой картинке).
+    Ресурсы, не влезшие в 10 ячеек картинки, перечисляем текстом."""
+    from bot.game import storehouse as sh
     parts = [
         f"📦 <b>СКЛАД «{escape(tavern.name.upper())}»</b>",
         "",
         f"🪙 <b>Золото — {player.gold}</b>",
-        "",
-        *_upgrade_need_block(player, tavern),
     ]
+    extra = [r for r in sh.OVERFLOW_RESOURCES if inventory.get(player, r) > 0] \
+        or list(sh.OVERFLOW_RESOURCES)
+    if extra:
+        line = " · ".join(
+            f"{RESOURCE_EMOJI[r]} {RESOURCE_NAMES[r]} {inventory.get(player, r)}"
+            for r in extra)
+        parts += ["", *_branch("ЕЩЁ НА СКЛАДЕ", [line])]
+    parts += ["", *_upgrade_need_block(player, tavern)]
     return "\n".join(parts)
 
 
@@ -1979,7 +2044,6 @@ def forge_item_screen(item, player, cur_tier: int, next_tier: int) -> str:
         )
     c = it.tier_cost(item, next_tier)
     hours = it.tier_hours(item, next_tier)
-    have_mark = lambda k, have: "✅" if have >= c.get(k, 0) else "❌"
     head = f"<b>{item.name} {it.TIER_STARS[next_tier]}</b> · слот: {it.SLOTS[item.slot]}"
     if cur_tier > 0:
         head += (
@@ -1991,10 +2055,7 @@ def forge_item_screen(item, player, cur_tier: int, next_tier: int) -> str:
         f"<i>{item.description}</i>\n\n"
         f"Будет давать: {_tier_bonus_line(item, next_tier)}\n"
         f"Ковать: {hours} ч\n\n"
-        f"Цена: 🪙 {c.get('gold',0)} {have_mark('gold', player.gold)} · "
-        f"🪵 {c.get('wood',0)} {have_mark('wood', inventory.get(player, 'wood'))} · "
-        f"🌾 {c.get('grain',0)} {have_mark('grain', inventory.get(player, 'grain'))} · "
-        f"🌿 {c.get('hops',0)} {have_mark('hops', inventory.get(player, 'hops'))}"
+        f"Цена: {_cost_line(c, player)}"
     )
 
 
