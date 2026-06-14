@@ -10,14 +10,14 @@ REGION_EMOJI = {"north_wilds": "❄️", "green_valleys": "🌾", "red_wastes": 
 
 def create_tavern_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="🏗 Создать таверну", callback_data="create_tavern")
+    kb.button(text="🏗 Создать таверну", callback_data="create_tavern", style="success")
     return kb.as_markup()
 
 
 def welcome_kb() -> InlineKeyboardMarkup:
     """Хаб на приветственном экране: завести кабак + разделы инфо."""
     kb = InlineKeyboardBuilder()
-    kb.button(text="🏗 Завести кабак", callback_data="create_tavern")
+    kb.button(text="🏗 Завести кабак", callback_data="create_tavern", style="success")
     kb.button(text="📖 Как играть", callback_data="how_play")
     kb.button(text="🏰 Живой город", callback_data="living_city")
     kb.button(text="👥 Затащить в чат", callback_data="add_chat")
@@ -73,13 +73,13 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     sizes: list[int] = []
 
     if story_state.get_retail(player):  # гости ждут решения по сбыту
-        kb.button(text="🍺 Гости ждут заказ!", callback_data="retail_open")
+        kb.button(text="🍺 Гости ждут заказ!", callback_data="retail_open", style="primary")
         sizes.append(1)
     if story_state.get_trade(player):  # купец ждёт ответа по цене
-        kb.button(text="🤝 Купец торгуется!", callback_data="trade_open")
+        kb.button(text="🤝 Купец торгуется!", callback_data="trade_open", style="primary")
         sizes.append(1)
     if story_state.get_pending(player):  # незакрытое событие — даём вернуться к нему
-        kb.button(text="🔔 Тебя ждёт гость!", callback_data="event_open")
+        kb.button(text="🔔 Тебя ждёт гость!", callback_data="event_open", style="primary")
         sizes.append(1)
 
     c = logic.expedition_counts(player, player.tavern)
@@ -117,7 +117,8 @@ def expedition_menu_kb(player: Player) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     sizes: list[int] = []
     if c.ready:
-        kb.button(text=f"🎒 Забрать вернувшихся ({c.ready})", callback_data="exp_claim")
+        kb.button(text=f"🎒 Забрать вернувшихся ({c.ready})", callback_data="exp_claim",
+                  style="success")
         sizes.append(1)
     if c.free > 0:
         from bot.game import season
@@ -137,7 +138,7 @@ def expedition_menu_kb(player: Player) -> InlineKeyboardMarkup:
 
 def upgrade_confirm_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="✅ Улучшить", callback_data="upgrade_confirm")
+    kb.button(text="✅ Улучшить", callback_data="upgrade_confirm", style="success")
     kb.button(text="↩️ Назад", callback_data="tavern")
     kb.adjust(2)
     return kb.as_markup()
@@ -145,7 +146,7 @@ def upgrade_confirm_kb() -> InlineKeyboardMarkup:
 
 def claim_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="🎒 Забрать добычу", callback_data="exp_claim")
+    kb.button(text="🎒 Забрать добычу", callback_data="exp_claim", style="success")
     kb.button(text="🏠 К таверне", callback_data="tavern")
     kb.adjust(1)
     return kb.as_markup()
@@ -157,16 +158,16 @@ def trade_kb(offer: dict) -> InlineKeyboardMarkup:
     kb.button(text=f"🪙 Дёшево · {p[0]}/шт", callback_data="trd:0")
     kb.button(text=f"💰 По рынку · {p[1]}/шт", callback_data="trd:1")
     kb.button(text=f"🤑 Дорого · {p[2]}/шт", callback_data="trd:2")
-    kb.button(text="🚪 Не продавать", callback_data="trd:no")
+    kb.button(text="🚪 Не продавать", callback_data="trd:no", style="danger")
     kb.adjust(1)
     return kb.as_markup()
 
 
 def trade_counter_kb(counter: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text=f"🤝 Идёт · {counter}/шт", callback_data="trd:ok")
+    kb.button(text=f"🤝 Идёт · {counter}/шт", callback_data="trd:ok", style="success")
     kb.button(text="💬 Дожать ещё", callback_data="trd:push")
-    kb.button(text="🚪 Послать", callback_data="trd:no")
+    kb.button(text="🚪 Послать", callback_data="trd:no", style="danger")
     kb.adjust(1)
     return kb.as_markup()
 
@@ -174,7 +175,7 @@ def trade_counter_kb(counter: int) -> InlineKeyboardMarkup:
 def loot_kb(drop_id: int) -> InlineKeyboardMarkup:
     """Кнопка подкидыша — кто первый нажал, тот подобрал (публичная)."""
     kb = InlineKeyboardBuilder()
-    kb.button(text="🤲 Поднять!", callback_data=f"loot:{drop_id}")
+    kb.button(text="🤲 Поднять!", callback_data=f"loot:{drop_id}", style="success")
     return kb.as_markup()
 
 
@@ -187,7 +188,8 @@ def back_kb() -> InlineKeyboardMarkup:
 def retail_kb(total: int) -> InlineKeyboardMarkup:
     """Подтверждение сбыта гостям: налить (продать) или придержать товар."""
     kb = InlineKeyboardBuilder()
-    kb.button(text=f"🍺 Налить гостям · +{total} 🪙", callback_data="retail_sell")
+    kb.button(text=f"🍺 Налить гостям · +{total} 🪙", callback_data="retail_sell",
+              style="success")
     kb.button(text="🤚 Придержать товар", callback_data="retail_hold")
     kb.adjust(1)
     return kb.as_markup()
@@ -196,7 +198,7 @@ def retail_kb(total: int) -> InlineKeyboardMarkup:
 def character_kb(craft_ready: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if craft_ready:
-        kb.button(text="🎁 Забрать у мастера", callback_data="craft_claim")
+        kb.button(text="🎁 Забрать у мастера", callback_data="craft_claim", style="success")
     kb.button(text="⚒ Кузница", callback_data="forge")
     kb.button(text="🏹 Охота", callback_data="hunt")
     kb.button(text="👥 Горожане", callback_data="citizens")
@@ -210,7 +212,7 @@ def hunt_menu_kb(player) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     sizes = []
     if combat.can_heal(player):
-        kb.button(text="🍖 Подлечиться", callback_data="healmenu")
+        kb.button(text="🍖 Подлечиться", callback_data="healmenu", style="success")
         sizes.append(1)
     for e in combat.ENEMIES:
         kb.button(text=f"{e.emoji} {e.name}", callback_data=f"hbeast:{e.id}")
@@ -232,7 +234,7 @@ def heal_kb(player) -> InlineKeyboardMarkup:
             if prods.get(k, 0) > 0:
                 g = prod.GOODS[k]
                 kb.button(text=f"{g.emoji} {g.name} +{balance.HEAL_VALUES[k]}❤",
-                          callback_data=f"heal:{k}")
+                          callback_data=f"heal:{k}", style="success")
     kb.button(text="↩️ К охоте", callback_data="hunt")
     kb.adjust(1)
     return kb.as_markup()
@@ -240,7 +242,7 @@ def heal_kb(player) -> InlineKeyboardMarkup:
 
 def hunt_detail_kb(enemy_id: str) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="⚔️ Охотиться!", callback_data=f"hfight:{enemy_id}")
+    kb.button(text="⚔️ Охотиться!", callback_data=f"hfight:{enemy_id}", style="danger")
     kb.button(text="↩️ К зверью", callback_data="hunt")
     kb.adjust(1)
     return kb.as_markup()
@@ -304,9 +306,9 @@ def auction_kb(tavern) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if tavern.auction:
         kb.button(text="🔄 Обновить торги", callback_data="auction")
-        kb.button(text="🚫 Снять лот", callback_data="auc_cancel")
+        kb.button(text="🚫 Снять лот", callback_data="auc_cancel", style="danger")
     else:
-        kb.button(text="🛒 Выставить лот", callback_data="auc_new")
+        kb.button(text="🛒 Выставить лот", callback_data="auc_new", style="success")
     kb.button(text="🏪 Рынок", callback_data="market")
     kb.button(text="🏠 К таверне", callback_data="tavern")
     kb.adjust(1)
@@ -369,7 +371,7 @@ def forge_kb(player: Player | None = None) -> InlineKeyboardMarkup:
 def forge_item_kb(item_id: str, maxed: bool = False) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     if not maxed:
-        kb.button(text="⚒ Заказать", callback_data=f"forge_make:{item_id}")
+        kb.button(text="⚒ Заказать", callback_data=f"forge_make:{item_id}", style="success")
     kb.button(text="↩️ В кузницу", callback_data="forge")
     kb.adjust(2)
     return kb.as_markup()
@@ -377,7 +379,7 @@ def forge_item_kb(item_id: str, maxed: bool = False) -> InlineKeyboardMarkup:
 
 def craft_claim_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    kb.button(text="🎁 Забрать вещь", callback_data="craft_claim")
+    kb.button(text="🎁 Забрать вещь", callback_data="craft_claim", style="success")
     kb.button(text="🧍 Персонаж", callback_data="character")
     kb.adjust(1)
     return kb.as_markup()
@@ -414,7 +416,8 @@ def building_detail_kb(player, tavern, building) -> InlineKeyboardMarkup:
         and bld.buildable(tavern, building)
     )
     if can_build:
-        kb.button(text="🏗 Построить", callback_data=f"build_make:{building.id}")
+        kb.button(text="🏗 Построить", callback_data=f"build_make:{building.id}",
+                  style="success")
     kb.button(text="↩️ Назад", callback_data="buildings")
     kb.adjust(1)
     return kb.as_markup()
@@ -443,35 +446,42 @@ def production_kb(player, tavern, building) -> InlineKeyboardMarkup:
     state, _ = prod.state(tavern, building.id)
     if building.id == "mill":
         if state == "ready":
-            kb.button(text="🌱 Забрать солод", callback_data="prod_claim:mill")
+            kb.button(text="🌱 Забрать солод", callback_data="prod_claim:mill",
+                      style="success")
         elif state == "none":
             kb.button(text="🌾 Молоть солод", callback_data="prod_make:mill")
     elif building.id == "brewery":
         phase, _ = prod.brew_phase(tavern)
         if phase == "ready":
-            kb.button(text="🍺 Разлить в погреб", callback_data="prod_claim:brewery")
+            kb.button(text="🍺 Разлить в погреб", callback_data="prod_claim:brewery",
+                      style="success")
             if int(tavern.production["brewery"]["tier"]) < 3:
-                kb.button(text="🛢 Выдержать (рискнуть)", callback_data="brew_age")
+                kb.button(text="🛢 Выдержать (рискнуть)", callback_data="brew_age",
+                          style="danger")
         elif phase in ("ripe", "overripe"):
-            kb.button(text="🍺 Разлить выдержку", callback_data="prod_claim:brewery")
+            kb.button(text="🍺 Разлить выдержку", callback_data="prod_claim:brewery",
+                      style="success")
         elif phase == "empty":
             kb.button(text="★ Эль", callback_data="brew:1")
             kb.button(text="★★ Светлое", callback_data="brew:2")
             kb.button(text="★★★ Праздничное", callback_data="brew:3")
     elif building.id == "meadery":
         if state == "ready":
-            kb.button(text="🍶 Разлить в погреб", callback_data="prod_claim:meadery")
+            kb.button(text="🍶 Разлить в погреб", callback_data="prod_claim:meadery",
+                      style="success")
         elif state == "none":
             kb.button(text="🍶 Медовуха", callback_data="meadery:mead")
             kb.button(text="🌿 Сбитень", callback_data="meadery:sbiten")
     elif building.id == "kitchen":
         if state == "ready":
-            kb.button(text="🍖 Забрать в кладовую", callback_data="prod_claim:kitchen")
+            kb.button(text="🍖 Забрать в кладовую", callback_data="prod_claim:kitchen",
+                      style="success")
         elif state == "none":
             kb.button(text="🍖 Жаркое", callback_data="kitchen:roast")
     elif building.id == "winery":
         if state == "ready":
-            kb.button(text="🍷 Разлить в погреб", callback_data="prod_claim:winery")
+            kb.button(text="🍷 Разлить в погреб", callback_data="prod_claim:winery",
+                      style="success")
         elif state == "none":
             kb.button(text="🍷 Вино", callback_data="winery:wine")
     kb.button(text="↩️ К пристройкам", callback_data="buildings")
