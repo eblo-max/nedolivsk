@@ -43,38 +43,38 @@ class Enemy:
 # game=дичь(кухня), honey(медоварня), herbs(сбитень/кухня), berries(вино),
 # ore(кузня/стройка), clay(стройка) — добыча кормит производство.
 ENEMIES = [
-    Enemy("zayac", "🐰", "Заяц", 10, 1, 0, (3, 12),
+    Enemy("zayac", "🐰", "Заяц", 8, 2, 0, (3, 12),
           (Drop("game", 2, 4),),
           blurb="Можно и голыми руками, если не жалко гордости.", video="zayc"),
-    Enemy("lisa", "🦊", "Лиса", 18, 3, 0, (10, 22),
+    Enemy("lisa", "🦊", "Лиса", 18, 5, 0, (10, 22),
           (Drop("game", 2, 4), Drop("herbs", 2, 3, 22)),
           blurb="Юркая, но кусачая. Шкурка ценится."),
-    Enemy("gadyuka", "🐍", "Гадюка", 24, 9, 0, (15, 30),
+    Enemy("gadyuka", "🐍", "Гадюка", 30, 10, 0, (15, 30),
           (Drop("herbs", 3, 6), Drop("game", 2, 3, 12)),
-          blurb="Бьёт больно и метко — броня спасает слабо. Яд идёт в зелья."),
-    Enemy("olen", "🦌", "Олень", 38, 4, 0, (18, 34),
+          blurb="Бьёт больно и метко — броня тут не спасёт. Яд идёт в зелья."),
+    Enemy("olen", "🦌", "Олень", 52, 7, 0, (18, 34),
           (Drop("game", 6, 10), Drop("herbs", 3, 5, 25)),
           blurb="Мяса много, отпор слабый. Добрая дичь к столу."),
-    Enemy("volk", "🐺", "Волк", 30, 6, 0, (12, 28),
+    Enemy("volk", "🐺", "Волк", 48, 11, 0, (16, 32),
           (Drop("game", 4, 7), Drop("herbs", 2, 4, 15)),
-          blurb="Кусается. Без оружия лучше не лезть."),
-    Enemy("vozhak", "🐺", "Вожак стаи", 72, 14, 3, (40, 75),
+          blurb="Кусается всерьёз. Без оружия лучше не лезть."),
+    Enemy("kaban", "🐗", "Кабан", 60, 13, 2, (25, 50),
+          (Drop("game", 7, 12), Drop("herbs", 3, 5, 20)),
+          blurb="Клыки. Нужен топор и хоть какая броня."),
+    Enemy("vozhak", "🐺", "Вожак стаи", 88, 18, 3, (45, 85),
           (Drop("game", 8, 14), Drop("ore", 3, 5, 18),
            Drop("", chance=8, label="🦷 клык вожака на ремень")),
           rep=1, blurb="Матёрый, со стаей за спиной. Нужна снаряга."),
-    Enemy("kaban", "🐗", "Кабан", 55, 10, 2, (25, 50),
-          (Drop("game", 7, 12), Drop("herbs", 3, 5, 20)),
-          blurb="Клыки. Нужен топор и хоть какая броня."),
-    Enemy("medved", "🐻", "Медведь", 95, 17, 5, (45, 90),
+    Enemy("medved", "🐻", "Медведь", 104, 21, 5, (45, 95),
           (Drop("game", 10, 16), Drop("honey", 3, 6),
            Drop("herbs", 4, 8, 25)),
           rep=1, blurb="Задерёт неподготовленного. Броня обязательна.",
           video="medved"),
-    Enemy("razboy", "🗡", "Разбойник", 85, 22, 8, (90, 170),
+    Enemy("razboy", "🗡", "Разбойник", 118, 28, 8, (90, 170),
           (Drop("ore", 4, 8), Drop("herbs", 4, 8),
            Drop("", chance=15, label="🗡 трофейный кинжал разбойника")),
           rep=2, blurb="С оружием и злой. Только для крепкого бойца."),
-    Enemy("ataman", "👹", "Атаман", 160, 30, 12, (180, 340),
+    Enemy("ataman", "👹", "Атаман", 210, 42, 12, (190, 360),
           (Drop("ore", 8, 14), Drop("clay", 6, 10, 40),
            Drop("", chance=12, label="👑 перстень атамана (хвастать в чате)")),
           rep=4, blurb="Гроза тракта. Идут только мастера в полном железе."),
@@ -106,6 +106,7 @@ def resolve(stats: dict, enemy: Enemy, rng: random.Random | None = None) -> Figh
     php = balance.BASE_HP
     ehp = enemy.hp
     v = balance.HUNT_DMG_VARIANCE
+    mit = balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + parmor)  # убывающая броня
     rounds = crits = dealt = 0
     while ehp > 0 and php > 0 and rounds < balance.HUNT_MAX_ROUNDS:
         rounds += 1
@@ -117,8 +118,7 @@ def resolve(stats: dict, enemy: Enemy, rng: random.Random | None = None) -> Figh
         dealt += hit
         if ehp <= 0:
             break
-        ehit = max(1, enemy.attack - parmor // balance.ARMOR_DR_DIV)
-        php -= max(1, round(ehit * rng.uniform(1 - v, 1 + v)))
+        php -= max(1, round(enemy.attack * mit * rng.uniform(1 - v, 1 + v)))
     win = ehp <= 0 and php > 0
     overwhelmed = ehp > 0 and rounds >= balance.HUNT_MAX_ROUNDS
     return Fight(win, rounds, crits, dealt, max(0, php), overwhelmed)
