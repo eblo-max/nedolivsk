@@ -105,10 +105,11 @@ def resolve(stats: dict, enemy: Enemy, rng: random.Random | None = None) -> Figh
     dmg, crit_pct, parmor = _player_offense(stats)
     php = balance.BASE_HP
     ehp = enemy.hp
+    v = balance.HUNT_DMG_VARIANCE
     rounds = crits = dealt = 0
     while ehp > 0 and php > 0 and rounds < balance.HUNT_MAX_ROUNDS:
         rounds += 1
-        hit = max(1, dmg - enemy.armor)
+        hit = max(1, round(max(1, dmg - enemy.armor) * rng.uniform(1 - v, 1 + v)))
         if rng.randint(1, 100) <= crit_pct:
             hit *= 2
             crits += 1
@@ -116,7 +117,8 @@ def resolve(stats: dict, enemy: Enemy, rng: random.Random | None = None) -> Figh
         dealt += hit
         if ehp <= 0:
             break
-        php -= max(1, enemy.attack - parmor // balance.ARMOR_DR_DIV)
+        ehit = max(1, enemy.attack - parmor // balance.ARMOR_DR_DIV)
+        php -= max(1, round(ehit * rng.uniform(1 - v, 1 + v)))
     win = ehp <= 0 and php > 0
     overwhelmed = ehp > 0 and rounds >= balance.HUNT_MAX_ROUNDS
     return Fight(win, rounds, crits, dealt, max(0, php), overwhelmed)
