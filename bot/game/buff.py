@@ -30,14 +30,32 @@ class Boon:
 
 
 BOONS: dict[str, Boon] = {
+    # mult — представительная величина эффекта (для income/harvest/trade — прямой
+    # множитель; для остальных смысл задаётся в *_mult/*_bonus ниже).
     "income": Boon("income", "🍺", "Бойкая касса",
                    "+10% золота с дохода и сбыта гостям", 1.10),
-    "harvest": Boon("harvest", "⛏", "Щедрая жила",
-                    "+15% ресурсов с вернувшихся бригад", 1.15),
     "trade": Boon("trade", "🤝", "Барыжья хватка",
                   "+10% золота с купца и аукциона", 1.10),
+    "harvest": Boon("harvest", "⛏", "Щедрая жила",
+                    "+15% ресурсов с вернувшихся бригад", 1.15),
+    "swift": Boon("swift", "🦵", "Быстрые ноги",
+                  "−25% времени вылазки бригад", 0.75),
+    "brew": Boon("brew", "🔥", "Спорая варка",
+                 "−20% времени производства на пристройках", 0.80),
+    "scent": Boon("scent", "🐾", "Звериный нюх",
+                  "+20% золота и добычи с охоты", 1.20),
+    "tough": Boon("tough", "🛡", "Толстая шкура",
+                  "−20% урона по тебе в бою", 0.80),
+    "luck": Boon("luck", "🍀", "Фартовый день",
+                 "+удача: крит, редкая добыча и фарт бригад", 1.0),
+    "cellar": Boon("cellar", "❄️", "Холодный погреб",
+                   "−50% порчи излишков в погребе", 0.50),
+    "mend": Boon("mend", "❤️‍🩹", "Быстрое заживление",
+                 "здоровье восстанавливается вдвое быстрее", 0.50),
 }
 POOL = list(BOONS)
+
+LUCK_BONUS = 20  # сколько очков удачи даёт «Фартовый день»
 
 
 def _now() -> datetime:
@@ -118,21 +136,56 @@ def activate(player, now: datetime | None = None) -> Activation:
     return Activation(True, boon=boon, minutes=BUFF_HOURS * 60)
 
 
-def _mult(player, kind: str, now: datetime | None = None) -> float:
+def _has(player, kind: str, now: datetime | None = None) -> bool:
     b = active(player, now)
-    return b.mult if b is not None and b.id == kind else 1.0
+    return b is not None and b.id == kind
 
 
 def gold_mult(player, now: datetime | None = None) -> float:
-    """Множитель золота с кассы (пассив + сбыт гостям)."""
-    return _mult(player, "income", now)
-
-
-def yield_mult(player, now: datetime | None = None) -> float:
-    """Множитель ресурсов с бригад."""
-    return _mult(player, "harvest", now)
+    """Множитель золота с кассы (пассив + сбыт гостям) — «Бойкая касса»."""
+    return BOONS["income"].mult if _has(player, "income", now) else 1.0
 
 
 def sale_mult(player, now: datetime | None = None) -> float:
-    """Множитель золота с купеческих сделок и аукциона."""
-    return _mult(player, "trade", now)
+    """Множитель золота с купца и аукциона — «Барыжья хватка»."""
+    return BOONS["trade"].mult if _has(player, "trade", now) else 1.0
+
+
+def yield_mult(player, now: datetime | None = None) -> float:
+    """Множитель ресурсов с бригад — «Щедрая жила»."""
+    return BOONS["harvest"].mult if _has(player, "harvest", now) else 1.0
+
+
+def expedition_speed_mult(player, now: datetime | None = None) -> float:
+    """Множитель времени вылазки (меньше — быстрее) — «Быстрые ноги»."""
+    return BOONS["swift"].mult if _has(player, "swift", now) else 1.0
+
+
+def prod_speed_mult(player, now: datetime | None = None) -> float:
+    """Множитель времени производства (меньше — быстрее) — «Спорая варка»."""
+    return BOONS["brew"].mult if _has(player, "brew", now) else 1.0
+
+
+def hunt_gold_mult(player, now: datetime | None = None) -> float:
+    """Множитель золота/добычи с охоты — «Звериный нюх»."""
+    return BOONS["scent"].mult if _has(player, "scent", now) else 1.0
+
+
+def tough_mult(player, now: datetime | None = None) -> float:
+    """Множитель урона ПО игроку в бою (меньше — крепче) — «Толстая шкура»."""
+    return BOONS["tough"].mult if _has(player, "tough", now) else 1.0
+
+
+def regen_mult(player, now: datetime | None = None) -> float:
+    """Множитель времени восстановления HP (меньше — быстрее) — «Заживление»."""
+    return BOONS["mend"].mult if _has(player, "mend", now) else 1.0
+
+
+def spoil_mult(player, now: datetime | None = None) -> float:
+    """Множитель порчи погреба (меньше — бережнее) — «Холодный погреб»."""
+    return BOONS["cellar"].mult if _has(player, "cellar", now) else 1.0
+
+
+def luck_bonus(player, now: datetime | None = None) -> int:
+    """Прибавка очков удачи — «Фартовый день» (крит, редкая добыча, фарт бригад)."""
+    return LUCK_BONUS if _has(player, "luck", now) else 0

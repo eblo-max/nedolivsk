@@ -72,7 +72,8 @@ def start_expedition(player: Player, tavern: Tavern, resource: str) -> Expeditio
         return ExpeditionStart(ok=False, reason="no_gold", pay=pay)
 
     player.gold -= pay
-    hours = balance.EXPEDITION_HOURS * items.speed_multiplier(equipment)
+    hours = (balance.EXPEDITION_HOURS * items.speed_multiplier(equipment)
+             * buff.expedition_speed_mult(player))  # баф «Быстрые ноги»
     exps.append({
         "resource": resource,
         "ends_at": (_now() + timedelta(hours=hours)).isoformat(),
@@ -97,7 +98,8 @@ def claim_expeditions(player: Player) -> list[tuple[str, int, bool]]:
         amount = balance.expedition_yield(resource, level, player.region)
         amount = int(amount * items.yield_multiplier(equipment, resource)
                      * season.yield_mult(resource) * buff.yield_mult(player))
-        luck = items.combat_stats(equipment)["luck"] + perks.luck_bonus(player)
+        luck = (items.combat_stats(equipment)["luck"] + perks.luck_bonus(player)
+                + buff.luck_bonus(player))  # баф «Фартовый день»
         lucky = random.randint(1, 100) <= balance.lucky_chance(luck)
         if lucky:
             amount *= balance.LUCKY_MULT
@@ -148,7 +150,7 @@ def collect_income(
 
     # Порча: излишек сверх вместимости киснет за период (независимо от продажи).
     products = dict(tavern.products or {})
-    spoiled = _spoilage(tavern, products, hours)
+    spoiled = _spoilage(player, tavern, products, hours)
     if spoiled:
         tavern.products = products
 
@@ -249,16 +251,18 @@ def apply_retail(player: Player, tavern: Tavern, want: dict | None):
     return sold, gold, rep_gain
 
 
-def _spoilage(tavern: Tavern, products: dict, hours: float) -> dict:
+def _spoilage(player: Player, tavern: Tavern, products: dict, hours: float) -> dict:
     """Излишек товара сверх вместимости погреба киснет. Мутирует products,
-    возвращает {ключ: скисло}. Бьёт пропорционально по запасам."""
+    возвращает {ключ: скисло}. Бьёт пропорционально по запасам.
+    Баф «Холодный погреб» режет порчу вдвое."""
     goods = [k for k in production.GOODS if products.get(k, 0) > 0]
     total = sum(products[k] for k in goods)
     cap = balance.cellar_capacity(tavern.capacity)
     if total <= cap:
         return {}
     excess = total - cap
-    spoil_total = int(excess * balance.SPOIL_PCT_PER_DAY * hours / 24)
+    spoil_total = int(excess * balance.SPOIL_PCT_PER_DAY * hours / 24
+                      * buff.spoil_mult(player))
     if spoil_total <= 0:
         return {}
     spoiled: dict[str, int] = {}

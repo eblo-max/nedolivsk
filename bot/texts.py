@@ -1117,7 +1117,8 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
                      else "🏆 Выше строить некуда")
 
     eq = getattr(player, "equipment", None) or {}
-    luck_pct = balance.lucky_chance(it.combat_stats(eq)["luck"])
+    luck_pct = balance.lucky_chance(
+        it.combat_stats(eq)["luck"] + buffmod.luck_bonus(player))
 
     parts = [
         f"🏡 <b>{escape(tavern.name.upper())}</b> · уровень {tavern.level}",
@@ -1567,8 +1568,8 @@ def market_pulse_chron(cit) -> str:
 
 
 def _hunter_stats(player):
-    from bot.game import combat, items
-    st = items.combat_stats(getattr(player, "equipment", None))
+    from bot.game import combat
+    st = combat.player_stats(player)  # снаряга + активные бафы (удача/шкура)
     dmg = balance.BASE_DAMAGE + st["damage"]
     crit = min(balance.HUNT_CRIT_CAP, st["crit"] + st["luck"] // 2)
     return st, dmg, crit, combat

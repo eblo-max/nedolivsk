@@ -10,7 +10,7 @@ import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from bot.game import balance, inventory, items
+from bot.game import balance, buff, inventory, items
 
 
 @dataclass(frozen=True)
@@ -94,6 +94,16 @@ class Fight:
     log: list = None             # [{pd, crit, ed, php, ehp}] — для анимации боя
 
 
+def player_stats(player) -> dict:
+    """Боевые статы игрока со снаряги ПЛЮС временные бафы («опохмел»):
+    удача (крит/добыча) и множитель урона по игроку («Толстая шкура»).
+    Использовать и для боя, и для прогноза — чтобы бриф не врал."""
+    stats = dict(items.combat_stats(getattr(player, "equipment", None)))
+    stats["luck"] = stats.get("luck", 0) + buff.luck_bonus(player)
+    stats["dmg_taken_mult"] = buff.tough_mult(player)
+    return stats
+
+
 def _player_offense(stats: dict) -> tuple[int, int, int]:
     dmg = balance.BASE_DAMAGE + stats.get("damage", 0)
     crit_pct = min(balance.HUNT_CRIT_CAP,
@@ -110,6 +120,7 @@ def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
     ehp = enemy.hp
     v = balance.HUNT_DMG_VARIANCE
     mit = balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + parmor)  # убывающая броня
+    tmult = stats.get("dmg_taken_mult", 1.0)  # баф «Толстая шкура» (<1 — крепче)
     rounds = crits = dealt = 0
     log = []
     while ehp > 0 and php > 0 and rounds < balance.HUNT_MAX_ROUNDS:
@@ -123,7 +134,7 @@ def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
         dealt += hit
         ed = 0
         if ehp > 0:
-            ed = max(1, round(enemy.attack * mit * rng.uniform(1 - v, 1 + v)))
+            ed = max(1, round(enemy.attack * mit * tmult * rng.uniform(1 - v, 1 + v)))
             php -= ed
         log.append({"pd": hit, "crit": crit, "ed": ed,
                     "php": max(0, php), "ehp": max(0, ehp)})
@@ -197,6 +208,11 @@ def max_hp(player=None) -> int:
     return balance.BASE_HP
 
 
+def _regen_hours(player) -> float:
+    """Часы до полного восстановления HP с учётом бафа «Заживление» (×0.5)."""
+    return balance.HP_REGEN_FULL_HOURS * buff.regen_mult(player)
+
+
 def current_hp(player, now: datetime | None = None) -> int:
     """Текущее здоровье с регенерацией от hp_at к максимуму."""
     cur = player.hp if player.hp is not None else balance.BASE_HP
@@ -207,7 +223,7 @@ def current_hp(player, now: datetime | None = None) -> int:
     if t.tzinfo is None:
         t = t.replace(tzinfo=timezone.utc)
     elapsed_h = max(0.0, (now - t).total_seconds() / 3600)
-    regen = elapsed_h * balance.BASE_HP / balance.HP_REGEN_FULL_HOURS
+    regen = elapsed_h * balance.BASE_HP / _regen_hours(player)
     return int(min(balance.BASE_HP, cur + regen))
 
 
@@ -220,7 +236,7 @@ def regen_full_minutes(player, now: datetime | None = None) -> int:
     chp = current_hp(player, now)
     if chp >= balance.BASE_HP:
         return 0
-    rate_per_min = (balance.BASE_HP / balance.HP_REGEN_FULL_HOURS) / 60
+    rate_per_min = (balance.BASE_HP / _regen_hours(player)) / 60
     return int((balance.BASE_HP - chp) / rate_per_min) + 1
 
 
@@ -229,7 +245,7 @@ def _mark_recovery(player, now: datetime) -> None:
     иначе сбросить. Колонка hunt_ready_at используется только для уведомления."""
     need = _min_hp()
     if player.hp < need:
-        rate = balance.BASE_HP / balance.HP_REGEN_FULL_HOURS
+        rate = balance.BASE_HP / _regen_hours(player)
         player.hunt_ready_at = now + timedelta(hours=(need - player.hp) / rate)
     else:
         player.hunt_ready_at = None
@@ -241,7 +257,7 @@ def hunt_ready(player, now: datetime | None = None) -> tuple[bool, int]:
     need = _min_hp()
     if chp >= need:
         return True, 0
-    rate_per_min = (balance.BASE_HP / balance.HP_REGEN_FULL_HOURS) / 60
+    rate_per_min = (balance.BASE_HP / _regen_hours(player)) / 60
     return False, int((need - chp) / rate_per_min) + 1
 
 
@@ -285,11 +301,12 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
     if not ready:
         return HuntResult(ok=False, reason="lowhp", minutes_left=mins)
 
-    stats = items.combat_stats(getattr(player, "equipment", None))
+    stats = player_stats(player)  # снаряга + бафы (удача, толстая шкура)
     fight = resolve(stats, enemy, chp, rng)
     player.hp_at = now
     if fight.win:
         loot = roll_loot(enemy, stats.get("luck", 0), rng)
+        loot["gold"] = int(loot["gold"] * buff.hunt_gold_mult(player))  # «Звериный нюх»
         player.gold += loot["gold"]
         for r, q in loot["res"].items():
             inventory.add(player, r, q)

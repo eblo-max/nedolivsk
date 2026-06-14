@@ -12,7 +12,7 @@ import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from bot.game import balance, inventory
+from bot.game import balance, buff, inventory
 
 
 def _scaled_inputs(base: dict, level: int) -> dict:
@@ -115,6 +115,12 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _ready_at(player, *, hours: float = 0, minutes: float = 0) -> str:
+    """Время готовности партии с учётом бафа «Спорая варка» (−20% времени)."""
+    m = buff.prod_speed_mult(player)
+    return (_now() + timedelta(hours=hours * m, minutes=minutes * m)).isoformat()
+
+
 def mill_inputs(level: int) -> dict:
     return {"grain": MILL_GRAIN * level}
 
@@ -155,7 +161,7 @@ def start_mill(player, tavern) -> tuple[bool, str, dict | None]:
     _set_batch(tavern, "mill", {
         "out_res": "malt",
         "out_qty": mill_output(level),
-        "ready_at": (_now() + timedelta(minutes=MILL_MINUTES)).isoformat(),
+        "ready_at": _ready_at(player, minutes=MILL_MINUTES),
     })
     return True, "", cin
 
@@ -185,7 +191,7 @@ def start_brew(player, tavern, tier: int) -> tuple[bool, str, dict | None]:
     _set_batch(tavern, "brewery", {
         "tier": tier,
         "out_qty": brew_output(tier, level),
-        "ready_at": (_now() + timedelta(hours=brew_hours(tier))).isoformat(),
+        "ready_at": _ready_at(player, hours=brew_hours(tier)),
     })
     return True, "", cin
 
@@ -224,7 +230,7 @@ def start_age(player, tavern) -> bool:
     if tier >= 3:
         return False
     batch["stage"] = "aging"
-    batch["ready_at"] = (_now() + timedelta(hours=brew_hours(tier))).isoformat()
+    batch["ready_at"] = _ready_at(player, hours=brew_hours(tier))
     batch.pop("notified", None)
     _set_batch(tavern, "brewery", batch)
     return True
@@ -273,7 +279,7 @@ def start_meadery(player, tavern, recipe: str) -> tuple[bool, str, dict | None]:
     _set_batch(tavern, "meadery", {
         "recipe": recipe,
         "out_qty": meadery_output(recipe, level),
-        "ready_at": (_now() + timedelta(hours=meadery_hours(recipe))).isoformat(),
+        "ready_at": _ready_at(player, hours=meadery_hours(recipe)),
     })
     return True, "", cin
 
@@ -317,7 +323,7 @@ def start_kitchen(player, tavern, recipe: str) -> tuple[bool, str, dict | None]:
     _set_batch(tavern, "kitchen", {
         "recipe": recipe,
         "out_qty": kitchen_output(recipe, level),
-        "ready_at": (_now() + timedelta(hours=kitchen_hours(recipe))).isoformat(),
+        "ready_at": _ready_at(player, hours=kitchen_hours(recipe)),
     })
     return True, "", cin
 
@@ -360,7 +366,7 @@ def start_winery(player, tavern, recipe: str) -> tuple[bool, str, dict | None]:
     _set_batch(tavern, "winery", {
         "recipe": recipe,
         "out_qty": winery_output(recipe, level),
-        "ready_at": (_now() + timedelta(hours=winery_hours(recipe))).isoformat(),
+        "ready_at": _ready_at(player, hours=winery_hours(recipe)),
     })
     return True, "", cin
 
