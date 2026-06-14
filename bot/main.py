@@ -21,6 +21,7 @@ from bot.handlers import (
     commands,
     group,
     hub,
+    hunt,
     loot,
     rating,
     start,
@@ -39,6 +40,7 @@ async def _setup_commands(bot: Bot) -> None:
     sections = [
         BotCommand(command="market", description="🏪 Базар — цены в реальном времени"),
         BotCommand(command="auction", description="🔨 Аукцион — выставить лот"),
+        BotCommand(command="hunt", description="🏹 Охота на зверя"),
         BotCommand(command="top", description="🏆 Рейтинг таверн"),
         BotCommand(command="city", description="🏛 Расклад фракций"),
         BotCommand(command="citizens", description="👥 Горожане и репутация"),
@@ -81,7 +83,7 @@ async def main() -> None:
         admin.router, worldmap_cmd.router, rating.router, character.router,
         buildings.router, start.router, tavern.router, story.router,
         trade.router, auction.router, commands.router, loot.router,
-        hub.router, group.router
+        hunt.router, hub.router, group.router
     )
 
     notifier_task = asyncio.create_task(notifier_loop(bot))

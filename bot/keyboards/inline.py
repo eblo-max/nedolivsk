@@ -198,7 +198,27 @@ def character_kb(craft_ready: bool = False) -> InlineKeyboardMarkup:
     if craft_ready:
         kb.button(text="🎁 Забрать у мастера", callback_data="craft_claim")
     kb.button(text="⚒ Кузница", callback_data="forge")
+    kb.button(text="🏹 Охота", callback_data="hunt")
     kb.button(text="👥 Горожане", callback_data="citizens")
+    kb.button(text="🏠 К таверне", callback_data="tavern_new")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def hunt_menu_kb(player) -> InlineKeyboardMarkup:
+    from bot.game import combat
+    kb = InlineKeyboardBuilder()
+    for e in combat.ENEMIES:
+        kb.button(text=f"{e.emoji} {e.name}", callback_data=f"hunt:{e.id}")
+    kb.button(text="🧍 К персонажу", callback_data="character")
+    kb.adjust(2, 2, 2, 1)
+    return kb.as_markup()
+
+
+def hunt_after_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏹 Ещё охота", callback_data="hunt")
+    kb.button(text="🧍 Персонаж", callback_data="character")
     kb.button(text="🏠 К таверне", callback_data="tavern_new")
     kb.adjust(1)
     return kb.as_markup()

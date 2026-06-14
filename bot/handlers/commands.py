@@ -92,3 +92,12 @@ async def cmd_citizens(message: Message, session: AsyncSession) -> None:
         await _send(message, "Сначала заведи кабак: /start")
         return
     await _send(message, texts.citizens_screen(player), kb.citizens_kb())
+
+
+@router.message(Command("hunt", "ohota"))
+async def cmd_hunt(message: Message, session: AsyncSession) -> None:
+    player = await repo.get_player(session, message.from_user.id)
+    if player is None or not player.tavern:
+        await _send(message, "Сначала заведи кабак: /start")
+        return
+    await _send(message, texts.hunt_menu(player), kb.hunt_menu_kb(player))

@@ -1524,6 +1524,67 @@ def market_pulse_chron(cit) -> str:
     return f"{cit.name} {verb}."
 
 
+def hunt_menu(player) -> str:
+    from bot.game import combat, items
+
+    st = items.combat_stats(getattr(player, "equipment", None))
+    dmg = balance.BASE_DAMAGE + st["damage"]
+    crit = min(balance.HUNT_CRIT_CAP, st["crit"] + st["luck"] // 2)
+    parts = [
+        "🏹 <b>ОХОТА</b>",
+        "",
+        *_branch("ТВОЙ БОЕЦ", [
+            f"⚔ Урон — {dmg}",
+            f"💥 Крит — {crit}%",
+            f"🛡 Броня — {st['armor']}",
+            f"❤ Здоровье — {balance.BASE_HP}",
+        ]),
+    ]
+    ready, mins = combat.hunt_ready(player)
+    if not ready:
+        parts += ["", f"🤕 Не оклемался — в строй через {_fmt_minutes(mins)}"]
+    prey = []
+    for e in combat.ENEMIES:
+        arm = f" 🛡{e.armor}" if e.armor else ""
+        prey.append(f"{e.emoji} {e.name} — ❤{e.hp} ⚔{e.attack}{arm}")
+    parts += ["", *_branch("ДОБЫЧА В ЛЕСУ", prey)]
+    parts += ["", "<i>Сильнее зверь — жирнее добыча и злее раны. "
+                  "Без снаряги — только заяц.</i>"]
+    return "\n".join(parts)
+
+
+def hunt_result(res) -> str:
+    e, f = res.enemy, res.fight
+    if f.win:
+        loot = res.loot
+        body = f"🗡 Уложил за {f.rounds} р."
+        if f.crits:
+            body += f", {f.crits} критов"
+        body += f" · осталось ❤{f.hp_left}/{balance.BASE_HP}"
+        detail = [f"🪙 Золото — +{loot['gold']}"]
+        for r, q in loot["res"].items():
+            detail.append(f"{RESOURCE_EMOJI.get(r, '📦')} {RESOURCE_NAMES.get(r, r)} — +{q}")
+        if loot["rep"]:
+            detail.append(f"⭐ Репутация — +{loot['rep']}")
+        if loot["rare"]:
+            detail.append(f"🏆 {loot['rare']}")
+        return "\n".join([
+            f"🏹 <b>{e.emoji} {e.name.upper()} ПОВЕРЖЕН!</b>",
+            "", body, "", *_branch("ДОБЫЧА", detail),
+        ])
+    if f.overwhelmed:
+        line = f"{e.name} оказался не по зубам — еле уволок ноги."
+    else:
+        line = f"{e.name} подмял тебя на {f.rounds}-м раунде."
+    tail = [f"🩸 Ранен — на охоту через {balance.HUNT_WOUND_HOURS} ч"]
+    if res.gold_lost:
+        tail.append(f"🪙 Обронил в суматохе — −{res.gold_lost}")
+    return "\n".join([
+        f"🩸 <b>{e.emoji} {e.name.upper()} ОДОЛЕЛ ТЕБЯ</b>",
+        "", f"«{line}»", "", *tail,
+    ])
+
+
 def loot_drop(flavor: str) -> str:
     return f"👀 <b>{flavor}</b>\n\nКто первый нажмёт — тот и подберёт!"
 
