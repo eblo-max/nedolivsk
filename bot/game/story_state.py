@@ -69,6 +69,19 @@ def adjust_faction(player: Player, fac_id: str, delta: int) -> None:
 
 
 # ── Текущее событие на решении ─────────────────────────────────────────
+def get_trade(player: Player) -> dict | None:
+    return (player.story or {}).get("trade")
+
+
+def set_trade(player: Player, offer: dict | None) -> None:
+    st = _st(player)
+    if offer is None:
+        st.pop("trade", None)
+    else:
+        st["trade"] = offer
+    _save(player, st)
+
+
 def get_pending(player: Player) -> dict | None:
     return (player.story or {}).get("pending")
 

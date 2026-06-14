@@ -1,5 +1,6 @@
 """Экран таверны и действия игрока."""
 
+import random
 from datetime import datetime, timezone
 
 from aiogram import F, Router
@@ -10,10 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import balance, logic, perks, season, story_engine
+from bot.game import balance, logic, perks, season, story_engine, story_state
 from bot.game import city as citymod
+from bot.game import trade as trademod
 from bot.game import world as wld
 from bot.handlers import common, story
+from bot.handlers import trade as trade_h
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -167,9 +170,23 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     await _safe_edit(callback, texts.income_success(result), kb.back_kb())
     await callback.answer(f"+{result.gold - result.skim} 🪙")
 
-    # Живой город: иногда на сбор дохода заглядывает «гость» с событием.
-    if story_engine.maybe_spawn(player, city, now) is not None:
-        await story.deliver_pending(callback.message, player, callback.from_user.id)
+    owner = callback.from_user.id
+    busy = story_state.get_pending(player) or story_state.get_trade(player)
+
+    # Торг: на сбор дохода заглядывает купец (чаще и богаче на ярмарке).
+    if not busy and trademod.has_sellable(player.tavern):
+        chance = (balance.TRADE_FAIR_CHANCE if wld.is_fair()
+                  else balance.TRADE_CHANCE)
+        if random.random() < chance:
+            offer = trademod.make_offer(player.tavern, player, wld.is_fair())
+            if offer is not None:
+                story_state.set_trade(player, offer)
+                await trade_h.deliver_trade(callback.message, player, owner)
+                busy = True
+
+    # Живой город: иначе иногда заглядывает «гость» с событием.
+    if not busy and story_engine.maybe_spawn(player, city, now) is not None:
+        await story.deliver_pending(callback.message, player, owner)
 
 
 @router.callback_query(F.data == "upgrade")

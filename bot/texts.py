@@ -1234,6 +1234,57 @@ def income_success(r) -> str:
     return "\n".join(parts)
 
 
+def _good_name(key: str) -> str:
+    from bot.game import production as prod
+    g = prod.GOODS.get(key)
+    return g.name if g else key
+
+
+def trade_offer(offer: dict) -> str:
+    return "\n".join([
+        f"{offer['emoji']} <b>{offer['name'].upper()}</b>",
+        f"«{offer['desc']}»",
+        "",
+        *_branch("ХОЧЕТ КУПИТЬ", [
+            f"🛢 {_good_name(offer['good'])} — до {offer['qty']} шт",
+            f"💰 Рыночная цена ~{int(offer['fv'])} 🪙/шт",
+        ]),
+        "",
+        "За сколько отдашь штуку, кабатчик?",
+    ])
+
+
+def trade_sold(offer: dict, qty: int, unit: int, gold: int) -> str:
+    return "\n".join([
+        "🤝 <b>ПО РУКАМ!</b>",
+        "",
+        *_branch("СДЕЛКА", [
+            f"🛢 Продано — {qty} × {_good_name(offer['good'])}",
+            f"💰 Цена — {unit} 🪙/шт",
+            f"🪙 Выручка — +{gold}",
+        ]),
+    ])
+
+
+def trade_counter(offer: dict, counter: int) -> str:
+    return "\n".join([
+        f"{offer['emoji']} <b>{offer['name'].upper()}</b>",
+        "",
+        f"«Дороговато! Больше {counter} 🪙 за штуку не дам. Идёт?»",
+    ])
+
+
+def trade_walked(offer: dict) -> str:
+    return (
+        f"{offer['emoji']} {offer['name']} сплюнул, буркнул «грабёж» — "
+        "и уковылял восвояси. Товар при тебе."
+    )
+
+
+def trade_cancelled() -> str:
+    return "Передумал продавать — купец пожал плечами и потопал дальше."
+
+
 def income_empty() -> str:
     return "💤 Касса пуста, как башка завсегдатая. Заглядывай позже."
 

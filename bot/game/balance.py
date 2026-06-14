@@ -122,6 +122,17 @@ MOOD_DEMAND_DIV = 1000         # настроение -> спрос: 1 + mood/di
 SEASON_LENGTH_DAYS = 7
 HOLIDAY_DEMAND = 1.5           # множитель спроса в праздник
 
+# Торг с купцами (гибрид A+D)
+TRADE_CHANCE = 0.25           # шанс прихода купца при сборе дохода
+TRADE_FAIR_CHANCE = 0.55     # шанс на ярмарке (купцы съезжаются)
+TRADE_FAIR_FV_MULT = 1.2     # ярмарка поднимает справедливую цену
+TRADE_MAX_OVER = 1.8         # потолок цены покупателя (×fv) — анти-гужёвка
+TRADE_MIN_UNDER = 0.6        # пол цены покупателя (×fv)
+TRADE_PRICE_TIERS = (0.85, 1.05, 1.4)  # дёшево / по рынку / дорого (× fv)
+TRADE_COUNTER_MARGIN = 1.25  # просишь не более +25% к потолку -> купец контрит
+TRADE_QTY_MIN = 3
+TRADE_QTY_MAX = 10
+
 # Перки за стояние у фракций (≥ порога — «в доску свои»)
 PERK_THRESHOLD = 50
 PERK_MERCHANT_DEMAND = 1.15    # купцы: множитель сбыта

@@ -72,6 +72,9 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     sizes: list[int] = []
 
+    if story_state.get_trade(player):  # купец ждёт ответа по цене
+        kb.button(text="🤝 Купец торгуется!", callback_data="trade_open")
+        sizes.append(1)
     if story_state.get_pending(player):  # незакрытое событие — даём вернуться к нему
         kb.button(text="🔔 Тебя ждёт гость!", callback_data="event_open")
         sizes.append(1)
@@ -131,6 +134,25 @@ def claim_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="🎒 Забрать добычу", callback_data="exp_claim")
     kb.button(text="🏠 К таверне", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def trade_kb(offer: dict) -> InlineKeyboardMarkup:
+    p = offer["prices"]
+    kb = InlineKeyboardBuilder()
+    kb.button(text=f"🪙 Дёшево · {p[0]}/шт", callback_data="trd:0")
+    kb.button(text=f"💰 По рынку · {p[1]}/шт", callback_data="trd:1")
+    kb.button(text=f"🤑 Дорого · {p[2]}/шт", callback_data="trd:2")
+    kb.button(text="🚪 Не продавать", callback_data="trd:no")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def trade_counter_kb(counter: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text=f"🤝 Идёт · {counter}/шт", callback_data="trd:ok")
+    kb.button(text="🚪 Послать", callback_data="trd:no")
     kb.adjust(1)
     return kb.as_markup()
 
