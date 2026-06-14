@@ -59,7 +59,8 @@ async def cmd_help(message: Message) -> None:
 @router.callback_query(F.data == "create_tavern")
 async def cb_create_tavern(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(CreateTavern.name)
-    await callback.message.edit_text(texts.ASK_TAVERN_NAME)
+    # welcome теперь фото-баннер — текст не отредактируешь, шлём вопрос отдельно.
+    await callback.message.answer(texts.ASK_TAVERN_NAME)
     await callback.answer()
 
 
