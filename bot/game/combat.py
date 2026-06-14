@@ -245,6 +245,34 @@ def hunt_ready(player, now: datetime | None = None) -> tuple[bool, int]:
     return False, int((need - chp) / rate_per_min) + 1
 
 
+def can_heal(player, now: datetime | None = None) -> bool:
+    """Есть ли чем подлечиться (товар в погребе) и не полон ли уже."""
+    if current_hp(player, now) >= balance.BASE_HP:
+        return False
+    prods = (player.tavern.products if player.tavern else None) or {}
+    return any(prods.get(k, 0) > 0 for k in balance.HEAL_VALUES)
+
+
+def heal(player, key: str, now: datetime | None = None) -> dict | None:
+    """Съесть/выпить 1 порцию из погреба → восстановить HP. None — нельзя."""
+    if key not in balance.HEAL_VALUES or player.tavern is None:
+        return None
+    now = now or _now()
+    prods = dict(player.tavern.products or {})
+    if prods.get(key, 0) <= 0:
+        return None
+    chp = current_hp(player, now)
+    if chp >= balance.BASE_HP:
+        return None
+    prods[key] -= 1
+    player.tavern.products = prods
+    new = min(balance.BASE_HP, chp + balance.HEAL_VALUES[key])
+    player.hp = new
+    player.hp_at = now
+    _mark_recovery(player, now)
+    return {"key": key, "healed": new - chp, "hp": new}
+
+
 def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
     """Сходить на охоту: гейт по HP, бой от текущего HP, добыча/утомление/раны."""
     rng = rng or random

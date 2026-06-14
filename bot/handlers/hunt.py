@@ -94,6 +94,28 @@ async def cb_hunt_beast(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "healmenu")
+async def cb_heal_menu(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _player(callback, session)
+    if player is None:
+        return
+    await _render(callback, texts.heal_menu(player), kb.heal_kb(player))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("heal:"))
+async def cb_heal_do(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _player(callback, session, lock=True)
+    if player is None:
+        return
+    res = combat.heal(player, callback.data.split(":", 1)[1])
+    if res is None:
+        await callback.answer("Нечем подлечиться или уже сыт.", show_alert=True)
+        return
+    await _render(callback, texts.heal_menu(player), kb.heal_kb(player))
+    await callback.answer(f"+{res['healed']} ❤")
+
+
 async def _set_caption(msg, text: str, markup) -> None:
     """Правит подпись/текст текущей панели (видео/фото/текст) — для анимации."""
     try:

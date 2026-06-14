@@ -1601,6 +1601,26 @@ def hunt_menu(player) -> str:
     return "\n".join(parts)
 
 
+def heal_menu(player) -> str:
+    from bot.game import combat
+    from bot.game import production as prod
+    chp, mx = combat.current_hp(player), combat.max_hp()
+    prods = (player.tavern.products if player.tavern else None) or {}
+    parts = ["🍖 <b>ПОДЛЕЧИТЬСЯ</b>", "", _hp_line(player), ""]
+    avail = [k for k in balance.HEAL_VALUES if prods.get(k, 0) > 0]
+    if chp >= mx:
+        parts.append("«Сыт и здоров — лечиться незачем.»")
+    elif not avail:
+        parts.append("«В погребе пусто — нечем подлечиться. Свари жаркое на кухне "
+                     "или налей дешёвого эля.»")
+    else:
+        parts += _branch("ЧЕМ ПОДЛЕЧИТЬСЯ", [
+            f"{prod.GOODS[k].emoji} {prod.GOODS[k].name} +{balance.HEAL_VALUES[k]} ❤ "
+            f"(в погребе {prods.get(k, 0)})" for k in avail])
+        parts += ["", "<i>Жаркое сытнее эля. Что съешь — в погреб не вернётся.</i>"]
+    return "\n".join(parts)
+
+
 def hunt_detail(player, enemy) -> str:
     st, _dmg, _crit, combat = _hunter_stats(player)
     chp = combat.current_hp(player)
