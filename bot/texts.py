@@ -411,7 +411,7 @@ def _build_line(player: Player) -> str:
     if state == "active":
         b = bld.CATALOG.get(player.build_item)
         name = b.name if b else "пристройка"
-        return f"🏗 Строится {name} — ещё {_fmt_minutes(minutes)}."
+        return f"🏗 Строится {name} — ещё {_fmt_minutes(minutes)}"
     if state == "ready":
         b = bld.CATALOG.get(player.build_item)
         return f"🏗 {b.name if b else 'Пристройка'} достроена — загляни в Пристройки!"
@@ -959,9 +959,9 @@ def _cellar_line(tavern: Tavern) -> str:
     return " · ".join(parts) if parts else "пусто"
 
 
-def _quote(header: str, lines: list[str]) -> str:
-    """Секция отступом-цитатой (с полоской слева)."""
-    return "<blockquote><b>" + header + "</b>\n" + "\n".join(lines) + "</blockquote>"
+def _quote(lines: list[str]) -> str:
+    """Секция отступом-цитатой (с полоской слева), без заголовка."""
+    return "<blockquote>" + "\n".join(lines) + "</blockquote>"
 
 
 def tavern_screen(player: Player, tavern: Tavern) -> str:
@@ -1012,14 +1012,14 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
         _upgrade_progress(player, tavern),
     ]
     blocks = [
-        _quote("⚒️ ДЕЛА", deeds),
-        _quote("📦 ДОБРО", [
+        _quote(deeds),
+        _quote([
             f"📦 Склад — {_storage_line(player)}",
             f"🛢 Погреб — {_cellar_line(tavern)}",
         ]),
-        _quote("🌍 МИР", _world_lines(chat_id, seasonmod, citymod)),
+        _quote(_world_lines(chat_id, seasonmod, citymod)),
     ]
-    return "\n".join(head) + "\n\n" + "\n".join(blocks)
+    return "\n".join(head) + "\n\n" + "\n\n".join(blocks)
 
 
 def _upgrade_need_block(player: Player, tavern: Tavern) -> list[str]:
