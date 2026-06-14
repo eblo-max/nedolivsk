@@ -33,6 +33,7 @@ SECTIONS = {
     "гг репутация": "citizens", "гг горожане": "citizens",
     "гг город": "city", "гг площадь": "city",
     "гг рынок": "market", "гг базар": "market", "гг цены": "market",
+    "гг бонус": "bonus", "гг опохмел": "bonus",
 }
 
 
@@ -97,6 +98,8 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
         await common.open_warehouse(message, player, owner)
     elif section == "forge":
         await common.open_forge(message, player, owner)
+    elif section == "bonus":
+        await common.open_bonus(message, player, owner)
     else:  # tavern
         await common.open_tavern(message, player, owner)
 

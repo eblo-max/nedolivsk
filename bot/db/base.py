@@ -105,6 +105,22 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS hp_at TIMESTAMPTZ"
         ))
+        # Ежедневный бонус («опохмел»)
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS bonus_kind VARCHAR(16)"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS bonus_offered_at TIMESTAMPTZ"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS buff_kind VARCHAR(16)"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS buff_until TIMESTAMPTZ"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS bonus_next_at TIMESTAMPTZ"
+        ))
         # Переход на единый инвентарь (Ярус 0). Колонка nullable: разовый
         # перелив только для ещё не мигрированных строк (inventory IS NULL),
         # чтобы опустошённый инвентарь не «возрождался» из старых колонок.

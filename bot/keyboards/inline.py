@@ -67,11 +67,14 @@ def regions_kb() -> InlineKeyboardMarkup:
 
 
 def tavern_kb(player: Player) -> InlineKeyboardMarkup:
-    from bot.game import story_state
+    from bot.game import buff, story_state
 
     kb = InlineKeyboardBuilder()
     sizes: list[int] = []
 
+    if buff.offer(player) is not None and buff.active(player) is None:
+        kb.button(text="🎁 Бонус дня!", callback_data="bonus", style="success")
+        sizes.append(1)
     if story_state.get_retail(player):  # гости ждут решения по сбыту
         kb.button(text="🍺 Гости ждут заказ!", callback_data="retail_open", style="primary")
         sizes.append(1)
@@ -182,6 +185,19 @@ def loot_kb(drop_id: int) -> InlineKeyboardMarkup:
 def back_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="↩️ К таверне", callback_data="tavern")
+    return kb.as_markup()
+
+
+def bonus_kb(player) -> InlineKeyboardMarkup:
+    """Экран ежедневного бонуса: активировать (если есть и не занят) + назад."""
+    from bot.game import buff
+
+    kb = InlineKeyboardBuilder()
+    if buff.active(player) is None and buff.offer(player) is not None:
+        kb.button(text=f"✨ Активировать ({buff.BUFF_HOURS} ч)",
+                  callback_data="bonus_go", style="success")
+    kb.button(text="↩️ К таверне", callback_data="tavern")
+    kb.adjust(1)
     return kb.as_markup()
 
 

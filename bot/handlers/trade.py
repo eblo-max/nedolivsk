@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import images, panels, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import balance, market, story_state, trade
+from bot.game import balance, buff, market, story_state, trade
 from bot.handlers import common
 from bot.keyboards import inline as kb
 
@@ -53,7 +53,7 @@ def _sell(player: Player, offer: dict, unit: int) -> tuple[int, int]:
     qty = min(trade._qty_affordable(offer, unit), stock)
     if qty <= 0:
         return 0, 0
-    gold = qty * unit
+    gold = int(qty * unit * buff.sale_mult(player))  # баф «Барыжья хватка»
     prods = dict(tavern.products or {})
     prods[offer["good"]] = stock - qty
     tavern.products = prods

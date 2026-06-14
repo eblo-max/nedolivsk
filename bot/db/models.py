@@ -62,6 +62,15 @@ class Player(Base):
     build_item: Mapped[str | None] = mapped_column(String(32))
     build_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Ежедневный бонус («опохмел»): claimable-предложение (bonus_kind) висит 24ч
+    # и сгорает; активный баф (buff_kind) действует 4ч; bonus_next_at — когда
+    # разрешено выдать следующее предложение (раз в сутки).
+    bonus_kind: Mapped[str | None] = mapped_column(String(16))
+    bonus_offered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    buff_kind: Mapped[str | None] = mapped_column(String(16))
+    buff_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    bonus_next_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     # Живой город: память игрока — флаги-факты, отношения с NPC, репутация
     # фракций, текущее событие на решении (pending) и очередь отложенных (queue).
     story: Mapped[dict] = mapped_column(JSONB, default=dict)

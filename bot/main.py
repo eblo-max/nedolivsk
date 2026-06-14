@@ -16,6 +16,7 @@ from bot.db.base import create_tables, engine
 from bot.handlers import (
     admin,
     auction,
+    bonus,
     buildings,
     character,
     commands,
@@ -38,6 +39,7 @@ async def _setup_commands(bot: Bot) -> None:
     """Меню команд (всплывает на «/»): публичные — всем, /tavern — в группах,
     админские — только в личке админа."""
     sections = [
+        BotCommand(command="bonus", description="🎁 Ежедневный бонус"),
         BotCommand(command="market", description="🏪 Базар — цены в реальном времени"),
         BotCommand(command="auction", description="🔨 Аукцион — выставить лот"),
         BotCommand(command="hunt", description="🏹 Охота на зверя"),
@@ -110,7 +112,7 @@ async def main() -> None:
         admin.router, worldmap_cmd.router, rating.router, character.router,
         buildings.router, start.router, tavern.router, story.router,
         trade.router, auction.router, commands.router, loot.router,
-        hunt.router, hub.router, group.router
+        hunt.router, bonus.router, hub.router, group.router
     )
 
     notifier_task = asyncio.create_task(notifier_loop(bot))

@@ -15,7 +15,7 @@ from aiogram.types import (
 
 from bot import autoclean, images, panels, texts
 from bot.db.models import Player
-from bot.game import balance
+from bot.game import balance, buff
 from bot.game import character as char
 from bot.game import logic, storehouse
 from bot.keyboards import inline as kb
@@ -90,6 +90,7 @@ async def send_tavern_screen(
     message: Message, player: Player, owner_id: int | None = None
 ) -> Message:
     """Экран таверны: фото уровня + подпись, либо просто текст, если фото нет."""
+    buff.refresh(player)  # прокрутить ежедневный бонус (выдать/сжечь/снять баф)
     caption = texts.tavern_screen(player, player.tavern)
     markup = kb.tavern_kb(player)
     img = images.tavern_image(player.tavern.level)
@@ -179,6 +180,7 @@ async def show_tavern_panel(
     message: Message, player: Player, owner_id: int | None = None
 ) -> Message:
     """Экран таверны в текущем окне (переход с куклы обратно к таверне)."""
+    buff.refresh(player)  # прокрутить ежедневный бонус (выдать/сжечь/снять баф)
     caption = texts.tavern_screen(player, player.tavern)
     markup = kb.tavern_kb(player)
     img = images.tavern_image(player.tavern.level)
@@ -277,3 +279,12 @@ async def open_forge(message: Message, player: Player, owner_id: int) -> Message
     return await _send_character_panel(
         message, player, texts.forge_screen(player), kb.forge_kb(player), owner_id
     )
+
+
+async def open_bonus(message: Message, player: Player, owner_id: int) -> Message:
+    """Открыть экран ежедневного бонуса отдельной панелью."""
+    buff.refresh(player)
+    msg = await message.answer(
+        texts.bonus_screen(player), reply_markup=kb.bonus_kb(player))
+    _register_panel(msg, owner_id)
+    return msg

@@ -72,7 +72,8 @@ COMMANDS_SCREEN = (
     "🍺 <b>Кабак и дела</b>\n"
     "• <code>гг</code> / <code>гг таверна</code> — твой кабак\n"
     "• <code>гг склад</code> — запасы · <code>гг перс</code> — персонаж · "
-    "<code>гг кузница</code> — снаряга · <code>гг охота</code> — зверьё\n\n"
+    "<code>гг кузница</code> — снаряга · <code>гг охота</code> — зверьё\n"
+    "• <code>гг бонус</code> — ежедневный опохмел (баф на 4 ч)\n\n"
     "💰 <b>Торговля</b>\n"
     "• <code>гг рынок</code> — живые цены · <code>гг аукцион</code> — выставить лот\n\n"
     "🏰 <b>Живой город</b>\n"
@@ -81,8 +82,8 @@ COMMANDS_SCREEN = (
     "🗺 <b>Мир</b>\n"
     "• <code>гг карта</code> — карта · <code>гг топ</code> — рейтинг\n"
     "• <code>гг правила</code> — как играть · <code>гг помощь</code> — этот хаб\n\n"
-    "В личке всё на кнопках; слэш-меню: <code>/start /market /auction /hunt "
-    "/top /map /help</code>.\n"
+    "В личке всё на кнопках; слэш-меню: <code>/start /bonus /market /auction "
+    "/hunt /top /map /help</code>.\n"
     "<i>Чужую панель не лапай — жмёт только хозяин.</i>"
 )
 
@@ -1079,6 +1080,7 @@ def _branch(label: str, lines: list[str]) -> list[str]:
 
 
 def tavern_screen(player: Player, tavern: Tavern) -> str:
+    from bot.game import buff as buffmod
     from bot.game import city as citymod
     from bot.game import items as it
     from bot.game import season as seasonmod
@@ -1089,6 +1091,12 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
 
     # СЕЙЧАС — активные дела
     now_lines = []
+    act = buffmod.active(player)
+    if act is not None:  # действует баф «опохмела»
+        now_lines.append(
+            f"{act.emoji} Баф «{act.name}» — ещё {_fmt_minutes(buffmod.minutes_left(player))}")
+    elif buffmod.offer(player) is not None:  # бонус дня ждёт активации
+        now_lines.append("🎁 Бонус дня готов — забери и активируй!")
     c = logic.expedition_counts(player, tavern)
     if c.ready and c.out:
         now_lines.append(f"⛏ Бригады: {c.ready} готовы, {c.out} в пути")
@@ -1279,7 +1287,7 @@ def expedition_returned(resources: list) -> str:
     )
 
 
-def income_success(r) -> str:
+def income_success(r, player=None) -> str:
     from bot.game import logic
     from bot.game import production as prod
 
@@ -1291,7 +1299,8 @@ def income_success(r) -> str:
         *_branch("ПАССИВ", [f"🪙 {r.passive} за простой кабака"]),
     ]
     if r.order:
-        total = logic.retail_total(r.order)
+        base = logic.retail_total(r.order)
+        total = logic.retail_total(r.order, player)
         items = [
             f"{prod.GOODS[k].emoji} {prod.GOODS[k].name} — {n} × {prod.GOODS[k].price}"
             f" = {n * prod.GOODS[k].price} 🪙"
@@ -1300,9 +1309,10 @@ def income_success(r) -> str:
         parts += [
             "",
             *_branch("ГОСТИ ХОТЯТ ВЫКУПИТЬ", items),
-            "",
-            f"Налить гостям на <b>{total} 🪙</b>?",
         ]
+        if total != base:  # активен баф «Бойкая касса»
+            parts.append(f"🍺 <i>Баф «Бойкая касса»: {base} → {total} 🪙</i>")
+        parts += ["", f"Налить гостям на <b>{total} 🪙</b>?"]
     else:
         parts += ["", "<i>Гостей на твой товар нет — только пассив.</i>"]
 
@@ -1367,22 +1377,26 @@ def retail_held() -> str:
             "Полежит в погребе (только гляди, чтоб не скисло).")
 
 
-def retail_prompt(want: dict) -> str:
+def retail_prompt(want: dict, player=None) -> str:
     from bot.game import logic
     from bot.game import production as prod
-    total = logic.retail_total(want)
+    base = logic.retail_total(want)
+    total = logic.retail_total(want, player)
     items = [
         f"{prod.GOODS[k].emoji} {prod.GOODS[k].name} — {n} × {prod.GOODS[k].price}"
         f" = {n * prod.GOODS[k].price} 🪙"
         for k, n in sorted(want.items(), key=lambda kv: -prod.GOODS[kv[0]].price)
     ]
-    return "\n".join([
+    parts = [
         "🍺 <b>ГОСТИ ЖДУТ ЗАКАЗ</b>",
         "",
         *_branch("ХОТЯТ ВЫКУПИТЬ", items),
         "",
-        f"Налить гостям на <b>{total} 🪙</b>?",
-    ])
+    ]
+    if total != base:  # активен баф «Бойкая касса»
+        parts.append(f"🍺 <i>Баф «Бойкая касса»: {base} → {total} 🪙</i>")
+    parts.append(f"Налить гостям на <b>{total} 🪙</b>?")
+    return "\n".join(parts)
 
 
 def _good_name(key: str) -> str:
@@ -1736,6 +1750,62 @@ def loot_claimed(name: str, out: dict, stored: bool = True) -> str:
 
 def income_empty() -> str:
     return "💤 Касса пуста, как башка завсегдатая. Заглядывай позже."
+
+
+def bonus_screen(player: Player) -> str:
+    """Экран ежедневного бонуса: что выпало, эффект, сколько до сгорания."""
+    from bot.game import buff as buffmod
+
+    act = buffmod.active(player)
+    if act is not None:  # баф уже крутится
+        return "\n".join([
+            f"🎁 <b>ОПОХМЕЛ</b> · {act.emoji} {act.name}",
+            "",
+            f"«{act.desc}»",
+            "",
+            *_branch("ДЕЙСТВУЕТ", [
+                f"⏳ Ещё {_fmt_minutes(buffmod.minutes_left(player))}",
+            ]),
+            "",
+            "<i>Один баф за раз. Новый бонус подвезут завтра.</i>",
+        ])
+    boon = buffmod.offer(player)
+    if boon is None:
+        return "\n".join([
+            "🎁 <b>ОПОХМЕЛ</b>",
+            "",
+            "«Сегодня халявы нет — всё уже выпито. Загляни завтра.»",
+        ])
+    return "\n".join([
+        f"🎁 <b>БОНУС ДНЯ</b> · {boon.emoji} {boon.name}",
+        "",
+        f"«{boon.desc}»",
+        "",
+        *_branch("УСЛОВИЯ", [
+            f"✨ Действует {buffmod.BUFF_HOURS} ч после активации",
+            f"🔥 Сгорит через {buffmod.offer_hours_left(player)} ч, если не забрать",
+        ]),
+        "",
+        "<i>Активируй, когда подойдёт момент — и греби больше.</i>",
+    ])
+
+
+def bonus_activated(boon, minutes: int) -> str:
+    return (
+        f"🍺 <b>Опохмелился!</b> {boon.emoji} «{boon.name}» — {boon.desc}.\n"
+        f"Гуляет {_fmt_minutes(minutes)}. Куй железо, пока горячо!"
+    )
+
+
+def bonus_busy(boon, minutes: int) -> str:
+    return (
+        f"⏳ Уже под бафом «{boon.name}» — ещё {_fmt_minutes(minutes)}. "
+        "Дождись конца, потом активируй новый."
+    )
+
+
+def bonus_none() -> str:
+    return "🎁 Бонус сгорел или ещё не подвезли. Загляни завтра."
 
 
 def upgrade_offer(tavern: Tavern, cost: dict) -> str:
