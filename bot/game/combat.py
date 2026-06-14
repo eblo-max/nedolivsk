@@ -215,6 +215,17 @@ def _min_hp() -> int:
     return max(1, int(balance.BASE_HP * balance.HUNT_MIN_HP_PCT))
 
 
+def _mark_recovery(player, now: datetime) -> None:
+    """Если ушёл ниже боевого порога — записать время восстановления (для пинга),
+    иначе сбросить. Колонка hunt_ready_at используется только для уведомления."""
+    need = _min_hp()
+    if player.hp < need:
+        rate = balance.BASE_HP / balance.HP_REGEN_FULL_HOURS
+        player.hunt_ready_at = now + timedelta(hours=(need - player.hp) / rate)
+    else:
+        player.hunt_ready_at = None
+
+
 def hunt_ready(player, now: datetime | None = None) -> tuple[bool, int]:
     """(в строю?, минут до восстановления до порога). Гейт — по HP, не по таймеру."""
     chp = current_hp(player, now)
@@ -251,11 +262,13 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
                 player.tavern.reputation = (player.tavern.reputation or 0) + loot["rep"]
         # утомление: бой стоит минимум HUNT_EXERTION, а тяжёлый — по факту урона
         player.hp = max(1, min(fight.hp_left, chp - balance.HUNT_EXERTION))
+        _mark_recovery(player, now)
         return HuntResult(ok=True, enemy=enemy, fight=fight, loot=loot,
                           hp_now=player.hp)
 
     lost = player.gold // balance.HUNT_LOSS_GOLD_DIV  # щепотка золота при поражении
     player.gold -= lost
     player.hp = balance.HP_LOSS_FLOOR
+    _mark_recovery(player, now)
     return HuntResult(ok=True, enemy=enemy, fight=fight, gold_lost=lost,
                       hp_now=player.hp)

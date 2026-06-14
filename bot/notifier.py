@@ -22,7 +22,7 @@ from bot.game import npc
 from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import (
-    buildings_notify_kb, claim_kb, craft_claim_kb, loot_kb,
+    buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb, loot_kb,
 )
 
 CHECK_INTERVAL_SECONDS = 60
@@ -145,6 +145,17 @@ async def _notify_returned(bot: Bot) -> None:
                     texts.craft_ready_notification(item, tier), craft_claim_kb(),
                 ))
             player.craft_notified = True
+
+        # Охота: пингуем, когда раненый охотник восстановил HP до боевого порога.
+        result = await session.execute(
+            select(Player).where(
+                Player.hunt_ready_at.is_not(None),
+                Player.hunt_ready_at <= now,
+            ).with_for_update(skip_locked=True)
+        )
+        for player in result.scalars().all():
+            player.hunt_ready_at = None
+            outbox.append((player, texts.hunter_recovered_notification(), hunt_cta_kb()))
 
         from bot.game import buildings as bld
 

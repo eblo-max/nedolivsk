@@ -226,6 +226,14 @@ def hunt_detail_kb(enemy_id: str) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def hunt_cta_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏹 На охоту", callback_data="hunt")
+    kb.button(text="🏠 К таверне", callback_data="tavern_new")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def hunt_after_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="🏹 Ещё охота", callback_data="hunt")
