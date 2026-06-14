@@ -40,6 +40,14 @@ async def cb_loot(callback: CallbackQuery, session: AsyncSession) -> None:
             stored = False  # выиграл ресурс, но кабака нет — некуда деть
 
     name = callback.from_user.first_name or "Кто-то"
+    if out["kind"] == "resource":
+        from bot.game import balance
+        what = f"{out['qty']}× {balance.RESOURCE_NAMES.get(out['res'], out['res'])}"
+    elif out["kind"] == "nothing":
+        what = "пшик"
+    else:
+        what = "хлам"
+    repo.add_log(session, "player", callback.from_user.id, f"🤲 поднял подкидыш: {what}")
     try:  # подкидыш — текстовое сообщение бота, правим на месте
         await callback.message.edit_text(texts.loot_claimed(name, out, stored),
                                           reply_markup=None)

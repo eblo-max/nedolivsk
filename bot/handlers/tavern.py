@@ -303,6 +303,8 @@ async def cb_upgrade_confirm(callback: CallbackQuery, session: AsyncSession) -> 
             )
             await callback.answer()
         return
+    repo.add_log(session, "player", player.id,
+                 f"🔨 улучшил таверну до ур.{result.new_level}")
 
     # Если у нового уровня другая картинка — показываем её
     new_img = images.tavern_image(result.new_level)

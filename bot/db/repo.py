@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
-    Chronicle, CityState, KnownChat, LootDrop, Player, Tavern, WorldState,
+    Chronicle, CityState, KnownChat, LogEntry, LootDrop, Player, Tavern,
+    WorldState,
 )
 from bot.game import balance
 
@@ -131,6 +132,46 @@ async def cleanup_loot(session: AsyncSession) -> None:
     """Подчистить старые подкидыши (день и старше), чтобы таблица не пухла."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=1)
     await session.execute(delete(LootDrop).where(LootDrop.created_at < cutoff))
+
+
+def add_log(session: AsyncSession, kind: str, actor_id: int, text: str) -> None:
+    """Записать событие в журнал (player|admin). Коммит — снаружи (middleware).
+    Не флашим: попадёт в общий коммит хендлера; при откате — пропадёт вместе с ним."""
+    session.add(LogEntry(kind=kind, actor_id=actor_id, text=text[:512]))
+
+
+async def recent_logs(
+    session: AsyncSession, *, kind: str | None = None, actor_id: int | None = None,
+    limit: int = 10, offset: int = 0,
+) -> list[LogEntry]:
+    """Свежие записи журнала (новые сверху), с фильтром по виду/актору."""
+    stmt = select(LogEntry)
+    if kind:
+        stmt = stmt.where(LogEntry.kind == kind)
+    if actor_id is not None:
+        stmt = stmt.where(LogEntry.actor_id == actor_id)
+    stmt = stmt.order_by(LogEntry.id.desc()).limit(limit).offset(offset)
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def count_logs(
+    session: AsyncSession, *, kind: str | None = None, actor_id: int | None = None,
+) -> int:
+    stmt = select(func.count(LogEntry.id))
+    if kind:
+        stmt = stmt.where(LogEntry.kind == kind)
+    if actor_id is not None:
+        stmt = stmt.where(LogEntry.actor_id == actor_id)
+    return await session.scalar(stmt) or 0
+
+
+async def cleanup_logs(session: AsyncSession, keep: int = 3000) -> None:
+    """Держим последние `keep` записей журнала, чтобы таблица не пухла."""
+    threshold = (await session.execute(
+        select(LogEntry.id).order_by(LogEntry.id.desc()).limit(1).offset(keep)
+    )).scalar()
+    if threshold is not None:
+        await session.execute(delete(LogEntry).where(LogEntry.id <= threshold))
 
 
 async def recent_chronicle(

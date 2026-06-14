@@ -101,6 +101,8 @@ async def tavern_region(
     if player.tavern is None:
         tavern = await repo.create_tavern(session, player, name, region)
         await repo.assign_map_slot(session, tavern, region)
+        repo.add_log(session, "player", player.id,
+                     f"🏗 завёл таверну «{name}» в регионе {REGIONS[region]}")
 
     await callback.message.edit_text(
         texts.CREATED.format(name=escape(name), region=REGIONS[region])

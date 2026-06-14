@@ -59,6 +59,7 @@ async def cb_bonus_go(callback: CallbackQuery, session: AsyncSession) -> None:
             await callback.answer(texts.bonus_none(), show_alert=True)
             await _edit(callback, texts.bonus_screen(player), kb.bonus_kb(player))
         return
+    repo.add_log(session, "player", player.id, f"🎁 активировал баф «{res.boon.name}»")
     await _edit(callback, texts.bonus_screen(player), kb.bonus_kb(player))
     await callback.answer(texts.bonus_activated(res.boon, res.minutes), show_alert=True)
 

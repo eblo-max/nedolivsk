@@ -18,6 +18,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config import settings
+from bot.db import repo
 from bot.db.models import CityState, KnownChat, Player, Tavern
 from bot.game import balance, buff, buildings, combat, items, production, season
 from bot.game import world as wld
@@ -36,6 +37,11 @@ async def _guard_cb(cb: CallbackQuery) -> bool:
         await cb.answer("Не для тебя.", show_alert=True)
         return False
     return True
+
+
+def _alog(cb: CallbackQuery, session: AsyncSession, text: str) -> None:
+    """Записать действие админа в журнал."""
+    repo.add_log(session, "admin", cb.from_user.id, text)
 
 
 def _now() -> datetime:
@@ -103,10 +109,11 @@ def _home_kb() -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
     kb.button(text="👥 Игроки", callback_data="adm:list:0")
     kb.button(text="🔍 Найти игрока", callback_data="adm:find")
+    kb.button(text="📜 Логи", callback_data="adm:logs:all:0")
     kb.button(text="🌍 Мир и события", callback_data="adm:world")
     kb.button(text="🏙 Города/чаты", callback_data="adm:cities")
     kb.button(text="🔄 Обновить", callback_data="adm:home")
-    kb.adjust(2, 2, 1)
+    kb.adjust(2, 1, 2, 1)
     return kb
 
 
@@ -244,9 +251,10 @@ def _card_kb(player: Player) -> InlineKeyboardBuilder:
     kb.button(text="🦸 GOD-режим", callback_data=f"adm:god:{i}")
     kb.button(text="🔄 Сброс прогресса", callback_data=f"adm:reset:{i}")
     kb.button(text="🗑 Удалить", callback_data=f"adm:del:{i}")
+    kb.button(text="📜 История игрока", callback_data=f"adm:plog:{i}:0")
     kb.button(text="↻ Обновить", callback_data=f"adm:p:{i}")
     kb.button(text="👥 К списку", callback_data="adm:list:0")
-    kb.adjust(4, 2, 2, 2, 2, 2, 2, 2, 2)
+    kb.adjust(4, 2, 2, 2, 2, 2, 2, 2, 1, 2)
     return kb
 
 
@@ -325,6 +333,7 @@ async def cb_gold(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.answer("Нет игрока.", show_alert=True)
         return
     player.gold = max(0, player.gold + int(delta))
+    _alog(cb, session, f"🪙 {int(delta):+} → id{player.id} (={player.gold})")
     await _show_card(cb, session, player.id)
     await cb.answer(f"🪙 {player.gold}")
 
@@ -341,6 +350,7 @@ async def cb_rep(cb: CallbackQuery, session: AsyncSession) -> None:
     player.reputation = max(0, player.reputation + int(delta))
     if player.tavern:
         player.tavern.reputation = max(0, player.tavern.reputation + int(delta))
+    _alog(cb, session, f"⭐ {int(delta):+} → id{player.id} (={player.reputation})")
     await _show_card(cb, session, player.id)
     await cb.answer(f"⭐ {player.reputation}")
 
@@ -356,6 +366,7 @@ async def cb_lvl(cb: CallbackQuery, session: AsyncSession) -> None:
         return
     player.level = max(1, min(balance.MAX_LEVEL, player.level + int(delta)))
     _sync_level(player)
+    _alog(cb, session, f"📈 уровень → id{player.id} (={player.level})")
     await _show_card(cb, session, player.id)
     await cb.answer(f"📈 ур.{player.level}")
 
@@ -372,6 +383,7 @@ async def cb_resall(cb: CallbackQuery, session: AsyncSession) -> None:
     from bot.game import inventory
     for r in balance.RESOURCES:
         inventory.add(player, r, int(amt))
+    _alog(cb, session, f"📦 +{amt} ко всем ресурсам → id{player.id}")
     await _show_card(cb, session, player.id)
     await cb.answer(f"📦 +{amt} ко всем ресурсам")
 
@@ -387,6 +399,7 @@ async def cb_heal(cb: CallbackQuery, session: AsyncSession) -> None:
     player.hp = combat.max_hp()
     player.hp_at = _now()
     player.hunt_ready_at = None
+    _alog(cb, session, f"❤️ полный HP → id{player.id}")
     await _show_card(cb, session, player.id)
     await cb.answer("❤️ Полное здоровье")
 
@@ -415,6 +428,7 @@ async def cb_cool(cb: CallbackQuery, session: AsyncSession) -> None:
         for b, batch in player.tavern.production.items():
             prod[b] = {**batch, "ready_at": past.isoformat()}
         player.tavern.production = prod
+    _alog(cb, session, f"⏱ снял кулдауны → id{player.id}")
     await _show_card(cb, session, player.id)
     await cb.answer("⏱ Кулдауны сняты — всё готово к забору")
 
@@ -430,6 +444,7 @@ async def cb_bonus(cb: CallbackQuery, session: AsyncSession) -> None:
     player.bonus_next_at = None  # снять кулдаун выдачи
     player.bonus_kind = None
     buff.refresh(player)
+    _alog(cb, session, f"🎁 выдал бонус → id{player.id}")
     await _show_card(cb, session, player.id)
     await cb.answer(f"🎁 Выдан бонус: {buff.offer(player).name if buff.offer(player) else '—'}")
 
@@ -446,6 +461,7 @@ async def cb_gear(cb: CallbackQuery, session: AsyncSession) -> None:
     for item in items.CATALOG.values():
         eq[item.slot] = items.make_entry(item.id, items.TIER_MAX)
     player.equipment = eq
+    _alog(cb, session, f"🎒 выдал топ-снарягу → id{player.id}")
     await _show_card(cb, session, player.id)
     await cb.answer("🎒 Выдана топ-снаряга (★★★)")
 
@@ -459,6 +475,7 @@ async def cb_build(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.answer("Нет таверны.", show_alert=True)
         return
     player.tavern.buildings = list(buildings.CATALOG)
+    _alog(cb, session, f"🏗 достроил все здания → id{player.id}")
     await _show_card(cb, session, player.id)
     await cb.answer("🏗 Все пристройки построены")
 
@@ -488,6 +505,7 @@ async def cb_god(cb: CallbackQuery, session: AsyncSession) -> None:
     player.hp = combat.max_hp()
     player.hp_at = _now()
     player.hunt_ready_at = None
+    _alog(cb, session, f"🦸 GOD-режим → id{player.id}")
     await _show_card(cb, session, player.id)
     await cb.answer("🦸 GOD-режим: всё по максимуму")
 
@@ -539,6 +557,7 @@ async def cb_resetok(cb: CallbackQuery, session: AsyncSession) -> None:
     player.buff_kind = None
     player.buff_until = None
     player.bonus_next_at = None
+    _alog(cb, session, f"🔄 сбросил прогресс → id{pid}")
     await session.flush()
     await _edit(cb, f"🔄 Прогресс игрока <code>{pid}</code> сброшен.",
                 _back_kb(pid))
@@ -566,6 +585,7 @@ async def cb_delok(cb: CallbackQuery, session: AsyncSession) -> None:
     pid = int(cb.data.rsplit(":", 1)[1])
     await session.execute(delete(Tavern).where(Tavern.player_id == pid))
     await session.execute(delete(Player).where(Player.id == pid))
+    _alog(cb, session, f"🗑 удалил игрока id{pid}")
     kb = InlineKeyboardBuilder()
     kb.button(text="👥 К списку", callback_data="adm:list:0")
     await _edit(cb, f"🗑 Игрок <code>{pid}</code> удалён подчистую.", kb)
@@ -613,6 +633,7 @@ async def cb_fair(cb: CallbackQuery, session: AsyncSession) -> None:
     await session.flush()
     chat_ids = await repo.all_chat_ids(session)
     await announce.broadcast_fair(cb.bot, "open", chat_ids, world)
+    _alog(cb, session, "🎪 открыл ярмарку вручную")
     await cb.answer(f"🎪 Ярмарка открыта, анонс в {len(chat_ids)} чат(ов)",
                     show_alert=True)
 
@@ -634,6 +655,82 @@ async def cb_cities(cb: CallbackQuery, session: AsyncSession) -> None:
         lines.append("<i>Бот пока ни в одном чате.</i>")
     kb = InlineKeyboardBuilder()
     kb.button(text="🏠 В меню", callback_data="adm:home")
+    await _edit(cb, "\n".join(lines), kb)
+    await cb.answer()
+
+
+# ── Журнал событий ─────────────────────────────────────────────────────────
+LOGPAGE = 12
+
+
+def _log_line(e) -> str:
+    ts = e.ts
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    when = ts.strftime("%d.%m %H:%M")
+    tag = "🛠" if e.kind == "admin" else "👤"
+    return f"<code>{when}</code> {tag} <code>{e.actor_id}</code> {escape(e.text)}"
+
+
+def _logs_kb(kind: str, page: int, total: int) -> InlineKeyboardBuilder:
+    kb = InlineKeyboardBuilder()
+    kb.button(text=("• Все" if kind == "all" else "Все"), callback_data="adm:logs:all:0")
+    kb.button(text=("• 🛠 Админ" if kind == "admin" else "🛠 Админ"),
+              callback_data="adm:logs:admin:0")
+    kb.button(text=("• 👤 Игроки" if kind == "player" else "👤 Игроки"),
+              callback_data="adm:logs:player:0")
+    nav = []
+    if page > 0:
+        kb.button(text="◀️", callback_data=f"adm:logs:{kind}:{page - 1}")
+        nav.append(1)
+    if (page + 1) * LOGPAGE < total:
+        kb.button(text="▶️", callback_data=f"adm:logs:{kind}:{page + 1}")
+        nav.append(1)
+    kb.button(text="🏠 В меню", callback_data="adm:home")
+    kb.adjust(3, *(nav or [1]), 1)
+    return kb
+
+
+@router.callback_query(F.data.startswith("adm:logs:"))
+async def cb_logs(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _guard_cb(cb):
+        return
+    _, _, kind, page_s = cb.data.split(":")
+    page = int(page_s)
+    flt = None if kind == "all" else kind
+    total = await repo.count_logs(session, kind=flt)
+    rows = await repo.recent_logs(session, kind=flt, limit=LOGPAGE,
+                                  offset=page * LOGPAGE)
+    pages = max(1, (total + LOGPAGE - 1) // LOGPAGE)
+    title = {"all": "ВСЕ", "admin": "АДМИН", "player": "ИГРОКИ"}.get(kind, kind)
+    lines = [f"📜 <b>ЖУРНАЛ · {title}</b> ({total}) · стр. {page + 1}/{pages}", ""]
+    lines += [_log_line(e) for e in rows] or ["<i>пусто</i>"]
+    await _edit(cb, "\n".join(lines), _logs_kb(kind, page, total))
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("adm:plog:"))
+async def cb_plog(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _guard_cb(cb):
+        return
+    _, _, pid_s, page_s = cb.data.split(":")
+    pid, page = int(pid_s), int(page_s)
+    total = await repo.count_logs(session, actor_id=pid)
+    rows = await repo.recent_logs(session, actor_id=pid, limit=LOGPAGE,
+                                  offset=page * LOGPAGE)
+    pages = max(1, (total + LOGPAGE - 1) // LOGPAGE)
+    lines = [f"📜 <b>ИСТОРИЯ id{pid}</b> ({total}) · стр. {page + 1}/{pages}", ""]
+    lines += [_log_line(e) for e in rows] or ["<i>событий нет</i>"]
+    kb = InlineKeyboardBuilder()
+    nav = []
+    if page > 0:
+        kb.button(text="◀️", callback_data=f"adm:plog:{pid}:{page - 1}")
+        nav.append(1)
+    if (page + 1) * LOGPAGE < total:
+        kb.button(text="▶️", callback_data=f"adm:plog:{pid}:{page + 1}")
+        nav.append(1)
+    kb.button(text="↻ К карточке", callback_data=f"adm:p:{pid}")
+    kb.adjust(*(nav or [1]), 1)
     await _edit(cb, "\n".join(lines), kb)
     await cb.answer()
 
@@ -736,5 +833,7 @@ async def on_input(message: Message, state: FSMContext, session: AsyncSession) -
                              reply_markup=_card_kb(player).as_markup())
         return
 
+    repo.add_log(session, "admin", message.from_user.id,
+                 f"✏️ задал {field} → id{player.id}: {note}")
     await message.answer(f"✅ {note}\n\n" + _card_text(player),
                          reply_markup=_card_kb(player).as_markup())

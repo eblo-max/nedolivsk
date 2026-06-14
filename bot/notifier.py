@@ -267,6 +267,13 @@ async def _notify_returned(bot: Bot) -> None:
             if auctionmod.is_due(tavern, now):
                 res = auctionmod.settle(player, tavern, city)
                 if res is not None:
+                    if res.get("sold"):
+                        from bot.game import production as prodmod
+                        gn = (prodmod.GOODS[res["good"]].name
+                              if res["good"] in prodmod.GOODS else res["good"])
+                        repo.add_log(session, "player", player.id,
+                                     f"🔨 аукцион: продал {res['qty']}×{gn} "
+                                     f"за {res['gold']} 🪙")
                     outbox.append((
                         player, texts.auction_settled(res),
                         buildings_notify_kb()))
@@ -298,6 +305,7 @@ async def _notify_returned(bot: Bot) -> None:
         # Подкидыш: в каждом чате независимо ~раз в час «что-то теряется».
         # Не множим, пока висит неподобранный (анти-навал).
         await repo.cleanup_loot(session)
+        await repo.cleanup_logs(session)  # держим журнал в разумном размере
         loot_to_post: list[tuple[int, int]] = []
         for chat_id in await repo.all_chat_ids(session):
             if random.random() >= balance.LOOT_DROP_CHANCE:

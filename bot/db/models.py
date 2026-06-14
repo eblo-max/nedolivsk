@@ -141,6 +141,20 @@ class LootDrop(Base):
     )
 
 
+class LogEntry(Base):
+    """Журнал событий: действия игроков и админа (для админ-панели)."""
+
+    __tablename__ = "logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16), index=True)  # 'player' | 'admin'
+    actor_id: Mapped[int] = mapped_column(BigInteger, index=True)  # кто (игрок/админ)
+    text: Mapped[str] = mapped_column(String(512))
+
+
 class Chronicle(Base):
     """Летопись города: лента заметных событий для экрана «Хроника»."""
 

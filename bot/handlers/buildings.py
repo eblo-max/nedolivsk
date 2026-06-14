@@ -103,6 +103,8 @@ async def cb_build_make(callback: CallbackQuery, session: AsyncSession) -> None:
             await callback.answer(alert, show_alert=True)
         return
 
+    repo.add_log(session, "player", player.id,
+                 f"🏗 заложил постройку: {result.building.name}")
     await common.caption_edit(
         callback.message,
         texts.build_started(result.building, result.hours),

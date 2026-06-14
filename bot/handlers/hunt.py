@@ -142,6 +142,13 @@ async def cb_hunt_fight(callback: CallbackQuery, session: AsyncSession) -> None:
         else:
             await callback.answer()
         return
+    if res.fight.win:
+        g = (res.loot or {}).get("gold", 0)
+        repo.add_log(session, "player", player.id,
+                     f"🏹 одолел: {res.enemy.name} (+{g} 🪙)")
+    else:
+        repo.add_log(session, "player", player.id,
+                     f"🩸 проиграл: {res.enemy.name} (−{res.gold_lost} 🪙)")
     await session.commit()  # фиксируем бой и отпускаем лок до анимации (~5с)
     await callback.answer("🏹 Победа!" if res.fight.win else "🩸 Поражение…")
     # Анимация боя: раунды раскрываются по кадрам, последний — итог с кнопками.
