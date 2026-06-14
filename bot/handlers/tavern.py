@@ -136,6 +136,13 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         return
 
+    pending = story_state.get_retail(player)
+    if pending:  # уже висит нерешённый заказ — сперва реши его (не копим заново)
+        await _safe_edit(callback, texts.retail_prompt(pending),
+                         kb.retail_kb(logic.retail_total(pending)))
+        await callback.answer()
+        return
+
     now = datetime.now(timezone.utc)
     city = None
     if player.chat_id is not None:
