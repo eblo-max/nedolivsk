@@ -37,6 +37,21 @@ def glut(city, good: str) -> float:
     return float((city.market or {}).get(good, 0.0))
 
 
+def climate(city) -> float:
+    """Климат спроса: настроение города × активная ситуация → множитель опта.
+    Купеческий бум поднимает цену, пост/хандра — роняют. Общий для чата."""
+    if city is None:
+        return 1.0
+    from bot.game import city as citymod
+    mood_m = 1.0 + citymod.mood_value(city) / balance.MARKET_MOOD_DIV
+    sit = citymod.current(city)
+    sit_raw = sit.demand_mult if sit is not None else 1.0
+    sit_m = 1.0 + (sit_raw - 1.0) * balance.MARKET_SITUATION_WEIGHT
+    c = mood_m * sit_m
+    return round(max(balance.MARKET_CLIMATE_MIN,
+                     min(balance.MARKET_CLIMATE_MAX, c)), 3)
+
+
 def nudge(city, good: str, delta: float) -> None:
     """Сдвинуть баланс рынка по товару: +delta — завал (цена вниз),
     −delta — дефицит/скупка (цена вверх)."""

@@ -148,7 +148,8 @@ def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
 
     mkt = market.factor(city, good)   # перекос рынка чата двигает оптовую цену
     fv = (prod.GOODS[good].price
-          * (balance.TRADE_FAIR_FV_MULT if fair else 1.0) * mkt)
+          * (balance.TRADE_FAIR_FV_MULT if fair else 1.0)
+          * mkt * market.climate(city))  # + климат спроса (настроение/ситуация)
     greed = rng.uniform(*arch.greed)
     need = rng.uniform(*arch.need)
     rel = min(0.3, max(0, story_state.faction(player, "merchants")) / 300)

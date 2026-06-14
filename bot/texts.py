@@ -319,12 +319,15 @@ def market_screen(city) -> str:
     from bot.game import production as prod
     from bot.game import world as wld
 
+    from bot.game import city as citymod
+
     fair = wld.is_fair()
     fairmult = balance.TRADE_FAIR_FV_MULT if fair else 1.0
+    clim = marketmod.climate(city)   # настроение × ситуация города
     rows, devs = [], []
     for key, g in sorted(prod.GOODS.items(), key=lambda kv: kv[1].price):
         f = marketmod.factor(city, key)
-        price = max(1, int(round(g.price * fairmult * f)))
+        price = max(1, int(round(g.price * fairmult * f * clim)))
         dev = price / g.price - 1
         devs.append(dev)
         if dev > 0.05:
@@ -337,8 +340,19 @@ def market_screen(city) -> str:
 
     flavor = _market_flavor(max(devs), min(devs), fair)
     parts = ["🏪 <b>БАЗАР НЕДОЛИВСКА</b>", "", f"«{flavor}»", ""]
+    notes = []
     if fair:
-        parts += ["🎪 Ярмарка: опт +20%, купцы съезжаются", ""]
+        notes.append("🎪 Ярмарка: опт +20%, купцы съезжаются")
+    sit = citymod.current(city) if city is not None else None
+    if sit is not None:
+        sign = "поднял" if sit.demand_mult >= 1.0 else "сбил"
+        notes.append(f"{sit.emoji} {sit.label}: {sign} оптовые цены")
+    if clim >= 1.05 and sit is None:
+        notes.append("😀 Город в духе — купцы щедрее")
+    elif clim <= 0.95 and sit is None:
+        notes.append("😟 Город хмур — купцы прижимисты")
+    if notes:
+        parts += [*notes, ""]
     parts += _branch("ОПТОВЫЕ ЦЕНЫ", rows)
     tail = ("<i>Купцы заходят на «Собрать доход» — лови и торгуйся. "
             "Кто качнул цены — гляди в Хронике.</i>")

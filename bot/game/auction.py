@@ -11,7 +11,6 @@ import random
 from datetime import datetime, timedelta, timezone
 
 from bot.game import balance, market, npc, production as prod, story_state, trade
-from bot.game import city as citymod
 from bot.game import world as wld
 
 
@@ -39,13 +38,11 @@ def sellable_goods(tavern) -> list[str]:
 
 
 def fair_value(city, good: str) -> float:
-    """Текущая справедливая цена товара (ярмарка × перекос рынка)."""
+    """Справедливая цена товара: ярмарка × перекос рынка × климат спроса
+    (настроение/ситуация города). Та же, что у реактивного купца."""
     fairmult = balance.TRADE_FAIR_FV_MULT if wld.is_fair() else 1.0
-    return prod.GOODS[good].price * fairmult * market.factor(city, good)
-
-
-def _mood_factor(city) -> float:
-    return 1.0 + citymod.mood_value(city) / balance.AUCTION_MOOD_DIV
+    return (prod.GOODS[good].price * fairmult
+            * market.factor(city, good) * market.climate(city))
 
 
 def _interested(arch, good: str) -> bool:
@@ -57,11 +54,12 @@ def _interested(arch, good: str) -> bool:
     return True
 
 
-def _ceiling(arch, fv: float, mood_f: float, rng: random.Random) -> float:
-    """Личный потолок цены покупателя за штуку (та же логика, что у купца)."""
+def _ceiling(arch, fv: float, rng: random.Random) -> float:
+    """Личный потолок цены покупателя за штуку (та же логика, что у купца).
+    Настроение/ситуация уже учтены в fv через климат спроса."""
     greed = rng.uniform(*arch.greed)
     need = rng.uniform(*arch.need)
-    c = fv * (1 + need) * (1 - greed * 0.3) * mood_f
+    c = fv * (1 + need) * (1 - greed * 0.3)
     return max(fv * balance.TRADE_MIN_UNDER, min(fv * balance.TRADE_MAX_OVER, c))
 
 
@@ -107,12 +105,11 @@ def try_bid(tavern, city, rng: random.Random | None = None) -> dict | None:
         return None
     good = lot["good"]
     fv = fair_value(city, good)
-    mood_f = _mood_factor(city)
     cit = npc.random_trader(rng)
     arch = trade.ARCH[cit.arch]
     if not _interested(arch, good):
         return None
-    ceil = _ceiling(arch, fv, mood_f, rng)
+    ceil = _ceiling(arch, fv, rng)
     cur = lot.get("top_bid") or 0
     floor = lot["unit_min"]
     if ceil < max(floor, cur + 1):       # не дотянет до резерва/перебивки
