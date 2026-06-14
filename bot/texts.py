@@ -1771,11 +1771,16 @@ def _item_bonus_line(item) -> str:
 
 
 def character_screen(player, craft_line: str = "") -> str:
+    from bot.game import combat
     from bot.game import items as it
 
     equipment = getattr(player, "equipment", None) or {}
     stats = it.combat_stats(equipment)
     worn = len(equipment)
+    # Эффективные боевые значения — те же, что в бою/охоте (с базой и удачей).
+    dmg = balance.BASE_DAMAGE + stats["damage"]
+    crit = min(balance.HUNT_CRIT_CAP, stats["crit"] + stats["luck"] // 2)
+    chp, mx = combat.current_hp(player), combat.max_hp()
 
     parts = [
         f"🧍 <b>{escape(player.first_name.upper())}, ХОЗЯИН КАБАКА</b>",
@@ -1785,8 +1790,9 @@ def character_screen(player, craft_line: str = "") -> str:
     if craft_line:
         parts += ["", craft_line]
     parts += ["", *_branch("БОЕВЫЕ", [
-        f"⚔ Урон — {stats['damage']}",
-        f"💥 Крит — {stats['crit']}%",
+        f"❤ Здоровье — {chp}/{mx} {_hp_bar(chp, mx)}",
+        f"⚔ Урон — {dmg}",
+        f"💥 Крит — {crit}%",
         f"🛡 Броня — {stats['armor']}",
         f"🍀 Удача — {stats['luck']} · вылазка {balance.lucky_chance(stats['luck'])}%",
     ])]
