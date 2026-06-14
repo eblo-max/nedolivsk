@@ -4,7 +4,12 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.types import BotCommand
+from aiogram.types import (
+    BotCommand,
+    BotCommandScopeAllGroupChats,
+    BotCommandScopeChat,
+    BotCommandScopeDefault,
+)
 
 from bot.config import settings
 from bot.db.base import create_tables, engine
@@ -24,6 +29,32 @@ from bot.handlers import (
 )
 from bot.middlewares import DbSessionMiddleware, PanelGuardMiddleware
 from bot.notifier import notifier_loop
+
+
+async def _setup_commands(bot: Bot) -> None:
+    """Меню команд (всплывает на «/»): публичные — всем, /tavern — в группах,
+    админские — только в личке админа."""
+    public = [
+        BotCommand(command="start", description="🍺 Открыть таверну"),
+        BotCommand(command="map", description="🗺 Карта мира"),
+        BotCommand(command="help", description="❓ Правила и помощь"),
+    ]
+    in_group = [
+        BotCommand(command="start", description="🍺 Открыть таверну"),
+        BotCommand(command="tavern", description="🏠 Мой кабак прямо в чате"),
+        BotCommand(command="map", description="🗺 Карта мира"),
+        BotCommand(command="help", description="❓ Правила и помощь"),
+    ]
+    await bot.set_my_commands(public, scope=BotCommandScopeDefault())
+    await bot.set_my_commands(in_group, scope=BotCommandScopeAllGroupChats())
+    if settings.admin_id:
+        await bot.set_my_commands(
+            public + [
+                BotCommand(command="fair", description="🎪 Запустить ярмарку (админ)"),
+                BotCommand(command="reset", description="🔥 Сбросить игрока (админ)"),
+            ],
+            scope=BotCommandScopeChat(chat_id=settings.admin_id),
+        )
 
 
 async def main() -> None:
@@ -47,10 +78,7 @@ async def main() -> None:
 
     notifier_task = asyncio.create_task(notifier_loop(bot))
 
-    await bot.set_my_commands([
-        BotCommand(command="start", description="🍺 Открыть таверну"),
-        BotCommand(command="help", description="❓ Как играть / правила"),
-    ])
+    await _setup_commands(bot)
 
     await bot.delete_webhook(drop_pending_updates=True)
     try:
