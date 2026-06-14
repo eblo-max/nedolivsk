@@ -37,28 +37,40 @@ def glut(city, good: str) -> float:
     return float((city.market or {}).get(good, 0.0))
 
 
-def add_supply(city, good: str, qty: int) -> None:
-    """Сбыт партии выбрасывает товар на рынок — давит его оптовую цену."""
-    if city is None or qty <= 0:
+def nudge(city, good: str, delta: float) -> None:
+    """Сдвинуть баланс рынка по товару: +delta — завал (цена вниз),
+    −delta — дефицит/скупка (цена вверх)."""
+    if city is None or delta == 0:
         return
     m = dict(city.market or {})
-    m[good] = float(m.get(good, 0.0)) + qty
+    m[good] = float(m.get(good, 0.0)) + delta
     m.setdefault(_TKEY, _now().isoformat())
     city.market = m  # переприсваивание — чтобы JSONB заметил
 
 
+def add_supply(city, good: str, qty: int) -> None:
+    """Сбыт партии выбрасывает товар на рынок — давит его оптовую цену."""
+    if qty > 0:
+        nudge(city, good, qty)
+
+
 def decay(city, now: datetime | None = None) -> None:
-    """Рынок впитывает излишки: завал тает экспоненциально к нулю (τ часов)."""
+    """Рынок впитывает перекос: тает экспоненциально к нулю (τ часов).
+    Пустой рынок чистим до {}, чтобы не писать в БД каждый тик и чтобы новая
+    партия не «впиталась» мгновенно из-за устаревшей метки."""
     if city is None:
         return
     m = dict(city.market or {})
     goods = [g for g in m if g != _TKEY]
+    if not goods:                       # впитывать нечего
+        if m:                           # остались только метки — сбрасываем
+            city.market = {}
+        return
     now = now or _now()
     t = m.get(_TKEY)
-    if not t:
-        if goods:                       # старое состояние без метки — проставим
-            m[_TKEY] = now.isoformat()
-            city.market = m
+    if not t:                           # старое состояние без метки — проставим
+        m[_TKEY] = now.isoformat()
+        city.market = m
         return
     elapsed_h = (now - datetime.fromisoformat(t)).total_seconds() / 3600
     if elapsed_h <= 0:
@@ -66,9 +78,9 @@ def decay(city, now: datetime | None = None) -> None:
     k = math.exp(-elapsed_h / balance.MARKET_ABSORB_HOURS)
     for g in goods:
         nv = m[g] * k
-        if nv < 0.5:                    # впитался — убираем ключ
+        if abs(nv) < 0.5:               # перекос впитался — убираем ключ
             m.pop(g)
         else:
             m[g] = round(nv, 3)
-    m[_TKEY] = now.isoformat()
-    city.market = m
+    remaining = [g for g in m if g != _TKEY]
+    city.market = {**m, _TKEY: now.isoformat()} if remaining else {}

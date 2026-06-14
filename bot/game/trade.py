@@ -11,7 +11,7 @@
 import random
 from dataclasses import dataclass
 
-from bot.game import balance, market, production as prod, story_state
+from bot.game import balance, market, npc, production as prod, story_state
 
 
 @dataclass(frozen=True)
@@ -142,10 +142,11 @@ def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
              if v > 0 and k in prod.GOODS}
     if not prods:
         return None
-    arch = rng.choice(ARCHES)
+    cit = npc.random_trader(rng)        # живой горожанин пришёл за товаром
+    arch = ARCH[cit.arch]
     good = _pick_good(prods, arch.pref, rng)
 
-    mkt = market.factor(city, good)   # завал рынка чата давит оптовую цену
+    mkt = market.factor(city, good)   # перекос рынка чата двигает оптовую цену
     fv = (prod.GOODS[good].price
           * (balance.TRADE_FAIR_FV_MULT if fair else 1.0) * mkt)
     greed = rng.uniform(*arch.greed)
@@ -159,13 +160,14 @@ def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
     qty_base = int(rng.randint(balance.TRADE_QTY_MIN, balance.TRADE_QTY_MAX)
                    * arch.qty_mult)
     qty = max(1, min(prods[good], qty_base))
-    wealth = int(fv * qty * rng.uniform(*arch.wealth_mult))
+    # Бюджет: и архетип, и личный достаток горожанина (0..5 → 0.6×..1.35×).
+    purse = (0.6 + cit.wealth * 0.15)
+    wealth = max(fv, int(fv * qty * rng.uniform(*arch.wealth_mult) * purse))
 
-    name = rng.choice(arch.names)
     prices = [max(1, int(round(fv * t))) for t in balance.TRADE_PRICE_TIERS]
     return {
-        "good": good, "qty": qty, "arch": arch.id, "emoji": arch.emoji,
-        "name": name, "intro": rng.choice(arch.intro),
+        "good": good, "qty": qty, "arch": cit.arch, "emoji": cit.emoji,
+        "name": cit.name, "intro": cit.blurb,
         "fv": round(fv, 2), "max_unit": round(max_unit, 2), "wealth": wealth,
         "greed": round(greed, 3), "prices": prices, "mkt": round(mkt, 3),
     }

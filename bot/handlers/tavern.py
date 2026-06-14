@@ -171,9 +171,9 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     await _safe_edit(callback, texts.income_success(result), kb.back_kb())
     await callback.answer(f"+{result.gold - result.skim} 🪙")
 
-    # Розничный сбыт гостям тоже выбрасывает товар на общий рынок чата.
+    # Розничный сбыт гостям — слабый сигнал изобилия товара на рынке чата.
     for good, qty in (result.sold or {}).items():
-        marketmod.add_supply(city, good, qty)
+        marketmod.nudge(city, good, qty * balance.MARKET_RETAIL_WEIGHT)
 
     owner = callback.from_user.id
     busy = story_state.get_pending(player) or story_state.get_trade(player)

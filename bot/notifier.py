@@ -3,6 +3,7 @@
 import asyncio
 import html
 import logging
+import random
 from datetime import datetime, timezone
 
 from aiogram import Bot
@@ -12,8 +13,10 @@ from bot import announce, panels, texts
 from bot.db import repo
 from bot.db.base import session_factory
 from bot.db.models import Player, Tavern
+from bot.game import balance
 from bot.game import city as citymod
 from bot.game import market as marketmod
+from bot.game import npc
 from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import buildings_notify_kb, claim_kb, craft_claim_kb
@@ -218,7 +221,16 @@ async def _notify_returned(bot: Bot) -> None:
         cities = await repo.all_cities(session, lock=True)
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
         for city in cities:
-            marketmod.decay(city, now)  # рынок впитывает излишки сбыта
+            marketmod.decay(city, now)  # рынок впитывает перекос
+            # Пульс рынка: иногда горожанин двигает спрос/предложение делами.
+            if random.random() < balance.MARKET_PULSE_CHANCE:
+                cit = npc.random_pulser()
+                good, delta, _verb = cit.pulse
+                marketmod.nudge(city, good, delta)
+                city_events.append(
+                    (city.chat_id, texts.market_pulse_announce(cit)))
+                await repo.add_chronicle(
+                    session, city.chat_id, texts.market_pulse_chron(cit))
             for kind, sit in citymod.advance(city, now):
                 text = sit.activate_text if kind == "activate" else sit.expire_text
                 city_events.append((city.chat_id, text))

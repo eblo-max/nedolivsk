@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import panels, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import market, story_state, trade
+from bot.game import balance, market, story_state, trade
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -51,7 +51,8 @@ async def _finish_sale(callback: CallbackQuery, player: Player, offer: dict,
     qty, gold = _sell(player, offer, unit)
     story_state.set_trade(player, None)
     if qty:
-        market.add_supply(city, offer["good"], qty)  # партия давит рынок
+        market.nudge(city, offer["good"],  # оптовый сброс — полный сигнал предложения
+                     qty * balance.MARKET_WHOLESALE_WEIGHT)
         react = trade.reaction(offer, kind)
         await _edit(callback, texts.trade_sold(offer, qty, unit, gold, react),
                     kb.back_kb())

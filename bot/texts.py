@@ -251,6 +251,14 @@ def citizens_screen(player) -> str:
     active = perks.active_perks(player)
     if active:
         parts += ["", *_branch("ПРИВИЛЕГИИ", active)]
+
+    # Живой город: сколько душ каких сословий населяют Недоливск.
+    counts: dict[str, int] = {}
+    for c in npc.CATALOG.values():
+        counts[c.estate] = counts.get(c.estate, 0) + 1
+    pop = [f"{npc.estate_label(e)} — {n}"
+           for e, n in sorted(counts.items(), key=lambda x: -x[1])]
+    parts += ["", *_branch(f"НАСЕЛЕНИЕ · {len(npc.CATALOG)} душ", pop)]
     return "\n".join(parts)
 
 
@@ -1295,6 +1303,21 @@ def trade_walked(offer: dict, react: str) -> str:
 
 def trade_cancelled() -> str:
     return "Передумал продавать — купец пожал плечами и потопал дальше."
+
+
+def market_pulse_announce(cit) -> str:
+    """Анонс в чат: горожанин качнул рынок своими делами."""
+    good, delta, verb = cit.pulse
+    if delta < 0:   # скупка/ажиотаж — товар в цене
+        effect = f"📈 {_good_name(good)} в цене — куй железо, сбывай, пока берут!"
+    else:           # завал — товар дешевеет
+        effect = f"📉 {_good_name(good)} дешевеет — придержи товар до лучших дней."
+    return f"{cit.emoji} <b>{escape(cit.name)}</b> {verb}.\n{effect}"
+
+
+def market_pulse_chron(cit) -> str:
+    _good, _delta, verb = cit.pulse
+    return f"{cit.name} {verb}."
 
 
 def income_empty() -> str:
