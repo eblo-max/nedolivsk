@@ -1,5 +1,6 @@
 """Все игровые тексты в одном месте. Тон — жёсткий трактирный."""
 
+import random
 from html import escape
 
 from bot.db.models import Player, Tavern
@@ -752,54 +753,223 @@ def malt_ready_notification() -> str:
     )
 
 
+# Реактивная атмосфера: сочные строки под текущее состояние кабака и города.
+_FLAVOR = {
+    "fair": [
+        "Площадь гудит, гости валят валом — наливай, не зевай!",
+        "Ярмарка! Народ при деньгах и при жажде — куй барыш, пока куётся.",
+    ],
+    "thieves_rampant": [
+        "По углам шныряют тёмные рожи — держи кассу ближе к телу.",
+        "Ворьё обнаглело вконец: считай монеты дважды, кабатчик.",
+    ],
+    "curfew": [
+        "Стража лютует, патрули на каждом шагу — гости жмутся по домам.",
+        "Комендантский час: зал пустеет затемно, хоть волком вой.",
+    ],
+    "merchant_boom": [
+        "Купцы гуляют от души, золото льётся рекой — твой час настал!",
+        "Торговый бум: гости при мошне и в настроении кутить до утра.",
+    ],
+    "crown_taxes": [
+        "Сборщики податей вынюхивают каждую монету — прячь выручку.",
+        "Корона трясёт поборами, в кассе будто дыра прохудилась.",
+    ],
+    "temperance": [
+        "Пост: народ кается и пьёт через раз, богомольные зануды.",
+        "Церковь загнала паству в трезвость — спрос просел, тоска.",
+    ],
+    "mood_high": [
+        "Кабак гудит, рожи довольные, эль течёт рекой.",
+        "Веселье в самом разгаре — гогот стоит до самого потолка.",
+    ],
+    "mood_low": [
+        "Народ хмурый, пьют молча, будто на похоронах.",
+        "Над городом висит тоска — и в кабаке тише стоячей воды.",
+    ],
+    "poor": [
+        "В мошне ветер свищет — пора шевелиться, голодранец.",
+        "Касса пуста, как башка завсегдатая. Иди работай, хозяин.",
+    ],
+    "brigades": [
+        "Работяги вернулись, гомонят у входа — забери добычу!",
+        "Бригады свалили мешки у порога — разбирай, пока цело.",
+    ],
+    "winter": [
+        "За окном метёт, у очага жмётся продрогший до костей люд.",
+        "Стужа лютая — гости отогреваются да требуют ещё по одной.",
+    ],
+    "summer": [
+        "Духота, все требуют чего похолоднее да побольше.",
+        "Жара выгнала народ из домов — в кабаке не протолкнуться.",
+    ],
+    "autumn": [
+        "Урожай свезли — гуляет народ, пока закрома полны.",
+        "Осень, мужики при деньгах после жатвы — знай наливай.",
+    ],
+    "spring": [
+        "Капель за окном, мужики тянутся пропустить по первой.",
+        "Весна разморозила дороги — потянулись захожие гости.",
+    ],
+    "default": [
+        "Скрипят половицы, воняет элем и мокрой псиной.",
+        "Обычный день: чад, гомон да кислый дух браги.",
+    ],
+}
+
+
+def _section(label: str) -> str:
+    return f"──────── <b>{label}</b> ────────"
+
+
+def _mood_short(v: int) -> str:
+    if v >= 40:
+        return "😀 город гуляет"
+    if v >= 10:
+        return "🙂 настроение доброе"
+    if v > -10:
+        return "😐 настроение обычное"
+    if v > -40:
+        return "😟 город хмур"
+    return "😠 город мрачен"
+
+
+def _flavor_line(player, tavern, chat_id, seasonmod, citymod) -> str:
+    sid = citymod.cached_situation_id(chat_id)
+    mood = citymod.cached_mood(chat_id)
+    c = logic.expedition_counts(player, tavern)
+    if wld.is_fair():
+        key = "fair"
+    elif sid in _FLAVOR:
+        key = sid
+    elif mood is not None and mood >= 40:
+        key = "mood_high"
+    elif mood is not None and mood <= -30:
+        key = "mood_low"
+    elif player.gold < 50:
+        key = "poor"
+    elif c.ready:
+        key = "brigades"
+    else:
+        key = seasonmod.current().id
+    return random.choice(_FLAVOR.get(key, _FLAVOR["default"]))
+
+
+def _production_lines(tavern: Tavern) -> list[str]:
+    from bot.game import production as prod
+
+    p = tavern.production or {}
+    out = []
+    if "brewery" in p:
+        phase, m = prod.brew_phase(tavern)
+        st = prod.ALE_STARS.get(int(p["brewery"].get("tier", 1)), "")
+        if phase == "fermenting":
+            out.append(f"🍺 Эль {st} бродит — {_fmt_minutes(m)}")
+        elif phase == "ready":
+            out.append(f"🍺 Эль {st} готов — разливай!")
+        elif phase == "aging":
+            out.append(f"🛢 Эль {st} на выдержке — {_fmt_minutes(m)}")
+        elif phase in ("ripe", "overripe"):
+            out.append(f"🛢 Эль {st} дошёл — разливай скорей!")
+    meadery_name = (
+        "Сбитень" if (p.get("meadery") or {}).get("recipe") == "sbiten"
+        else "Медовуха")
+    simple = [
+        ("mill", "🌱", "Солод", "мелется"),
+        ("meadery", "🍶", meadery_name, "зреет"),
+        ("kitchen", "🍖", "Жаркое", "готовится"),
+        ("winery", "🍷", "Вино", "бродит"),
+    ]
+    for bid, emoji, name, verb in simple:
+        if bid not in p:
+            continue
+        s, m = prod.state(tavern, bid)
+        if s == "active":
+            out.append(f"{emoji} {name} {verb} — {_fmt_minutes(m)}")
+        elif s == "ready":
+            out.append(f"{emoji} {name} готово — забирай!")
+    return out
+
+
+def _world_lines(chat_id, seasonmod, citymod) -> list[str]:
+    s = seasonmod.current()
+    hol = seasonmod.holiday()
+    if hol is not None:
+        w1 = f"{hol.emoji} {hol.name}! спрос ×{balance.HOLIDAY_DEMAND:g}"
+    elif s.demand_mult > 1:
+        w1 = f"{s.emoji} {s.name}, спрос выше"
+    elif s.demand_mult < 1:
+        w1 = f"{s.emoji} {s.name}, спрос ниже"
+    else:
+        w1 = f"{s.emoji} {s.name}"
+    line1 = [w1]
+    if wld.is_fair():
+        line1.append(f"🎪 Ярмарка — ещё {_fmt_minutes(wld.fair_minutes_left())}")
+
+    line2 = []
+    mood = citymod.cached_mood(chat_id)
+    if mood is not None:
+        line2.append(_mood_short(mood))
+    clabel = citymod.cached_label(chat_id)
+    line2.append(clabel if clabel else "🏛 в городе тихо")
+    return [" · ".join(line1), " · ".join(line2)]
+
+
+def _upgrade_progress(player: Player, tavern: Tavern) -> str:
+    if tavern.level >= balance.MAX_LEVEL:
+        return "🏆 Выше строить некуда — ты легенда Недоливска."
+    cost = balance.upgrade_cost(tavern.level)
+    pcts = []
+    for k in ("gold", "wood", "grain", "hops"):
+        have = player.gold if k == "gold" else inventory.get(player, k)
+        need = cost.get(k, 0)
+        pcts.append(min(1.0, have / need) if need else 1.0)
+    pct = sum(pcts) / len(pcts)
+    filled = round(pct * 5)
+    bar = "▰" * filled + "▱" * (5 - filled)
+    return f"🔨 До перестройки <code>{bar}</code> {round(pct * 100)}%"
+
+
 def tavern_screen(player: Player, tavern: Tavern) -> str:
     from bot.game import city as citymod
     from bot.game import season as seasonmod
 
+    chat_id = getattr(player, "chat_id", None)
     region = balance.REGIONS.get(player.region, player.region)
+    remoji = ZONE_EMOJI.get(player.region, "📍")
+    flavor = _flavor_line(player, tavern, chat_id, seasonmod, citymod)
+
     c = logic.expedition_counts(player, tavern)
     if c.ready and c.out:
-        exp = f"🎒 Вернулось бригад: {c.ready}, ещё {c.out} в пути — забирай добычу!"
+        exp = f"⛏ Бригады — {c.ready} вернулись, {c.out} в пути"
     elif c.ready:
-        exp = f"🎒 Бригады вернулись ({c.ready}) — забирай, пока не пропили!"
+        exp = f"⛏ Бригады вернулись ({c.ready}) — забирай!"
     elif c.out:
-        exp = (f"⏳ Бригад в пути: {c.out}/{c.total}, ближайшая через "
-               f"{_fmt_minutes(c.next_minutes)}.")
+        exp = f"⛏ Бригады {c.out}/{c.total} в пути — ещё {_fmt_minutes(c.next_minutes)}"
     else:
-        exp = f"😴 Все бригады ({c.total}) дрыхнут на сене. Гони за ресурсами."
-
-    notices = [exp]
+        exp = "⛏ Бригады свободны — гони за добром"
+    deeds = [exp] + _production_lines(tavern)
     bl = _build_line(player)
     if bl:
-        notices.append(bl)
-    if wld.is_fair():
-        notices.append(
-            f"🎪 <b>Ярмарка!</b> Спрос ×{balance.FAIR_DEMAND_MULT:g} — ещё "
-            f"{_fmt_minutes(wld.fair_minutes_left())}, тащи бочки!")
-    _hol = seasonmod.holiday()
-    if _hol is not None:
-        notices.append(f"{_hol.emoji} <b>{_hol.name}!</b> {_hol.blurb}.")
-    else:
-        _s = seasonmod.current()
-        notices.append(f"{_s.emoji} {_s.name} — {_s.blurb}.")
-    clabel = citymod.cached_label(getattr(player, "chat_id", None))
-    if clabel:
-        notices.append(f"{clabel} — отражается на торговле.")
+        deeds.append(bl)
 
-    return (
-        f"🏠 <b>{escape(tavern.name)}</b>\n"
-        f"📍 {region} · ур. {tavern.level}\n\n"
-        f"<blockquote>Скрипят половицы, воняет элем и мокрой псиной. "
-        f"За стойкой — {escape(player.first_name)}, и спорить с хозяином тут "
-        f"не принято.</blockquote>\n\n"
-        + "\n".join(notices) + "\n\n"
-        f"<b>Заведение</b>\n"
-        f"👥 Вместимость — {tavern.capacity}\n"
-        f"✨ Комфорт — {tavern.comfort}\n"
-        f"💰 Доход — {tavern.income_rate} 🪙/час\n"
-        f"⭐ Репутация — {tavern.reputation}\n\n"
-        f"🪙 <b>Золото — {player.gold}</b>"
-    )
+    parts = [
+        f"🏠 <b>{escape(tavern.name)}</b>",
+        f"{remoji} {region} · ур. {tavern.level}",
+        "",
+        f"<i>{flavor}</i>",
+        "",
+        f"🪙 <b>{player.gold}</b> · ⭐ {tavern.reputation} · 👥 {tavern.capacity} "
+        f"· ✨ {tavern.comfort} · 💰 {tavern.income_rate}/ч",
+        _upgrade_progress(player, tavern),
+        "",
+        _section("ДЕЛА"),
+        *deeds,
+        "",
+        _section("МИР"),
+        *_world_lines(chat_id, seasonmod, citymod),
+    ]
+    return "\n".join(parts)
 
 
 def _upgrade_need_block(player: Player, tavern: Tavern) -> list[str]:

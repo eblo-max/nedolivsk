@@ -112,8 +112,8 @@ class CityEffects:
 
 _NEUTRAL = CityEffects()
 
-# Лёгкий кэш активной ситуации по чату (для экранов, без БД).
-_cache: dict[int, str] = {}
+# Лёгкий кэш состояния города по чату (для экранов, без БД).
+_cache: dict[int, dict] = {}
 
 
 def _now() -> datetime:
@@ -247,17 +247,29 @@ def advance(city, now: datetime | None = None) -> list[tuple[str, Situation]]:
     return events
 
 
-# ── Кэш активной ситуации (для экранов) ────────────────────────────────
+# ── Кэш состояния города (для экранов) ─────────────────────────────────
 def refresh_cache(city, now: datetime | None = None) -> None:
     sit = _active_situation(city, now or _now())
-    if sit is None:
-        _cache.pop(city.chat_id, None)
-    else:
-        _cache[city.chat_id] = f"{sit.emoji} {sit.label}"
+    _cache[city.chat_id] = {
+        "label": f"{sit.emoji} {sit.label}" if sit else None,
+        "sid": sit.id if sit else None,
+        "mood": mood_value(city),
+    }
 
 
 def cached_label(chat_id: int | None) -> str | None:
-    return _cache.get(chat_id) if chat_id is not None else None
+    e = _cache.get(chat_id) if chat_id is not None else None
+    return e.get("label") if e else None
+
+
+def cached_situation_id(chat_id: int | None) -> str | None:
+    e = _cache.get(chat_id) if chat_id is not None else None
+    return e.get("sid") if e else None
+
+
+def cached_mood(chat_id: int | None) -> int | None:
+    e = _cache.get(chat_id) if chat_id is not None else None
+    return e.get("mood") if e else None
 
 
 # ── Настроение города (фаза 4b) ────────────────────────────────────────
