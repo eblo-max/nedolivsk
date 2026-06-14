@@ -315,6 +315,7 @@ async def _notify_returned(bot: Bot) -> None:
             except Exception:  # noqa: BLE001 — бота нет в чате и т.п.
                 logger.warning("Анонс ситуации не доставлен в чат %s", chat_id)
         # Подкидыш — постим после коммита (строка уже сохранена, id известен).
+        orphaned: list[int] = []
         for chat_id, drop_id in loot_to_post:
             try:
                 await bot.send_message(
@@ -322,3 +323,8 @@ async def _notify_returned(bot: Bot) -> None:
                     reply_markup=loot_kb(drop_id))
             except Exception:  # noqa: BLE001 — бота нет в чате и т.п.
                 logger.warning("Подкидыш не доставлен в чат %s", chat_id)
+                orphaned.append(drop_id)  # не блокируем чат осиротевшей строкой
+        if orphaned:
+            for drop_id in orphaned:
+                await repo.delete_loot(session, drop_id)
+            await session.commit()

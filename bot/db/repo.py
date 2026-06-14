@@ -122,6 +122,11 @@ async def has_active_loot(session: AsyncSession, chat_id: int) -> bool:
     return result.first() is not None
 
 
+async def delete_loot(session: AsyncSession, drop_id: int) -> None:
+    """Убрать подкидыш (например, если сообщение не доставилось — не блокируем чат)."""
+    await session.execute(delete(LootDrop).where(LootDrop.id == drop_id))
+
+
 async def cleanup_loot(session: AsyncSession) -> None:
     """Подчистить старые подкидыши (день и старше), чтобы таблица не пухла."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=1)
