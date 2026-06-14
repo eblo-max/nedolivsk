@@ -96,7 +96,7 @@ def claim_expeditions(player: Player) -> list[tuple[str, int, bool]]:
         resource = e["resource"]
         amount = balance.expedition_yield(resource, level, player.region)
         amount = int(amount * items.yield_multiplier(equipment, resource))
-        luck = items.combat_stats(equipment)["luck"]
+        luck = items.combat_stats(equipment)["luck"] + perks.luck_bonus(player)
         lucky = random.randint(1, 100) <= balance.lucky_chance(luck)
         if lucky:
             amount *= balance.LUCKY_MULT
@@ -133,7 +133,7 @@ def collect_income(
         return IncomeResult(ok=False)
 
     mult = items.income_multiplier(getattr(player, "equipment", None))
-    passive = int(tavern.income_rate * hours * mult)
+    passive = int(tavern.income_rate * hours * mult * perks.passive_mult(player))
 
     demand = int(tavern.capacity * balance.DEMAND_PER_CAPACITY * hours * demand_mult)
     share = min(balance.PREMIUM_SHARE_MAX, tavern.reputation / balance.PREMIUM_REP_DIV)
@@ -168,7 +168,8 @@ def collect_income(
         commoner_demand -= sell(key, commoner_demand)
 
     # Еда: отдельный пул (голод) — сытый гость доплачивает за блюдо.
-    hunger = int(tavern.capacity * balance.FOOD_DEMAND_PER_CAPACITY * hours * demand_mult)
+    hunger = int(tavern.capacity * balance.FOOD_DEMAND_PER_CAPACITY * hours
+                 * demand_mult * perks.food_mult(player))
     food_keys = sorted(
         (k for k in products if k in production.FOODS and products[k] > 0),
         key=lambda k: -production.FOODS[k].price,
@@ -185,6 +186,8 @@ def collect_income(
 
     total_sold = sum(sold.values())
     rep_gain = total_sold // balance.REP_PER_ALE_SOLD
+    if total_sold and perks.has_fame(player):  # знаменитый кабак — слава со сбыта
+        rep_gain += 1
     gold = passive + sales
     if gold <= 0 and rep_gain == 0:
         return IncomeResult(ok=False)

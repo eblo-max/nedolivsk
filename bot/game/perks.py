@@ -40,8 +40,33 @@ def temperance_immune(player: Player) -> bool:
 
 
 def curfew_immune(player: Player) -> bool:
-    """Комендантский час не бьёт — стража пускает своего работать."""
-    return _friend(player, "watch")
+    """Комендантский час не бьёт — стража пускает своего (или с грамотой)."""
+    return _friend(player, "watch") or story_state.has_flag(player, "law_friend")
+
+
+# ── Арк-перки (вечные награды личных линий NPC, фаза 4a) ────────────────
+def _has(player: Player, flag: str) -> bool:
+    return story_state.has_flag(player, flag)
+
+
+def passive_mult(player: Player) -> float:
+    """Знатные завсегдатаи (арка Бухло) — больше пассивного дохода."""
+    return 1.05 if _has(player, "noble_patrons") else 1.0
+
+
+def food_mult(player: Player) -> float:
+    """Домашняя кухня (арка Параски) — еду берут охотнее."""
+    return 1.10 if _has(player, "home_cooking") else 1.0
+
+
+def has_fame(player: Player) -> bool:
+    """Знаменитый кабак (арка Лютика) — слава капает репутацией со сбыта."""
+    return _has(player, "famous_tavern")
+
+
+def luck_bonus(player: Player) -> int:
+    """Талисман удачи (арка Алхимика) — счастливые вылазки чаще."""
+    return 5 if _has(player, "lucky_charm") else 0
 
 
 # ── Пассивные перки экономики ──────────────────────────────────────────
@@ -51,9 +76,13 @@ def demand_bonus(player: Player) -> float:
 
 
 def expedition_pay_mult(player: Player) -> float:
-    """Воровские связи — дешевле нанимать бригады."""
-    return balance.PERK_THIEVES_EXPEDITION if (
-        _friend(player, "thieves") or is_guild(player)) else 1.0
+    """Воровские связи — дешевле нанимать бригады. «Свой» (арка Скупщика) —
+    ещё дешевле."""
+    if story_state.has_flag(player, "made_man"):
+        return 0.75
+    if _friend(player, "thieves") or is_guild(player):
+        return balance.PERK_THIEVES_EXPEDITION
+    return 1.0
 
 
 # ── Для показа на экране горожан ───────────────────────────────────────
@@ -69,4 +98,17 @@ def active_perks(player: Player) -> list[str]:
         out.append("👑 Королевская грамота: поборы не страшны")
     if _friend(player, "church"):
         out.append("⛪ Благословение: пост нипочём")
+    # Арк-перки (вечные награды личных линий)
+    if _has(player, "noble_patrons"):
+        out.append("🛡 Знатные завсегдатаи: +5% пассивного дохода")
+    if _has(player, "famous_tavern"):
+        out.append("🎻 Знаменитый кабак: слава капает репутацией со сбыта")
+    if _has(player, "home_cooking"):
+        out.append("🧹 Домашняя кухня: +10% к продаже еды")
+    if _has(player, "made_man"):
+        out.append("🥷 Свой в гильдии: бригады дешевле некуда (−25%)")
+    if _has(player, "lucky_charm"):
+        out.append("⚗️ Талисман удачи: счастливые вылазки чаще")
+    if _has(player, "law_friend"):
+        out.append("👮 Грамота доверия: комендантский час нипочём")
     return out
