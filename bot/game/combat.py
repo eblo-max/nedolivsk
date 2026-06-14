@@ -215,6 +215,15 @@ def _min_hp() -> int:
     return max(1, int(balance.BASE_HP * balance.HUNT_MIN_HP_PCT))
 
 
+def regen_full_minutes(player, now: datetime | None = None) -> int:
+    """Минут до полного восстановления HP (0 — уже полное)."""
+    chp = current_hp(player, now)
+    if chp >= balance.BASE_HP:
+        return 0
+    rate_per_min = (balance.BASE_HP / balance.HP_REGEN_FULL_HOURS) / 60
+    return int((balance.BASE_HP - chp) / rate_per_min) + 1
+
+
 def _mark_recovery(player, now: datetime) -> None:
     """Если ушёл ниже боевого порога — записать время восстановления (для пинга),
     иначе сбросить. Колонка hunt_ready_at используется только для уведомления."""

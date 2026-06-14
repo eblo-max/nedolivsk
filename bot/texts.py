@@ -1565,15 +1565,24 @@ def _hp_bar(cur: int, mx: int) -> str:
     return "❤" * fill + "▱" * (5 - fill)
 
 
+def _hp_line(player) -> str:
+    """Строка здоровья: текущее/макс + полоска + таймер до полного восстановления."""
+    from bot.game import combat
+    chp, mx = combat.current_hp(player), combat.max_hp()
+    line = f"❤ Здоровье — {chp}/{mx} {_hp_bar(chp, mx)}"
+    if chp < mx:
+        line += f" · ⏳ до полного {_fmt_minutes(combat.regen_full_minutes(player))}"
+    return line
+
+
 def hunt_menu(player) -> str:
     st, dmg, crit, combat = _hunter_stats(player)
     chp = combat.current_hp(player)
-    mx = combat.max_hp()
     parts = [
         "🏹 <b>ОХОТА</b>",
         "",
         *_branch("ТВОЙ БОЕЦ", [
-            f"❤ Здоровье — {chp}/{mx} {_hp_bar(chp, mx)}",
+            _hp_line(player),
             f"⚔ Урон — {dmg}",
             f"💥 Крит — {crit}%",
             f"🛡 Броня — {st['armor']}",
@@ -1799,7 +1808,6 @@ def _item_bonus_line(item) -> str:
 
 
 def character_screen(player, craft_line: str = "") -> str:
-    from bot.game import combat
     from bot.game import items as it
 
     equipment = getattr(player, "equipment", None) or {}
@@ -1808,7 +1816,6 @@ def character_screen(player, craft_line: str = "") -> str:
     # Эффективные боевые значения — те же, что в бою/охоте (с базой и удачей).
     dmg = balance.BASE_DAMAGE + stats["damage"]
     crit = min(balance.HUNT_CRIT_CAP, stats["crit"] + stats["luck"] // 2)
-    chp, mx = combat.current_hp(player), combat.max_hp()
 
     parts = [
         f"🧍 <b>{escape(player.first_name.upper())}, ХОЗЯИН КАБАКА</b>",
@@ -1818,7 +1825,7 @@ def character_screen(player, craft_line: str = "") -> str:
     if craft_line:
         parts += ["", craft_line]
     parts += ["", *_branch("БОЕВЫЕ", [
-        f"❤ Здоровье — {chp}/{mx} {_hp_bar(chp, mx)}",
+        _hp_line(player),
         f"⚔ Урон — {dmg}",
         f"💥 Крит — {crit}%",
         f"🛡 Броня — {stats['armor']}",
