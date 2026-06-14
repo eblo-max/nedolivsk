@@ -211,7 +211,7 @@ def collect_income(
     return IncomeResult(
         ok=True, gold=gold, passive=passive, sales=sales,
         sold=sold, spoiled=spoiled or None, rep_gain=rep_gain,
-        premium_unsold=premium_unsold, fair=demand_mult > 1.0,
+        premium_unsold=premium_unsold,  # fair проставляет хендлер из wld.is_fair()
     )
 
 

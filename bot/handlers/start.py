@@ -85,6 +85,11 @@ async def tavern_region(
     data = await state.get_data()
     await state.clear()
 
+    name = data.get("name")
+    if not name:  # стейт сбросился (рестарт/устаревшая кнопка) — начать заново
+        await callback.answer("Что-то сбилось. Начни заново: /start", show_alert=True)
+        return
+
     player = await repo.get_player(session, callback.from_user.id)
     if player is None:
         player = await repo.create_player(
@@ -94,11 +99,11 @@ async def tavern_region(
             callback.from_user.first_name,
         )
     if player.tavern is None:
-        tavern = await repo.create_tavern(session, player, data["name"], region)
+        tavern = await repo.create_tavern(session, player, name, region)
         await repo.assign_map_slot(session, tavern, region)
 
     await callback.message.edit_text(
-        texts.CREATED.format(name=escape(data["name"]), region=REGIONS[region])
+        texts.CREATED.format(name=escape(name), region=REGIONS[region])
     )
     await send_tavern_screen(callback.message, player)
     await callback.answer()
