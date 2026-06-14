@@ -53,8 +53,10 @@ class Player(Base):
     craft_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     craft_notified: Mapped[bool] = mapped_column(default=False)
 
-    # Охота: до этого момента охотник на кулдауне (победа) или ранен (поражение).
+    # Охота: постоянное здоровье (макс = BASE_HP), регенится со временем от hp_at.
     hunt_ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    hp: Mapped[int | None] = mapped_column()
+    hp_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Стройка пристройки (один слот за раз)
     build_item: Mapped[str | None] = mapped_column(String(32))

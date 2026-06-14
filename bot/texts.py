@@ -1532,24 +1532,31 @@ def _hunter_stats(player):
     return st, dmg, crit, combat
 
 
+def _hp_bar(cur: int, mx: int) -> str:
+    fill = max(0, min(5, round(5 * cur / mx))) if mx else 0
+    return "❤" * fill + "▱" * (5 - fill)
+
+
 def hunt_menu(player) -> str:
     st, dmg, crit, combat = _hunter_stats(player)
+    chp = combat.current_hp(player)
+    mx = combat.max_hp()
     parts = [
         "🏹 <b>ОХОТА</b>",
         "",
         *_branch("ТВОЙ БОЕЦ", [
+            f"❤ Здоровье — {chp}/{mx} {_hp_bar(chp, mx)}",
             f"⚔ Урон — {dmg}",
             f"💥 Крит — {crit}%",
             f"🛡 Броня — {st['armor']}",
-            f"❤ Здоровье — {balance.BASE_HP}",
         ]),
     ]
     ready, mins = combat.hunt_ready(player)
     if not ready:
-        parts += ["", f"🤕 Не оклемался — в строй через {_fmt_minutes(mins)}"]
+        parts += ["", f"🩸 Ранен — отлёживаешься, в строй через {_fmt_minutes(mins)}"]
     prey = []
     for e in combat.ENEMIES:
-        wp, _ = combat.forecast(st, e, 120)   # стабильный цвет-индикатор
+        wp, _ = combat.forecast(st, e, chp, 120)   # шансы от текущего HP
         tcol, _lbl = combat.threat(wp)
         prey.append(f"{tcol} {e.emoji} {e.name} — ❤{e.hp}")
     parts += ["", *_branch("ЗВЕРЬЁ (цвет — твои шансы)", prey)]
@@ -1559,7 +1566,8 @@ def hunt_menu(player) -> str:
 
 def hunt_detail(player, enemy) -> str:
     st, _dmg, _crit, combat = _hunter_stats(player)
-    wp, avg = combat.forecast(st, enemy, 200)
+    chp = combat.current_hp(player)
+    wp, avg = combat.forecast(st, enemy, chp, 200)
     tcol, lbl = combat.threat(wp)
 
     guar, rare = [], []
@@ -1575,9 +1583,9 @@ def hunt_detail(player, enemy) -> str:
     g = [ln for ln, _ in guar] + [f"🪙 Золото {enemy.gold[0]}–{enemy.gold[1]}"]
     if enemy.rep:
         g.append(f"⭐ Репутация +{enemy.rep}")
-    odds = [f"{tcol} {lbl}", f"🎯 Победа ~{wp}%"]
+    odds = [f"{tcol} {lbl}", f"🎯 Победа ~{wp}% (при ❤{chp}/{combat.max_hp()})"]
     if wp > 0:
-        odds.append(f"❤ Останется ~{avg}/{balance.BASE_HP}")
+        odds.append(f"❤ Останется ~{avg}/{combat.max_hp()}")
 
     parts = [
         f"🏹 <b>{enemy.emoji} {enemy.name.upper()}</b>",
@@ -1601,12 +1609,13 @@ def hunt_detail(player, enemy) -> str:
 
 def hunt_result(res) -> str:
     e, f = res.enemy, res.fight
+    mx = balance.BASE_HP
     if f.win:
         loot = res.loot
         body = f"🗡 Уложил за {f.rounds} р."
         if f.crits:
             body += f", {f.crits} критов"
-        body += f" · осталось ❤{f.hp_left}/{balance.BASE_HP}"
+        body += f" · осталось ❤{res.hp_now}/{mx} {_hp_bar(res.hp_now, mx)}"
         detail = [f"🪙 Золото — +{loot['gold']}"]
         for r, q in loot["res"].items():
             detail.append(f"{RESOURCE_EMOJI.get(r, '📦')} {RESOURCE_NAMES.get(r, r)} — +{q}")
@@ -1622,13 +1631,31 @@ def hunt_result(res) -> str:
         line = f"{e.name} оказался не по зубам — еле уволок ноги."
     else:
         line = f"{e.name} подмял тебя на {f.rounds}-м раунде."
-    tail = [f"🩸 Ранен — на охоту через {balance.HUNT_WOUND_HOURS} ч"]
+    tail = [f"🩸 Еле выполз — ❤{res.hp_now}/{mx} {_hp_bar(res.hp_now, mx)}",
+            "Отлёживайся — здоровье вернётся со временем."]
     if res.gold_lost:
         tail.append(f"🪙 Обронил в суматохе — −{res.gold_lost}")
     return "\n".join([
         f"🩸 <b>{e.emoji} {e.name.upper()} ОДОЛЕЛ ТЕБЯ</b>",
         "", f"«{line}»", "", *tail,
     ])
+
+
+def hunt_anim_frames(res) -> list[str]:
+    """Кадры анимации боя (нарастающий лог раундов) — последний кадр = итог."""
+    e, f = res.enemy, res.fight
+    head = f"🏹 <b>СХВАТКА: {e.emoji} {e.name.upper()}</b>"
+    frames = [f"{head}\n\n<i>Сходишься вплотную…</i>"]
+    acc: list[str] = []
+    for rd in (f.log or [])[:4]:
+        s = f"⚔ Бьёшь на {rd['pd']}" + (" 💥 КРИТ!" if rd["crit"] else "")
+        if rd["ed"]:
+            s += f"\n{e.emoji} в ответ −{rd['ed']}"
+        s += f"\n   <i>{e.name} ❤{rd['ehp']} · ты ❤{rd['php']}</i>"
+        acc.append(s)
+        frames.append(f"{head}\n\n" + "\n\n".join(acc))
+    frames.append(hunt_result(res))
+    return frames
 
 
 def loot_drop(flavor: str) -> str:

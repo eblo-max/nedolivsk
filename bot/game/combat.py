@@ -91,6 +91,7 @@ class Fight:
     dealt: int
     hp_left: int
     overwhelmed: bool
+    log: list = None             # [{pd, crit, ed, php, ehp}] — для анимации боя
 
 
 def _player_offense(stats: dict) -> tuple[int, int, int]:
@@ -100,38 +101,44 @@ def _player_offense(stats: dict) -> tuple[int, int, int]:
     return dmg, crit_pct, stats.get("armor", 0)
 
 
-def resolve(stats: dict, enemy: Enemy, rng: random.Random | None = None) -> Fight:
-    """Прогон боя по статам снаряги. stats — items.combat_stats(equipment)."""
+def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
+            rng: random.Random | None = None) -> Fight:
+    """Прогон боя по статам снаряги от заданного HP (по умолч. полный BASE_HP)."""
     rng = rng or random
     dmg, crit_pct, parmor = _player_offense(stats)
-    php = balance.BASE_HP
+    php = balance.BASE_HP if start_hp is None else start_hp
     ehp = enemy.hp
     v = balance.HUNT_DMG_VARIANCE
     mit = balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + parmor)  # убывающая броня
     rounds = crits = dealt = 0
+    log = []
     while ehp > 0 and php > 0 and rounds < balance.HUNT_MAX_ROUNDS:
         rounds += 1
         hit = max(1, round(max(1, dmg - enemy.armor) * rng.uniform(1 - v, 1 + v)))
-        if rng.randint(1, 100) <= crit_pct:
+        crit = rng.randint(1, 100) <= crit_pct
+        if crit:
             hit *= 2
             crits += 1
         ehp -= hit
         dealt += hit
-        if ehp <= 0:
-            break
-        php -= max(1, round(enemy.attack * mit * rng.uniform(1 - v, 1 + v)))
+        ed = 0
+        if ehp > 0:
+            ed = max(1, round(enemy.attack * mit * rng.uniform(1 - v, 1 + v)))
+            php -= ed
+        log.append({"pd": hit, "crit": crit, "ed": ed,
+                    "php": max(0, php), "ehp": max(0, ehp)})
     win = ehp <= 0 and php > 0
     overwhelmed = ehp > 0 and rounds >= balance.HUNT_MAX_ROUNDS
-    return Fight(win, rounds, crits, dealt, max(0, php), overwhelmed)
+    return Fight(win, rounds, crits, dealt, max(0, php), overwhelmed, log)
 
 
-def forecast(stats: dict, enemy: Enemy, n: int = 160,
-             rng: random.Random | None = None) -> tuple[int, int]:
-    """Прогноз исхода по статам: (шанс победы %, средне-остаточное HP при победе)."""
+def forecast(stats: dict, enemy: Enemy, start_hp: int | None = None,
+             n: int = 160, rng: random.Random | None = None) -> tuple[int, int]:
+    """Прогноз исхода от текущего HP: (шанс победы %, средне-остаточное HP)."""
     rng = rng or random
     wins = hp_sum = 0
     for _ in range(n):
-        f = resolve(stats, enemy, rng)
+        f = resolve(stats, enemy, start_hp, rng)
         if f.win:
             wins += 1
             hp_sum += f.hp_left
@@ -173,44 +180,66 @@ def roll_loot(enemy: Enemy, luck: int, rng: random.Random | None = None) -> dict
 @dataclass
 class HuntResult:
     ok: bool
-    reason: str = ""           # unknown | cooldown
+    reason: str = ""           # unknown | lowhp
     minutes_left: int = 0
     enemy: Enemy | None = None
     fight: Fight | None = None
     loot: dict | None = None
     gold_lost: int = 0
+    hp_now: int = 0
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def hunt_ready(player, now: datetime | None = None) -> tuple[bool, int]:
-    """(готов?, минут до готовности). Кулдаун/ранение — в player.hunt_ready_at."""
+def max_hp(player=None) -> int:
+    return balance.BASE_HP
+
+
+def current_hp(player, now: datetime | None = None) -> int:
+    """Текущее здоровье с регенерацией от hp_at к максимуму."""
+    cur = player.hp if player.hp is not None else balance.BASE_HP
+    if cur >= balance.BASE_HP or player.hp_at is None:
+        return min(balance.BASE_HP, cur)
     now = now or _now()
-    t = player.hunt_ready_at
-    if t is None:
-        return True, 0
+    t = player.hp_at
     if t.tzinfo is None:
         t = t.replace(tzinfo=timezone.utc)
-    if t <= now:
+    elapsed_h = max(0.0, (now - t).total_seconds() / 3600)
+    regen = elapsed_h * balance.BASE_HP / balance.HP_REGEN_FULL_HOURS
+    return int(min(balance.BASE_HP, cur + regen))
+
+
+def _min_hp() -> int:
+    return max(1, int(balance.BASE_HP * balance.HUNT_MIN_HP_PCT))
+
+
+def hunt_ready(player, now: datetime | None = None) -> tuple[bool, int]:
+    """(в строю?, минут до восстановления до порога). Гейт — по HP, не по таймеру."""
+    chp = current_hp(player, now)
+    need = _min_hp()
+    if chp >= need:
         return True, 0
-    return False, int((t - now).total_seconds() // 60) + 1
+    rate_per_min = (balance.BASE_HP / balance.HP_REGEN_FULL_HOURS) / 60
+    return False, int((need - chp) / rate_per_min) + 1
 
 
 def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
-    """Сходить на охоту: проверка кулдауна, бой, добыча/раны. Мутирует игрока."""
+    """Сходить на охоту: гейт по HP, бой от текущего HP, добыча/утомление/раны."""
     rng = rng or random
     enemy = ENEMY.get(enemy_id)
     if enemy is None:
         return HuntResult(ok=False, reason="unknown")
-    ready, mins = hunt_ready(player)
+    now = _now()
+    chp = current_hp(player, now)
+    ready, mins = hunt_ready(player, now)
     if not ready:
-        return HuntResult(ok=False, reason="cooldown", minutes_left=mins)
+        return HuntResult(ok=False, reason="lowhp", minutes_left=mins)
 
     stats = items.combat_stats(getattr(player, "equipment", None))
-    fight = resolve(stats, enemy, rng)
-    now = _now()
+    fight = resolve(stats, enemy, chp, rng)
+    player.hp_at = now
     if fight.win:
         loot = roll_loot(enemy, stats.get("luck", 0), rng)
         player.gold += loot["gold"]
@@ -220,10 +249,13 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
             player.reputation = (player.reputation or 0) + loot["rep"]
             if player.tavern is not None:
                 player.tavern.reputation = (player.tavern.reputation or 0) + loot["rep"]
-        player.hunt_ready_at = now + timedelta(minutes=balance.HUNT_COOLDOWN_MINUTES)
-        return HuntResult(ok=True, enemy=enemy, fight=fight, loot=loot)
+        # утомление: бой стоит минимум HUNT_EXERTION, а тяжёлый — по факту урона
+        player.hp = max(1, min(fight.hp_left, chp - balance.HUNT_EXERTION))
+        return HuntResult(ok=True, enemy=enemy, fight=fight, loot=loot,
+                          hp_now=player.hp)
 
     lost = player.gold // balance.HUNT_LOSS_GOLD_DIV  # щепотка золота при поражении
     player.gold -= lost
-    player.hunt_ready_at = now + timedelta(hours=balance.HUNT_WOUND_HOURS)
-    return HuntResult(ok=True, enemy=enemy, fight=fight, gold_lost=lost)
+    player.hp = balance.HP_LOSS_FLOOR
+    return HuntResult(ok=True, enemy=enemy, fight=fight, gold_lost=lost,
+                      hp_now=player.hp)

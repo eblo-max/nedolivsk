@@ -4,6 +4,8 @@
 брифа и в бою, морфя панель в видео; в меню/прочих экранах — фото/текст.
 """
 
+import asyncio
+
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, InputMediaVideo
@@ -92,6 +94,17 @@ async def cb_hunt_beast(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer()
 
 
+async def _set_caption(msg, text: str, markup) -> None:
+    """Правит подпись/текст текущей панели (видео/фото/текст) — для анимации."""
+    try:
+        if msg.photo or msg.video:
+            await msg.edit_caption(caption=text, reply_markup=markup)
+        else:
+            await msg.edit_text(text, reply_markup=markup)
+    except TelegramBadRequest:
+        pass
+
+
 @router.callback_query(F.data.startswith("hfight:"))
 async def cb_hunt_fight(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _player(callback, session, lock=True)
@@ -100,13 +113,18 @@ async def cb_hunt_fight(callback: CallbackQuery, session: AsyncSession) -> None:
     enemy_id = callback.data.split(":", 1)[1]
     res = combat.hunt(player, enemy_id)
     if not res.ok:
-        if res.reason == "cooldown":
+        if res.reason == "lowhp":
             await callback.answer(
-                f"Ещё не оклемался — отдых до охоты {res.minutes_left} мин.",
+                f"Слишком ранен — отлёживайся, в строй через {res.minutes_left} мин.",
                 show_alert=True)
         else:
             await callback.answer()
         return
-    await _render(callback, texts.hunt_result(res), kb.hunt_after_kb(),
-                  video=res.enemy.video or None)
+    await session.commit()  # фиксируем бой и отпускаем лок до анимации (~5с)
     await callback.answer("🏹 Победа!" if res.fight.win else "🩸 Поражение…")
+    # Анимация боя: раунды раскрываются по кадрам, последний — итог с кнопками.
+    frames = texts.hunt_anim_frames(res)
+    for fr in frames[:-1]:
+        await _set_caption(callback.message, fr, None)
+        await asyncio.sleep(0.9)
+    await _set_caption(callback.message, frames[-1], kb.hunt_after_kb())

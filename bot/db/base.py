@@ -94,6 +94,12 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS hunt_ready_at TIMESTAMPTZ"
         ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS hp INTEGER"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS hp_at TIMESTAMPTZ"
+        ))
         # Переход на единый инвентарь (Ярус 0). Колонка nullable: разовый
         # перелив только для ещё не мигрированных строк (inventory IS NULL),
         # чтобы опустошённый инвентарь не «возрождался» из старых колонок.
