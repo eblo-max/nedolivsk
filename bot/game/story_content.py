@@ -6,8 +6,8 @@
 from bot.game import balance
 from bot.game.story_defs import (
     Choice, CitySituation, ClearFlag, Echo, FacRep, Faction, FactionPower, Gold,
-    HasBuilding, HasFlag, Chron, MinLevel, NotFlag, NpcRel, Outcome, Product,
-    RelTo, Rep, Res, Schedule, SetFlag, Storylet,
+    HasBuilding, HasFlag, Chron, MinLevel, Mood, NotFlag, NpcRel, Outcome,
+    Product, RelTo, Rep, Res, Schedule, SetFlag, Storylet,
 )
 
 _FRIEND = balance.REL_FRIEND  # порог «свой» (40)
@@ -102,7 +102,7 @@ _LIST = [
             Choice("🎻 Пусти петь", (
                 Outcome(70, "Лютик завёл такую похабень, что зал гудел до утра. "
                             "Касса звенит, репутация растёт.",
-                        (Gold(tier="minor"), Rep(1), RelTo("lutik", 10),
+                        (Gold(tier="minor"), Rep(1), RelTo("lutik", 10), Mood(4),
                          Echo("🎻 У {name} нынче пел Лютик — весь Недоливск сбежался!"))),
                 Outcome(30, "Бард нажрался и заснул в супе. Гости разошлись. "
                             "Ну хоть бесплатно.",
@@ -298,6 +298,7 @@ _LIST = [
                 Outcome(1, "Параска осталась у печи, накормила весь зал кашей "
                            "и взяла кухню под крыло. Добром за добро.",
                         (Rep(1), RelTo("paraska", 15), SetFlag("paraska_friend"),
+                         Mood(4),
                          Chron("{name} приютил вдову Параску — теперь у него на кухне порядок."))),
             )),
             Choice("🚪 Не богадельня тут", (
@@ -923,6 +924,7 @@ _LIST = [
                            "тени — и ты среди своих.",
                         (Gold(tier="major"), FacRep("thieves", 10),
                          FactionPower("thieves", 10), SetFlag("city_thieves_rising"),
+                         Mood(-10),
                          Echo("🥷 {name} помог гильдии подмять Недоливск — теперь воры тут хозяева."),
                          Chron("При участии {name} воровская гильдия взяла верх в Недоливске."))),
             )),
@@ -1052,6 +1054,7 @@ _LIST = [
                            "В Недоливске стало потише.",
                         (Gold(tier="major"), FacRep("watch", 10),
                          FactionPower("watch", 10), SetFlag("city_order_rising"),
+                         Mood(8),
                          Echo("🛡 {name} помог страже накрыть гильдию — в Недоливске стало потише."),
                          Chron("При участии {name} стража навела порядок и осадила гильдию."))),
             )),

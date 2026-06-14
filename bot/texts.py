@@ -188,12 +188,26 @@ def _power_bar(v: int) -> str:
     return ("▰" * fill + "▱" * (5 - fill))
 
 
+def _mood_label(v: int) -> str:
+    if v >= 40:
+        return "😀 приподнятое"
+    if v >= 10:
+        return "🙂 доброе"
+    if v > -10:
+        return "😐 обычное"
+    if v > -40:
+        return "😟 хмурое"
+    return "😠 мрачное"
+
+
 def city_screen(city) -> str:
-    """Расклад сил фракций и текущая городская ситуация."""
+    """Расклад сил фракций, настроение и текущая городская ситуация."""
     from bot.game import city as citymod
     from bot.game import factions
 
     lines = ["🏛 <b>Недоливск сегодня</b>", ""]
+    lines.append(f"Настроение: <b>{_mood_label(citymod.mood_value(city))}</b>")
+    lines.append("")
     sit = citymod.current(city)
     if sit is not None:
         lines.append(f"{sit.emoji} <b>{sit.label}</b> — в самом разгаре.")

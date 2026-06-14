@@ -25,6 +25,7 @@ class Situation:
     activate_text: str       # анонс в чат при начале
     expire_text: str         # анонс в чат при окончании
     chron: str               # запись в летопись
+    mood: int = 0            # к чему тянет настроение города, пока активна
 
 
 # Одна доминирующая фракция = одна ситуация. Тон — по тон-байблу.
@@ -41,6 +42,7 @@ SITUATIONS: dict[str, Situation] = {
         ),
         expire_text="🥷 Воровская вакханалия поутихла — стража поддавила гильдию. Касса снова твоя.",
         chron="Воровская гильдия устроила в Недоливске беспредел.",
+        mood=-30,
     ),
     "watch": Situation(
         id="curfew", faction="watch", emoji="👮",
@@ -54,6 +56,7 @@ SITUATIONS: dict[str, Situation] = {
         ),
         expire_text="👮 Комендантский час сняли — народ снова потянулся в кабаки. Гуляем!",
         chron="Стража ввела в Недоливске комендантский час.",
+        mood=-20,
     ),
     "merchants": Situation(
         id="merchant_boom", faction="merchants", emoji="💰",
@@ -67,6 +70,7 @@ SITUATIONS: dict[str, Situation] = {
         ),
         expire_text="💰 Купеческий бум схлынул — торговцы разъехались, спрос вернулся к обычному.",
         chron="Купеческая лига устроила в Недоливске торговый бум.",
+        mood=40,
     ),
     "crown": Situation(
         id="crown_taxes", faction="crown", emoji="👑",
@@ -80,6 +84,7 @@ SITUATIONS: dict[str, Situation] = {
         ),
         expire_text="👑 Сборщики податей убрались восвояси — выручка снова целиком твоя.",
         chron="Корона обложила Недоливск поборами.",
+        mood=-15,
     ),
     "church": Situation(
         id="temperance", faction="church", emoji="⛪",
@@ -92,6 +97,7 @@ SITUATIONS: dict[str, Situation] = {
         ),
         expire_text="⛪ Пост окончен — паства возвращается к кружке с утроенной жаждой!",
         chron="Церковь объявила в Недоливске Великий пост.",
+        mood=-15,
     ),
 }
 
@@ -162,6 +168,7 @@ def advance(city, now: datetime | None = None) -> list[tuple[str, Situation]]:
     Мутирует city; кэш обновляется снаружи (refresh_cache)."""
     now = now or _now()
     events: list[tuple[str, Situation]] = []
+    drift_h = 0.0  # сколько часов «прошло» этим тиком (для дрейфа настроения)
 
     # 1) Дрейф силы фракций к нулю (накапливаем дробное через updated_at).
     updated = city.updated_at
@@ -171,6 +178,7 @@ def advance(city, now: datetime | None = None) -> list[tuple[str, Situation]]:
         steps = int(balance.FACTION_DECAY_PER_HOUR
                     * (now - updated).total_seconds() / 3600)
         if steps > 0:
+            drift_h = steps / balance.FACTION_DECAY_PER_HOUR
             fp = dict(city.faction_power or {})
             changed = False
             for f, v in list(fp.items()):
@@ -224,6 +232,18 @@ def advance(city, now: datetime | None = None) -> list[tuple[str, Situation]]:
                         {"id": sit.id, "faction": fac, "until": until.isoformat()}
                     ]
                     events.append(("activate", sit))
+
+    # 4) Дрейф настроения к цели текущей ситуации (или к 0, если тихо).
+    if drift_h > 0:
+        sit = _active_situation(city, now)
+        target = sit.mood if sit is not None else 0
+        mood = city.mood or 0
+        move = balance.MOOD_DRIFT_PER_HOUR * drift_h
+        if mood < target:
+            mood = min(target, mood + move)
+        elif mood > target:
+            mood = max(target, mood - move)
+        city.mood = int(round(mood))
     return events
 
 
@@ -238,3 +258,15 @@ def refresh_cache(city, now: datetime | None = None) -> None:
 
 def cached_label(chat_id: int | None) -> str | None:
     return _cache.get(chat_id) if chat_id is not None else None
+
+
+# ── Настроение города (фаза 4b) ────────────────────────────────────────
+def mood_value(city) -> int:
+    return int(max(-100, min(100, (city.mood or 0)))) if city is not None else 0
+
+
+def mood_factor(city) -> float:
+    """Мягкий ambient-множитель спроса от настроения (±10% на краях)."""
+    if city is None:
+        return 1.0
+    return 1.0 + mood_value(city) / balance.MOOD_DEMAND_DIV

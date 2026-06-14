@@ -148,7 +148,8 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
 
     result = logic.collect_income(
         player, player.tavern,
-        demand_mult=wld.demand_mult() * ce.demand_mult * perks.demand_bonus(player),
+        demand_mult=(wld.demand_mult() * ce.demand_mult
+                     * perks.demand_bonus(player) * citymod.mood_factor(city)),
     )
     if not result.ok:
         await callback.answer(texts.income_empty(), show_alert=True)

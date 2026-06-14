@@ -189,6 +189,15 @@ class FactionPower:
         ctx.city.faction_power = fp
 
 
+class Mood:
+    """Сдвиг настроения города от поступка (добро +, лихо −). Ambient-эффект."""
+    def __init__(self, delta): self.delta = delta
+    def apply(self, ctx):
+        if ctx.city is None:
+            return
+        ctx.city.mood = int(max(-100, min(100, (ctx.city.mood or 0) + self.delta)))
+
+
 # ─────────────────────────── СТОРИЛЕТ ──────────────────────────────────
 @dataclass(frozen=True)
 class Outcome:
