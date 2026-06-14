@@ -19,6 +19,8 @@ CATALOG: dict[str, Npc] = {
     "skupshik": Npc("skupshik", "Скупщик", "🥷", "thieves"),
     "alchemist": Npc("alchemist", "Безумный Алхимик", "⚗️"),
     "magnat": Npc("magnat", "Купец Толстосумов", "💰", "merchants"),
+    "vedma": Npc("vedma", "Ведьма Гнилозубка", "🔮"),
+    "kartavy": Npc("kartavy", "Картёжник Картавый", "🎲"),
 }
 
 
