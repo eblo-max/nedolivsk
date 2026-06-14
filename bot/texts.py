@@ -227,29 +227,31 @@ def citizens_screen(player) -> str:
     """Репутация игрока у горожан и фракций (видимая память)."""
     from bot.game import factions, npc
 
+    from bot.game import perks
+
     st = player.story or {}
-    lines = ["👥 <b>Горожане Недоливска</b>", ""]
+    parts = ["👥 <b>ГОРОЖАНЕ НЕДОЛИВСКА</b>", ""]
 
     known = [(nid, v) for nid, v in st.get("npc_rel", {}).items() if v != 0]
     if known:
-        lines.append("<b>Как к тебе относятся:</b>")
-        for nid, v in sorted(known, key=lambda x: -x[1]):
-            lines.append(f"{npc.label(nid)} — {_rel_label(v)}")
+        parts += _branch("ОТНОШЕНИЯ", [
+            f"{npc.label(nid)} — {_rel_label(v)}"
+            for nid, v in sorted(known, key=lambda x: -x[1])
+        ])
     else:
-        lines.append("Тебя тут пока не знают. Поживёшь — приметят.")
+        parts.append("«Тебя тут пока не знают. Поживёшь — приметят»")
 
     facs = [(f, v) for f, v in st.get("faction", {}).items() if v != 0]
     if facs:
-        lines += ["", "🏛 <b>Фракции:</b>"]
-        for f, v in sorted(facs, key=lambda x: -x[1]):
-            lines.append(f"{factions.name(f)} — {_faction_label(v)}")
+        parts += ["", *_branch("ФРАКЦИИ", [
+            f"{factions.name(f)} — {_faction_label(v)}"
+            for f, v in sorted(facs, key=lambda x: -x[1])
+        ])]
 
-    from bot.game import perks
     active = perks.active_perks(player)
     if active:
-        lines += ["", "🎁 <b>Привилегии:</b>"]
-        lines += active
-    return "\n".join(lines)
+        parts += ["", *_branch("ПРИВИЛЕГИИ", active)]
+    return "\n".join(parts)
 
 
 def _power_bar(v: int) -> str:
@@ -274,36 +276,37 @@ def city_screen(city) -> str:
     from bot.game import city as citymod
     from bot.game import factions
 
-    lines = ["🏛 <b>Недоливск сегодня</b>", ""]
-    lines.append(f"Настроение: <b>{_mood_label(citymod.mood_value(city))}</b>")
-    lines.append("")
+    parts = ["🏛 <b>НЕДОЛИВСК СЕГОДНЯ</b>", ""]
     sit = citymod.current(city)
     if sit is not None:
-        lines.append(f"{sit.emoji} <b>{sit.label}</b> — в самом разгаре.")
-        lines.append("")
+        parts += [f"«{sit.emoji} {sit.label} — в самом разгаре»", ""]
+    parts += _branch("НАСТРОЕНИЕ", [_mood_label(citymod.mood_value(city))])
     fp = {f: v for f, v in (city.faction_power or {}).items() if v}
     if fp:
-        lines.append("<b>Расклад сил:</b>")
-        for f, v in sorted(fp.items(), key=lambda x: -x[1]):
-            lines.append(f"{factions.name(f)}: {_power_bar(v)} {v}")
-        lines.append("")
-        lines.append("<i>Кто заберёт власть — решают ваши дела в городе.</i>")
+        parts += ["", *_branch("РАСКЛАД СИЛ", [
+            f"{factions.name(f)} {_power_bar(v)} {v}"
+            for f, v in sorted(fp.items(), key=lambda x: -x[1])
+        ])]
+        parts += ["", "<i>Кто заберёт власть — решают ваши дела в городе.</i>"]
     else:
-        lines.append("Тишь да гладь — фракции дремлют. Пока.")
-    return "\n".join(lines)
+        parts += ["", "«Тишь да гладь — фракции дремлют. Пока»"]
+    return "\n".join(parts)
 
 
 def chronicle_screen(entries: list[str]) -> str:
     """Летопись города — лента заметных событий."""
     if not entries:
         return (
-            "📜 <b>Хроники Недоливска</b>\n\n"
-            "Летопись чиста, как совесть младенца. Пока тут не стряслось "
-            "ничего, достойного пера."
+            "📜 <b>ХРОНИКИ НЕДОЛИВСКА</b>\n\n"
+            "«Летопись чиста, как совесть младенца — пока тут не стряслось "
+            "ничего, достойного пера»"
         )
-    # Экран персонажа — фото; подпись ≤1024, поэтому строки подрезаем.
-    body = "\n".join(f"• {e[:90]}" for e in entries[:10])
-    return f"📜 <b>Хроники Недоливска</b>\n\n{body}"
+    # Подпись к фото ≤1024, поэтому строки подрезаем.
+    return "\n".join([
+        "📜 <b>ХРОНИКИ НЕДОЛИВСКА</b>",
+        "",
+        *_branch("ЗАПИСИ", [e[:90] for e in entries[:10]]),
+    ])
 
 
 def craft_line(player) -> str:
@@ -434,13 +437,7 @@ def _cost_line(cost: dict, player: Player) -> str:
 def buildings_screen(player: Player, tavern: Tavern) -> str:
     from bot.game import buildings as bld
 
-    lines = [
-        "🏗 <b>Пристройки</b>",
-        "",
-        "<blockquote>Каждая открывает своё производство. "
-        "Деньги и сырьё — вперёд.</blockquote>",
-        "",
-    ]
+    items = []
     for bid in bld.ORDER:
         b = bld.CATALOG[bid]
         if bld.is_built(tavern, bid):
@@ -453,8 +450,14 @@ def buildings_screen(player: Player, tavern: Tavern) -> str:
             status = f"🔒 нужна: {req}"
         else:
             status = "доступна к стройке"
-        lines.append(f"{b.emoji} <b>{b.name}</b> — {status}")
-    return "\n".join(lines)
+        items.append(f"{b.emoji} {b.name} — {status}")
+    return "\n".join([
+        "🏗 <b>ПРИСТРОЙКИ</b>",
+        "",
+        "«Каждая открывает своё производство. Деньги и сырьё — вперёд»",
+        "",
+        *_branch("ПОСТРОЙКИ", items),
+    ])
 
 
 def building_detail(building, player: Player, tavern: Tavern) -> str:
@@ -1045,49 +1048,48 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
 
 
 def _upgrade_need_block(player: Player, tavern: Tavern) -> list[str]:
-    """Блок «до перестройки» — список строк с галочками."""
+    """Секция «до перестройки» в едином стиле (└)."""
     if tavern.level >= balance.MAX_LEVEL:
-        return ["🏆 Выше строить некуда — разве что до небес."]
+        return ["🏆 Выше строить некуда — ты легенда Недоливска."]
     cost = balance.upgrade_cost(tavern.level)
     emoji = {"gold": "🪙", **RESOURCE_EMOJI}
-    out = [f"<b>🔨 До перестройки (ур. {tavern.level + 1})</b>"]
+    lines = []
     for key in ("gold", "wood", "grain", "hops"):
         have = player.gold if key == "gold" else inventory.get(player, key)
         mark = "✅" if have >= cost[key] else "❌"
-        out.append(f"{emoji[key]} {have} / {cost[key]} {mark}")
-    return out
+        lines.append(f"{emoji[key]} {have} / {cost[key]} {mark}")
+    return _branch(f"ПЕРЕСТРОЙКА · ур. {tavern.level + 1}", lines)
 
 
 def warehouse_screen(player: Player, tavern: Tavern) -> str:
-    lines = [
-        f"📦 <b>Склад «{escape(tavern.name)}»</b>",
+    stock = [
+        f"{RESOURCE_EMOJI[r]} {RESOURCE_NAMES[r]} — {inventory.get(player, r)}"
+        for r in balance.RESOURCES
+    ]
+    parts = [
+        f"📦 <b>СКЛАД «{escape(tavern.name.upper())}»</b>",
         "",
-        "<blockquote>Темно, пыльно, по углам шуршат крысы. "
-        "Вот что ещё не растащили.</blockquote>",
+        "«Темно, пыльно, по углам крысы — что ещё не растащили»",
         "",
         f"🪙 <b>Золото — {player.gold}</b>",
         "",
-        "<b>📥 Запасы</b>",
+        *_branch("ЗАПАСЫ", stock),
+        "",
+        *_upgrade_need_block(player, tavern),
     ]
-    for res in balance.RESOURCES:
-        lines.append(
-            f"{RESOURCE_EMOJI[res]} {RESOURCE_NAMES[res]} — {inventory.get(player, res)}"
-        )
-    lines.append("")
-    lines += _upgrade_need_block(player, tavern)
-    return "\n".join(lines)
+    return "\n".join(parts)
 
 
 def storehouse_caption(player: Player, tavern: Tavern) -> str:
     """Короткая подпись к складской ведомости (ресурсы — на самой картинке)."""
-    lines = [
-        f"📦 <b>Складская ведомость «{escape(tavern.name)}»</b>",
+    parts = [
+        f"📦 <b>СКЛАД «{escape(tavern.name.upper())}»</b>",
         "",
         f"🪙 <b>Золото — {player.gold}</b>",
         "",
+        *_upgrade_need_block(player, tavern),
     ]
-    lines += _upgrade_need_block(player, tavern)
-    return "\n".join(lines)
+    return "\n".join(parts)
 
 
 def expedition_menu(player: Player) -> str:
@@ -1095,13 +1097,18 @@ def expedition_menu(player: Player) -> str:
     level = tavern.level if tavern else 1
     pay = balance.worker_pay(level)
     c = logic.expedition_counts(player, tavern)
-    return (
-        "⛏ <b>Бригады работников</b>\n\n"
-        f"<blockquote>Свободно {c.free}/{c.total} · в пути {c.out} · "
-        f"вернулись {c.ready}</blockquote>\n\n"
-        f"Ходка — {balance.EXPEDITION_HOURS} ч, плата {pay} 🪙 за бригаду вперёд.\n"
-        "<i>Гони сразу несколько — кто за чем.</i>"
-    )
+    return "\n".join([
+        "⛏ <b>БРИГАДЫ РАБОТНИКОВ</b>",
+        "",
+        f"«Свободно {c.free}/{c.total} · в пути {c.out} · вернулись {c.ready}»",
+        "",
+        *_branch("УСЛОВИЯ", [
+            f"Ходка — {balance.EXPEDITION_HOURS} ч",
+            f"Плата — {pay} 🪙 за бригаду вперёд",
+        ]),
+        "",
+        "<i>Гони сразу несколько — кто за чем.</i>",
+    ])
 
 
 def expedition_no_slot() -> str:
@@ -1177,63 +1184,54 @@ def expedition_returned(resources: list) -> str:
 def income_success(r) -> str:
     from bot.game import production as prod
 
-    lines = [
-        "💰 <b>Касса</b>",
-        "",
-        f"<blockquote>В кассе осело <b>{r.gold} 🪙</b></blockquote>",
-        "",
-    ]
+    income = [f"Пассив — {r.passive}"]
     if r.sales > 0:
         parts = [
             f"{prod.GOODS[k].name} {n}"
             for k, n in sorted(r.sold.items(), key=lambda kv: -prod.GOODS[kv[0]].price)
         ]
-        lines.append(f"Пассив {r.passive} + сбыт {r.sales}")
-        lines.append(f"🍺 Раскуплено: {' · '.join(parts)}")
+        income.append(f"Сбыт — {r.sales}")
+        income.append(f"🍺 Раскуплено: {' · '.join(parts)}")
     else:
-        lines.append("Сбыта нет — только пассивный доход с заведения.")
+        income.append("Сбыта нет — только пассив")
+
+    mods = []
     if r.fair:
-        lines.append("🎪 Ярмарка! Гости валом — спрос вдвое. Куй железо!")
+        mods.append("🎪 Ярмарка — спрос вдвое, куй железо!")
     if r.city_label and r.skim:
-        lines.append(
-            f"{r.city_label}: с выручки утекло <b>{r.skim} 🪙</b> "
-            f"(в кассе осталось {r.gold - r.skim})."
-        )
+        mods.append(f"{r.city_label} — утекло {r.skim} 🪙")
     elif r.city_label:
-        lines.append(f"{r.city_label} — сказывается на сбыте в городе.")
+        mods.append(f"{r.city_label}")
     if r.perk_demand > 1.0:
-        lines.append(
-            f"💰 Купеческая протекция: +{round((r.perk_demand - 1) * 100)}% к сбыту."
-        )
+        mods.append(f"💰 Купеческая протекция — +{round((r.perk_demand - 1) * 100)}% сбыт")
     if r.mood_factor >= 1.02:
-        lines.append(
-            f"😀 Город в приподнятом духе — спрос выше на "
-            f"{round((r.mood_factor - 1) * 100)}%."
-        )
+        mods.append(f"😀 Город в духе — +{round((r.mood_factor - 1) * 100)}% спрос")
     elif r.mood_factor <= 0.98:
-        lines.append(
-            f"😟 Город хмур — гуляют вяло, спрос ниже на "
-            f"{round((1 - r.mood_factor) * 100)}%."
-        )
+        mods.append(f"😟 Город хмур — −{round((1 - r.mood_factor) * 100)}% спрос")
     if r.season_demand >= 1.4:
-        lines.append(
-            f"{r.season_label} — гуляет весь город, спрос "
-            f"×{r.season_demand:g}! Лови момент."
-        )
+        mods.append(f"{r.season_label} — спрос ×{r.season_demand:g}!")
     elif r.season_demand >= 1.02:
-        lines.append(
-            f"{r.season_label}: спрос выше на {round((r.season_demand - 1) * 100)}%."
-        )
+        mods.append(f"{r.season_label} — +{round((r.season_demand - 1) * 100)}% спрос")
     elif r.season_demand <= 0.98:
-        lines.append(
-            f"{r.season_label}: народ по домам, спрос ниже на "
-            f"{round((1 - r.season_demand) * 100)}%."
-        )
+        mods.append(f"{r.season_label} — −{round((1 - r.season_demand) * 100)}% спрос")
+
+    parts = [
+        "💰 <b>КАССА</b>",
+        "",
+        f"«В кассе осело {r.gold} 🪙»",
+        "",
+        *_branch("ДОХОД", income),
+    ]
+    if mods:
+        parts += ["", *_branch("ОБСТАНОВКА", mods)]
+    tail = []
     if r.rep_gain:
-        lines.append(f"⭐ +{r.rep_gain} к репутации за бойкую торговлю.")
+        tail.append(f"⭐ +{r.rep_gain} к репутации за бойкую торговлю")
     if r.premium_unsold:
-        lines.append("⚠️ Состоятельных гостей мало — дорогое не разбирают. Репутация решает.")
-    return "\n".join(lines)
+        tail.append("⚠️ Состоятельных мало — дорогое не разбирают")
+    if tail:
+        parts += ["", *tail]
+    return "\n".join(parts)
 
 
 def income_empty() -> str:
@@ -1242,16 +1240,22 @@ def income_empty() -> str:
 
 def upgrade_offer(tavern: Tavern, cost: dict) -> str:
     new_stats = balance.stats_for_level(tavern.level + 1)
-    return (
-        f"🔨 <b>Перестройка до уровня {tavern.level + 1}</b>\n\n"
-        f"<b>Выложишь</b>\n"
-        f"🪙 {cost['gold']} · 🪵 {cost['wood']} · 🌾 {cost['grain']} · 🌿 {cost['hops']}\n\n"
-        f"<b>Получишь</b>\n"
-        f"👥 Вместимость — {tavern.capacity} → {new_stats['capacity']}\n"
-        f"✨ Комфорт — {tavern.comfort} → {new_stats['comfort']}\n"
-        f"💰 Доход — {tavern.income_rate} → {new_stats['income_rate']} 🪙/час\n\n"
-        "<i>Плотники деньги вперёд берут и сдачу не дают.</i>"
-    )
+    return "\n".join([
+        f"🔨 <b>ПЕРЕСТРОЙКА · ур. {tavern.level + 1}</b>",
+        "",
+        *_branch("ВЫЛОЖИШЬ", [
+            f"🪙 {cost['gold']} · 🪵 {cost['wood']} · "
+            f"🌾 {cost['grain']} · 🌿 {cost['hops']}",
+        ]),
+        "",
+        *_branch("ПОЛУЧИШЬ", [
+            f"👥 Вместимость — {tavern.capacity} → {new_stats['capacity']}",
+            f"✨ Комфорт — {tavern.comfort} → {new_stats['comfort']}",
+            f"💰 Доход — {tavern.income_rate} → {new_stats['income_rate']}/ч",
+        ]),
+        "",
+        "<i>Плотники деньги вперёд берут и сдачу не дают.</i>",
+    ])
 
 
 def upgrade_success(new_level: int) -> str:
@@ -1330,23 +1334,19 @@ def character_screen(player, craft_line: str = "") -> str:
     stats = it.combat_stats(equipment)
     worn = len(equipment)
 
-    lines = [
-        f"🧍 <b>{escape(player.first_name)}, хозяин кабака</b>",
+    parts = [
+        f"🧍 <b>{escape(player.first_name.upper())}, ХОЗЯИН КАБАКА</b>",
         "",
-        f"<blockquote>Морда кирпичом, руки в мозолях. "
-        f"Надето {worn}/{len(it.SLOTS)}.</blockquote>",
+        f"«Морда кирпичом, руки в мозолях. Надето {worn}/{len(it.SLOTS)}»",
     ]
     if craft_line:
-        lines += ["", craft_line]
-    lines += [
-        "",
-        "<b>⚔ Боевые</b>",
+        parts += ["", craft_line]
+    parts += ["", *_branch("БОЕВЫЕ", [
         f"⚔ Урон — {stats['damage']}",
         f"💥 Крит — {stats['crit']}%",
         f"🛡 Броня — {stats['armor']}",
-        f"🍀 Удача — {stats['luck']} "
-        f"(счастливая вылазка {balance.lucky_chance(stats['luck'])}%)",
-    ]
+        f"🍀 Удача — {stats['luck']} · вылазка {balance.lucky_chance(stats['luck'])}%",
+    ])]
     bonuses = []
     if it.income_multiplier(equipment) > 1:
         bonuses.append(f"+{round((it.income_multiplier(equipment)-1)*100)}% доход")
@@ -1358,19 +1358,23 @@ def character_screen(player, craft_line: str = "") -> str:
     if it.pay_multiplier(equipment) < 1:
         bonuses.append(f"−{round((1-it.pay_multiplier(equipment))*100)}% плата работникам")
     if bonuses:
-        lines += ["", "<b>💼 Хозяйство</b>", " · ".join(bonuses)]
-    lines += ["", "<i>Голый трактирщик — смешной трактирщик. Загляни в кузницу.</i>"]
-    return "\n".join(lines)
+        parts += ["", *_branch("ХОЗЯЙСТВО", bonuses)]
+    parts += ["", "<i>Голый трактирщик — смешной трактирщик. Загляни в кузницу.</i>"]
+    return "\n".join(parts)
 
 
 def forge_screen(player) -> str:
-    return (
-        "⚒ <b>Кузница Недоливска</b>\n\n"
-        "<blockquote>Мастер плюёт на ладони и смотрит на твоё золото. "
-        "Один заказ за раз, деньги вперёд, претензии — никогда.</blockquote>\n\n"
-        f"🪙 {player.gold} · 🪵 {inventory.get(player, 'wood')} · "
-        f"🌾 {inventory.get(player, 'grain')} · 🌿 {inventory.get(player, 'hops')}"
-    )
+    return "\n".join([
+        "⚒ <b>КУЗНИЦА НЕДОЛИВСКА</b>",
+        "",
+        "«Мастер плюёт на ладони и косится на твоё золото. "
+        "Один заказ за раз, деньги вперёд»",
+        "",
+        *_branch("В МОШНЕ", [
+            f"🪙 {player.gold} · 🪵 {inventory.get(player, 'wood')} · "
+            f"🌾 {inventory.get(player, 'grain')} · 🌿 {inventory.get(player, 'hops')}",
+        ]),
+    ])
 
 
 def _tier_bonus_line(item, tier: int) -> str:
