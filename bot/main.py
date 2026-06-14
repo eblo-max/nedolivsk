@@ -127,4 +127,9 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    try:
+        import uvloop  # быстрый event loop (Linux/Railway); на Windows-dev нет — ок
+        uvloop.install()
+    except ImportError:
+        pass
     asyncio.run(main())

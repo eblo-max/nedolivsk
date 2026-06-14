@@ -12,7 +12,12 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_async_engine(settings.database_url, echo=False)
+engine = create_async_engine(
+    settings.database_url,
+    echo=False,
+    pool_pre_ping=True,   # проверять живость соединения перед выдачей (Railway роняет idle)
+    pool_recycle=1800,    # переоткрывать соединения старше 30 мин
+)
 session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
