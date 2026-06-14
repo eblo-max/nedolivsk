@@ -78,8 +78,12 @@ def cached_media(img: Path) -> str | InputFile:
 
 
 def remember_file_id(img: Path, message: Message | None) -> None:
-    if message is not None and message.photo:
+    if message is None:
+        return
+    if message.photo:
         _file_id_cache[str(img)] = message.photo[-1].file_id
+    elif message.video:
+        _file_id_cache[str(img)] = message.video.file_id
 
 
 async def send_tavern_screen(

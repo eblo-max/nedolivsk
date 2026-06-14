@@ -1,10 +1,15 @@
-"""Охота: выбор зверя и мгновенный бой по статам снаряги."""
+"""Охота: бестиарий, бриф зверя (расклад по статам + добыча), бой.
+
+У зверя может быть видео (assets/<video>.mp4) — показываем его при просмотре
+брифа и в бою, морфя панель в видео; в меню/прочих экранах — фото/текст.
+"""
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import CallbackQuery, InputMediaVideo
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import texts
+from bot import images, panels, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import combat
@@ -24,19 +29,55 @@ async def _player(
     return player
 
 
+async def _render(callback: CallbackQuery, caption: str, markup,
+                  video: str | None = None) -> None:
+    """Показать экран охоты. video задан → панель-видео (морфим); иначе фото/текст."""
+    msg = callback.message
+    path = images.named_video(video) if video else None
+    if path is not None:
+        media = common.cached_media(path)
+        if msg.photo or msg.video:           # есть медиа — подменяем на видео
+            try:
+                res = await msg.edit_media(
+                    InputMediaVideo(media=media, caption=caption, parse_mode="HTML"),
+                    reply_markup=markup)
+                common.remember_file_id(path, res)
+                return
+            except TelegramBadRequest:
+                pass
+        panels.release(msg)                  # из текста / правка не прошла — пересоздаём
+        try:
+            await msg.delete()
+        except TelegramBadRequest:
+            pass
+        sent = await msg.answer_video(media, caption=caption, reply_markup=markup)
+        common.remember_file_id(path, sent)
+        panels.claim(sent, callback.from_user.id)
+        return
+    if msg.video:                            # уходим с видео на текстовый экран
+        panels.release(msg)
+        try:
+            await msg.delete()
+        except TelegramBadRequest:
+            pass
+        sent = await msg.answer(caption, reply_markup=markup)
+        panels.claim(sent, callback.from_user.id)
+        return
+    await common.caption_edit(msg, caption, markup)
+
+
 @router.callback_query(F.data == "hunt")
 async def cb_hunt(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _player(callback, session)
     if player is None:
         return
-    await common.caption_edit(
-        callback.message, texts.hunt_menu(player), kb.hunt_menu_kb(player))
+    await _render(callback, texts.hunt_menu(player), kb.hunt_menu_kb(player))
     await callback.answer()
 
 
 @router.callback_query(F.data.startswith("hbeast:"))
 async def cb_hunt_beast(callback: CallbackQuery, session: AsyncSession) -> None:
-    """Бриф зверя: HP, расклад по статам, таблица добычи."""
+    """Бриф зверя: HP, расклад по статам, таблица добычи (+ видео, если есть)."""
     player = await _player(callback, session)
     if player is None:
         return
@@ -44,9 +85,8 @@ async def cb_hunt_beast(callback: CallbackQuery, session: AsyncSession) -> None:
     if enemy is None:
         await callback.answer()
         return
-    await common.caption_edit(
-        callback.message, texts.hunt_detail(player, enemy),
-        kb.hunt_detail_kb(enemy.id))
+    await _render(callback, texts.hunt_detail(player, enemy),
+                  kb.hunt_detail_kb(enemy.id), video=enemy.video or None)
     await callback.answer()
 
 
@@ -65,6 +105,6 @@ async def cb_hunt_fight(callback: CallbackQuery, session: AsyncSession) -> None:
         else:
             await callback.answer()
         return
-    await common.caption_edit(
-        callback.message, texts.hunt_result(res), kb.hunt_after_kb())
+    await _render(callback, texts.hunt_result(res), kb.hunt_after_kb(),
+                  video=res.enemy.video or None)
     await callback.answer("🏹 Победа!" if res.fight.win else "🩸 Поражение…")

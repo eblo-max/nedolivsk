@@ -33,3 +33,12 @@ def named_image(name: str) -> Path | None:
 def warehouse_image() -> Path | None:
     """Картинка склада: assets/sklad.{jpg,jpeg,png}, иначе None."""
     return named_image("sklad")
+
+
+def named_video(name: str) -> Path | None:
+    """Видео раздела/зверя: assets/<name>.{mp4,webm,gif}."""
+    for ext in ("mp4", "webm", "gif"):
+        p = ASSETS_DIR / f"{name}.{ext}"
+        if p.is_file():
+            return p
+    return None
