@@ -113,6 +113,20 @@ class CityState(Base):
     )
 
 
+class LootDrop(Base):
+    """Подкидыш в общий чат: что-то «потерялось». Кто первый нажал — подобрал
+    (claimed_by). Исход роллится при подборе; строка нужна для гонки «кто первый»."""
+
+    __tablename__ = "loot_drops"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    claimed_by: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class Chronicle(Base):
     """Летопись города: лента заметных событий для экрана «Хроника»."""
 

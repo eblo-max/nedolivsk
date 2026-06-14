@@ -21,6 +21,7 @@ from bot.handlers import (
     commands,
     group,
     hub,
+    loot,
     rating,
     start,
     story,
@@ -79,7 +80,8 @@ async def main() -> None:
     dp.include_routers(
         admin.router, worldmap_cmd.router, rating.router, character.router,
         buildings.router, start.router, tavern.router, story.router,
-        trade.router, auction.router, commands.router, hub.router, group.router
+        trade.router, auction.router, commands.router, loot.router,
+        hub.router, group.router
     )
 
     notifier_task = asyncio.create_task(notifier_loop(bot))

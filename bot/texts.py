@@ -1524,6 +1524,25 @@ def market_pulse_chron(cit) -> str:
     return f"{cit.name} {verb}."
 
 
+def loot_drop(flavor: str) -> str:
+    return f"👀 <b>{flavor}</b>\n\nКто первый нажмёт — тот и подберёт!"
+
+
+def loot_claimed(name: str, out: dict, stored: bool = True) -> str:
+    name = escape(name)
+    if out["kind"] == "resource":
+        rn = RESOURCE_NAMES.get(out["res"], out["res"])
+        re_ = RESOURCE_EMOJI.get(out["res"], "📦")
+        if stored:
+            return (f"🤲 <b>{name}</b> подобрал и нашёл там "
+                    f"{re_} {rn} ×{out['qty']}! Подфартило.")
+        return (f"🤲 <b>{name}</b> нашёл {re_} {rn} ×{out['qty']}, да кабака нет — "
+                "добро пропало даром. Заводи свой: /start")
+    if out["kind"] == "nothing":
+        return f"🤲 <b>{name}</b> подобрал… а там пусто. Показалось, видать. Облом."
+    return f"🤲 <b>{name}</b> подобрал… {out['junk']}. Фу-у-у, лучше б мимо прошёл."
+
+
 def income_empty() -> str:
     return "💤 Касса пуста, как башка завсегдатая. Заглядывай позже."
 

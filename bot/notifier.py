@@ -16,11 +16,14 @@ from bot.db.models import Player, Tavern
 from bot.game import auction as auctionmod
 from bot.game import balance
 from bot.game import city as citymod
+from bot.game import loot
 from bot.game import market as marketmod
 from bot.game import npc
 from bot.game import season, story_engine, story_state
 from bot.game import world as wld
-from bot.keyboards.inline import buildings_notify_kb, claim_kb, craft_claim_kb
+from bot.keyboards.inline import (
+    buildings_notify_kb, claim_kb, craft_claim_kb, loot_kb,
+)
 
 CHECK_INTERVAL_SECONDS = 60
 
@@ -268,6 +271,16 @@ async def _notify_returned(bot: Bot) -> None:
                 if kind == "activate":
                     await repo.add_chronicle(session, city.chat_id, sit.chron)
 
+        # Подкидыш: иногда в случайном чате «что-то теряется» — кто первый, тот подобрал.
+        await repo.cleanup_loot(session)
+        loot_to_post: list[tuple[int, int]] = []
+        if random.random() < balance.LOOT_DROP_CHANCE:
+            chat_ids = await repo.all_chat_ids(session)
+            if chat_ids:
+                target = random.choice(chat_ids)
+                drop = await repo.create_loot(session, target)
+                loot_to_post.append((target, drop.id))
+
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода
         for city in cities:
@@ -299,3 +312,11 @@ async def _notify_returned(bot: Bot) -> None:
                 await bot.send_message(chat_id, text)
             except Exception:  # noqa: BLE001 — бота нет в чате и т.п.
                 logger.warning("Анонс ситуации не доставлен в чат %s", chat_id)
+        # Подкидыш — постим после коммита (строка уже сохранена, id известен).
+        for chat_id, drop_id in loot_to_post:
+            try:
+                await bot.send_message(
+                    chat_id, texts.loot_drop(loot.flavor()),
+                    reply_markup=loot_kb(drop_id))
+            except Exception:  # noqa: BLE001 — бота нет в чате и т.п.
+                logger.warning("Подкидыш не доставлен в чат %s", chat_id)

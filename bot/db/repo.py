@@ -1,10 +1,10 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
-    Chronicle, CityState, KnownChat, Player, Tavern, WorldState,
+    Chronicle, CityState, KnownChat, LootDrop, Player, Tavern, WorldState,
 )
 from bot.game import balance
 
@@ -84,6 +84,34 @@ async def add_chronicle(
                 Chronicle.chat_id == chat_id, Chronicle.id <= threshold
             )
         )
+
+
+async def create_loot(session: AsyncSession, chat_id: int) -> LootDrop:
+    """Создать подкидыш в чате (id нужен для callback кнопки «Поднять»)."""
+    drop = LootDrop(chat_id=chat_id)
+    session.add(drop)
+    await session.flush()
+    return drop
+
+
+async def claim_loot(session: AsyncSession, drop_id: int, user_id: int) -> bool:
+    """Атомарно застолбить подкидыш за первым нажавшим. True — этот игрок успел."""
+    cutoff = datetime.now(timezone.utc) - timedelta(
+        minutes=balance.LOOT_EXPIRE_MINUTES)
+    result = await session.execute(
+        update(LootDrop)
+        .where(LootDrop.id == drop_id,
+               LootDrop.claimed_by.is_(None),
+               LootDrop.created_at >= cutoff)
+        .values(claimed_by=user_id)
+    )
+    return result.rowcount == 1
+
+
+async def cleanup_loot(session: AsyncSession) -> None:
+    """Подчистить старые подкидыши (день и старше), чтобы таблица не пухла."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+    await session.execute(delete(LootDrop).where(LootDrop.created_at < cutoff))
 
 
 async def recent_chronicle(

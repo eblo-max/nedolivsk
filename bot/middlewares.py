@@ -37,6 +37,9 @@ class PanelGuardMiddleware(BaseMiddleware):
         event: CallbackQuery,
         data: dict[str, Any],
     ) -> Any:
+        # Подкидыш — публичная кнопка: жмёт любой, не только владелец панели.
+        if event.data and event.data.startswith("loot:"):
+            return await handler(event, data)
         msg = event.message
         if panels.is_group(msg):
             owner = panels.owner_of(msg.chat.id, msg.message_id)

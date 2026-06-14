@@ -171,6 +171,13 @@ def trade_counter_kb(counter: int) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def loot_kb(drop_id: int) -> InlineKeyboardMarkup:
+    """Кнопка подкидыша — кто первый нажал, тот подобрал (публичная)."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🤲 Поднять!", callback_data=f"loot:{drop_id}")
+    return kb.as_markup()
+
+
 def back_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="↩️ К таверне", callback_data="tavern")
