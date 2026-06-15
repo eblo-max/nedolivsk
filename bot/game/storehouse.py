@@ -115,7 +115,7 @@ def render(inventory: dict | None) -> bytes:
             scale = min(iw_max / sprite.width, ih_max / sprite.height)
             sp = sprite.resize(
                 (max(1, int(sprite.width * scale)), max(1, int(sprite.height * scale))),
-                Image.LANCZOS,
+                Image.Resampling.LANCZOS,
             )
             px = x1 + (w - sp.width) // 2
             py = y1 + 6 + (ih_max - sp.height) // 2

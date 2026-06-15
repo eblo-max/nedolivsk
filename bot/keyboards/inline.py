@@ -510,7 +510,7 @@ def auction_qty_kb(good: str, stock: int) -> InlineKeyboardMarkup:
 def auction_price_kb(good: str, qty: int, prices: list[int]) -> InlineKeyboardMarkup:
     labels = ("По рынку", "Бодрее", "Дорого")
     kb = InlineKeyboardBuilder()
-    for idx, (lab, p) in enumerate(zip(labels, prices)):
+    for idx, (lab, p) in enumerate(zip(labels, prices, strict=False)):
         kb.button(text=f"{lab} · {p} 🪙/шт", callback_data=f"aucp:{good}:{qty}:{idx}")
     kb.button(text="↩️ Назад", callback_data=f"aucg:{good}")
     kb.adjust(1)

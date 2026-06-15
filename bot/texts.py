@@ -656,7 +656,7 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
             status = "😴 Простаивает."
         lines = [head, "", status, "", f"Передел (ур. {level}):"]
         src_keys: set[str] = set()
-        for recipe, (inp, mins, _o) in prod.GRIND[building.id].items():
+        for recipe, (_inp, mins, _o) in prod.GRIND[building.id].items():
             cin = prod.grind_inputs(building.id, recipe, level)
             out = prod.grind_output(building.id, recipe, level)
             src = " ".join(f"{ico.get(r, r)}{q}" for r, q in cin.items())

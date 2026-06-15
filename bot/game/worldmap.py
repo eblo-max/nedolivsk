@@ -131,7 +131,7 @@ def render(taverns: list[MapTavern]) -> bytes:
         if sprite is not None:
             width = sprite_width(tier)
             sp = sprite.resize(
-                (width, int(sprite.height * width / sprite.width)), Image.LANCZOS
+                (width, int(sprite.height * width / sprite.width)), Image.Resampling.LANCZOS
             )
             # низ здания — в центр круга, чуть ниже
             base.alpha_composite(sp, (x - sp.width // 2, y - sp.height + 55))
