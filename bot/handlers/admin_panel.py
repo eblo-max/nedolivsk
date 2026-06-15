@@ -536,6 +536,7 @@ async def cb_resetok(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.answer("Нет игрока.", show_alert=True)
         return
     await session.execute(delete(Tavern).where(Tavern.player_id == pid))
+    await repo.delete_player_orders(session, pid)  # биржевые лоты не осиротят
     # сброс полей игрока к стартовым
     player.level = 1
     player.gold = 100
@@ -584,6 +585,7 @@ async def cb_delok(cb: CallbackQuery, session: AsyncSession) -> None:
         return
     pid = int(cb.data.rsplit(":", 1)[1])
     await session.execute(delete(Tavern).where(Tavern.player_id == pid))
+    await repo.delete_player_orders(session, pid)
     await session.execute(delete(Player).where(Player.id == pid))
     _alog(cb, session, f"🗑 удалил игрока id{pid}")
     kb = InlineKeyboardBuilder()

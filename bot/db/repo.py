@@ -262,6 +262,12 @@ async def delete_order(session: AsyncSession, order_id: int) -> None:
     await session.execute(delete(MarketOrder).where(MarketOrder.id == order_id))
 
 
+async def delete_player_orders(session: AsyncSession, seller_id: int) -> None:
+    """Снести все биржевые лоты игрока (при сбросе/удалении — чтоб не осиротели)."""
+    await session.execute(
+        delete(MarketOrder).where(MarketOrder.seller_id == seller_id))
+
+
 async def recent_chronicle(
     session: AsyncSession, chat_id: int, limit: int = 10
 ) -> list[str]:

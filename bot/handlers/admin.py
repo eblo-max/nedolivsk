@@ -37,6 +37,7 @@ async def cmd_reset(
         return
 
     await session.execute(delete(Tavern).where(Tavern.player_id == target_id))
+    await repo.delete_player_orders(session, target_id)
     await session.execute(delete(Player).where(Player.id == target_id))
     await message.answer(
         f"🔥 Готово. Игрок {target_id} стёрт подчистую — таверна, золото, "

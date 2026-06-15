@@ -289,6 +289,13 @@ async def cb_fill_buy(callback: CallbackQuery, session: AsyncSession) -> None:
     if order.seller_id == player.id:
         await callback.answer("Это твоя заявка.", show_alert=True)
         return
+    # Владелец заявки должен существовать и иметь погреб — иначе товар «в никуда».
+    buyer = await repo.get_player(session, order.seller_id, for_update=True)
+    if buyer is None or buyer.tavern is None:
+        await repo.delete_order(session, order.id)  # протухшая сиротская заявка
+        await callback.answer("Заявка протухла — хозяин сгинул.", show_alert=True)
+        await _render_list(callback, session, player, "buy", "all", 0)
+        return
     good, nm = order.good, _gname(order.good)
     stock = int((player.tavern.products or {}).get(good, 0))
     want = order.qty if qarg == "all" else int(qarg)
@@ -300,13 +307,11 @@ async def cb_fill_buy(callback: CallbackQuery, session: AsyncSession) -> None:
     net = bourse.net_to_seller(gross)
     bourse.freeze(player.tavern, good, qty)   # списать у продавца
     player.gold += net                        # ему — за вычетом налога
-    buyer = await repo.get_player(session, order.seller_id, for_update=True)
-    if buyer is not None and buyer.tavern is not None:
-        _give(buyer.tavern, good, qty)        # товар покупателю (из залога оплачено)
-        repo.queue_notify(session, buyer.id,
-                          f"📥 По твоей заявке доставили {qty}×{nm} "
-                          f"(из залога списано {gross} 🪙)")
-        repo.add_log(session, "player", buyer.id, f"📥 заявка: получил {qty}×{nm}")
+    _give(buyer.tavern, good, qty)            # товар покупателю (из залога оплачено)
+    repo.queue_notify(session, buyer.id,
+                      f"📥 По твоей заявке доставили {qty}×{nm} "
+                      f"(из залога списано {gross} 🪙)")
+    repo.add_log(session, "player", buyer.id, f"📥 заявка: получил {qty}×{nm}")
     order.qty -= qty
     if order.qty <= 0:
         await repo.delete_order(session, order.id)
