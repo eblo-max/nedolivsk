@@ -1,23 +1,39 @@
 """Ежедневный бонус («опохмел»).
 
-Раз в сутки игроку выпадает claimable-баф из пула. Он висит 24ч и сгорает,
-если не активировать. Активируешь когда хочешь — действует 4 часа; одновременно
-активен только один. Эффекты намеренно скромные (10–15%), чтобы не ломать
-экономику: дают приятный повод заходить каждый день, а не перекос в балансе.
+Сброс — каждое утро в 10:00 по Москве: после этого рубежа при заходе в таверну
+игроку выпадает новый claimable-баф из пула (затирая вчерашний невзятый).
+Активируешь когда хочешь — действует 4 часа; одновременно активен только один.
+Эффекты намеренно скромные (10–15%), чтобы не ломать экономику: дают приятный
+повод заходить каждый день, а не перекос в балансе.
 
 Состояние на Player:
-  bonus_kind / bonus_offered_at — висящее предложение и время его выдачи (TTL 24ч)
+  bonus_kind / bonus_offered_at — висящее предложение и время его выдачи
   buff_kind / buff_until        — активный баф и время его окончания
-  bonus_next_at                 — когда разрешено выдать следующее предложение
+  bonus_next_at                 — рубеж (10:00 МСK) того дня, за который бонус
+                                  уже выдан (маркер «сегодня выдали»)
 """
 
 import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-OFFER_TTL_HOURS = 24   # сколько висит неактивированное предложение
-BUFF_HOURS = 4         # длительность активного бафа
-COOLDOWN_HOURS = 24    # как часто появляется новое предложение
+BUFF_HOURS = 4              # длительность активного бафа
+MSK = timezone(timedelta(hours=3))  # московское время (UTC+3, без перевода часов)
+RESET_HOUR_MSK = 10         # ежедневный сброс бонуса — 10:00 МСК
+
+
+def _last_reset(now: datetime) -> datetime:
+    """Последний пройденный рубеж 10:00 МСК на момент now (в UTC)."""
+    msk = now.astimezone(MSK)
+    boundary = msk.replace(hour=RESET_HOUR_MSK, minute=0, second=0, microsecond=0)
+    if msk < boundary:
+        boundary -= timedelta(days=1)
+    return boundary.astimezone(timezone.utc)
+
+
+def _next_reset(now: datetime) -> datetime:
+    """Ближайший будущий рубеж 10:00 МСК (в UTC)."""
+    return _last_reset(now) + timedelta(days=1)
 
 
 @dataclass(frozen=True)
@@ -63,24 +79,23 @@ def _now() -> datetime:
 
 
 def refresh(player, now: datetime | None = None) -> None:
-    """Прокрутить состояние бонуса: снять истёкший баф, сжечь протухшее
-    предложение, выдать новое по кулдауну. Вызывать перед показом таверны."""
+    """Прокрутить состояние бонуса: снять истёкший баф и, если наступил новый
+    день (после 10:00 МСК), выдать свежий бонус. Вызывать перед показом таверны."""
     now = now or _now()
     # истёкший активный баф
     if player.buff_until is not None and player.buff_until <= now:
         player.buff_kind = None
         player.buff_until = None
-    # протухшее (неактивированное за 24ч) предложение сгорает
-    if (player.bonus_kind is not None and player.bonus_offered_at is not None
-            and player.bonus_offered_at + timedelta(hours=OFFER_TTL_HOURS) <= now):
-        player.bonus_kind = None
-        player.bonus_offered_at = None
-    # выдать новое предложение, если ничего не висит и кулдаун прошёл
-    if player.bonus_kind is None and (
-            player.bonus_next_at is None or player.bonus_next_at <= now):
+    # ежедневный сброс: если с последнего рубежа 10:00 МСК ещё не выдавали —
+    # выдаём свежий бонус (затирая вчерашний невзятый).
+    reset = _last_reset(now)
+    granted = player.bonus_next_at
+    if granted is not None and granted.tzinfo is None:
+        granted = granted.replace(tzinfo=timezone.utc)
+    if granted is None or granted < reset:
         player.bonus_kind = random.choice(POOL)
         player.bonus_offered_at = now
-        player.bonus_next_at = now + timedelta(hours=COOLDOWN_HOURS)
+        player.bonus_next_at = reset  # маркер дня выдачи
 
 
 def offer(player) -> Boon | None:
@@ -104,11 +119,11 @@ def minutes_left(player, now: datetime | None = None) -> int:
 
 
 def offer_hours_left(player, now: datetime | None = None) -> int:
-    """Сколько часов осталось до сгорания висящего предложения."""
-    if player.bonus_kind is None or player.bonus_offered_at is None:
+    """Сколько часов до сброса (10:00 МСК), когда бонус сменится новым."""
+    if player.bonus_kind is None:
         return 0
     now = now or _now()
-    left = (player.bonus_offered_at + timedelta(hours=OFFER_TTL_HOURS) - now)
+    left = _next_reset(now) - now
     return max(0, int(left.total_seconds() // 3600) + 1)
 
 

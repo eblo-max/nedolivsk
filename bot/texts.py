@@ -1881,7 +1881,7 @@ def bonus_screen(player: Player) -> str:
         "",
         *_branch("УСЛОВИЯ", [
             f"✨ Действует {buffmod.BUFF_HOURS} ч после активации",
-            f"🔥 Сгорит через {buffmod.offer_hours_left(player)} ч, если не забрать",
+            f"🔄 Сброс в 10:00 МСК — через {buffmod.offer_hours_left(player)} ч",
         ]),
         "",
         "<i>Активируй, когда подойдёт момент — и греби больше.</i>",
