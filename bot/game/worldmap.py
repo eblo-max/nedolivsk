@@ -12,6 +12,8 @@
 """
 
 import io
+import math
+import random
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,28 +32,85 @@ ZONE_RECTS: dict[str, tuple[float, float, float, float]] = {
     "green_valleys": (0.47, 0.22, 0.76, 0.71),
     "red_wastes":    (0.17, 0.61, 0.45, 0.89),
 }
-# Сетка (столбцы, строки) на зону. cols*rows = вместимость зоны.
-ZONE_GRID: dict[str, tuple[int, int]] = {
-    "north_wilds":   (6, 4),   # 24
-    "green_valleys": (7, 7),   # 49
-    "red_wastes":    (6, 5),   # 30
-}
-
-# Размер спрайта таверны = доля ширины ячейки (чтобы влезал и не наезжал).
-SPRITE_CELL_FRAC = 0.92
+# Минимальная дистанция между тавернами (доля от стороны карты) — blue-noise:
+# таверны раскиданы органично, но не ближе этого, чтобы спрайты и подписи дышали.
+MIN_DIST = 0.072
+# Размер спрайта таверны = доля от MIN_DIST·сторона (чтобы влезал и не наезжал).
+SPRITE_FRAC = 0.62
 
 
 def _zone_index(zone: str) -> int:
     return ZONE_ORDER.index(zone)
 
 
+def _poisson(rect: tuple[float, float, float, float], d: float,
+             seed: int, k: int = 30) -> list[tuple[float, float]]:
+    """Blue-noise точки в прямоугольнике (Бридсон): минимум d между точками.
+    Детерминированно по seed → таверна на слоте всегда в одном месте."""
+    x1, y1, x2, y2 = rect
+    rng = random.Random(seed)
+    cell = d / math.sqrt(2)
+    gw = int((x2 - x1) / cell) + 1
+    gh = int((y2 - y1) / cell) + 1
+    grid = [-1] * (gw * gh)
+    pts: list[tuple[float, float]] = []
+    active: list[int] = []
+
+    def _add(p: tuple[float, float]) -> None:
+        gx = int((p[0] - x1) / cell)
+        gy = int((p[1] - y1) / cell)
+        grid[gy * gw + gx] = len(pts)
+        active.append(len(pts))
+        pts.append(p)
+
+    _add((x1 + rng.random() * (x2 - x1), y1 + rng.random() * (y2 - y1)))
+    while active:
+        ai = rng.randrange(len(active))
+        px, py = pts[active[ai]]
+        placed = False
+        for _ in range(k):
+            ang = rng.random() * 2 * math.pi
+            rad = d * (1 + rng.random())
+            nx, ny = px + math.cos(ang) * rad, py + math.sin(ang) * rad
+            if not (x1 <= nx < x2 and y1 <= ny < y2):
+                continue
+            gx, gy = int((nx - x1) / cell), int((ny - y1) / cell)
+            ok = True
+            for yy in range(max(0, gy - 2), min(gh, gy + 3)):
+                for xx in range(max(0, gx - 2), min(gw, gx + 3)):
+                    j = grid[yy * gw + xx]
+                    if j != -1 and (pts[j][0] - nx) ** 2 + (pts[j][1] - ny) ** 2 < d * d:
+                        ok = False
+                        break
+                if not ok:
+                    break
+            if ok:
+                _add((nx, ny))
+                placed = True
+                break
+        if not placed:
+            active.pop(ai)
+    pts.sort(key=lambda p: (p[1], p[0]))  # сверху вниз — стабильный порядок слотов
+    return pts
+
+
+_zone_points_cache: dict[str, list[tuple[float, float]]] = {}
+
+
+def _zone_points(zone: str) -> list[tuple[float, float]]:
+    """Нормированные [0,1] позиции таверн зоны (blue-noise, детерминированно)."""
+    if zone not in _zone_points_cache:
+        _zone_points_cache[zone] = _poisson(
+            ZONE_RECTS[zone], MIN_DIST, seed=_zone_index(zone) + 1)
+    return _zone_points_cache[zone]
+
+
 def zone_slots(zone: str) -> list[int]:
-    """Все слот-id зоны (для assign_map_slot). id = (idx+1)*1000 + 1..cols*rows."""
-    if zone not in ZONE_GRID:
+    """Все слот-id зоны (для assign_map_slot). id = (idx+1)*1000 + 1..N."""
+    if zone not in ZONE_RECTS:
         return []
-    cols, rows = ZONE_GRID[zone]
     base = (_zone_index(zone) + 1) * 1000
-    return [base + i for i in range(1, cols * rows + 1)]
+    return [base + i for i in range(1, len(_zone_points(zone)) + 1)]
 
 
 def slot_zone(slot_id: int) -> str | None:
@@ -59,22 +118,17 @@ def slot_zone(slot_id: int) -> str | None:
     return ZONE_ORDER[idx] if 0 <= idx < len(ZONE_ORDER) else None
 
 
-def _slot_cell_xy(slot_id: int, w: int, h: int) -> tuple[int, int, int, int] | None:
-    """Центр ячейки слота и её размер в пикселях: (cx, cy, cell_w, cell_h)."""
+def _slot_pos(slot_id: int, w: int, h: int) -> tuple[int, int] | None:
+    """Пиксельный центр таверны по слоту (из blue-noise точки зоны)."""
     zone = slot_zone(slot_id)
     if zone is None:
         return None
-    cols, rows = ZONE_GRID[zone]
+    pts = _zone_points(zone)
     local = slot_id % 1000 - 1
-    if not 0 <= local < cols * rows:
+    if not 0 <= local < len(pts):
         return None
-    fx1, fy1, fx2, fy2 = ZONE_RECTS[zone]
-    x1, y1, x2, y2 = fx1 * w, fy1 * h, fx2 * w, fy2 * h
-    cw, ch = (x2 - x1) / cols, (y2 - y1) / rows
-    col, row = local % cols, local // cols
-    cx = x1 + cw * (col + 0.5)
-    cy = y1 + ch * (row + 0.5)
-    return int(cx), int(cy), int(cw), int(ch)
+    nx, ny = pts[local]
+    return int(nx * w), int(ny * h)
 
 
 def sprite_tier(level: int) -> int:
@@ -104,18 +158,19 @@ def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def _draw_label(d: ImageDraw.ImageDraw, x: int, y: int, text: str, size: int) -> None:
-    """Подпись с тёмной обводкой по центру."""
-    font = _font(size)
-    if len(text) > 14:
-        text = text[:13] + "…"
-    bbox = d.textbbox((0, 0), text, font=font)
-    w = bbox[2] - bbox[0]
-    px, py = x - w // 2, y
-    for dx in (-2, -1, 1, 2):
-        for dy in (-2, -1, 1, 2):
-            d.text((px + dx, py + dy), text, font=font, fill=(35, 18, 5))
-    d.text((px, py), text, font=font, fill=(250, 232, 185))
+def _text_size(text: str, font) -> tuple[int, int]:
+    left, top, right, bottom = font.getbbox(text)
+    return right - left, bottom - top
+
+
+def _blit_label(d: ImageDraw.ImageDraw, px: int, py: int, text: str, font) -> None:
+    """Подпись с тёмной обводкой, верхний-левый угол в (px, py)."""
+    d.text((px, py), text, font=font, fill=(250, 232, 185),
+           stroke_width=2, stroke_fill=(35, 18, 5))
+
+
+def _overlap(a: tuple, b: tuple) -> bool:
+    return not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1])
 
 
 def _draw_fallback_marker(
@@ -143,7 +198,8 @@ _cache_bytes: bytes | None = None
 
 
 def render(taverns: list[MapTavern]) -> bytes:
-    """Собирает карту с тавернами по авто-сетке. Кэширует по состоянию мира."""
+    """Карта с тавернами: blue-noise позиции + коллизийные подписи (PFLP).
+    Кэширует по состоянию мира."""
     global _cache_key, _cache_bytes
     key = tuple(sorted((t.slot, t.level, t.name) for t in taverns))
     if key == _cache_key and _cache_bytes is not None:
@@ -151,49 +207,72 @@ def render(taverns: list[MapTavern]) -> bytes:
 
     base = Image.open(MAP_FILE).convert("RGBA")
     w, h = base.size
+    unit = int(MIN_DIST * min(w, h))           # шаг разброса в px (карта квадратная)
+    sprite_w = max(24, int(unit * SPRITE_FRAC))
+    font = _font(max(13, int(unit * 0.34)))
 
-    # Единый размер таверн = самая тесная ячейка среди зон (нигде не наедут).
-    unit = min(
-        min((fx2 - fx1) * w / ZONE_GRID[z][0], (fy2 - fy1) * h / ZONE_GRID[z][1])
-        for z, (fx1, fy1, fx2, fy2) in ZONE_RECTS.items()
-    )
-    cell = int(unit)
-
-    # 1) Позиции один раз.
-    placed: list[tuple[int, int, MapTavern]] = []  # (cx, cy, tavern)
+    placed: list[tuple[int, int, MapTavern]] = []
     for t in taverns:
-        pos = _slot_cell_xy(t.slot, w, h)
+        pos = _slot_pos(t.slot, w, h)
         if pos is not None:
             placed.append((pos[0], pos[1], t))
+    placed.sort(key=lambda p: p[1])            # сверху вниз
 
-    # 2) Подложки-«пятаки» под таверны — полупрозрачным слоем (читаемость на фоне).
+    # 1) Подложки-«пятаки» под таверны — отдельным полупрозрачным слоем.
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay)
-    rr = int(cell * 0.46)
+    rr = int(sprite_w * 0.58)
     for cx, cy, _t in placed:
-        od.ellipse([cx - rr, cy - int(rr * 0.7), cx + rr, cy + int(rr * 0.7)],
+        od.ellipse([cx - rr, cy - int(rr * 0.62), cx + rr, cy + int(rr * 0.62)],
                    fill=(25, 15, 8, 95))
     base = Image.alpha_composite(base, overlay)
     d = ImageDraw.Draw(base)
 
-    # 3) Спрайты + подписи. Рисуем сверху вниз, чтобы нижние перекрывали верхние.
+    # 2) Спрайты + сбор занятых прямоугольников (footprint таверн).
     sprites: dict[int, Image.Image | None] = {}
-    target_w = max(24, int(cell * SPRITE_CELL_FRAC))
-    label_size = max(12, int(cell * 0.22))
-    for cx, cy, t in sorted(placed, key=lambda p: p[1]):
+    occupied: list[tuple[int, int, int, int]] = []
+    drawn: list[tuple[int, int, MapTavern, tuple[int, int, int, int]]] = []
+    for cx, cy, t in placed:
         tier = sprite_tier(t.level)
         if tier not in sprites:
             sprites[tier] = _load_sprite(tier)
         sprite = sprites[tier]
         if sprite is not None:
             sp = sprite.resize(
-                (target_w, max(1, int(sprite.height * target_w / sprite.width))),
+                (sprite_w, max(1, int(sprite.height * sprite_w / sprite.width))),
                 Image.Resampling.LANCZOS,
             )
-            base.alpha_composite(sp, (cx - sp.width // 2, cy - int(sp.height * 0.72)))
+            tx, ty = cx - sp.width // 2, cy - int(sp.height * 0.72)
+            base.alpha_composite(sp, (tx, ty))
+            srect = (tx, ty, tx + sp.width, ty + sp.height)
         else:
-            _draw_fallback_marker(d, cx, cy, t.level, target_w // 2)
-        _draw_label(d, cx, cy + int(cell * 0.34), t.name, label_size)
+            r = sprite_w // 2
+            _draw_fallback_marker(d, cx, cy, t.level, r)
+            srect = (cx - r, cy - r, cx + r, cy + r)
+        occupied.append(srect)
+        drawn.append((cx, cy, t, srect))
+
+    # 3) Подписи с выбором кандидат-позиции (PFLP): низ → верх → право → лево →
+    # ниже-низ. Берём первую без коллизий и в пределах карты; иначе пропускаем.
+    for cx, cy, t, (sx1, sy1, sx2, sy2) in drawn:
+        text = t.name if len(t.name) <= 14 else t.name[:13] + "…"
+        lw, lh = _text_size(text, font)
+        candidates = (
+            (cx - lw // 2, sy2 + 3),            # под спрайтом
+            (cx - lw // 2, sy1 - lh - 3),       # над спрайтом
+            (sx2 + 5, cy - lh // 2),            # справа
+            (sx1 - lw - 5, cy - lh // 2),       # слева
+            (cx - lw // 2, sy2 + lh + 6),       # ещё ниже
+        )
+        for px, py in candidates:
+            rect = (px - 2, py - 1, px + lw + 2, py + lh + 2)
+            if px < 4 or py < 4 or px + lw > w - 4 or py + lh > h - 4:
+                continue
+            if any(_overlap(rect, o) for o in occupied):
+                continue
+            _blit_label(d, px, py, text, font)
+            occupied.append(rect)
+            break
 
     out = io.BytesIO()
     base.convert("RGB").save(out, "JPEG", quality=88, optimize=True)
