@@ -1596,7 +1596,7 @@ def auction_settled(res: dict) -> str:
     g = prod.GOODS[res["good"]]
     if res["sold"]:
         return "\n".join([
-            f"🔨 <b>ЛОТ УШЁЛ!</b>",
+            "🔨 <b>ЛОТ УШЁЛ!</b>",
             "",
             f"{npc.label(res['npc'])} забрал лот.",
             "",

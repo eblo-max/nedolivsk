@@ -5,7 +5,7 @@
 Картинки предметов: assets/items/<item_id>.png (прозрачный фон).
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

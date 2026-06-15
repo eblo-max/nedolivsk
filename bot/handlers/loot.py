@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import effects, texts
 from bot.db import repo
 from bot.game import inventory, loot
-from bot.keyboards import inline as kb
 
 router = Router()
 

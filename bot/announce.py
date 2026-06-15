@@ -32,7 +32,7 @@ async def broadcast_fair(
     for chat_id in chat_ids:
         if media is not None:
             sent = await deliver(
-                lambda cid=chat_id: bot.send_photo(cid, media, caption=text),
+                lambda cid=chat_id, m=media: bot.send_photo(cid, m, caption=text),
                 what=f"ярмарка→{chat_id}")
             if sent is not None and sent.photo:
                 media = sent.photo[-1].file_id  # дальше шлём по file_id

@@ -11,7 +11,7 @@
 
 from datetime import datetime, timedelta, timezone
 
-from bot.game import balance, inventory, story_state
+from bot.game import inventory, story_state
 
 NEWBIE_MAX_LEVEL = 2          # «новичок», пока уровень таверны <= этого
 NEWBIE_GRACE_DAYS = 7        # поблажки — только первые N дней (анти-турель на ур.2)
