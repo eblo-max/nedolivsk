@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import balance, logic, perks, season, story_engine, story_state
+from bot.game import (
+    balance, logic, newbie, perks, season, story_engine, story_state,
+)
 from bot.game import city as citymod
 from bot.game import market as marketmod
 from bot.game import trade as trademod
@@ -69,6 +71,30 @@ async def cb_tavern(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "newbie")
+async def cb_newbie(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session)
+    if player is None:
+        return
+    await _safe_edit(callback, texts.newbie_screen(player, player.tavern),
+                     kb.newbie_kb(player))
+    await callback.answer()
+
+
+@router.callback_query(F.data == "newbie_claim")
+async def cb_newbie_claim(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _get_player(callback, session, lock=True)
+    if player is None:
+        return
+    total = newbie.claim_all(player, player.tavern)
+    await _safe_edit(callback, texts.newbie_screen(player, player.tavern),
+                     kb.newbie_kb(player))
+    if total:
+        repo.add_log(session, "player", player.id,
+                     f"📜 забрал награды грамоты: {sum(total.values())} ед.")
+    await callback.answer(texts.newbie_claimed(total), show_alert=True)
+
+
 @router.callback_query(F.data == "warehouse")
 async def cb_warehouse(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session)
@@ -112,6 +138,7 @@ async def cb_exp_start(callback: CallbackQuery, session: AsyncSession) -> None:
                 texts.expedition_no_gold(result.pay, player.gold), show_alert=True
             )
         return
+    newbie.mark(player, "nb_brigade")  # веха грамоты новосёла
 
     await _safe_edit(
         callback, texts.expedition_menu(player), kb.expedition_menu_kb(player)
@@ -247,6 +274,7 @@ async def cb_retail_sell(callback: CallbackQuery, session: AsyncSession) -> None
         await _safe_edit(callback, texts.retail_held(), kb.back_kb())
         await callback.answer("Товар разошёлся или скис.")
         return
+    newbie.mark(player, "nb_sale")  # веха грамоты новосёла
     skim = 0
     ce = citymod.effects(city, player, now)
     if ce.skim_pct and gold > 0:  # воры/корона снимают долю и со сбыта

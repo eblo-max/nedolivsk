@@ -67,7 +67,9 @@ async def _finish_sale(callback: CallbackQuery, player: Player, offer: dict,
     qty, gold = _sell(player, offer, unit)
     story_state.set_trade(player, None)
     if qty:
+        from bot.game import newbie
         from bot.game import production as prod
+        newbie.mark(player, "nb_sale")  # веха грамоты новосёла
         gname = prod.GOODS[offer["good"]].name if offer["good"] in prod.GOODS else offer["good"]
         repo.add_log(session, "player", player.id,
                      f"🤝 продал купцу {qty}×{gname} за {gold} 🪙")

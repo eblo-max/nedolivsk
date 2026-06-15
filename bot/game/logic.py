@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from bot.db.models import Player, Tavern
-from bot.game import balance, buff, inventory, items, perks, production, season
+from bot.game import (
+    balance, buff, inventory, items, newbie, perks, production, season,
+)
 
 
 def _now() -> datetime:
@@ -68,13 +70,15 @@ def start_expedition(player: Player, tavern: Tavern, resource: str) -> Expeditio
     level = tavern.level if tavern else 1
     equipment = getattr(player, "equipment", None)
     pay = max(1, int(balance.worker_pay(level) * items.pay_multiplier(equipment)
-                     * perks.expedition_pay_mult(player)))
+                     * perks.expedition_pay_mult(player)
+                     * newbie.pay_mult(tavern)))  # поблажка новичку
     if player.gold < pay:
         return ExpeditionStart(ok=False, reason="no_gold", pay=pay)
 
     player.gold -= pay
     hours = (balance.EXPEDITION_HOURS * items.speed_multiplier(equipment)
-             * buff.expedition_speed_mult(player))  # баф «Быстрые ноги»
+             * buff.expedition_speed_mult(player)   # баф «Быстрые ноги»
+             * newbie.speed_mult(tavern))           # поблажка новичку
     exps.append({
         "resource": resource,
         "ends_at": (_now() + timedelta(hours=hours)).isoformat(),
@@ -98,7 +102,8 @@ def claim_expeditions(player: Player) -> list[tuple[str, int, bool]]:
         resource = e["resource"]
         amount = balance.expedition_yield(resource, level, player.region)
         amount = int(amount * items.yield_multiplier(equipment, resource)
-                     * season.yield_mult(resource) * buff.yield_mult(player))
+                     * season.yield_mult(resource) * buff.yield_mult(player)
+                     * newbie.yield_mult(player.tavern))  # поблажка новичку
         luck = (items.combat_stats(equipment)["luck"] + perks.luck_bonus(player)
                 + buff.luck_bonus(player))  # баф «Фартовый день»
         lucky = random.randint(1, 100) <= balance.lucky_chance(luck)

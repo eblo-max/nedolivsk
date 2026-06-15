@@ -98,14 +98,19 @@ async def tavern_region(
             callback.from_user.username,
             callback.from_user.first_name,
         )
+    chest = None
     if player.tavern is None:
         tavern = await repo.create_tavern(session, player, name, region)
         await repo.assign_map_slot(session, tavern, region)
         repo.add_log(session, "player", player.id,
                      f"🏗 завёл таверну «{name}» в регионе {REGIONS[region]}")
+        from bot.game import newbie
+        chest = newbie.grant_chest(player)  # стартовый сундук новосёла
 
     await callback.message.edit_text(
         texts.CREATED.format(name=escape(name), region=REGIONS[region])
     )
+    if chest:
+        await callback.message.answer(texts.starter_chest(chest))
     await send_tavern_screen(callback.message, player)
     await callback.answer()

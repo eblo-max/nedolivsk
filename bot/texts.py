@@ -1884,6 +1884,45 @@ def bonus_ready_push() -> str:
     return random.choice(_BONUS_PUSH)
 
 
+def _reward_str(reward: dict) -> str:
+    ico = {"gold": "🪙", **RESOURCE_EMOJI}
+    return " ".join(f"{ico.get(r, r)}{a}" for r, a in reward.items())
+
+
+def starter_chest(chest: dict) -> str:
+    return (
+        "📦 <b>СУНДУК НОВОСЁЛА</b>\n"
+        f"Город подкинул на обзаведение: {_reward_str(chest)}.\n"
+        "Трать с умом — на бригады да первую перестройку."
+    )
+
+
+def newbie_screen(player, tavern) -> str:
+    from bot.game import newbie
+    lines = [
+        "📜 <b>ГРАМОТА НОВОСЁЛА</b>",
+        "",
+        "«Обживайся, кабатчик — за первые шаги город отсыпет на бедность.»",
+        "",
+    ]
+    for _key, label, reward, done, claimed in newbie.states(player, tavern):
+        mark = "✅" if claimed else ("🎁" if done else "⬜")
+        lines.append(f"{mark} {label} — {_reward_str(reward)}")
+    if newbie.claimable(player, tavern):
+        lines += ["", "🎁 <b>Есть готовые награды — жми «Забрать»!</b>"]
+    lines += ["", *_branch("ПОБЛАЖКИ (ур. 1–2)", [
+        "🪙 работники −50% · ⛏ добыча +25% · 🦵 ходки быстрее",
+        "<i>снимутся, как дорастёшь до ур.3 — окрепнешь.</i>",
+    ])]
+    return "\n".join(lines)
+
+
+def newbie_claimed(total: dict) -> str:
+    if not total:
+        return "Пока нечего забирать — выполняй задания грамоты."
+    return f"🎁 Получено: {_reward_str(total)}. Так держать, новосёл!"
+
+
 def bonus_screen(player: Player) -> str:
     """Экран ежедневного бонуса: что выпало, эффект, сколько до сгорания."""
     from bot.game import buff as buffmod

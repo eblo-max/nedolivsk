@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import images, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import balance, buildings, production
+from bot.game import balance, buildings, newbie, production
 from bot.handlers import common
 from bot.keyboards import inline as kb
 
@@ -310,6 +310,7 @@ async def cb_prod_claim(callback: CallbackQuery, session: AsyncSession) -> None:
             return
         recipe, qty = res
         good = production.GOODS[recipe]
+        newbie.mark(player, "nb_craft")  # веха грамоты новосёла
         building = buildings.CATALOG[bid]
         await common.caption_edit(
             callback.message,
@@ -328,6 +329,7 @@ async def cb_prod_claim(callback: CallbackQuery, session: AsyncSession) -> None:
             return
         recipe, qty = result
         good = production.GOODS[recipe]
+        newbie.mark(player, "nb_craft")  # веха грамоты новосёла
         building = buildings.CATALOG[bid]
         await common.caption_edit(
             callback.message,
@@ -342,6 +344,8 @@ async def cb_prod_claim(callback: CallbackQuery, session: AsyncSession) -> None:
             await callback.answer("Эль ещё не готов.", show_alert=True)
             return
         outcome, tier, qty = result
+        if qty > 0:
+            newbie.mark(player, "nb_craft")  # веха грамоты новосёла
         building = buildings.CATALOG["brewery"]
         await common.caption_edit(
             callback.message,

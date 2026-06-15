@@ -67,11 +67,16 @@ def regions_kb() -> InlineKeyboardMarkup:
 
 
 def tavern_kb(player: Player) -> InlineKeyboardMarkup:
-    from bot.game import buff, story_state
+    from bot.game import buff, newbie, story_state
 
     kb = InlineKeyboardBuilder()
     sizes: list[int] = []
 
+    if newbie.visible(player, player.tavern):  # грамота новосёла (до ур.2)
+        ready = newbie.claimable(player, player.tavern)
+        kb.button(text="📜 Грамота новосёла 🎁" if ready else "📜 Грамота новосёла",
+                  callback_data="newbie", style="success" if ready else None)
+        sizes.append(1)
     if buff.offer(player) is not None and buff.active(player) is None:
         kb.button(text="🎁 Бонус дня!", callback_data="bonus", style="success")
         sizes.append(1)
@@ -199,6 +204,18 @@ def bonus_push_kb() -> InlineKeyboardMarkup:
     """Кнопка из утреннего пуша — сразу к экрану бонуса дня."""
     kb = InlineKeyboardBuilder()
     kb.button(text="🎁 Забрать опохмел", callback_data="bonus", style="success")
+    return kb.as_markup()
+
+
+def newbie_kb(player) -> InlineKeyboardMarkup:
+    """Экран грамоты новосёла: забрать готовые награды (если есть) + назад."""
+    from bot.game import newbie
+    kb = InlineKeyboardBuilder()
+    if newbie.claimable(player, player.tavern):
+        kb.button(text="🎁 Забрать награды", callback_data="newbie_claim",
+                  style="success")
+    kb.button(text="↩️ К таверне", callback_data="tavern")
+    kb.adjust(1)
     return kb.as_markup()
 
 
