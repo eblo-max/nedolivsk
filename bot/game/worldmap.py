@@ -172,6 +172,30 @@ def _fit_text(text: str, font, max_w: int) -> str:
     return (text + "…") if text else "…"
 
 
+_font_cache: dict[int, object] = {}
+
+
+def _cached_font(size: int):
+    f = _font_cache.get(size)
+    if f is None:
+        f = _font(size)
+        _font_cache[size] = f
+    return f
+
+
+def _fit_label(text: str, max_w: int, base: int, low: int):
+    """Адаптивный шрифт: уменьшаем кегль (base→low), чтобы имя влезло ЦЕЛИКОМ.
+    Если даже на минимуме не лезет — обрезаем с «…». Возвращает (текст, шрифт)."""
+    size = base
+    while size > low:
+        f = _cached_font(size)
+        if _text_size(text, f)[0] <= max_w:
+            return text, f
+        size -= 1
+    f = _cached_font(low)
+    return _fit_text(text, f, max_w), f
+
+
 def _blit_label(d: ImageDraw.ImageDraw, px: int, py: int, text: str, font) -> None:
     """Подпись с тёмной обводкой, верхний-левый угол в (px, py)."""
     d.text((px, py), text, font=font, fill=(250, 232, 185),
@@ -218,8 +242,10 @@ def render(taverns: list[MapTavern]) -> bytes:
     w, h = base.size
     unit = int(MIN_DIST * min(w, h))           # шаг разброса в px (карта квадратная)
     sprite_w = max(24, int(unit * SPRITE_FRAC))
-    font = _font(max(12, int(unit * 0.22)))    # компактная подпись
-    max_label_w = int(unit * 1.7)              # длинное имя ужимаем под эту ширину
+    # Адаптивная подпись: кегль подбирается под длину имени (base→low).
+    base_size = max(14, int(unit * 0.28))
+    low_size = max(10, int(unit * 0.15))
+    max_label_w = int(unit * 1.9)              # под эту ширину имя ужимается шрифтом
 
     placed: list[tuple[int, int, MapTavern]] = []
     for t in taverns:
@@ -265,8 +291,8 @@ def render(taverns: list[MapTavern]) -> bytes:
     # 3) Подписи с выбором кандидат-позиции (PFLP): низ → верх → право → лево →
     # ниже-низ. Берём первую без коллизий и в пределах карты; иначе пропускаем.
     for cx, cy, t, (sx1, sy1, sx2, sy2) in drawn:
-        text = _fit_text(t.name, font, max_label_w)
-        lw, lh = _text_size(text, font)
+        text, lfont = _fit_label(t.name, max_label_w, base_size, low_size)
+        lw, lh = _text_size(text, lfont)
         candidates = (
             (cx - lw // 2, sy2 + 3),            # под спрайтом
             (cx - lw // 2, sy1 - lh - 3),       # над спрайтом
@@ -280,7 +306,7 @@ def render(taverns: list[MapTavern]) -> bytes:
                 continue
             if any(_overlap(rect, o) for o in occupied):
                 continue
-            _blit_label(d, px, py, text, font)
+            _blit_label(d, px, py, text, lfont)
             occupied.append(rect)
             break
 
