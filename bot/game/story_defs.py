@@ -6,6 +6,7 @@
 """
 
 from dataclasses import dataclass, field
+from html import escape
 
 from bot.db.models import Player
 from bot.game import balance, inventory, story_state
@@ -175,7 +176,8 @@ class Echo:
     """Строка-эхо в общий чат (социальная текстура). {name} — имя игрока."""
     def __init__(self, template): self.template = template
     def apply(self, ctx):
-        name = ctx.player.first_name or "Кабатчик"
+        # Имя экранируем: уходит в чат как HTML, а в Telegram-имени бывают & < >.
+        name = escape(ctx.player.first_name or "Кабатчик")
         ctx.chat_echo.append(self.template.replace("{name}", name))
 
 
@@ -183,7 +185,8 @@ class Chron:
     """Запись в летопись города. {name} — имя игрока."""
     def __init__(self, template): self.template = template
     def apply(self, ctx):
-        name = ctx.player.first_name or "Кабатчик"
+        # Имя экранируем: летопись рендерится как HTML (chronicle_screen).
+        name = escape(ctx.player.first_name or "Кабатчик")
         ctx.chronicle.append(self.template.replace("{name}", name))
 
 
