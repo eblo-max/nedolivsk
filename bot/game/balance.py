@@ -51,6 +51,11 @@ EXPEDITION_YIELD = {  # (база на 1-м уровне, прирост за у
     "milk": (12, 3),
 }
 WORKER_PAY_PER_LEVEL = 10  # плата работникам за вылазку: 10 * уровень таверны
+# Прирост добычи за уровень множится на это: плата бригадам растёт ×уровень, и
+# чтобы себестоимость дешёвых товаров (эль★, хлеб) не обгоняла их цену к высоким
+# уровням, добыча с уровнем растёт быстрее. 1.5 — минимум, чтобы маржа всех
+# товаров оставалась плюсовой на ур.1–10 (см. scripts/audit_production_margin).
+YIELD_LEVEL_GROWTH = 1.5
 
 # Специализация зон: ресурсы зоны +50%, «чужие» -25%, прочие — как у всех.
 # Каждый ресурс ровно один раз усилен и один раз ослаблен — зоны равноценны.
@@ -284,12 +289,12 @@ MAX_LEVEL = 10
 
 def expedition_yield(resource: str, level: int, region: str) -> int:
     base, per_level = EXPEDITION_YIELD[resource]
-    amount = base + per_level * (level - 1)
+    amount = base + per_level * YIELD_LEVEL_GROWTH * (level - 1)
     if resource in REGION_BONUS.get(region, ()):
         return int(amount * BONUS_MULT)
     if resource in REGION_PENALTY.get(region, ()):
         return max(1, int(amount * PENALTY_MULT))
-    return amount
+    return int(amount)
 
 
 def worker_pay(level: int) -> int:
