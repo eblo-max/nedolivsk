@@ -160,6 +160,7 @@ MARKET_CLIMATE_MAX = 1.25   # потолок климата спроса
 # розница гостям — конечное потребление, лишь слабый признак изобилия товара.
 MARKET_WHOLESALE_WEIGHT = 1.0
 MARKET_RETAIL_WEIGHT = 0.4
+MARKET_P2P_WEIGHT = 0.3     # биржевая сделка двигает оптовую цену (мягко)
 
 
 def market_factor(glut: float) -> float:

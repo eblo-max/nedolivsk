@@ -365,9 +365,18 @@ def auction_kb(tavern) -> InlineKeyboardMarkup:
     kb.button(text="📤 Продать", callback_data="bsell", style="success")
     kb.button(text="📣 Куплю", callback_data="bbidnew", style="success")
     kb.button(text="📦 Мои лоты", callback_data="bmine")
+    kb.button(text="📊 Цены", callback_data="bprices")
     kb.button(text="🏪 Рынок", callback_data="market")
     kb.button(text="🏠 Таверна", callback_data="tavern")
-    kb.adjust(*sizes, 2, 2, 1, 2)
+    kb.adjust(*sizes, 2, 2, 2, 2)
+    return kb.as_markup()
+
+
+def bourse_prices_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔄 Обновить", callback_data="bprices", style="success")
+    kb.button(text="↩️ К торгам", callback_data="auction")
+    kb.adjust(1)
     return kb.as_markup()
 
 

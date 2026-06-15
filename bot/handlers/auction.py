@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import images, panels, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import auction, balance, bourse
+from bot.game import auction, balance, bourse, market
 from bot.game import production as prod
 from bot.handlers import common
 from bot.keyboards import inline as kb
@@ -211,9 +211,12 @@ async def cb_sell_order(callback: CallbackQuery, session: AsyncSession) -> None:
         await callback.answer("Лот уже разобрали.", show_alert=True)
         return
     owner = await repo.get_player(session, order.seller_id)
+    best_bid = await repo.best_price(session, _chat_id(callback, player),
+                                     order.good, "buy")
     await common.caption_edit(
         callback.message,
-        texts.bourse_order(order, owner.first_name if owner else "кто-то", player),
+        texts.bourse_order(order, owner.first_name if owner else "кто-то",
+                           player, best_bid),
         kb.bourse_order_kb(order, player))
     await callback.answer()
 
@@ -228,9 +231,12 @@ async def cb_buy_order(callback: CallbackQuery, session: AsyncSession) -> None:
         await callback.answer("Заявку уже закрыли.", show_alert=True)
         return
     owner = await repo.get_player(session, order.seller_id)
+    best_ask = await repo.best_price(session, _chat_id(callback, player),
+                                     order.good, "sell")
     await common.caption_edit(
         callback.message,
-        texts.bourse_bid(order, owner.first_name if owner else "кто-то", player.tavern),
+        texts.bourse_bid(order, owner.first_name if owner else "кто-то",
+                         player.tavern, best_ask),
         kb.bourse_bid_kb(order, player.tavern))
     await callback.answer()
 
@@ -271,6 +277,7 @@ async def cb_buy_from_sell(callback: CallbackQuery, session: AsyncSession) -> No
     if order.qty <= 0:
         await repo.delete_order(session, order.id)
     repo.add_log(session, "player", player.id, f"🏪 купил на бирже {qty}×{nm} за {cost}🪙")
+    await _market_nudge(session, _chat_id(callback, player), good, qty)
     await _render_list(callback, session, player, "sell", "all", 0)
     await callback.answer(f"Куплено {qty}×{nm} за {cost}🪙")
 
@@ -317,6 +324,7 @@ async def cb_fill_buy(callback: CallbackQuery, session: AsyncSession) -> None:
         await repo.delete_order(session, order.id)
     repo.add_log(session, "player", player.id,
                  f"🏪 продал по заявке {qty}×{nm} за {net}🪙")
+    await _market_nudge(session, _chat_id(callback, player), good, qty)
     await _render_list(callback, session, player, "buy", "all", 0)
     await callback.answer(f"Продано {qty}×{nm} → +{net}🪙")
 
@@ -402,6 +410,8 @@ async def cb_sell_create(callback: CallbackQuery, session: AsyncSession) -> None
             bourse.freeze(player.tavern, good, remaining)
             repo.create_order(session, chat_id, player.id, good, remaining, price, side="sell")
             listed = remaining
+    if matched:
+        await _market_nudge(session, chat_id, good, matched)
     repo.add_log(session, "player", player.id,
                  f"📤 продажа {qty}×{nm} по {price}🪙 (свёл {matched}, выставил {listed})")
     await _back_auction(callback, session, player)
@@ -493,6 +503,8 @@ async def cb_bid_create(callback: CallbackQuery, session: AsyncSession) -> None:
             repo.create_order(session, chat_id, player.id, good, listed, price, side="buy")
         else:
             listed = 0
+    if matched:
+        await _market_nudge(session, chat_id, good, matched)
     repo.add_log(session, "player", player.id,
                  f"📣 куплю {qty}×{nm} по {price}🪙 (свёл {matched}, заявка {listed})")
     await _back_auction(callback, session, player)
@@ -505,6 +517,21 @@ async def cb_bid_create(callback: CallbackQuery, session: AsyncSession) -> None:
 
 
 # ── Мои лоты / отмена ───────────────────────────────────────────────────────
+@router.callback_query(F.data == "bprices")
+async def cb_prices(callback: CallbackQuery, session: AsyncSession) -> None:
+    player = await _player(callback, session)
+    if player is None:
+        return
+    chat_id = _chat_id(callback, player)
+    if chat_id is None:
+        await callback.answer("Биржа — в общем чате. Заходи через «гг».", show_alert=True)
+        return
+    board = await repo.market_summary(session, chat_id)
+    await common.caption_edit(callback.message, texts.bourse_prices(board),
+                              kb.bourse_prices_kb())
+    await callback.answer()
+
+
 @router.callback_query(F.data == "bmine")
 async def cb_mine(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _player(callback, session)
@@ -616,6 +643,15 @@ async def _match_buy(session: AsyncSession, player: Player, chat_id: int,
             await repo.delete_order(session, so.id)
         remaining -= k
     return qty - remaining, remaining
+
+
+async def _market_nudge(session: AsyncSession, chat_id: int | None,
+                        good: str, qty: int) -> None:
+    """P2P-сделка двигает оптовую цену чата (мягкий сигнал изобилия)."""
+    if chat_id is None or qty <= 0:
+        return
+    city = await repo.get_or_create_city(session, chat_id)
+    market.nudge(city, good, qty * balance.MARKET_P2P_WEIGHT)
 
 
 async def _back_auction(callback: CallbackQuery, session: AsyncSession,

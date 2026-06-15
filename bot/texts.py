@@ -1959,35 +1959,46 @@ def bourse_list(orders, names: dict, page: int, total: int,
     return "\n".join(lines)
 
 
-def bourse_order(order, seller_name: str, player: Player) -> str:
+def bourse_order(order, seller_name: str, player: Player,
+                 best_bid: int | None = None) -> str:
     afford = player.gold // order.unit_price if order.unit_price > 0 else 0
-    return "\n".join([
+    lines = [
         "🛒 <b>ЛОТ ПРОДАЖИ</b>",
         "",
         f"{_good_label(order.good)} — {order.qty} шт по {order.unit_price} 🪙/шт",
         f"Весь лот: <b>{order.qty * order.unit_price} 🪙</b>",
         f"Продавец: {escape(seller_name)}",
+    ]
+    if best_bid is not None:
+        lines.append(f"📈 Спрос в городе: купят до {best_bid} 🪙/шт")
+    lines += [
         "",
         f"🪙 У тебя {player.gold} — хватит на {afford} шт.",
         "<i>Покупаешь сколько надо, остаток останется другим.</i>",
-    ])
+    ]
+    return "\n".join(lines)
 
 
-def bourse_bid(order, owner_name: str, tavern) -> str:
+def bourse_bid(order, owner_name: str, tavern, best_ask: int | None = None) -> str:
     from bot.game import bourse
     stock = int((tavern.products or {}).get(order.good, 0))
     can = min(order.qty, stock)
     net = bourse.net_to_seller(order.unit_price)
-    return "\n".join([
+    lines = [
         "📥 <b>ЗАЯВКА «КУПЛЮ»</b>",
         "",
         f"{_good_label(order.good)} — нужно {order.qty} шт по {order.unit_price} 🪙/шт",
         f"Тебе на руки: <b>{net} 🪙/шт</b> "
         f"(после налога {int(balance.BOURSE_SALE_TAX * 100)}%)",
         f"Заявку выставил: {escape(owner_name)}",
+    ]
+    if best_ask is not None:
+        lines.append(f"📉 На бирже продают от {best_ask} 🪙/шт")
+    lines += [
         "",
         f"📦 В погребе {_good_label(order.good)}: {stock} → продашь до {can} шт.",
-    ])
+    ]
+    return "\n".join(lines)
 
 
 def bourse_sell_intro(tavern, slots_left: int) -> str:
@@ -2031,6 +2042,24 @@ def bourse_pick_price(good: str, qty: int, *, buy: bool = False) -> str:
     return (f"{head} <b>{_good_label(good)}</b> · {qty} шт\n\n"
             f"Ценовой коридор: <b>{lo}–{hi}</b> 🪙/шт "
             "(анти-перекачка). Выбери цену:")
+
+
+def bourse_prices(board: dict) -> str:
+    from bot.game import production as prod
+    lines = ["📊 <b>ЦЕНЫ БИРЖИ</b> (живые на момент показа)", ""]
+    if not board:
+        lines.append("<i>Пока тихо — ни лотов, ни заявок. Выстави первым!</i>")
+    order = sorted(board, key=lambda g: -(prod.GOODS[g].price if g in prod.GOODS else 0))
+    for good in order:
+        d = board[good]
+        parts = []
+        if d.get("ask") is not None:
+            parts.append(f"продают от {d['ask']}🪙 ({d['ask_qty']})")
+        if d.get("bid") is not None:
+            parts.append(f"купят до {d['bid']}🪙 ({d['bid_qty']})")
+        lines.append(f"{_good_label(good)}: " + " · ".join(parts))
+    lines += ["", "<i>🔄 Обновить — пересчитать. В скобках — сколько штук.</i>"]
+    return "\n".join(lines)
 
 
 def bourse_mine(orders) -> str:
