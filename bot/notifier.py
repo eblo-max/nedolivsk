@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from bot import announce, effects, panels, texts
 from bot.db import repo
 from bot.db.base import session_factory
+from bot.handlers import common
 from bot.sender import deliver
 from bot.db.models import Player, Tavern
 from bot.game import auction as auctionmod
@@ -376,6 +377,12 @@ async def _notify_returned(bot: Bot) -> None:
                 continue
             drop = await repo.create_loot(session, chat_id)
             loot_to_post.append((chat_id, drop.id))
+
+        # Сброс новых file_id медиа в БД (переживут деплой → без повторной загрузки).
+        pending = common.pending_file_ids()
+        if pending is not None:
+            world.media_ids = pending
+            common.mark_file_ids_saved()
 
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода

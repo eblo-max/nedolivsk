@@ -111,17 +111,52 @@ def tag_in_group(message: Message, player: Player, text: str) -> str:
     return text
 
 
+_file_ids_dirty = False
+
+
+def _media_key(img: Path) -> str:
+    """Ключ кэша: имя+размер файла. Стабилен между деплоями, но при ЗАМЕНЕ
+    ассета (другой размер) ключ меняется → старый file_id не подхватится."""
+    try:
+        return f"{img.name}:{img.stat().st_size}"
+    except OSError:
+        return img.name
+
+
 def cached_media(img: Path) -> str | InputFile:
-    return _file_id_cache.get(str(img)) or FSInputFile(img)
+    return _file_id_cache.get(_media_key(img)) or FSInputFile(img)
+
+
+def _set_file_id(key: str, file_id: str) -> None:
+    global _file_ids_dirty
+    if _file_id_cache.get(key) != file_id:
+        _file_id_cache[key] = file_id
+        _file_ids_dirty = True
 
 
 def remember_file_id(img: Path, message: Message | None) -> None:
     if message is None:
         return
     if message.photo:
-        _file_id_cache[str(img)] = message.photo[-1].file_id
+        _set_file_id(_media_key(img), message.photo[-1].file_id)
     elif message.video:
-        _file_id_cache[str(img)] = message.video.file_id
+        _set_file_id(_media_key(img), message.video.file_id)
+
+
+def load_file_ids(mapping: dict | None) -> None:
+    """Подтянуть сохранённые file_id из БД в кэш (на старте, без пометки dirty)."""
+    if mapping:
+        _file_id_cache.update({str(k): str(v) for k, v in mapping.items()})
+
+
+def pending_file_ids() -> dict | None:
+    """Снимок кэша, если появились новые file_id (для записи в БД); иначе None."""
+    return dict(_file_id_cache) if _file_ids_dirty else None
+
+
+def mark_file_ids_saved() -> None:
+    global _file_ids_dirty
+    _file_ids_dirty = False
 
 
 async def send_tavern_screen(

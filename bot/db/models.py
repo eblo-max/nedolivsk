@@ -113,6 +113,9 @@ class WorldState(Base):
     # насыщения/дефицита множатся на него: реактивность цены держится как у одного
     # чата при любом размере мира (нормировка по интенсивности, не по объёму).
     market_scale: Mapped[int] = mapped_column(default=1)
+    # Кэш Telegram file_id статичных картинок/видео: {"имя:размер": file_id}.
+    # Переживает деплой (ФС Railway эфемерна) → медиа не грузятся заново каждый раз.
+    media_ids: Mapped[dict] = mapped_column(JSONB, default=dict)
 
 
 class KnownChat(Base):
