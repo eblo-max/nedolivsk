@@ -202,7 +202,9 @@ def _parse_list_cb(data: str) -> tuple[int, str]:
 
 
 @router.callback_query(F.data.startswith("bourse:"))
-async def cb_sell_list(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_sell_list(callback: CallbackQuery, session: AsyncSession,
+                       state: FSMContext) -> None:
+    await state.clear()
     player = await _player(callback, session)
     if player is None:
         return
@@ -215,7 +217,9 @@ async def cb_sell_list(callback: CallbackQuery, session: AsyncSession) -> None:
 
 
 @router.callback_query(F.data.startswith("blb:"))
-async def cb_buy_list(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_buy_list(callback: CallbackQuery, session: AsyncSession,
+                      state: FSMContext) -> None:
+    await state.clear()
     player = await _player(callback, session)
     if player is None:
         return
@@ -228,7 +232,9 @@ async def cb_buy_list(callback: CallbackQuery, session: AsyncSession) -> None:
 
 
 @router.callback_query(F.data.startswith("bord:"))
-async def cb_sell_order(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_sell_order(callback: CallbackQuery, session: AsyncSession,
+                        state: FSMContext) -> None:
+    await state.clear()
     player = await _player(callback, session)
     if player is None:
         return
@@ -248,7 +254,9 @@ async def cb_sell_order(callback: CallbackQuery, session: AsyncSession) -> None:
 
 
 @router.callback_query(F.data.startswith("bbid:"))
-async def cb_buy_order(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_buy_order(callback: CallbackQuery, session: AsyncSession,
+                       state: FSMContext) -> None:
+    await state.clear()
     player = await _player(callback, session)
     if player is None:
         return
@@ -324,7 +332,9 @@ async def cb_fill_prompt(callback: CallbackQuery, session: AsyncSession,
 
 # ── Создание лота продажи ───────────────────────────────────────────────────
 @router.callback_query(F.data == "bsell")
-async def cb_sell_new(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_sell_new(callback: CallbackQuery, session: AsyncSession,
+                      state: FSMContext) -> None:
+    await state.clear()
     player = await _player(callback, session)
     if player is None:
         return
@@ -368,7 +378,9 @@ async def cb_sell_good(callback: CallbackQuery, session: AsyncSession,
 
 # ── Создание заявки «куплю» ─────────────────────────────────────────────────
 @router.callback_query(F.data == "bbidnew")
-async def cb_bid_new(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_bid_new(callback: CallbackQuery, session: AsyncSession,
+                     state: FSMContext) -> None:
+    await state.clear()
     player = await _player(callback, session)
     if player is None:
         return
@@ -408,7 +420,9 @@ async def cb_bid_good(callback: CallbackQuery, session: AsyncSession,
 
 # ── Мои лоты / отмена ───────────────────────────────────────────────────────
 @router.callback_query(F.data == "bprices")
-async def cb_prices(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_prices(callback: CallbackQuery, session: AsyncSession,
+                    state: FSMContext) -> None:
+    await state.clear()
     player = await _player(callback, session)
     if player is None:
         return
@@ -423,7 +437,9 @@ async def cb_prices(callback: CallbackQuery, session: AsyncSession) -> None:
 
 
 @router.callback_query(F.data == "bmine")
-async def cb_mine(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_mine(callback: CallbackQuery, session: AsyncSession,
+                  state: FSMContext) -> None:
+    await state.clear()
     player = await _player(callback, session)
     if player is None:
         return
@@ -434,7 +450,9 @@ async def cb_mine(callback: CallbackQuery, session: AsyncSession) -> None:
 
 
 @router.callback_query(F.data.startswith("bcancel:"))
-async def cb_cancel(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_cancel(callback: CallbackQuery, session: AsyncSession,
+                    state: FSMContext) -> None:
+    await state.clear()
     player = await _player(callback, session, lock=True)
     if player is None:
         return
