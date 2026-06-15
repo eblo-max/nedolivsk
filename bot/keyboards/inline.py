@@ -523,6 +523,8 @@ def forge_kb(player: Player | None = None) -> InlineKeyboardMarkup:
     equipment = getattr(player, "equipment", None) if player else None
     kb = InlineKeyboardBuilder()
     for item in CATALOG.values():
+        if not item.craftable:        # эксклюзив боссов в кузнице не куётся
+            continue
         tier = equipped_tier(equipment, item.id)
         label = f"{item.name} {TIER_STARS[tier]}" if tier else item.name
         kb.button(text=label, callback_data=f"forge_item:{item.id}")
@@ -667,4 +669,22 @@ def production_kb(player, tavern, building) -> InlineKeyboardMarkup:
             kb.button(text="🍷 Вино", callback_data="winery:wine")
     kb.button(text="↩️ К пристройкам", callback_data="buildings")
     kb.adjust(1)
+    return kb.as_markup()
+
+
+def raid_gather_kb(raid_id: int) -> InlineKeyboardMarkup:
+    """Фаза сбора: записаться в рейд (публичная кнопка)."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⚔️ Присоединиться", callback_data=f"raidjoin:{raid_id}", style="success")
+    kb.button(text="🔄 Обновить", callback_data=f"raidref:{raid_id}")
+    kb.adjust(1, 1)
+    return kb.as_markup()
+
+
+def raid_kb(raid_id: int) -> InlineKeyboardMarkup:
+    """Фаза битвы: бить босса (публичная — но бьют лишь записавшиеся, см. хендлер)."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⚔️ Бить", callback_data=f"raidhit:{raid_id}", style="danger")
+    kb.button(text="🔄 Обновить", callback_data=f"raidref:{raid_id}")
+    kb.adjust(2)
     return kb.as_markup()

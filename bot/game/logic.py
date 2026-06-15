@@ -355,7 +355,7 @@ def start_craft(player: Player, item_id: str) -> CraftStart:
     if state != "none":
         return CraftStart(ok=False, reason="busy")
     item = items.CATALOG.get(item_id)
-    if item is None:
+    if item is None or not item.craftable:   # эксклюзив боссов не куётся
         return CraftStart(ok=False, reason="unknown")
 
     tier = next_craft_tier(player, item_id)

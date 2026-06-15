@@ -17,13 +17,16 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot import texts
 from bot.config import settings
 from bot.db import repo
 from bot.db.models import CityState, KnownChat, MarketOrder, Player, Tavern
 from bot.game import (
-    balance, buff, buildings, combat, inventory, items, market, production, season,
+    balance, buff, buildings, combat, inventory, items, market, production, raid,
+    season,
 )
 from bot.game import world as wld
+from bot.keyboards.inline import raid_gather_kb
 from bot.sender import deliver
 
 # Ресурсы, которые можно раздавать (сырьё + полуфабрикаты) — анти-опечатка.
@@ -118,11 +121,12 @@ def _home_kb() -> InlineKeyboardBuilder:
     kb.button(text="📊 Аналитика", callback_data="adm:stats")
     kb.button(text="🎁 Раздать всем", callback_data="adm:grantall")
     kb.button(text="📣 Рассылка", callback_data="adm:cast")
+    kb.button(text="⚔️ Рейд-босс", callback_data="adm:raid")
     kb.button(text="📜 Логи", callback_data="adm:logs:all:0")
     kb.button(text="🌍 Мир и события", callback_data="adm:world")
     kb.button(text="🏙 Города/чаты", callback_data="adm:cities")
     kb.button(text="🔄 Обновить", callback_data="adm:home")
-    kb.adjust(2, 2, 2, 2, 1)
+    kb.adjust(2, 2, 2, 2, 2)
     return kb
 
 
@@ -882,6 +886,79 @@ async def cb_cast_mode(cb: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(pid=0, field=field)
     await cb.message.answer(_PROMPTS[field])
     await cb.answer()
+
+
+# ── Рейд-босс ───────────────────────────────────────────────────────────────
+@router.callback_query(F.data == "adm:raid")
+async def cb_raid_menu(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _guard_cb(cb):
+        return
+    active = await repo.get_active_raid(session)
+    kb = InlineKeyboardBuilder()
+    if active is not None:
+        spec = raid.BOSSES.get(active.boss_key)
+        nm = f"{spec.emoji if spec else ''} {spec.name if spec else active.boss_key}"
+        phase = ("идёт СБОР" if active.status == "gathering"
+                 else f"БИТВА — {max(0, active.hp)}/{active.max_hp} HP")
+        kb.button(text="💀 Убрать активного", callback_data="adm:raidkill")
+        head = (f"⚔️ <b>РЕЙД-БОСС</b>\n\nСейчас: {nm} ({phase}), "
+                f"бойцов {raid.registered_count(active)}. Новый можно призвать "
+                "после его смерти/ухода.")
+    else:
+        for key, b in raid.BOSSES.items():
+            kb.button(text=f"{b.emoji} {b.name} (~{b.hp_per_fighter} HP/боец)",
+                      callback_data=f"adm:raidspawn:{key}")
+        head = ("⚔️ <b>РЕЙД-БОСС</b>\n\nПризвать босса — сперва 20-мин сбор во всех "
+                "чатах, затем битва. HP растёт от явки. Бьют записавшиеся, награда — "
+                "золото поровну на всех, кто бил, плюс шанс на эксклюзивный трофей.")
+    kb.button(text="🏠 В меню", callback_data="adm:home")
+    kb.adjust(1)
+    await _edit(cb, head, kb)
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("adm:raidspawn:"))
+async def cb_raid_spawn(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _guard_cb(cb):
+        return
+    if await repo.get_active_raid(session) is not None:
+        await cb.answer("Уже есть активный босс.", show_alert=True)
+        return
+    key = cb.data.split(":", 2)[2]
+    spec = raid.BOSSES.get(key)
+    if spec is None:
+        await cb.answer("Нет такого босса.", show_alert=True)
+        return
+    boss = repo.create_raid(session, key, raid.gather_until())
+    await session.flush()  # нужен boss.id для кнопок
+    _alog(cb, session, f"⚔️ призван рейд-босс {key} (сбор {raid.GATHER_MINUTES} мин)")
+    from bot.handlers.raid import send_raid_announce
+    text = texts.raid_gather_screen(boss)
+    chat_ids = await repo.all_chat_ids(session)
+    msgs: dict[str, int] = {}
+    for cid in chat_ids:  # видео грузится 1 раз, дальше по чатам — по кэш-file_id
+        sent = await deliver(lambda c=cid: send_raid_announce(
+            cb.bot, c, boss, text, raid_gather_kb(boss.id)), what=f"raid→{cid}")
+        if sent is not None:
+            msgs[str(cid)] = sent.message_id
+    boss.messages = msgs  # запоминаем сообщения — нотифаер правит отсчёт/HP
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏠 В меню", callback_data="adm:home")
+    await _edit(cb, f"⚔️ {spec.emoji} {spec.name} призван — сбор {raid.GATHER_MINUTES} "
+                    f"мин, разослан в {len(msgs)} из {len(chat_ids)} чатов.", kb)
+    await cb.answer("Босс призван! Идёт сбор.")
+
+
+@router.callback_query(F.data == "adm:raidkill")
+async def cb_raid_kill(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _guard_cb(cb):
+        return
+    boss = await repo.get_active_raid(session, lock=True)
+    if boss is not None:
+        boss.status = "expired"
+        _alog(cb, session, f"⚔️ снят рейд-босс {boss.boss_key}")
+    await cb.answer("Босс снят.")
+    await cb_raid_menu(cb, session)
 
 
 # ── Ввод точных значений (FSM) ─────────────────────────────────────────────

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
     Chronicle, CityState, KnownChat, LogEntry, LootDrop, MarketOrder,
-    Notification, Player, Tavern, WorldState,
+    Notification, Player, RaidBoss, Tavern, WorldState,
 )
 from bot.game import balance
 
@@ -47,6 +47,38 @@ async def all_chat_ids(session: AsyncSession) -> list[int]:
 async def count_known_chats(session: AsyncSession) -> int:
     """Число известных общих чатов — масштаб единого рынка (адаптивные пороги)."""
     return await session.scalar(select(func.count(KnownChat.chat_id))) or 0
+
+
+# ── Рейд-босс (глобальный, один активный) ───────────────────────────────────
+async def get_active_raid(
+    session: AsyncSession, *, lock: bool = False
+) -> RaidBoss | None:
+    """Живой босс (фаза сбора ИЛИ битвы). Один на весь мир."""
+    stmt = (select(RaidBoss)
+            .where(RaidBoss.status.in_(("gathering", "active"))).limit(1))
+    if lock:
+        stmt = stmt.with_for_update()
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
+async def live_raids(session: AsyncSession) -> list[RaidBoss]:
+    """Все живые боссы (для тика жизненного цикла в нотифаере)."""
+    return list((await session.execute(
+        select(RaidBoss).where(RaidBoss.status.in_(("gathering", "active")))
+        .with_for_update(skip_locked=True))).scalars().all())
+
+
+async def get_raid(
+    session: AsyncSession, raid_id: int, *, lock: bool = False
+) -> RaidBoss | None:
+    return await session.get(RaidBoss, raid_id, with_for_update=lock)
+
+
+def create_raid(session: AsyncSession, boss_key: str, gather_until) -> RaidBoss:
+    """Создать босса в фазе СБОРА. HP/ends_at ставятся при старте битвы."""
+    raid = RaidBoss(boss_key=boss_key, status="gathering", gather_until=gather_until)
+    session.add(raid)
+    return raid
 
 
 async def get_or_create_city(

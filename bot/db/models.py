@@ -199,6 +199,33 @@ class Notification(Base):
     )
 
 
+class RaidBoss(Base):
+    """Глобальный рейд-босс (один живой на весь мир). Две фазы:
+      gathering — 20 мин сбор: игроки регистрируются, идёт обратный отсчёт;
+      active    — битва ~1ч: записавшиеся бьют, HP — единый источник правды.
+    Далее dead (повержен) / expired (ушёл/никто не пришёл).
+
+    contributions: {str(player_id): {"dmg": int, "hits": int, "last": iso,
+    "name": str}} — запись (dmg=0 при регистрации), потом копит урон.
+    messages: {str(chat_id): message_id} — сообщения-анонсы в чатах (правим
+    текст: отсчёт сбора → HP-бар битвы)."""
+
+    __tablename__ = "raid_boss"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    boss_key: Mapped[str] = mapped_column(String(32))
+    max_hp: Mapped[int] = mapped_column(default=0)   # ставится при старте битвы
+    hp: Mapped[int] = mapped_column(default=0)
+    contributions: Mapped[dict] = mapped_column(JSONB, default=dict)
+    messages: Mapped[dict] = mapped_column(JSONB, default=dict)
+    status: Mapped[str] = mapped_column(String(10), default="gathering")
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    gather_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class LogEntry(Base):
     """Журнал событий: действия игроков и админа (для админ-панели)."""
 

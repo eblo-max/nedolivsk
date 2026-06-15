@@ -17,6 +17,7 @@ class Item:
     cost: dict              # gold/wood/grain/hops
     craft_hours: int
     sprite: str = ""        # имя файла арта в assets/items (без .png); "" = по id
+    craftable: bool = True  # False — эксклюзив, только с рейд-боссов; в кузнице нет
     # экономика
     income_pct: int = 0         # +% к доходу таверны
     yield_pct: int = 0          # +% к добыче вылазок (все ресурсы)
@@ -165,6 +166,66 @@ CATALOG: dict[str, Item] = {
             description="Двойное дно, тройная выгода, обереги от налогов.",
             cost={"gold": 750, "wood": 10, "grain": 25, "hops": 20},
             craft_hours=4, pay_discount_pct=15, luck=2,
+        ),
+        # ═══════ ЭКСКЛЮЗИВ РЕЙД-БОССОВ (craftable=False, только выбить) ═══════
+        # Статы множатся на ярус; падают рандомным ярусом, ★★★ — редчайшее.
+        # cost — прокси-стоимость для ВВП (не куётся, цена символическая).
+        # 🐀 Крысиный Король
+        Item(
+            id="rat_crown", slot="head", name="Корона Крысиного Короля",
+            description="Жестяной обруч с подвала. Крысы кланялись — теперь кланяйся ты.",
+            cost={"gold": 1500}, craft_hours=0, craftable=False,
+            income_pct=3, armor=6, luck=4,
+        ),
+        Item(
+            id="rat_pelt", slot="chest", name="Душегрейка крысиного бугра",
+            description="Сшита из шкур подвальной знати. Воняет, но греет и держит удар.",
+            cost={"gold": 1500}, craft_hours=0, craftable=False,
+            yield_pct=4, armor=12,
+        ),
+        Item(
+            id="rat_tail", slot="right_hand", name="Плеть из крысиных хвостов",
+            description="Свистит и жалит. Гадко, зато по делу.",
+            cost={"gold": 1500}, craft_hours=0, craftable=False,
+            damage=10, crit=4,
+        ),
+        # 👹 Болотный Тролль
+        Item(
+            id="troll_club", slot="weapon", name="Дубина болотного тролля",
+            description="Бревно с тролльей лапы. Махнул — и спор окончен.",
+            cost={"gold": 4000}, craft_hours=0, craftable=False,
+            damage=18, crit=4,
+        ),
+        Item(
+            id="troll_hide", slot="chest", name="Шкура болотного тролля",
+            description="Толстая, склизкая, непробиваемая. Работники боятся — и слушаются.",
+            cost={"gold": 4000}, craft_hours=0, craftable=False,
+            pay_discount_pct=5, armor=24,
+        ),
+        Item(
+            id="troll_eye", slot="amulet", name="Глаз тролля",
+            description="Мутный, но видит фарт за версту. Носи — и удача косится на тебя.",
+            cost={"gold": 4000}, craft_hours=0, craftable=False,
+            income_pct=4, luck=8,
+        ),
+        # 🐲 Древний Змей
+        Item(
+            id="dragon_fang", slot="weapon", name="Клык Древнего Змея",
+            description="Длиннее руки, острее совести. Лучшее оружие Недоливска.",
+            cost={"gold": 9000}, craft_hours=0, craftable=False,
+            damage=28, crit=10, luck=3,
+        ),
+        Item(
+            id="dragon_scale", slot="chest", name="Чешуя Древнего Змея",
+            description="Не берёт ни клинок, ни топор, ни косой взгляд кредитора.",
+            cost={"gold": 9000}, craft_hours=0, craftable=False,
+            income_pct=6, armor=35,
+        ),
+        Item(
+            id="dragon_heart", slot="talisman", name="Сердце Древнего Змея",
+            description="Тлеет углём по сей день. Удача, деньги и нюх на добычу — при тебе.",
+            cost={"gold": 9000}, craft_hours=0, craftable=False,
+            income_pct=6, yield_pct=5, luck=12,
         ),
     ]
 }

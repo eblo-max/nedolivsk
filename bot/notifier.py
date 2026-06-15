@@ -21,11 +21,12 @@ from bot.game import city as citymod
 from bot.game import loot
 from bot.game import market as marketmod
 from bot.game import npc
+from bot.game import raid as raidmod
 from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import (
     bonus_push_kb, buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb,
-    idle_nudge_kb, loot_kb,
+    idle_nudge_kb, loot_kb, raid_gather_kb, raid_kb,
 )
 
 CHECK_INTERVAL_SECONDS = 60
@@ -342,6 +343,41 @@ async def _notify_returned(bot: Bot) -> None:
                                   f"{o.qty * o.unit_price} 🪙 вернулся")
             await repo.delete_order(session, o.id)
 
+        # Рейд-босс: жизненный цикл. Сбор → битва (HP под явку + пинг) → уход.
+        # Правки сообщений в чатах копим и шлём ПОСЛЕ коммита (не под локами).
+        # (messages, text, markup|None, is_video) — видео правим подписью, текст текстом
+        raid_edits: list[tuple[dict, str, object, bool]] = []
+        from bot import images as imgmod
+        for boss in await repo.live_raids(session):
+            spec = raidmod.BOSSES.get(boss.boss_key)
+            if spec is None:
+                continue
+            is_vid = bool(spec.video and imgmod.named_video(spec.video))
+            if boss.status == "gathering":
+                if now >= (boss.gather_until or now):       # сбор окончен
+                    fighters = raidmod.registered_count(boss)
+                    if fighters == 0:                        # никто не пришёл
+                        boss.status = "expired"
+                        raid_edits.append((dict(boss.messages or {}),
+                                           texts.raid_no_show(boss), None, is_vid))
+                    else:                                    # старт битвы
+                        boss.max_hp = boss.hp = raidmod.hp_for(boss.boss_key, fighters)
+                        boss.status = "active"
+                        boss.ends_at = raidmod.fight_until(now)
+                        raid_edits.append((dict(boss.messages or {}),
+                                           texts.raid_screen(boss), raid_kb(boss.id),
+                                           is_vid))
+                        for pid in list((boss.contributions or {}).keys()):
+                            repo.queue_notify(session, int(pid), texts.raid_fight_ping())
+                else:                                        # идёт сбор — отсчёт
+                    raid_edits.append((dict(boss.messages or {}),
+                                       texts.raid_gather_screen(boss),
+                                       raid_gather_kb(boss.id), is_vid))
+            elif boss.status == "active" and now >= (boss.ends_at or now):
+                boss.status = "expired"                      # не добили — ушёл
+                raid_edits.append((dict(boss.messages or {}),
+                                   texts.raid_expired(boss), None, is_vid))
+
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
 
         # ЕДИНЫЙ рынок: масштаб (число активных чатов) для адаптивных порогов цены,
@@ -433,6 +469,16 @@ async def _notify_returned(bot: Bot) -> None:
                         lambda cid=chat_id, t=text: bot.send_message(cid, t),
                         what=f"сезон→{chat_id}")
                     await effects.react_msg(msg, "🎉")  # праздничный бейдж
+        # Рейд-босс: правка анонса в чатах (отсчёт сбора / старт битвы / уход).
+        # Видео-анонс правим подписью, текстовый — текстом (edit_raid_announce).
+        from bot.handlers.raid import edit_raid_announce
+        for messages, rtext, rmarkup, is_vid in raid_edits:
+            for cid_s, mid in messages.items():
+                await deliver(
+                    lambda c=int(cid_s), m=mid, t=rtext, mk=rmarkup, v=is_vid:
+                    edit_raid_announce(bot, c, m, v, t, mk),
+                    what=f"raid-edit→{cid_s}")
+
         # Анонсы городских ситуаций (после коммита).
         for chat_id, text in city_events:
             msg = await deliver(
