@@ -64,6 +64,11 @@ async def create_tables() -> None:
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS "
             "market JSONB NOT NULL DEFAULT '{}'::jsonb"
         ))
+        # Масштаб рынка (число активных чатов) для адаптивных порогов цены.
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS "
+            "market_scale INTEGER NOT NULL DEFAULT 1"
+        ))
         # Лимит покупки на бирже (анти-абуз): окно 4ч по товарам.
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "

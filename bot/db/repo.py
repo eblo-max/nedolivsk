@@ -44,6 +44,11 @@ async def all_chat_ids(session: AsyncSession) -> list[int]:
     return [row[0] for row in result.all()]
 
 
+async def count_known_chats(session: AsyncSession) -> int:
+    """Число известных общих чатов — масштаб единого рынка (адаптивные пороги)."""
+    return await session.scalar(select(func.count(KnownChat.chat_id))) or 0
+
+
 async def get_or_create_city(
     session: AsyncSession, chat_id: int, *, lock: bool = False
 ) -> CityState:

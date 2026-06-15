@@ -346,8 +346,10 @@ async def _notify_returned(bot: Bot) -> None:
 
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
 
-        # ЕДИНЫЙ рынок: впитывание перекоса + редкий пульс — двигает цену всего
-        # мира сразу. Молва о скачке цен идёт во ВСЕ чаты (это мировая новость).
+        # ЕДИНЫЙ рынок: масштаб (число активных чатов) для адаптивных порогов цены,
+        # затем впитывание перекоса + редкий пульс — двигает цену всего мира сразу.
+        # Молва о скачке цен идёт во ВСЕ чаты (это мировая новость).
+        world.market_scale = max(1, await repo.count_known_chats(session))
         marketmod.decay(world, now)
         if random.random() < balance.MARKET_PULSE_CHANCE:
             cit = npc.random_pulser()

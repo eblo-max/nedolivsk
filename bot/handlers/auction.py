@@ -485,10 +485,10 @@ def _give(tavern, good: str, qty: int) -> None:
     tavern.products = prods
 
 
-async def _match_sell(session: AsyncSession, player: Player, chat_id: int,
+async def _match_sell(session: AsyncSession, player: Player,
                       good: str, qty: int, ask: int) -> int:
-    """Свести новую ПРОДАЖУ со встречными заявками «куплю» (цена >= ask, дороже
-    первыми). Сделка по цене заявки (maker). Возвращает сведённое количество."""
+    """Свести новую ПРОДАЖУ со встречными заявками «куплю» со всего мира (цена >=
+    ask, дороже первыми). Сделка по цене заявки (maker). Возвращает сведённое кол-во."""
     nm = _gname(good)
     remaining = qty
     bids = await repo.best_buy_orders(session, good, ask, player.id,
@@ -518,10 +518,10 @@ async def _match_sell(session: AsyncSession, player: Player, chat_id: int,
     return qty - remaining
 
 
-async def _match_buy(session: AsyncSession, player: Player, chat_id: int,
+async def _match_buy(session: AsyncSession, player: Player,
                      good: str, qty: int, bid: int) -> tuple[int, int]:
-    """Свести новую ЗАЯВКУ «куплю» со встречными лотами продажи (цена <= bid,
-    дешевле первыми). Сделка по цене лота. (сведено, остаток)."""
+    """Свести новую ЗАЯВКУ «куплю» со встречными лотами продажи со всего мира
+    (цена <= bid, дешевле первыми). Сделка по цене лота. (сведено, остаток)."""
     nm = _gname(good)
     remaining = qty
     asks = await repo.best_sell_orders(session, good, bid, player.id,
@@ -621,7 +621,7 @@ async def _do_fill(session: AsyncSession, player: Player, chat_id: int | None,
 async def _do_create_sell(session: AsyncSession, player: Player, chat_id: int,
                           good: str, qty: int, price: int) -> str:
     nm = _gname(good)
-    matched = await _match_sell(session, player, chat_id, good, qty, price)
+    matched = await _match_sell(session, player, good, qty, price)
     remaining = qty - matched
     listed = 0
     if remaining > 0 and await repo.count_seller_orders(
@@ -650,7 +650,7 @@ async def _do_create_buy(session: AsyncSession, player: Player, chat_id: int,
     if qty <= 0:
         return (f"📣 {nm}: лимит покупки исчерпан (до {balance.BOURSE_BUY_LIMIT} шт "
                 f"за {balance.BOURSE_BUY_WINDOW_H}ч). Подожди — обновится.")
-    matched, remaining = await _match_buy(session, player, chat_id, good, qty, price)
+    matched, remaining = await _match_buy(session, player, good, qty, price)
     listed = 0
     if remaining > 0:
         affordable = player.gold // price if price > 0 else 0

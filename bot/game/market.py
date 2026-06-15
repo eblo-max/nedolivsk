@@ -27,11 +27,13 @@ def _now() -> datetime:
 
 
 def factor(holder, good: str) -> float:
-    """Множитель справедливой цены good от завала мирового рынка (≤1, не ниже пола)."""
+    """Множитель справедливой цены good от завала мирового рынка (≤1, не ниже пола).
+    Пороги — адаптивные: множатся на holder.market_scale (число активных чатов)."""
     if holder is None:
         return 1.0
     glut = float((holder.market or {}).get(good, 0.0))
-    return balance.market_factor(glut)
+    scale = getattr(holder, "market_scale", 1) or 1
+    return balance.market_factor(glut, scale)
 
 
 def glut(holder, good: str) -> float:
