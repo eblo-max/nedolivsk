@@ -9,11 +9,14 @@
 '<key>_c' — награда забрана, 'nb_chest' — сундук выдан.
 """
 
+from datetime import datetime, timedelta, timezone
+
 from bot.game import balance, inventory, story_state
 
 NEWBIE_MAX_LEVEL = 2          # «новичок», пока уровень таверны <= этого
+NEWBIE_GRACE_DAYS = 7        # поблажки — только первые N дней (анти-турель на ур.2)
 
-# Поблажки (действуют, пока новичок)
+# Поблажки (действуют, пока новичок И в грейс-окне)
 NEWBIE_PAY_MULT = 0.5        # −50% платы работникам
 NEWBIE_YIELD_MULT = 1.25     # +25% добычи бригад
 NEWBIE_SPEED_MULT = 0.8      # −20% времени ходки
@@ -38,20 +41,36 @@ def _level(tavern) -> int:
 
 
 def is_newbie(tavern) -> bool:
+    """Новичок по уровню — для грамоты-чеклиста и сундука (разовые, не фармятся)."""
     return _level(tavern) <= NEWBIE_MAX_LEVEL
 
 
-# ── Поблажки ───────────────────────────────────────────────────────────────
-def pay_mult(tavern) -> float:
-    return NEWBIE_PAY_MULT if is_newbie(tavern) else 1.0
+def _within_grace(player) -> bool:
+    """В грейс-окне онбординга (первые NEWBIE_GRACE_DAYS дней с регистрации)."""
+    created = getattr(player, "created_at", None)
+    if created is None:
+        return True
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - created < timedelta(days=NEWBIE_GRACE_DAYS)
 
 
-def yield_mult(tavern) -> float:
-    return NEWBIE_YIELD_MULT if is_newbie(tavern) else 1.0
+def perks_active(player) -> bool:
+    """Поблажки — пока новичок ПО УРОВНЮ и в грейс-окне (анти-абуз «турель»)."""
+    return is_newbie(player.tavern) and _within_grace(player)
 
 
-def speed_mult(tavern) -> float:
-    return NEWBIE_SPEED_MULT if is_newbie(tavern) else 1.0
+# ── Поблажки (на вход — игрок: нужен возраст аккаунта) ──────────────────────
+def pay_mult(player) -> float:
+    return NEWBIE_PAY_MULT if perks_active(player) else 1.0
+
+
+def yield_mult(player) -> float:
+    return NEWBIE_YIELD_MULT if perks_active(player) else 1.0
+
+
+def speed_mult(player) -> float:
+    return NEWBIE_SPEED_MULT if perks_active(player) else 1.0
 
 
 # ── Задания ────────────────────────────────────────────────────────────────

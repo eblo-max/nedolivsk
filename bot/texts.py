@@ -1910,9 +1910,13 @@ def newbie_screen(player, tavern) -> str:
         lines.append(f"{mark} {label} — {_reward_str(reward)}")
     if newbie.claimable(player, tavern):
         lines += ["", "🎁 <b>Есть готовые награды — жми «Забрать»!</b>"]
-    lines += ["", *_branch("ПОБЛАЖКИ (ур. 1–2)", [
+    from bot.game import newbie
+    perks_on = newbie.perks_active(player)
+    head = "ПОБЛАЖКИ — активны" if perks_on else "ПОБЛАЖКИ — выдохлись"
+    lines += ["", *_branch(head, [
         "🪙 работники −50% · ⛏ добыча +25% · 🦵 ходки быстрее",
-        "<i>снимутся, как дорастёшь до ур.3 — окрепнешь.</i>",
+        f"<i>только первые {newbie.NEWBIE_GRACE_DAYS} дней и до ур.3 — "
+        "потом сам, кабатчик.</i>",
     ])]
     return "\n".join(lines)
 

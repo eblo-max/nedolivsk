@@ -71,14 +71,14 @@ def start_expedition(player: Player, tavern: Tavern, resource: str) -> Expeditio
     equipment = getattr(player, "equipment", None)
     pay = max(1, int(balance.worker_pay(level) * items.pay_multiplier(equipment)
                      * perks.expedition_pay_mult(player)
-                     * newbie.pay_mult(tavern)))  # поблажка новичку
+                     * newbie.pay_mult(player)))  # поблажка новичку (с грейс-окном)
     if player.gold < pay:
         return ExpeditionStart(ok=False, reason="no_gold", pay=pay)
 
     player.gold -= pay
     hours = (balance.EXPEDITION_HOURS * items.speed_multiplier(equipment)
              * buff.expedition_speed_mult(player)   # баф «Быстрые ноги»
-             * newbie.speed_mult(tavern))           # поблажка новичку
+             * newbie.speed_mult(player))           # поблажка новичку (с грейс-окном)
     exps.append({
         "resource": resource,
         "ends_at": (_now() + timedelta(hours=hours)).isoformat(),
@@ -103,7 +103,7 @@ def claim_expeditions(player: Player) -> list[tuple[str, int, bool]]:
         amount = balance.expedition_yield(resource, level, player.region)
         amount = int(amount * items.yield_multiplier(equipment, resource)
                      * season.yield_mult(resource) * buff.yield_mult(player)
-                     * newbie.yield_mult(player.tavern))  # поблажка новичку
+                     * newbie.yield_mult(player))  # поблажка новичку (с грейс-окном)
         luck = (items.combat_stats(equipment)["luck"] + perks.luck_bonus(player)
                 + buff.luck_bonus(player))  # баф «Фартовый день»
         lucky = random.randint(1, 100) <= balance.lucky_chance(luck)
