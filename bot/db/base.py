@@ -121,6 +121,18 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS bonus_next_at TIMESTAMPTZ"
         ))
+        # Возвращалка (напоминание о простое)
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "nudge_tier INTEGER NOT NULL DEFAULT 0"
+        ))
+        # существующих не дёргаем сразу — стартуют «свежими»
+        await conn.execute(text(
+            "UPDATE players SET last_seen_at = now() WHERE last_seen_at IS NULL"
+        ))
         # Переход на единый инвентарь (Ярус 0). Колонка nullable: разовый
         # перелив только для ещё не мигрированных строк (inventory IS NULL),
         # чтобы опустошённый инвентарь не «возрождался» из старых колонок.

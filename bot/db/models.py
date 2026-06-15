@@ -62,6 +62,12 @@ class Player(Base):
     build_item: Mapped[str | None] = mapped_column(String(32))
     build_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Возвращалка: last_seen_at — любое действие игрока (трогает middleware);
+    # nudge_tier — какая ступень напоминания о простое уже отправлена (0/1/2/3),
+    # сбрасывается в 0 при активности.
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    nudge_tier: Mapped[int] = mapped_column(default=0)
+
     # Ежедневный бонус («опохмел»): claimable-предложение (bonus_kind) висит 24ч
     # и сгорает; активный баф (buff_kind) действует 4ч; bonus_next_at — когда
     # разрешено выдать следующее предложение (раз в сутки).

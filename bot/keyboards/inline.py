@@ -188,6 +188,13 @@ def back_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def idle_nudge_kb() -> InlineKeyboardMarkup:
+    """Кнопка возвращения в игру из напоминания о простое."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🍺 Скорей в кабак!", callback_data="tavern", style="success")
+    return kb.as_markup()
+
+
 def bonus_kb(player) -> InlineKeyboardMarkup:
     """Экран ежедневного бонуса: активировать (если есть и не занят) + назад."""
     from bot.game import buff

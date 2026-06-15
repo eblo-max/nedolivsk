@@ -4,7 +4,7 @@ import asyncio
 import html
 import logging
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aiogram import Bot
 from sqlalchemy import func, select
@@ -22,7 +22,8 @@ from bot.game import npc
 from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import (
-    buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb, loot_kb,
+    buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb, idle_nudge_kb,
+    loot_kb,
 )
 
 CHECK_INTERVAL_SECONDS = 60
@@ -156,6 +157,27 @@ async def _notify_returned(bot: Bot) -> None:
         for player in result.scalars().all():
             player.hunt_ready_at = None
             outbox.append((player, texts.hunter_recovered_notification(), hunt_cta_kb()))
+
+        # Возвращалка: напоминаем забывчивым (простой 1/3/7 дней, тон нарастает).
+        # nudge_tier сбрасывается в 0 при любой активности (middleware), так что
+        # одно напоминание на ступень за период простоя.
+        idle_nudges: list[tuple[int, int]] = []  # (player_id, ступень)
+        result = await session.execute(
+            select(Player).where(
+                Player.last_seen_at.is_not(None),
+                Player.last_seen_at < now - timedelta(days=1),
+                Player.nudge_tier < 3,
+            ).with_for_update(skip_locked=True)
+        )
+        for player in result.scalars().all():
+            seen = player.last_seen_at
+            if seen.tzinfo is None:
+                seen = seen.replace(tzinfo=timezone.utc)
+            days = (now - seen).total_seconds() / 86400
+            tier = 3 if days >= 7 else 2 if days >= 3 else 1
+            if tier > player.nudge_tier:
+                player.nudge_tier = tier
+                idle_nudges.append((player.id, tier))
 
         from bot.game import buildings as bld
 
@@ -323,6 +345,15 @@ async def _notify_returned(bot: Bot) -> None:
         # Персональные уведомления — после коммита (локи уже отпущены).
         for player, text, markup in outbox:
             await _notify(bot, player, text, markup)
+
+        # Возвращалка — строго в личку (nudge_tier уже зафиксирован: при сбое
+        # доставки не долбим каждый тик, ждём следующей ступени/возврата).
+        for pid, tier in idle_nudges:
+            try:
+                await bot.send_message(
+                    pid, texts.idle_nudge(tier), reply_markup=idle_nudge_kb())
+            except Exception:  # noqa: BLE001 — заблокировал бота и т.п.
+                logger.warning("Напоминание о простое игроку %s не доставлено", pid)
 
         # Анонсы мировых событий в общие чаты (после коммита состояния).
         if fair_event or season_changed or holiday_new:

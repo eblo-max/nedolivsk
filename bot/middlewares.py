@@ -3,13 +3,25 @@ from typing import Any
 
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, TelegramObject
+from sqlalchemy import func, update
 
 from bot import autoclean, panels
 from bot.db.base import session_factory
+from bot.db.models import Player
+
+
+def _actor_id(event: TelegramObject) -> int | None:
+    """Telegram-id инициатора апдейта (для отметки активности)."""
+    inner = getattr(event, "event", None)  # Update -> вложенное событие
+    user = getattr(inner, "from_user", None)
+    if user is None or user.is_bot:
+        return None
+    return user.id
 
 
 class DbSessionMiddleware(BaseMiddleware):
-    """Открывает сессию БД на каждое событие и коммитит после хендлера."""
+    """Открывает сессию БД на каждое событие и коммитит после хендлера.
+    Заодно отмечает активность игрока (last_seen) и сбрасывает напоминания."""
 
     async def __call__(
         self,
@@ -21,6 +33,12 @@ class DbSessionMiddleware(BaseMiddleware):
             data["session"] = session
             try:
                 result = await handler(event, data)
+                uid = _actor_id(event)
+                if uid is not None:  # любое действие игрока — он «в строю»
+                    await session.execute(
+                        update(Player).where(Player.id == uid)
+                        .values(last_seen_at=func.now(), nudge_tier=0)
+                    )
                 await session.commit()
                 return result
             except Exception:
