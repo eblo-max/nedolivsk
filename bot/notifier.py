@@ -318,7 +318,37 @@ async def _notify_returned(bot: Bot) -> None:
             chance = balance.AUCTION_BID_CHANCE * (
                 balance.AUCTION_FAIR_BID_MULT if wld.is_fair() else 1.0)
             if random.random() < chance:
-                auctionmod.try_bid(tavern, city)  # ставка тихо, итог — при закрытии
+                had_bid = bool((tavern.auction or {}).get("top_bid"))
+                bres = auctionmod.try_bid(tavern, city)
+                if bres and not had_bid:  # первая ставка — пингуем продавца
+                    from bot.game import production as prodmod
+                    lot = tavern.auction or {}
+                    gn = (prodmod.GOODS[lot.get("good")].name
+                          if lot.get("good") in prodmod.GOODS else lot.get("good"))
+                    repo.queue_notify(
+                        session, player.id,
+                        f"🔨 Твой лот {lot.get('qty')}×{gn} заметили на торгах — "
+                        f"ставка {bres['unit']} 🪙!")
+
+        # Авто-истечение биржевых лотов: старше TTL — вернуть товар/залог владельцу.
+        from bot.game import production as prodmod2
+        stale_cut = now - timedelta(days=balance.BOURSE_ORDER_TTL_DAYS)
+        for o in await repo.stale_orders(session, stale_cut, 30):
+            owner = await repo.get_player(session, o.seller_id, for_update=True)
+            gname = (prodmod2.GOODS[o.good].name
+                     if o.good in prodmod2.GOODS else o.good)
+            if owner is not None and o.side == "sell" and owner.tavern is not None:
+                pr = dict(owner.tavern.products or {})
+                pr[o.good] = pr.get(o.good, 0) + o.qty
+                owner.tavern.products = pr
+                repo.queue_notify(session, owner.id,
+                                  f"⌛ Лот на бирже истёк — {o.qty}×{gname} в погребе")
+            elif owner is not None and o.side == "buy":
+                owner.gold += o.qty * o.unit_price  # возврат залога
+                repo.queue_notify(session, owner.id,
+                                  f"⌛ Заявка «куплю» истекла — залог "
+                                  f"{o.qty * o.unit_price} 🪙 вернулся")
+            await repo.delete_order(session, o.id)
 
         # Симуляция фракций — дрейф силы, рынок, пульс, старт/конец ситуаций.
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)

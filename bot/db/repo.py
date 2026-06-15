@@ -268,6 +268,53 @@ async def delete_player_orders(session: AsyncSession, seller_id: int) -> None:
         delete(MarketOrder).where(MarketOrder.seller_id == seller_id))
 
 
+async def best_buy_orders(
+    session: AsyncSession, chat_id: int, good: str, min_price: int,
+    exclude_seller: int, *, limit: int, lock: bool = True,
+) -> list[MarketOrder]:
+    """Заявки «куплю» по товару с ценой >= min_price (лучшие — дороже первыми).
+    Для авто-сведения новой ПРОДАЖИ. lock — FOR UPDATE SKIP LOCKED."""
+    stmt = (select(MarketOrder).where(
+                MarketOrder.chat_id == chat_id, MarketOrder.side == "buy",
+                MarketOrder.good == good, MarketOrder.qty > 0,
+                MarketOrder.unit_price >= min_price,
+                MarketOrder.seller_id != exclude_seller)
+            .order_by(MarketOrder.unit_price.desc(), MarketOrder.id)
+            .limit(limit))
+    if lock:
+        stmt = stmt.with_for_update(skip_locked=True)
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def best_sell_orders(
+    session: AsyncSession, chat_id: int, good: str, max_price: int,
+    exclude_seller: int, *, limit: int, lock: bool = True,
+) -> list[MarketOrder]:
+    """Лоты продажи по товару с ценой <= max_price (лучшие — дешевле первыми).
+    Для авто-сведения новой ЗАЯВКИ «куплю»."""
+    stmt = (select(MarketOrder).where(
+                MarketOrder.chat_id == chat_id, MarketOrder.side == "sell",
+                MarketOrder.good == good, MarketOrder.qty > 0,
+                MarketOrder.unit_price <= max_price,
+                MarketOrder.seller_id != exclude_seller)
+            .order_by(MarketOrder.unit_price.asc(), MarketOrder.id)
+            .limit(limit))
+    if lock:
+        stmt = stmt.with_for_update(skip_locked=True)
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def stale_orders(
+    session: AsyncSession, cutoff: datetime, limit: int = 30
+) -> list[MarketOrder]:
+    """Лоты старше cutoff — на авто-истечение (с возвратом товара/залога)."""
+    return list((await session.execute(
+        select(MarketOrder).where(MarketOrder.created_at < cutoff)
+        .order_by(MarketOrder.id).limit(limit)
+        .with_for_update(skip_locked=True)
+    )).scalars().all())
+
+
 async def recent_chronicle(
     session: AsyncSession, chat_id: int, limit: int = 10
 ) -> list[str]:

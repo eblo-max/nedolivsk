@@ -383,22 +383,36 @@ async def cb_sell_create(callback: CallbackQuery, session: AsyncSession) -> None
     if chat_id is None:
         await callback.answer("Биржа — в общем чате.", show_alert=True)
         return
-    if await repo.count_seller_orders(session, player.id, "sell") >= balance.BOURSE_MAX_ORDERS:
-        await callback.answer("Лимит лотов достигнут.", show_alert=True)
-        return
     prices = bourse.price_tiers(good)
     if not 0 <= idx < len(prices):
         await callback.answer()
         return
     price = prices[idx]
-    if not bourse.valid_price(good, price) or not bourse.freeze(player.tavern, good, qty):
-        await callback.answer("Не вышло выставить.", show_alert=True)
+    stock = int((player.tavern.products or {}).get(good, 0))
+    qty = min(qty, stock)
+    if qty <= 0 or not bourse.valid_price(good, price):
+        await callback.answer("Не вышло выставить (товар/цена).", show_alert=True)
         return
-    repo.create_order(session, chat_id, player.id, good, qty, price, side="sell")
+    nm = _gname(good)
+    matched = await _match_sell(session, player, chat_id, good, qty, price)  # авто-сведение
+    remaining = qty - matched
+    listed = 0
+    if remaining > 0:
+        if await repo.count_seller_orders(session, player.id, "sell") < balance.BOURSE_MAX_ORDERS:
+            bourse.freeze(player.tavern, good, remaining)
+            repo.create_order(session, chat_id, player.id, good, remaining, price, side="sell")
+            listed = remaining
     repo.add_log(session, "player", player.id,
-                 f"📤 выставил на биржу {qty}×{_gname(good)} по {price}🪙")
+                 f"📤 продажа {qty}×{nm} по {price}🪙 (свёл {matched}, выставил {listed})")
     await _back_auction(callback, session, player)
-    await callback.answer(f"Лот выставлен: {qty}×{_gname(good)} по {price}🪙")
+    parts = []
+    if matched:
+        parts.append(f"свёл сразу {matched}")
+    if listed:
+        parts.append(f"выставил {listed}")
+    if remaining and not listed:
+        parts.append(f"{remaining} осталось в погребе (лимит лотов)")
+    await callback.answer(f"{nm}: " + (", ".join(parts) if parts else "ничего"))
 
 
 # ── Создание заявки «куплю» ─────────────────────────────────────────────────
@@ -459,28 +473,35 @@ async def cb_bid_create(callback: CallbackQuery, session: AsyncSession) -> None:
     if chat_id is None:
         await callback.answer("Биржа — в общем чате.", show_alert=True)
         return
-    if await repo.count_seller_orders(session, player.id, "buy") >= balance.BOURSE_MAX_ORDERS:
-        await callback.answer("Лимит заявок достигнут.", show_alert=True)
-        return
     prices = bourse.price_tiers(good)
     if not 0 <= idx < len(prices):
         await callback.answer()
         return
     price = prices[idx]
-    escrow = qty * price
     if not bourse.valid_price(good, price) or qty <= 0:
         await callback.answer("Цена/кол-во вне правил.", show_alert=True)
         return
-    if player.gold < escrow:
-        await callback.answer(f"Нужно {escrow}🪙 в залог, а у тебя {player.gold}.",
-                              show_alert=True)
-        return
-    player.gold -= escrow  # залог
-    repo.create_order(session, chat_id, player.id, good, qty, price, side="buy")
+    nm = _gname(good)
+    matched, remaining = await _match_buy(session, player, chat_id, good, qty, price)
+    listed = 0
+    if remaining > 0:  # остаток — в залог и в книгу
+        affordable = player.gold // price if price > 0 else 0
+        listed = min(remaining, affordable)
+        if listed > 0 and await repo.count_seller_orders(
+                session, player.id, "buy") < balance.BOURSE_MAX_ORDERS:
+            player.gold -= listed * price
+            repo.create_order(session, chat_id, player.id, good, listed, price, side="buy")
+        else:
+            listed = 0
     repo.add_log(session, "player", player.id,
-                 f"📣 заявка «куплю» {qty}×{_gname(good)} по {price}🪙 (залог {escrow})")
+                 f"📣 куплю {qty}×{nm} по {price}🪙 (свёл {matched}, заявка {listed})")
     await _back_auction(callback, session, player)
-    await callback.answer(f"Заявка выставлена, в залог {escrow}🪙")
+    parts = []
+    if matched:
+        parts.append(f"купил сразу {matched}")
+    if listed:
+        parts.append(f"заявка на {listed} (залог {listed * price}🪙)")
+    await callback.answer(f"{nm}: " + (", ".join(parts) if parts else "ничего не вышло"))
 
 
 # ── Мои лоты / отмена ───────────────────────────────────────────────────────
@@ -526,6 +547,75 @@ def _give(tavern, good: str, qty: int) -> None:
     prods = dict(tavern.products or {})
     prods[good] = int(prods.get(good, 0)) + qty
     tavern.products = prods
+
+
+async def _match_sell(session: AsyncSession, player: Player, chat_id: int,
+                      good: str, qty: int, ask: int) -> int:
+    """Свести новую ПРОДАЖУ со встречными заявками «куплю» (цена >= ask, дороже
+    первыми). Сделка по цене заявки (maker). Возвращает сведённое количество."""
+    nm = _gname(good)
+    remaining = qty
+    bids = await repo.best_buy_orders(session, chat_id, good, ask, player.id,
+                                      limit=balance.BOURSE_MATCH_MAX)
+    for bo in bids:
+        if remaining <= 0:
+            break
+        if bo.qty <= 0:
+            continue
+        buyer = await repo.get_player(session, bo.seller_id, for_update=True)
+        if buyer is None or buyer.tavern is None:  # сиротская заявка — снести
+            await repo.delete_order(session, bo.id)
+            continue
+        k = min(remaining, bo.qty)
+        gross = k * bo.unit_price            # по цене заявки
+        net = bourse.net_to_seller(gross)
+        bourse.freeze(player.tavern, good, k)  # списать у продавца
+        player.gold += net
+        _give(buyer.tavern, good, k)           # покупателю (оплачено из залога)
+        repo.queue_notify(session, buyer.id,
+                          f"📥 По твоей заявке свели {k}×{nm} (из залога {gross} 🪙)")
+        repo.add_log(session, "player", buyer.id, f"📥 заявка свелась: {k}×{nm}")
+        bo.qty -= k
+        if bo.qty <= 0:
+            await repo.delete_order(session, bo.id)
+        remaining -= k
+    return qty - remaining
+
+
+async def _match_buy(session: AsyncSession, player: Player, chat_id: int,
+                     good: str, qty: int, bid: int) -> tuple[int, int]:
+    """Свести новую ЗАЯВКУ «куплю» со встречными лотами продажи (цена <= bid,
+    дешевле первыми). Сделка по цене лота. (сведено, остаток)."""
+    nm = _gname(good)
+    remaining = qty
+    asks = await repo.best_sell_orders(session, chat_id, good, bid, player.id,
+                                       limit=balance.BOURSE_MATCH_MAX)
+    for so in asks:
+        if remaining <= 0:
+            break
+        if so.qty <= 0:
+            continue
+        ask = so.unit_price
+        k = min(remaining, so.qty, player.gold // ask if ask > 0 else 0)
+        if k <= 0:
+            if player.gold < ask:
+                break          # на самый дешёвый уже не хватает
+            continue
+        cost = k * ask
+        net = bourse.net_to_seller(cost)
+        player.gold -= cost
+        _give(player.tavern, good, k)         # товар из замороженного лота → покупателю
+        seller = await repo.get_player(session, so.seller_id, for_update=True)
+        if seller is not None:
+            seller.gold += net
+            repo.queue_notify(session, seller.id,
+                              f"🛒 Твой лот свели на бирже: {k}×{nm} → +{net} 🪙")
+            repo.add_log(session, "player", seller.id, f"🛒 лот свёлся: {k}×{nm}")
+        so.qty -= k
+        if so.qty <= 0:
+            await repo.delete_order(session, so.id)
+        remaining -= k
+    return qty - remaining, remaining
 
 
 async def _back_auction(callback: CallbackQuery, session: AsyncSession,
