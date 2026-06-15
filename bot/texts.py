@@ -1069,6 +1069,26 @@ def _production_lines(tavern: Tavern) -> list[str]:
     return out
 
 
+def _producer_counts(tavern: Tavern) -> tuple[int, int]:
+    """(в работе, готово) по всем пристройкам — для компактной сводки."""
+    from bot.game import production as prod
+    active = ready = 0
+    for bid in (tavern.production or {}):
+        if bid not in prod.PRODUCERS:
+            continue
+        if bid == "brewery":
+            ph, _ = prod.brew_phase(tavern)
+            if ph in ("fermenting", "aging"):
+                active += 1
+            elif ph in ("ready", "ripe", "overripe"):
+                ready += 1
+        else:
+            s, _ = prod.state(tavern, bid)
+            active += s == "active"
+            ready += s == "ready"
+    return active, ready
+
+
 def _world_lines(chat_id, seasonmod, citymod) -> list[str]:
     s = seasonmod.current()
     hol = seasonmod.holiday()
@@ -1183,7 +1203,17 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
         now_lines.append(f"⏳ Возврат через {_fmt_minutes(c.next_minutes)}")
     else:
         now_lines.append("⛏ Бригады свободны — гони за добром")
-    now_lines += _production_lines(tavern)
+    prod_lines = _production_lines(tavern)
+    if len(prod_lines) > 3:  # не разводим простыню — сводка (подпись фото ≤1024)
+        active, ready = _producer_counts(tavern)
+        bits = []
+        if active:
+            bits.append(f"{active} в работе")
+        if ready:
+            bits.append(f"{ready} готовы — забирай")
+        now_lines.append("🏭 Пристройки: " + ", ".join(bits))
+    else:
+        now_lines += prod_lines
     bl = _build_line(player)
     if bl:
         now_lines.append(bl)

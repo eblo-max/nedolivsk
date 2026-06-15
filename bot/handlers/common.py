@@ -21,6 +21,29 @@ from bot.game import character as char
 from bot.game import logic, storehouse
 from bot.keyboards import inline as kb
 
+# Лимит подписи к фото в Telegram — 1024 UTF-16 code units (не 4096, как у текста).
+_CAPTION_LIMIT = 1024
+
+
+def _u16len(s: str) -> int:
+    return len(s.encode("utf-16-le")) // 2
+
+
+def clamp_caption(text: str, limit: int = _CAPTION_LIMIT) -> str:
+    """Подстраховка: не дать подписи превысить лимит Telegram (иначе панель
+    падает и сносится). Режем ЦЕЛЫМИ строками с конца — теги у нас всегда
+    открыты-закрыты в пределах одной строки, так что HTML остаётся валидным."""
+    if _u16len(text) <= limit:
+        return text
+    lines = text.split("\n")
+    while len(lines) > 1 and _u16len("\n".join(lines)) > limit - 1:
+        lines.pop()
+    out = "\n".join(lines)
+    while out and _u16len(out) > limit - 1:  # одна сверхдлинная строка (страховка)
+        out = out[:-1]
+    return out + "…"
+
+
 # Кэш file_id статичных картинок (по пути файла).
 _file_id_cache: dict[str, str] = {}
 
@@ -111,7 +134,7 @@ async def send_tavern_screen(
     img = images.tavern_image(player.tavern.level)
     if img is not None:
         msg = await message.answer_photo(
-            cached_media(img), caption=caption, reply_markup=markup
+            cached_media(img), caption=clamp_caption(caption), reply_markup=markup
         )
         remember_file_id(img, msg)
     else:
@@ -124,7 +147,7 @@ async def caption_edit(message: Message, text: str, markup) -> None:
     """Правит подпись к фото или текст сообщения — что есть."""
     try:
         if message.photo:
-            await message.edit_caption(caption=text, reply_markup=markup)
+            await message.edit_caption(caption=clamp_caption(text), reply_markup=markup)
         else:
             await message.edit_text(text, reply_markup=markup)
     except TelegramBadRequest:
@@ -151,6 +174,7 @@ async def show_photo_panel(
     """Переход в том же окне: подменяем фото панели (edit_media), не двигая
     сообщение. Если оно не фото или правка не прошла — пересоздаём с переносом
     владельца."""
+    caption = clamp_caption(caption)
     if message.photo:
         try:
             return await message.edit_media(
@@ -245,7 +269,7 @@ async def open_warehouse(message: Message, player: Player, owner_id: int) -> Mes
         media, key, need_capture = await sklad_media(player)
         msg = await message.answer_photo(
             media,
-            caption=texts.storehouse_caption(player, player.tavern),
+            caption=clamp_caption(texts.storehouse_caption(player, player.tavern)),
             reply_markup=markup,
         )
         if need_capture:
@@ -257,7 +281,7 @@ async def open_warehouse(message: Message, player: Player, owner_id: int) -> Mes
     img = _warehouse_img(player)
     if img is not None:
         msg = await message.answer_photo(
-            cached_media(img), caption=caption, reply_markup=markup
+            cached_media(img), caption=clamp_caption(caption), reply_markup=markup
         )
         remember_file_id(img, msg)
     else:
@@ -274,7 +298,8 @@ async def _send_character_panel(
         _register_panel(msg, owner_id)
         return msg
     media, key, need_capture = await doll_media(player)
-    msg = await message.answer_photo(media, caption=caption, reply_markup=markup)
+    msg = await message.answer_photo(media, caption=clamp_caption(caption),
+                                     reply_markup=markup)
     if need_capture:
         remember_media(key, msg)
     _register_panel(msg, owner_id)
