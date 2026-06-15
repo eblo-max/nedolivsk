@@ -24,6 +24,7 @@ from bot.game import (
     balance, buff, buildings, combat, inventory, items, market, production, season,
 )
 from bot.game import world as wld
+from bot.sender import deliver
 
 # Ресурсы, которые можно раздавать (сырьё + полуфабрикаты) — анти-опечатка.
 _GIVABLE = set(balance.RESOURCES) | {"malt", "flour", "ingot"}
@@ -852,12 +853,34 @@ async def cb_giveall(cb: CallbackQuery, state: FSMContext) -> None:
 
 
 @router.callback_query(F.data == "adm:cast")
-async def cb_cast(cb: CallbackQuery, state: FSMContext) -> None:
+async def cb_cast(cb: CallbackQuery, session: AsyncSession) -> None:
     if not await _guard_cb(cb):
         return
+    chats = await session.scalar(select(func.count(KnownChat.chat_id))) or 0
+    kb = InlineKeyboardBuilder()
+    kb.button(text=f"💬 Во все чаты ({chats})", callback_data="adm:cast:chats")
+    kb.button(text="✉️ В личку игрокам", callback_data="adm:cast:dm")
+    kb.button(text="🏠 В меню", callback_data="adm:home")
+    kb.adjust(1)
+    await _edit(cb, (
+        "📣 <b>РАССЫЛКА</b>\n\n"
+        "💬 <b>Во все чаты</b> — пост уйдёт во все общие чаты, где есть бот. "
+        "Это доходит до всех, кто играет в группе. <i>Рекомендуется.</i>\n\n"
+        "✉️ <b>В личку</b> — только тем, кто открывал бота в личных сообщениях. "
+        "Тех, кто играет лишь в группе, Telegram писать в ЛС не даёт — до них "
+        "не дойдёт."
+    ), kb)
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("adm:cast:"))
+async def cb_cast_mode(cb: CallbackQuery, state: FSMContext) -> None:
+    if not await _guard_cb(cb):
+        return
+    field = "cast_chats" if cb.data.split(":")[2] == "chats" else "cast_dm"
     await state.set_state(AdmInput.wait)
-    await state.update_data(pid=0, field="cast_dm")
-    await cb.message.answer(_PROMPTS["cast_dm"])
+    await state.update_data(pid=0, field=field)
+    await cb.message.answer(_PROMPTS[field])
     await cb.answer()
 
 
@@ -877,8 +900,10 @@ _PROMPTS = {
     "grant_res_all": "Что раздать ВСЕМ: <code>ресурс количество</code> "
                      "(напр. <code>wood 200</code>).\nРесурсы: "
                      + ", ".join(balance.RESOURCES) + ", malt, flour, ingot",
-    "cast_dm": "Введи текст рассылки — уйдёт В ЛИЧКУ всем игрокам "
-               "(можно с HTML-разметкой):",
+    "cast_dm": "Введи текст рассылки — уйдёт В ЛИЧКУ тем, кто открывал бота "
+               "в ЛС (можно с HTML-разметкой):",
+    "cast_chats": "Введи текст рассылки — уйдёт ВО ВСЕ ЧАТЫ с ботом "
+                  "(можно с HTML-разметкой):",
 }
 
 
@@ -931,6 +956,23 @@ async def on_input(message: Message, state: FSMContext, session: AsyncSession) -
         return
 
     # ── Массовые операции (на всех игроков) ──
+    if field == "cast_chats":
+        if not raw:
+            await message.answer("Пустой текст — отменено.",
+                                 reply_markup=_home_kb().as_markup())
+            return
+        chat_ids = await repo.all_chat_ids(session)
+        sent = 0
+        for cid in chat_ids:
+            if await deliver(lambda c=cid: message.bot.send_message(c, raw),
+                             what=f"cast→{cid}") is not None:
+                sent += 1
+        repo.add_log(session, "admin", message.from_user.id,
+                     f"📣 рассылка в чаты: {sent}/{len(chat_ids)}")
+        await message.answer(f"📣 Отправлено в {sent} из {len(chat_ids)} чатов.",
+                             reply_markup=_home_kb().as_markup())
+        return
+
     if field == "cast_dm":
         if not raw:
             await message.answer("Пустой текст — отменено.",
