@@ -13,9 +13,10 @@ def _now() -> datetime:
 
 
 def expedition_slots(tavern: Tavern) -> int:
-    """Число бригад (параллельных вылазок), растёт с уровнем таверны."""
+    """Число бригад (параллельных вылазок), растёт с уровнем таверны.
+    +1 бригада каждые 3 уровня, первая прибавка — уже на 3-м уровне."""
     level = tavern.level if tavern else 1
-    return 1 + (level - 1) // 3
+    return 1 + level // 3
 
 
 def _exps(player: Player) -> list:
