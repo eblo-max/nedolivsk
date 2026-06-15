@@ -163,6 +163,15 @@ def _text_size(text: str, font) -> tuple[int, int]:
     return right - left, bottom - top
 
 
+def _fit_text(text: str, font, max_w: int) -> str:
+    """Ужать имя под max_w пикселей по РЕАЛЬНОЙ ширине (а не числу букв), с «…»."""
+    if _text_size(text, font)[0] <= max_w:
+        return text
+    while text and _text_size(text + "…", font)[0] > max_w:
+        text = text[:-1]
+    return (text + "…") if text else "…"
+
+
 def _blit_label(d: ImageDraw.ImageDraw, px: int, py: int, text: str, font) -> None:
     """Подпись с тёмной обводкой, верхний-левый угол в (px, py)."""
     d.text((px, py), text, font=font, fill=(250, 232, 185),
@@ -209,7 +218,8 @@ def render(taverns: list[MapTavern]) -> bytes:
     w, h = base.size
     unit = int(MIN_DIST * min(w, h))           # шаг разброса в px (карта квадратная)
     sprite_w = max(24, int(unit * SPRITE_FRAC))
-    font = _font(max(13, int(unit * 0.34)))
+    font = _font(max(12, int(unit * 0.22)))    # компактная подпись
+    max_label_w = int(unit * 1.7)              # длинное имя ужимаем под эту ширину
 
     placed: list[tuple[int, int, MapTavern]] = []
     for t in taverns:
@@ -255,7 +265,7 @@ def render(taverns: list[MapTavern]) -> bytes:
     # 3) Подписи с выбором кандидат-позиции (PFLP): низ → верх → право → лево →
     # ниже-низ. Берём первую без коллизий и в пределах карты; иначе пропускаем.
     for cx, cy, t, (sx1, sy1, sx2, sy2) in drawn:
-        text = t.name if len(t.name) <= 14 else t.name[:13] + "…"
+        text = _fit_text(t.name, font, max_label_w)
         lw, lh = _text_size(text, font)
         candidates = (
             (cx - lw // 2, sy2 + 3),            # под спрайтом
