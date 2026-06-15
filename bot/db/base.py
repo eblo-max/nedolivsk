@@ -57,6 +57,9 @@ async def create_tables() -> None:
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS holiday VARCHAR(48)"
         ))
         await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS bonus_push_on VARCHAR(10)"
+        ))
+        await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "expedition_resource VARCHAR(16)"
         ))

@@ -99,6 +99,8 @@ class WorldState(Base):
     # Последний анонсированный сезон/праздник (дедуп рассылки смены).
     season: Mapped[int] = mapped_column(default=-1)
     holiday: Mapped[str | None] = mapped_column(String(48))
+    # Дата (МСК, YYYY-MM-DD) последней утренней рассылки «бонус готов» — дедуп.
+    bonus_push_on: Mapped[str | None] = mapped_column(String(10))
 
 
 class KnownChat(Base):

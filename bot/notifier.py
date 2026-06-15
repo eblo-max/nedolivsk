@@ -22,8 +22,8 @@ from bot.game import npc
 from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import (
-    buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb, idle_nudge_kb,
-    loot_kb,
+    bonus_push_kb, buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb,
+    idle_nudge_kb, loot_kb,
 )
 
 CHECK_INTERVAL_SECONDS = 60
@@ -81,6 +81,21 @@ async def _notify_returned(bot: Bot) -> None:
         holiday_new = hol is not None and world.holiday != hol_token
         if hol is not None:
             world.holiday = hol_token
+
+        # Утренний пуш «бонус готов»: раз в день после рубежа 10:00 МСК.
+        # Шлём недавно активным (за 3 дня) — давно ушедших ведёт «возвращалка».
+        from bot.game import buff as buffmod
+        bonus_push_targets: list[int] = []
+        day_key = buffmod.reset_day_key(now)
+        if world.bonus_push_on != day_key:
+            world.bonus_push_on = day_key
+            res = await session.execute(
+                select(Player.id)
+                .join(Tavern, Tavern.player_id == Player.id)
+                .where(Player.last_seen_at.is_not(None),
+                       Player.last_seen_at >= now - timedelta(days=3))
+            )
+            bonus_push_targets = [r[0] for r in res.all()]
 
         # Рассылку копим и шлём ПОСЛЕ коммита, чтобы не держать локи строк
         # через сетевые вызовы Telegram (иначе клики игроков ждут весь тик).
@@ -354,6 +369,14 @@ async def _notify_returned(bot: Bot) -> None:
                     pid, texts.idle_nudge(tier), reply_markup=idle_nudge_kb())
             except Exception:  # noqa: BLE001 — заблокировал бота и т.п.
                 logger.warning("Напоминание о простое игроку %s не доставлено", pid)
+
+        # Утренний пуш «бонус готов» — в личку (маркер дня уже зафиксирован).
+        for pid in bonus_push_targets:
+            try:
+                await bot.send_message(
+                    pid, texts.bonus_ready_push(), reply_markup=bonus_push_kb())
+            except Exception:  # noqa: BLE001 — заблокировал бота и т.п.
+                logger.warning("Утренний пуш бонуса игроку %s не доставлен", pid)
 
         # Анонсы мировых событий в общие чаты (после коммита состояния).
         if fair_event or season_changed or holiday_new:

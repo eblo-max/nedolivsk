@@ -1850,6 +1850,20 @@ def idle_nudge(tier: int) -> str:
     return random.choice(_IDLE_NUDGE.get(tier, _IDLE_NUDGE[1]))
 
 
+# Утренний пуш «бонус готов» (10:00 МСК).
+_BONUS_PUSH = [
+    "🍺 Утро, хозяин! Опохмел подъехал — забери бонус дня, пока не выветрился.",
+    "🍺 Колокол пробил десять! Свежий бонус на стойке — хватай, не зевай.",
+    "🍺 Новый день — новая халява. Загляни в кабак за бонусом дня!",
+    "🍺 Подъём, кабатчик! Бонус дня уже греется у очага — не проспи.",
+]
+
+
+def bonus_ready_push() -> str:
+    import random
+    return random.choice(_BONUS_PUSH)
+
+
 def bonus_screen(player: Player) -> str:
     """Экран ежедневного бонуса: что выпало, эффект, сколько до сгорания."""
     from bot.game import buff as buffmod

@@ -36,6 +36,13 @@ def _next_reset(now: datetime) -> datetime:
     return _last_reset(now) + timedelta(days=1)
 
 
+def reset_day_key(now: datetime | None = None) -> str:
+    """Ключ текущего «бонусного дня» (дата МСК последнего рубежа 10:00) —
+    для дедупа утренней рассылки «бонус готов»."""
+    now = now or _now()
+    return _last_reset(now).astimezone(MSK).date().isoformat()
+
+
 @dataclass(frozen=True)
 class Boon:
     id: str

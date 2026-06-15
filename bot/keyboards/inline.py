@@ -195,6 +195,13 @@ def idle_nudge_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def bonus_push_kb() -> InlineKeyboardMarkup:
+    """Кнопка из утреннего пуша — сразу к экрану бонуса дня."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🎁 Забрать опохмел", callback_data="bonus", style="success")
+    return kb.as_markup()
+
+
 def bonus_kb(player) -> InlineKeyboardMarkup:
     """Экран ежедневного бонуса: активировать (если есть и не занят) + назад."""
     from bot.game import buff
