@@ -206,3 +206,9 @@ async def create_tables() -> None:
             "|| CASE WHEN products ? '3' THEN jsonb_build_object('ale3', products->'3') ELSE '{}'::jsonb END "
             "WHERE products ?| array['1','2','3']"
         ))
+        # Новая карта-схема: слоты зонно-блочные (≥1001). Старые ручные слоты
+        # (1..15) гасим разово — переназначатся по региону при показе карты.
+        # Идемпотентно: новые id ≥1001 под условие не попадают.
+        await conn.execute(text(
+            "UPDATE taverns SET map_slot = NULL WHERE map_slot IS NOT NULL AND map_slot < 1000"
+        ))
