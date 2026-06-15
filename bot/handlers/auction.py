@@ -277,6 +277,12 @@ async def cb_buy_prompt(callback: CallbackQuery, session: AsyncSession,
     if order.seller_id == player.id:
         await callback.answer("Это твой лот.", show_alert=True)
         return
+    if bourse.buy_room(player, order.good) <= 0:
+        await callback.answer(
+            f"Лимит скупки {_gname(order.good)} исчерпан "
+            f"({balance.BOURSE_BUY_LIMIT} шт/{balance.BOURSE_BUY_WINDOW_H}ч). "
+            "Скоро обновится.", show_alert=True)
+        return
     cap = min(order.qty, player.gold // order.unit_price if order.unit_price else 0,
               bourse.buy_room(player, order.good))
     if cap <= 0:
@@ -395,6 +401,12 @@ async def cb_bid_good(callback: CallbackQuery, session: AsyncSession,
     if player is None:
         return
     good = callback.data.split(":", 1)[1]
+    if bourse.buy_room(player, good) <= 0:
+        await callback.answer(
+            f"Лимит скупки {_gname(good)} исчерпан "
+            f"({balance.BOURSE_BUY_LIMIT} шт/{balance.BOURSE_BUY_WINDOW_H}ч). "
+            "Скоро обновится.", show_alert=True)
+        return
     cap = min(balance.BOURSE_QTY_MAX, player.gold // bourse.price_floor(good),
               bourse.buy_room(player, good))
     if cap <= 0:
@@ -542,12 +554,14 @@ async def _match_buy(session: AsyncSession, player: Player, chat_id: int,
     return qty - remaining, remaining
 
 
-async def _market_nudge(session: AsyncSession, good: str, qty: int) -> None:
-    """P2P-сделка двигает оптовую цену ЕДИНОГО рынка (мягкий сигнал изобилия)."""
-    if qty <= 0:
+async def _market_nudge(session: AsyncSession, good: str, delta: int) -> None:
+    """P2P-сделка двигает оптовую цену ЕДИНОГО рынка по потоку ордеров (order-flow):
+    агрессор-ПРОДАВЕЦ давит цену вниз (delta>0 — завал), агрессор-ПОКУПАТЕЛЬ тянет
+    вверх (delta<0 — скупка/дефицит). Мягко, через вес MARKET_P2P_WEIGHT."""
+    if delta == 0:
         return
     world = await repo.get_or_create_world(session)
-    market.nudge(world, good, qty * balance.MARKET_P2P_WEIGHT)
+    market.nudge(world, good, delta * balance.MARKET_P2P_WEIGHT)
 
 
 async def _back_auction(callback: CallbackQuery, session: AsyncSession,
@@ -581,7 +595,7 @@ async def _do_buy(session: AsyncSession, player: Player, chat_id: int | None,
     if order.qty <= 0:
         await repo.delete_order(session, order.id)
     repo.add_log(session, "player", player.id, f"🏪 купил на бирже {qty}×{nm} за {cost}🪙")
-    await _market_nudge(session, good, qty)
+    await _market_nudge(session, good, -qty)  # скупка тянет цену вверх
     return f"Куплено {qty}×{nm} за {cost} 🪙."
 
 
@@ -651,7 +665,7 @@ async def _do_create_buy(session: AsyncSession, player: Player, chat_id: int,
     # долив заявки позже не обошёл потолок. Отмена заявки лимит не возвращает.
     bourse.record_buy(player, good, matched + listed)
     if matched:
-        await _market_nudge(session, good, matched)
+        await _market_nudge(session, good, -matched)  # скупка тянет цену вверх
     repo.add_log(session, "player", player.id,
                  f"📣 куплю {qty}×{nm} по {price}🪙 (свёл {matched}, заявка {listed})")
     parts = []

@@ -281,9 +281,11 @@ async def cb_retail_sell(callback: CallbackQuery, session: AsyncSession) -> None
     if ce.skim_pct and gold > 0:  # воры/корона снимают долю и со сбыта
         skim = int(gold * ce.skim_pct)
         player.gold -= skim
-    # Розничный сбыт — слабый сигнал изобилия товара на рынке чата.
-    for good, qty in sold.items():
-        marketmod.nudge(city, good, qty * balance.MARKET_RETAIL_WEIGHT)
+    # Розничный сбыт — слабый сигнал изобилия товара на ЕДИНОМ рынке.
+    if sold:
+        world = await repo.get_or_create_world(session)
+        for good, qty in sold.items():
+            marketmod.nudge(world, good, qty * balance.MARKET_RETAIL_WEIGHT)
     await _safe_edit(callback, texts.retail_sold(sold, gold, rep, skim), kb.back_kb())
     await callback.answer(f"+{gold - skim} 🪙")
 

@@ -75,8 +75,8 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
         autoclean.schedule_message(await message.reply(texts.city_screen(city)))
         return
     if section == "market":
-        city = await repo.get_or_create_city(session, message.chat.id)
-        autoclean.schedule_message(await message.reply(texts.market_screen(city)))
+        world = await repo.get_or_create_world(session)  # единый рынок (глобальный)
+        autoclean.schedule_message(await message.reply(texts.market_screen(world)))
         return
 
     player = await repo.get_player(session, message.from_user.id)
