@@ -476,11 +476,31 @@ def fair_open_announce() -> str:
     )
 
 
+def _season_perks(s) -> str:
+    """Что сезон даёт — по данным сезона, в трактирном стиле (└-строки)."""
+    parts = []
+    d = round((s.demand_mult - 1) * 100)
+    if d > 0:
+        parts.append(f"🍺 Жажда +{d}% — пьянь прёт в кабак, наливай не зевай")
+    elif d < 0:
+        parts.append(f"🍺 Спрос {d}% — народ жмётся по избам, гуляк меньше")
+    boosted = [r for r, m in s.yield_mults.items() if m > 1]
+    if boosted:
+        res = " ".join(f"{RESOURCE_EMOJI[r]}{RESOURCE_NAMES[r].lower()}" for r in boosted)
+        parts.append(f"⛏ Прёт само в руки: {res} — бригады гребут с горкой")
+    if s.default_yield < 1:
+        parts.append(
+            f"⛏ Добыча в целом −{round((1 - s.default_yield) * 100)}% — "
+            "мёрзни да кляни погоду")
+    return "\n".join(f"└ {p}" for p in parts) or "└ погода как погода, без чудес"
+
+
 def season_announce(s) -> str:
     """Анонс смены сезона в чат."""
     return (
-        f"{s.emoji} <b>{s.name.upper()} ПРИШЛА В НЕДОЛИВСК</b>\n\n"
-        f"{s.blurb[0].upper()}{s.blurb[1:]}.\n"
+        f"{s.emoji} <b>{s.name.upper()} НА ДВОРЕ, НЕДОЛИВСК!</b>\n\n"
+        f"{s.blurb[0].upper()}{s.blurb[1:]}.\n\n"
+        f"<b>ЧТО С ЭТОГО:</b>\n{_season_perks(s)}\n\n"
         "Подстраивай дела под погоду, кабатчик, — кто не чешется, тот и пролетает."
     )
 
