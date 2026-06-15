@@ -1,14 +1,12 @@
 """Анонсы мировых событий в общие чаты."""
 
-import logging
 from datetime import datetime, timezone
 
 from aiogram import Bot
 from aiogram.types import FSInputFile
 
 from bot import images, texts
-
-logger = logging.getLogger(__name__)
+from bot.sender import deliver
 
 
 async def broadcast_fair(
@@ -32,11 +30,12 @@ async def broadcast_fair(
         return
 
     for chat_id in chat_ids:
-        try:
-            if media is not None:
-                sent = await bot.send_photo(chat_id, media, caption=text)
+        if media is not None:
+            sent = await deliver(
+                lambda cid=chat_id: bot.send_photo(cid, media, caption=text),
+                what=f"ярмарка→{chat_id}")
+            if sent is not None and sent.photo:
                 media = sent.photo[-1].file_id  # дальше шлём по file_id
-            else:
-                await bot.send_message(chat_id, text)
-        except Exception:  # noqa: BLE001 — чат удалён/бот выгнан и т.п.
-            logger.warning("Анонс ярмарки не доставлен в чат %s", chat_id)
+        else:
+            await deliver(lambda cid=chat_id: bot.send_message(cid, text),
+                          what=f"ярмарка→{chat_id}")

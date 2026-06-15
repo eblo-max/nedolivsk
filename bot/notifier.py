@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from bot import announce, effects, panels, texts
 from bot.db import repo
 from bot.db.base import session_factory
+from bot.sender import deliver
 from bot.db.models import Player, Tavern
 from bot.game import auction as auctionmod
 from bot.game import balance
@@ -38,19 +39,15 @@ async def _notify(bot: Bot, player: Player, text: str, markup) -> None:
     if player.chat_id is not None:
         name = html.escape(player.first_name or "Хозяин")
         body = f'<a href="tg://user?id={player.id}">{name}</a>!\n{text}'
-        try:
-            msg = await bot.send_message(player.chat_id, body, reply_markup=markup)
+        msg = await deliver(
+            lambda: bot.send_message(player.chat_id, body, reply_markup=markup),
+            what=f"увед→чат{player.chat_id}")
+        if msg is not None:
             panels.claim(msg, player.id)  # кнопку жмёт только владелец
             return
-        except Exception:  # noqa: BLE001 — бота нет в чате/чат удалён
-            logger.warning(
-                "Увед. в чат %s игроку %s не ушло, шлю в личку",
-                player.chat_id, player.id,
-            )
-    try:
-        await bot.send_message(player.id, text, reply_markup=markup)
-    except Exception:  # noqa: BLE001 — заблокировал бота и т.п.
-        logger.warning("Уведомление игроку %s не доставлено", player.id)
+        # в чат не ушло (бота нет/чат удалён) — пробуем личку
+    await deliver(lambda: bot.send_message(player.id, text, reply_markup=markup),
+                  what=f"увед→личка{player.id}")
 
 
 async def notifier_loop(bot: Bot) -> None:
@@ -392,28 +389,24 @@ async def _notify_returned(bot: Bot) -> None:
         # Возвращалка — строго в личку (nudge_tier уже зафиксирован: при сбое
         # доставки не долбим каждый тик, ждём следующей ступени/возврата).
         for pid, tier in idle_nudges:
-            try:
-                await bot.send_message(
-                    pid, texts.idle_nudge(tier), reply_markup=idle_nudge_kb())
-            except Exception:  # noqa: BLE001 — заблокировал бота и т.п.
-                logger.warning("Напоминание о простое игроку %s не доставлено", pid)
+            await deliver(
+                lambda p=pid, t=tier: bot.send_message(
+                    p, texts.idle_nudge(t), reply_markup=idle_nudge_kb()),
+                what=f"простой→{pid}")
 
         # Утренний пуш «бонус готов» — в личку (маркер дня уже зафиксирован).
         for pid in bonus_push_targets:
-            try:
-                await bot.send_message(
-                    pid, texts.bonus_ready_push(), reply_markup=bonus_push_kb())
-            except Exception:  # noqa: BLE001 — заблокировал бота и т.п.
-                logger.warning("Утренний пуш бонуса игроку %s не доставлен", pid)
+            await deliver(
+                lambda p=pid: bot.send_message(
+                    p, texts.bonus_ready_push(), reply_markup=bonus_push_kb()),
+                what=f"пуш-бонус→{pid}")
 
         # Outbox: отложенная личка (биржа: «твой лот купили» и т.п.).
         notes = await repo.pop_notifications(session, 50)
         if notes:
             for n in notes:
-                try:
-                    await bot.send_message(n.user_id, n.text)
-                except Exception:  # noqa: BLE001 — заблокировал бота и т.п.
-                    logger.warning("Outbox игроку %s не доставлен", n.user_id)
+                await deliver(lambda nn=n: bot.send_message(nn.user_id, nn.text),
+                              what=f"outbox→{n.user_id}")
             await repo.delete_notifications(session, [n.id for n in notes])
             await session.commit()
 
@@ -429,29 +422,28 @@ async def _notify_returned(bot: Bot) -> None:
                 season_msgs.append(texts.holiday_announce(hol))
             for chat_id in chat_ids:
                 for text in season_msgs:
-                    try:
-                        msg = await bot.send_message(chat_id, text)
-                        await effects.react_msg(msg, "🎉")  # праздничный бейдж
-                    except Exception:  # noqa: BLE001
-                        logger.warning("Анонс сезона не доставлен в чат %s", chat_id)
+                    msg = await deliver(
+                        lambda cid=chat_id, t=text: bot.send_message(cid, t),
+                        what=f"сезон→{chat_id}")
+                    await effects.react_msg(msg, "🎉")  # праздничный бейдж
         # Анонсы городских ситуаций (после коммита).
         for chat_id, text in city_events:
-            try:
-                msg = await bot.send_message(chat_id, text)
-                await effects.react_msg(msg, "🔥")  # «жизнь» городу
-            except Exception:  # noqa: BLE001 — бота нет в чате и т.п.
-                logger.warning("Анонс ситуации не доставлен в чат %s", chat_id)
+            msg = await deliver(
+                lambda cid=chat_id, t=text: bot.send_message(cid, t),
+                what=f"ситуация→{chat_id}")
+            await effects.react_msg(msg, "🔥")  # «жизнь» городу
         # Подкидыш — постим после коммита (строка уже сохранена, id известен).
         orphaned: list[int] = []
         for chat_id, drop_id in loot_to_post:
-            try:
-                msg = await bot.send_message(
-                    chat_id, texts.loot_drop(loot.flavor()),
-                    reply_markup=loot_kb(drop_id))
-                await effects.react_msg(msg, "👀")  # «ой, что-то упало» — привлечь глаз
-            except Exception:  # noqa: BLE001 — бота нет в чате и т.п.
-                logger.warning("Подкидыш не доставлен в чат %s", chat_id)
+            drop_text = texts.loot_drop(loot.flavor())
+            msg = await deliver(
+                lambda cid=chat_id, did=drop_id, t=drop_text: bot.send_message(
+                    cid, t, reply_markup=loot_kb(did)),
+                what=f"подкидыш→{chat_id}")
+            if msg is None:
                 orphaned.append(drop_id)  # не блокируем чат осиротевшей строкой
+            else:
+                await effects.react_msg(msg, "👀")  # «ой, что-то упало»
         if orphaned:
             for drop_id in orphaned:
                 await repo.delete_loot(session, drop_id)
