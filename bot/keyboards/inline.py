@@ -353,22 +353,21 @@ def auction_kb(tavern) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     sizes = []
     if tavern.auction:
-        kb.button(text="🔄 Обновить торги", callback_data="auction")
-        kb.button(text="🚫 Снять лот (NPC)", callback_data="auc_cancel", style="danger")
-        sizes += [1, 1]
+        kb.button(text="🔄 Обновить", callback_data="auction")
+        kb.button(text="🚫 Снять лот", callback_data="auc_cancel", style="danger")
+        sizes.append(2)
     else:
-        kb.button(text="🔨 Аукцион NPC — выставить", callback_data="auc_new",
-                  style="success")
+        kb.button(text="🔨 Аукцион NPC", callback_data="auc_new", style="success")
         sizes.append(1)
-    # Городская биржа (P2P): обе стороны ордербука
-    kb.button(text="🛒 Купить (лоты продажи)", callback_data="bourse:0:all")
-    kb.button(text="📥 Заявки «куплю»", callback_data="blb:0:all")
-    kb.button(text="📤 Выставить продажу", callback_data="bsell", style="success")
-    kb.button(text="📣 Выставить «куплю»", callback_data="bbidnew", style="success")
-    kb.button(text="📦 Мои лоты на бирже", callback_data="bmine")
+    # Городская биржа (P2P): обе стороны ордербука — короткие подписи
+    kb.button(text="🛒 Купить", callback_data="bourse:0:all")
+    kb.button(text="📥 Заявки", callback_data="blb:0:all")
+    kb.button(text="📤 Продать", callback_data="bsell", style="success")
+    kb.button(text="📣 Куплю", callback_data="bbidnew", style="success")
+    kb.button(text="📦 Мои лоты", callback_data="bmine")
     kb.button(text="🏪 Рынок", callback_data="market")
-    kb.button(text="🏠 К таверне", callback_data="tavern")
-    kb.adjust(*sizes, 2, 2, 1, 1, 1)
+    kb.button(text="🏠 Таверна", callback_data="tavern")
+    kb.adjust(*sizes, 2, 2, 1, 2)
     return kb.as_markup()
 
 
@@ -392,7 +391,7 @@ def bourse_list_kb(orders, page: int, total: int, cat: str,
     list_cb = "bourse" if side == "sell" else "blb"
     item_cb = "bord" if side == "sell" else "bbid"
     kb = InlineKeyboardBuilder()
-    kb.button(text=f"🔎 Фильтр: {CAT_LABEL[cat]}",
+    kb.button(text=f"🔎 {CAT_LABEL[cat]}",
               callback_data=f"{list_cb}:0:{_CAT_NEXT[cat]}")
     for o in orders:
         kb.button(text=f"{_good_emoji(o.good)} {o.qty}шт × {o.unit_price}🪙",
