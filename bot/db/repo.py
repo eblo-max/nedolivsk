@@ -205,10 +205,9 @@ def create_order(
     return order
 
 
-def _orders_q(chat_id: int, exclude_seller: int, side: str,
-              goods: list[str] | None):
+def _orders_q(exclude_seller: int, side: str, goods: list[str] | None):
+    # ЕДИНЫЙ рынок: стакан глобальный (без фильтра по чату), скрываем лишь свои.
     stmt = select(MarketOrder).where(
-        MarketOrder.chat_id == chat_id,
         MarketOrder.seller_id != exclude_seller,
         MarketOrder.qty > 0,
         MarketOrder.side == side,
@@ -219,20 +218,20 @@ def _orders_q(chat_id: int, exclude_seller: int, side: str,
 
 
 async def open_orders(
-    session: AsyncSession, chat_id: int, exclude_seller: int, side: str,
+    session: AsyncSession, exclude_seller: int, side: str,
     *, goods: list[str] | None = None, limit: int = 6, offset: int = 0,
 ) -> list[MarketOrder]:
-    """Чужие активные лоты стороны side (свои не показываем). goods — фильтр."""
-    stmt = (_orders_q(chat_id, exclude_seller, side, goods)
+    """Чужие активные лоты стороны side со всего мира (свои не показываем)."""
+    stmt = (_orders_q(exclude_seller, side, goods)
             .order_by(MarketOrder.id.desc()).limit(limit).offset(offset))
     return list((await session.execute(stmt)).scalars().all())
 
 
 async def count_open_orders(
-    session: AsyncSession, chat_id: int, exclude_seller: int, side: str,
+    session: AsyncSession, exclude_seller: int, side: str,
     *, goods: list[str] | None = None,
 ) -> int:
-    sub = _orders_q(chat_id, exclude_seller, side, goods).subquery()
+    sub = _orders_q(exclude_seller, side, goods).subquery()
     return await session.scalar(select(func.count()).select_from(sub)) or 0
 
 
@@ -269,13 +268,13 @@ async def delete_player_orders(session: AsyncSession, seller_id: int) -> None:
 
 
 async def best_buy_orders(
-    session: AsyncSession, chat_id: int, good: str, min_price: int,
+    session: AsyncSession, good: str, min_price: int,
     exclude_seller: int, *, limit: int, lock: bool = True,
 ) -> list[MarketOrder]:
-    """Заявки «куплю» по товару с ценой >= min_price (лучшие — дороже первыми).
-    Для авто-сведения новой ПРОДАЖИ. lock — FOR UPDATE SKIP LOCKED."""
+    """Заявки «куплю» со всего мира по товару с ценой >= min_price (лучшие —
+    дороже первыми). Для авто-сведения новой ПРОДАЖИ. lock — FOR UPDATE SKIP LOCKED."""
     stmt = (select(MarketOrder).where(
-                MarketOrder.chat_id == chat_id, MarketOrder.side == "buy",
+                MarketOrder.side == "buy",
                 MarketOrder.good == good, MarketOrder.qty > 0,
                 MarketOrder.unit_price >= min_price,
                 MarketOrder.seller_id != exclude_seller)
@@ -287,13 +286,13 @@ async def best_buy_orders(
 
 
 async def best_sell_orders(
-    session: AsyncSession, chat_id: int, good: str, max_price: int,
+    session: AsyncSession, good: str, max_price: int,
     exclude_seller: int, *, limit: int, lock: bool = True,
 ) -> list[MarketOrder]:
-    """Лоты продажи по товару с ценой <= max_price (лучшие — дешевле первыми).
-    Для авто-сведения новой ЗАЯВКИ «куплю»."""
+    """Лоты продажи со всего мира по товару с ценой <= max_price (лучшие —
+    дешевле первыми). Для авто-сведения новой ЗАЯВКИ «куплю»."""
     stmt = (select(MarketOrder).where(
-                MarketOrder.chat_id == chat_id, MarketOrder.side == "sell",
+                MarketOrder.side == "sell",
                 MarketOrder.good == good, MarketOrder.qty > 0,
                 MarketOrder.unit_price <= max_price,
                 MarketOrder.seller_id != exclude_seller)
@@ -304,14 +303,14 @@ async def best_sell_orders(
     return list((await session.execute(stmt)).scalars().all())
 
 
-async def market_summary(session: AsyncSession, chat_id: int) -> dict:
-    """Сводка биржи по товарам: {good: {ask, ask_qty, bid, bid_qty}}.
+async def market_summary(session: AsyncSession) -> dict:
+    """Сводка ЕДИНОЙ биржи по товарам: {good: {ask, ask_qty, bid, bid_qty}}.
     ask — лучшая (минимальная) цена продажи, bid — лучшая (макс.) цена покупки."""
     rows = (await session.execute(
         select(MarketOrder.good, MarketOrder.side,
                func.min(MarketOrder.unit_price), func.max(MarketOrder.unit_price),
                func.sum(MarketOrder.qty))
-        .where(MarketOrder.chat_id == chat_id, MarketOrder.qty > 0)
+        .where(MarketOrder.qty > 0)
         .group_by(MarketOrder.good, MarketOrder.side)
     )).all()
     board: dict[str, dict] = {}
@@ -325,13 +324,13 @@ async def market_summary(session: AsyncSession, chat_id: int) -> dict:
 
 
 async def best_price(
-    session: AsyncSession, chat_id: int, good: str, side: str
+    session: AsyncSession, good: str, side: str
 ) -> int | None:
-    """Лучшая встречная цена: side='sell' → мин ask, 'buy' → макс bid."""
+    """Лучшая встречная цена на ЕДИНОЙ бирже: side='sell' → мин ask, 'buy' → макс bid."""
     col = (func.min(MarketOrder.unit_price) if side == "sell"
            else func.max(MarketOrder.unit_price))
     return await session.scalar(
-        select(col).where(MarketOrder.chat_id == chat_id, MarketOrder.side == side,
+        select(col).where(MarketOrder.side == side,
                           MarketOrder.good == good, MarketOrder.qty > 0))
 
 

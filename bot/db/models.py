@@ -81,6 +81,10 @@ class Player(Base):
     # фракций, текущее событие на решении (pending) и очередь отложенных (queue).
     story: Mapped[dict] = mapped_column(JSONB, default=dict)
 
+    # Лимит покупки на бирже (анти-абуз, как buy-limit в RuneScape): сколько
+    # каждого товара куплено в текущем 4-часовом окне. {good: {"t": iso, "q": n}}.
+    bourse_buys: Mapped[dict] = mapped_column(JSONB, default=dict)
+
     tavern: Mapped["Tavern | None"] = relationship(
         back_populates="player", uselist=False, lazy="selectin"
     )
@@ -101,6 +105,10 @@ class WorldState(Base):
     holiday: Mapped[str | None] = mapped_column(String(48))
     # Дата (МСК, YYYY-MM-DD) последней утренней рассылки «бонус готов» — дедуп.
     bonus_push_on: Mapped[str | None] = mapped_column(String(10))
+    # ЕДИНЫЙ глобальный рынок (общий для всех чатов): оптовый завал/дефицит по
+    # товарам — {good: glut_units, '_t': метка распада}. Двигают его ВСЕ сделки
+    # мира (сбыт купцам, NPC-аукцион, P2P-биржа), цена одна для всех.
+    market: Mapped[dict] = mapped_column(JSONB, default=dict)
 
 
 class KnownChat(Base):
@@ -150,14 +158,16 @@ class LootDrop(Base):
 
 
 class MarketOrder(Base):
-    """Лот городской биржи (P2P). side='sell' — владелец продаёт (товар заморожен
-    в погребе); side='buy' — владелец покупает (золото qty*unit_price в эскроу).
-    seller_id — id владельца-создателя лота. Скоуп — чат."""
+    """Лот ЕДИНОЙ (глобальной) биржи. side='sell' — владелец продаёт (товар
+    заморожен в погребе); side='buy' — владелец покупает (золото qty*unit_price
+    в эскроу). seller_id — id владельца-создателя лота. Скоуп ГЛОБАЛЬНЫЙ: стакан
+    общий для всех чатов, сведение идёт по всему миру. chat_id — лишь «источник»
+    (откуда выставлен), для аналитики; на матчинг не влияет."""
 
     __tablename__ = "market_orders"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)  # источник (аналитика)
     seller_id: Mapped[int] = mapped_column(BigInteger, index=True)  # владелец лота
     side: Mapped[str] = mapped_column(String(8), default="sell")    # 'sell' | 'buy'
     good: Mapped[str] = mapped_column(String(16))

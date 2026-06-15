@@ -59,6 +59,16 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS bonus_push_on VARCHAR(10)"
         ))
+        # Единый глобальный рынок: оптовый завал/дефицит — на строке мира (id=1).
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS "
+            "market JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))
+        # Лимит покупки на бирже (анти-абуз): окно 4ч по товарам.
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "bourse_buys JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))
         # Биржа: сторона лота (продажа/покупка)
         await conn.execute(text(
             "ALTER TABLE market_orders ADD COLUMN IF NOT EXISTS "

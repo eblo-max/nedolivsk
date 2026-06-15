@@ -136,7 +136,7 @@ def _pick_good(prods: dict, pref: str, rng: random.Random) -> str:
 
 
 def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
-               city=None) -> dict | None:
+               world=None) -> dict | None:
     rng = rng or random
     prods = {k: v for k, v in (tavern.products or {}).items()
              if v > 0 and k in prod.GOODS}
@@ -146,10 +146,9 @@ def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
     arch = ARCH[cit.arch]
     good = _pick_good(prods, arch.pref, rng)
 
-    mkt = market.factor(city, good)   # перекос рынка чата двигает оптовую цену
+    mkt = market.factor(world, good)  # перекос ЕДИНОГО рынка двигает оптовую цену
     fv = (prod.GOODS[good].price
-          * (balance.TRADE_FAIR_FV_MULT if fair else 1.0)
-          * mkt * market.climate(city))  # + климат спроса (настроение/ситуация)
+          * (balance.TRADE_FAIR_FV_MULT if fair else 1.0) * mkt)
     greed = rng.uniform(*arch.greed)
     need = rng.uniform(*arch.need)
     rel = min(0.3, max(0, story_state.faction(player, "merchants")) / 300)

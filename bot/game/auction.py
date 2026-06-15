@@ -37,12 +37,11 @@ def sellable_goods(tavern) -> list[str]:
     return [k for k in prod.GOODS if prods.get(k, 0) > 0]
 
 
-def fair_value(city, good: str) -> float:
-    """Справедливая цена товара: ярмарка × перекос рынка × климат спроса
-    (настроение/ситуация города). Та же, что у реактивного купца."""
+def fair_value(world, good: str) -> float:
+    """Справедливая цена товара: ярмарка × перекос ЕДИНОГО рынка. Цена глобальна
+    (одна для всех чатов). Та же, что у реактивного купца."""
     fairmult = balance.TRADE_FAIR_FV_MULT if wld.is_fair() else 1.0
-    return (prod.GOODS[good].price * fairmult
-            * market.factor(city, good) * market.climate(city))
+    return prod.GOODS[good].price * fairmult * market.factor(world, good)
 
 
 def _interested(arch, good: str) -> bool:
@@ -96,7 +95,7 @@ def cancel(player, tavern) -> bool:
     return True
 
 
-def try_bid(tavern, city, rng: random.Random | None = None) -> dict | None:
+def try_bid(tavern, world, rng: random.Random | None = None) -> dict | None:
     """Один прогон ставки: заглянул ли горожанин и перебил ли цену.
     Мутирует лот; возвращает {npc, unit} при новой ставке, иначе None."""
     rng = rng or random
@@ -104,7 +103,7 @@ def try_bid(tavern, city, rng: random.Random | None = None) -> dict | None:
     if not lot:
         return None
     good = lot["good"]
-    fv = fair_value(city, good)
+    fv = fair_value(world, good)
     cit = npc.random_trader(rng)
     arch = trade.ARCH[cit.arch]
     if not _interested(arch, good):
@@ -136,7 +135,7 @@ def try_bid(tavern, city, rng: random.Random | None = None) -> dict | None:
     return {"npc": cit.id, "unit": bid, "fv": fv}
 
 
-def settle(player, tavern, city) -> dict | None:
+def settle(player, tavern, world) -> dict | None:
     """Закрыть торги: продать победителю или вернуть товар. Возвращает итог."""
     lot = tavern.auction
     if not lot:
@@ -148,7 +147,7 @@ def settle(player, tavern, city) -> dict | None:
         gold = int(qty * top * buff.sale_mult(player))  # баф «Барыжья хватка»
         player.gold += gold
         story_state.adjust_faction(player, "merchants", 1)
-        market.add_supply(city, good, int(qty * balance.MARKET_WHOLESALE_WEIGHT))
+        market.add_supply(world, good, int(qty * balance.MARKET_WHOLESALE_WEIGHT))
         return {"sold": True, "good": good, "qty": qty,
                 "unit": top, "gold": gold, "npc": bidder}
     prods = dict(tavern.products or {})

@@ -228,8 +228,9 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
         chance = (balance.TRADE_FAIR_CHANCE if wld.is_fair()
                   else balance.TRADE_CHANCE)
         if random.random() < chance:
+            world = await repo.get_or_create_world(session)
             offer = trademod.make_offer(
-                player.tavern, player, wld.is_fair(), city=city)
+                player.tavern, player, wld.is_fair(), world=world)
             if offer is not None:
                 story_state.set_trade(player, offer)
                 await trade_h.deliver_trade(callback.message, player, owner)

@@ -47,10 +47,9 @@ async def cmd_top(message: Message, session: AsyncSession) -> None:
 
 @router.message(Command("market", "bazar"))
 async def cmd_market(message: Message, session: AsyncSession) -> None:
-    player = await repo.get_player(session, message.from_user.id)
-    chat_id = _chat_id(message, player)
-    city = await repo.get_or_create_city(session, chat_id) if chat_id else None
-    await _send(message, texts.market_screen(city), kb.market_kb())
+    # Рынок ЕДИНЫЙ для всех — цены не зависят от чата/игрока.
+    world = await repo.get_or_create_world(session)
+    await _send(message, texts.market_screen(world), kb.market_kb())
 
 
 @router.message(Command("auction", "torgi"))
@@ -59,9 +58,7 @@ async def cmd_auction(message: Message, session: AsyncSession) -> None:
     if player is None or not player.tavern:
         await _send(message, "Сначала заведи кабак: /start")
         return
-    chat_id = _chat_id(message, player)
-    city = await repo.get_or_create_city(session, chat_id) if chat_id else None
-    await _send(message, texts.auction_screen(player.tavern, city),
+    await _send(message, texts.auction_screen(player.tavern),
                 kb.auction_kb(player.tavern))
 
 

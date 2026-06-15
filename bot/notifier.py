@@ -282,10 +282,9 @@ async def _notify_returned(bot: Bot) -> None:
                     new = dict(tavern.production)
                     new[bname] = {**rbatch, "notified": True}
                     tavern.production = new
-        # Живой город: блокируем города ПЕРВЫМИ (FOR UPDATE), чтобы аукцион,
-        # читающий/пишущий market, не словил гонку с правкой faction_power.
+        # Живой город: блокируем города ПЕРВЫМИ (FOR UPDATE), чтобы тик фракций
+        # не словил гонку с правкой faction_power из хендлеров.
         cities = await repo.all_cities(session, lock=True)
-        city_by_id = {c.chat_id: c for c in cities}
 
         # Аукцион: горожане перебивают ставки по активным лотам; закрытие — продажа.
         result = await session.execute(
@@ -296,13 +295,8 @@ async def _notify_returned(bot: Bot) -> None:
         )
         for player in result.scalars().all():
             tavern = player.tavern
-            city = city_by_id.get(player.chat_id) if player.chat_id else None
-            if city is None and player.chat_id is not None:  # чат без CityState
-                city = await repo.get_or_create_city(session, player.chat_id, lock=True)
-                city_by_id[player.chat_id] = city
-                cities.append(city)
             if auctionmod.is_due(tavern, now):
-                res = auctionmod.settle(player, tavern, city)
+                res = auctionmod.settle(player, tavern, world)  # сбыт на ЕДИНЫЙ рынок
                 if res is not None:
                     if res.get("sold"):
                         from bot.game import production as prodmod
@@ -319,7 +313,7 @@ async def _notify_returned(bot: Bot) -> None:
                 balance.AUCTION_FAIR_BID_MULT if wld.is_fair() else 1.0)
             if random.random() < chance:
                 had_bid = bool((tavern.auction or {}).get("top_bid"))
-                bres = auctionmod.try_bid(tavern, city)
+                bres = auctionmod.try_bid(tavern, world)
                 if bres and not had_bid:  # первая ставка — пингуем продавца
                     from bot.game import production as prodmod
                     lot = tavern.auction or {}
@@ -350,19 +344,21 @@ async def _notify_returned(bot: Bot) -> None:
                                   f"{o.qty * o.unit_price} 🪙 вернулся")
             await repo.delete_order(session, o.id)
 
-        # Симуляция фракций — дрейф силы, рынок, пульс, старт/конец ситуаций.
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
+
+        # ЕДИНЫЙ рынок: впитывание перекоса + редкий пульс — двигает цену всего
+        # мира сразу. Молва о скачке цен идёт во ВСЕ чаты (это мировая новость).
+        marketmod.decay(world, now)
+        if random.random() < balance.MARKET_PULSE_CHANCE:
+            cit = npc.random_pulser()
+            good, delta, _verb = cit.pulse
+            marketmod.nudge(world, good, delta)
+            for cid in await repo.all_chat_ids(session):
+                city_events.append((cid, texts.market_pulse_announce(cit)))
+                await repo.add_chronicle(session, cid, texts.market_pulse_chron(cit))
+
+        # Симуляция фракций — по чатам (фракции/ситуации остаются ЛОКАЛЬНЫМИ).
         for city in cities:
-            marketmod.decay(city, now)  # рынок впитывает перекос
-            # Пульс рынка: иногда горожанин двигает спрос/предложение делами.
-            if random.random() < balance.MARKET_PULSE_CHANCE:
-                cit = npc.random_pulser()
-                good, delta, _verb = cit.pulse
-                marketmod.nudge(city, good, delta)
-                city_events.append(
-                    (city.chat_id, texts.market_pulse_announce(cit)))
-                await repo.add_chronicle(
-                    session, city.chat_id, texts.market_pulse_chron(cit))
             for kind, sit in citymod.advance(city, now):
                 text = sit.activate_text if kind == "activate" else sit.expire_text
                 city_events.append((city.chat_id, text))

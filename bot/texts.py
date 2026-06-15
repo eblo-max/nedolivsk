@@ -184,22 +184,23 @@ RULES = (
     "надо угадать.\n\n"
 
     "<b>🔨 6. Аукцион NPC</b>\n"
-    "Выставляешь лот — горожане сами перебивают ставки по таймеру. Хорошее "
-    "настроение города и дефицит гонят цену вверх. Товар заморожен до конца "
-    "торгов.\n\n"
+    "Выставляешь лот — горожане сами перебивают ставки по таймеру. Дефицит на "
+    "едином рынке гонит цену вверх. Товар заморожен до конца торгов.\n\n"
 
-    "<b>🛒 7. Биржа — между игроками</b>\n"
-    "Раздел «Торги» — торговля с живыми игроками чата:\n"
+    "<b>🛒 7. Биржа — единая, со всем миром</b>\n"
+    "Раздел «Торги» — общий стакан для игроков ВСЕХ чатов:\n"
     "• <u>Купить</u> — берёшь чужие лоты продажи.\n"
     "• <u>Продать</u> — выставляешь свой товар (он замораживается).\n"
     "• <u>Заявки «куплю» / Куплю</u> — задаёшь спрос: золото идёт в залог, "
     "тебе продают.\n"
-    "Цену и кол-во вводишь сам (в коридоре). Новый ордер сразу сводится со "
-    "встречными. Налог биржи 5%. «📊 Цены» — спрос/предложение по товарам.\n\n"
+    "Цену и кол-во вводишь сам (в коридоре). Ордер сразу сводится со встречными. "
+    f"Налог 5%. Скупка одного товара — до {balance.BOURSE_BUY_LIMIT} шт за "
+    f"{balance.BOURSE_BUY_WINDOW_H}ч (анти-абуз). «📊 Цены» — спрос/предложение.\n\n"
 
-    "<b>🏪 8. Базар — живые цены</b>\n"
-    "Оптовые цены чата дышат: завалишь рынок — просядут, дефицит/ярмарка — "
-    "взлетят. Купец, аукцион и биржа считают по базару — подгадывай момент.\n\n"
+    "<b>🏪 8. Базар — единые цены мира</b>\n"
+    "Оптовая цена ОДНА на весь мир: завалят товаром — просядет у всех, "
+    "дефицит/ярмарка — взлетит. Купец и аукцион считают по базару — лови "
+    "момент.\n\n"
 
     "<b>━ РОСТ ━</b>\n\n"
 
@@ -360,21 +361,19 @@ def _market_flavor(hi: float, lo: float, fair: bool) -> str:
     return "На базаре спокойно — цены держатся, торг идёт неспешно"
 
 
-def market_screen(city) -> str:
-    """Живой опт: текущие цены по товарам с трендом (завал/дефицит) и ярмаркой."""
+def market_screen(world) -> str:
+    """Единый опт: глобальные цены по товарам с трендом (завал/дефицит) и ярмаркой.
+    Цены ОДНИ для всех чатов — их двигают сделки всего мира."""
     from bot.game import market as marketmod
     from bot.game import production as prod
     from bot.game import world as wld
 
-    from bot.game import city as citymod
-
     fair = wld.is_fair()
     fairmult = balance.TRADE_FAIR_FV_MULT if fair else 1.0
-    clim = marketmod.climate(city)   # настроение × ситуация города
     rows, devs = [], []
     for key, g in sorted(prod.GOODS.items(), key=lambda kv: kv[1].price):
-        f = marketmod.factor(city, key)
-        price = max(1, int(round(g.price * fairmult * f * clim)))
+        f = marketmod.factor(world, key)
+        price = max(1, int(round(g.price * fairmult * f)))
         dev = price / g.price - 1
         devs.append(dev)
         if dev > 0.05:
@@ -386,27 +385,13 @@ def market_screen(city) -> str:
         rows.append(f"{g.emoji} {g.name} — {price} 🪙 · {arrow}")
 
     flavor = _market_flavor(max(devs), min(devs), fair)
-    parts = ["🏪 <b>БАЗАР НЕДОЛИВСКА</b>", "", f"«{flavor}»", ""]
-    notes = []
+    parts = ["🏪 <b>ЕДИНЫЙ БАЗАР НЕДОЛИВСКА</b>", "", f"«{flavor}»", ""]
     if fair:
-        notes.append("🎪 Ярмарка: опт +20%, купцы съезжаются")
-    sit = citymod.current(city) if city is not None else None
-    if sit is not None:
-        sign = "поднял" if sit.demand_mult >= 1.0 else "сбил"
-        notes.append(f"{sit.emoji} {sit.label}: {sign} оптовые цены")
-    if clim >= 1.05 and sit is None:
-        notes.append("😀 Город в духе — купцы щедрее")
-    elif clim <= 0.95 and sit is None:
-        notes.append("😟 Город хмур — купцы прижимисты")
-    if notes:
-        parts += [*notes, ""]
+        parts += ["🎪 Ярмарка: опт +20%, купцы съезжаются", ""]
     parts += _branch("ОПТОВЫЕ ЦЕНЫ", rows)
-    tail = ("<i>Купцы заходят на «Собрать доход» — лови и торгуйся. "
-            "Кто качнул цены — гляди в Хронике.</i>")
-    if city is None:
-        tail = ("<i>Это базовые цены. Прибейся к городу (играй через «гг» в общем "
-                "чате) — и рынок оживёт: спрос, завалы, дефицит.</i>")
-    parts += ["", tail]
+    parts += ["", "<i>Рынок один на весь мир: цены двигают сделки всех городов "
+              "сразу. Заваливаешь товаром — цена падает у всех; раскупают — растёт. "
+              "Кто качнул рынок — гляди в Хронике.</i>"]
     return "\n".join(parts)
 
 
@@ -1504,7 +1489,7 @@ def _good_name(key: str) -> str:
     return g.name if g else key
 
 
-def auction_screen(tavern, city) -> str:
+def auction_screen(tavern) -> str:
     """Аукцион: статус активного лота или приглашение выставить товар."""
     from bot.game import auction as auc
     from bot.game import npc
@@ -1543,11 +1528,11 @@ def auction_screen(tavern, city) -> str:
     return "\n".join(parts)
 
 
-def auction_pick_qty(good: str, stock: int, city) -> str:
+def auction_pick_qty(good: str, stock: int, world) -> str:
     from bot.game import auction as auc
     from bot.game import production as prod
     g = prod.GOODS[good]
-    fv = int(round(auc.fair_value(city, good)))
+    fv = int(round(auc.fair_value(world, good)))
     return "\n".join([
         f"🔨 <b>ВЫСТАВИТЬ: {g.name.upper()}</b>",
         "",
@@ -1560,11 +1545,11 @@ def auction_pick_qty(good: str, stock: int, city) -> str:
     ])
 
 
-def auction_pick_price(good: str, qty: int, city) -> str:
+def auction_pick_price(good: str, qty: int, world) -> str:
     from bot.game import auction as auc
     from bot.game import production as prod
     g = prod.GOODS[good]
-    fv = int(round(auc.fair_value(city, good)))
+    fv = int(round(auc.fair_value(world, good)))
     return "\n".join([
         f"🔨 <b>ЛОТ: {qty} × {g.name.upper()}</b>",
         "",
@@ -1983,11 +1968,12 @@ def bourse_order(order, seller_name: str, player: Player,
         f"Продавец: {escape(seller_name)}",
     ]
     if best_bid is not None:
-        lines.append(f"📈 Спрос в городе: купят до {best_bid} 🪙/шт")
+        lines.append(f"📈 Спрос на бирже: купят до {best_bid} 🪙/шт")
     lines += [
         "",
         f"🪙 У тебя {player.gold} — хватит на {afford} шт.",
-        "<i>Покупаешь сколько надо, остаток останется другим.</i>",
+        f"<i>Покупаешь сколько надо. Лимит скупки — {balance.BOURSE_BUY_LIMIT} шт "
+        f"одного товара за {balance.BOURSE_BUY_WINDOW_H}ч.</i>",
     ]
     return "\n".join(lines)
 
@@ -2006,7 +1992,7 @@ def bourse_bid(order, owner_name: str, tavern, best_ask: int | None = None) -> s
         f"Заявку выставил: {escape(owner_name)}",
     ]
     if best_ask is not None:
-        lines.append(f"📉 На бирже продают от {best_ask} 🪙/шт")
+        lines.append(f"📉 На бирже продают от {best_ask} 🪙/шт (весь мир)")
     lines += [
         "",
         f"📦 В погребе {_good_label(order.good)}: {stock} → продашь до {can} шт.",
@@ -2059,9 +2045,9 @@ def bourse_pick_price(good: str, qty: int, *, buy: bool = False) -> str:
 
 def bourse_prices(board: dict) -> str:
     from bot.game import production as prod
-    lines = ["📊 <b>ЦЕНЫ БИРЖИ</b> (живые на момент показа)", ""]
+    lines = ["📊 <b>ЦЕНЫ ЕДИНОЙ БИРЖИ</b> (весь мир, живые на момент показа)", ""]
     if not board:
-        lines.append("<i>Пока тихо — ни лотов, ни заявок. Выстави первым!</i>")
+        lines.append("<i>Пока тихо — ни лотов, ни заявок во всём мире. Выстави первым!</i>")
     order = sorted(board, key=lambda g: -(prod.GOODS[g].price if g in prod.GOODS else 0))
     for good in order:
         d = board[good]

@@ -13,6 +13,7 @@
 """
 
 import math
+from datetime import datetime, timezone
 
 from bot.game import balance
 from bot.game import production as prod
@@ -76,6 +77,38 @@ def net_to_seller(gross: int) -> int:
 
 def tax_amount(gross: int) -> int:
     return gross - net_to_seller(gross)
+
+
+def _window_fresh(rec: dict, now: datetime) -> bool:
+    """Запись лимита покупки ещё в текущем 4-часовом окне?"""
+    try:
+        t = datetime.fromisoformat(rec["t"])
+    except (KeyError, ValueError):
+        return False
+    return (now - t).total_seconds() < balance.BOURSE_BUY_WINDOW_H * 3600
+
+
+def buy_room(player, good: str, now: datetime | None = None) -> int:
+    """Сколько ещё единиц good игрок вправе СКУПИТЬ в текущем окне (анти-абуз,
+    как buy-limit в RuneScape). Истёкшее окно = полный лимит."""
+    now = now or datetime.now(timezone.utc)
+    rec = (player.bourse_buys or {}).get(good)
+    used = int(rec.get("q", 0)) if rec and _window_fresh(rec, now) else 0
+    return max(0, balance.BOURSE_BUY_LIMIT - used)
+
+
+def record_buy(player, good: str, qty: int, now: datetime | None = None) -> None:
+    """Зачесть купленные/законтрактованные qty в окно лимита покупки."""
+    if qty <= 0:
+        return
+    now = now or datetime.now(timezone.utc)
+    buys = dict(player.bourse_buys or {})
+    rec = buys.get(good)
+    if rec and _window_fresh(rec, now):
+        buys[good] = {"t": rec["t"], "q": int(rec.get("q", 0)) + qty}
+    else:
+        buys[good] = {"t": now.isoformat(), "q": qty}
+    player.bourse_buys = buys  # переприсваивание — для JSONB
 
 
 def category_goods(cat: str) -> list[str] | None:

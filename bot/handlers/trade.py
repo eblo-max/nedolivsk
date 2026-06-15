@@ -63,7 +63,7 @@ def _sell(player: Player, offer: dict, unit: int) -> tuple[int, int]:
 
 
 async def _finish_sale(callback: CallbackQuery, player: Player, offer: dict,
-                       unit: int, kind: str, session: AsyncSession, city=None) -> None:
+                       unit: int, kind: str, session: AsyncSession, world=None) -> None:
     qty, gold = _sell(player, offer, unit)
     story_state.set_trade(player, None)
     if qty:
@@ -73,7 +73,7 @@ async def _finish_sale(callback: CallbackQuery, player: Player, offer: dict,
         gname = prod.GOODS[offer["good"]].name if offer["good"] in prod.GOODS else offer["good"]
         repo.add_log(session, "player", player.id,
                      f"🤝 продал купцу {qty}×{gname} за {gold} 🪙")
-        market.nudge(city, offer["good"],  # оптовый сброс — полный сигнал предложения
+        market.nudge(world, offer["good"],  # сброс на ЕДИНЫЙ рынок — полный сигнал
                      qty * balance.MARKET_WHOLESALE_WEIGHT)
         react = trade.reaction(offer, kind)
         await _edit(callback, texts.trade_sold(offer, qty, unit, gold, react),
@@ -107,9 +107,7 @@ async def cb_trade(callback: CallbackQuery, session: AsyncSession) -> None:
         await callback.answer("Купец уже ушёл.", show_alert=True)
         return
 
-    city = None
-    if player.chat_id is not None:
-        city = await repo.get_or_create_city(session, player.chat_id)
+    world = await repo.get_or_create_world(session)  # единый рынок (глобальный)
 
     arg = callback.data.split(":", 1)[1]
 
@@ -122,7 +120,7 @@ async def cb_trade(callback: CallbackQuery, session: AsyncSession) -> None:
     if arg == "ok":  # согласие на контр-цену
         unit = int(offer.get("counter", offer["max_unit"]))
         kind = "accept_high" if unit >= offer["fv"] * 1.15 else "accept"
-        await _finish_sale(callback, player, offer, unit, kind, session, city)
+        await _finish_sale(callback, player, offer, unit, kind, session, world)
         return
 
     if arg == "push":  # дожать контр-цену
@@ -149,7 +147,7 @@ async def cb_trade(callback: CallbackQuery, session: AsyncSession) -> None:
     decision, price = trade.evaluate(offer, unit)
     if decision == "accept":
         kind = "accept_high" if unit >= offer["fv"] * 1.15 else "accept"
-        await _finish_sale(callback, player, offer, unit, kind, session, city)
+        await _finish_sale(callback, player, offer, unit, kind, session, world)
     elif decision == "counter":
         offer["counter"] = price
         story_state.set_trade(player, offer)
