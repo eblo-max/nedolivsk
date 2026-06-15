@@ -29,7 +29,7 @@ async def deliver_trade(message: Message, player: Player, owner_id: int) -> None
     offer = story_state.get_trade(player)
     if offer is None:
         return
-    text = texts.trade_offer(offer)
+    text = common.tag_in_group(message, player, texts.trade_offer(offer))
     markup = kb.trade_kb(offer)
     img = _trade_image(offer)
     if img is not None:

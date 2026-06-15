@@ -87,6 +87,7 @@ async def deliver_pending(message: Message, player: Player, owner_id: int) -> No
     if s is None:
         return
     text, markup = story_engine.present(s, player)
+    text = common.tag_in_group(message, player, text)  # в чате — тег-пинг владельцу
     msg = await message.answer(text, reply_markup=markup)
     panels.claim(msg, owner_id)  # в группе кнопки жмёт только владелец; в личке no-op
 

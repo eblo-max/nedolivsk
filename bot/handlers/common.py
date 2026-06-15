@@ -2,6 +2,7 @@
 
 import asyncio
 from collections import OrderedDict
+from html import escape
 from pathlib import Path
 
 from aiogram.exceptions import TelegramBadRequest
@@ -71,6 +72,20 @@ def _register_panel(msg: Message, owner_id: int | None) -> None:
     """Закрепить владельца и (в группе) запланировать авто-подчистку."""
     panels.claim(msg, owner_id)
     autoclean.schedule_message(msg)
+
+
+def mention(player: Player) -> str:
+    """HTML-упоминание игрока со ссылкой-пингом (tg://user). Для тегов в чате."""
+    name = escape(player.first_name or "Хозяин")
+    return f'<a href="tg://user?id={player.id}">{name}</a>'
+
+
+def tag_in_group(message: Message, player: Player, text: str) -> str:
+    """В группе — префикс с тегом игрока (чтобы пинговало, как подкидыш);
+    в личке — текст как есть."""
+    if panels.is_group(message):
+        return f"{mention(player)}!\n\n{text}"
+    return text
 
 
 def cached_media(img: Path) -> str | InputFile:
