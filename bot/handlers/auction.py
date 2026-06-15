@@ -1,5 +1,7 @@
 """Аукцион: выставление лота и просмотр торгов (асинхронный сбыт)."""
 
+from datetime import datetime, timezone
+
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -23,6 +25,28 @@ _QTY_ALL = {"всё", "все", "all", "max", "максимум"}
 class BInput(StatesGroup):
     """Свободный ввод числа на бирже (кол-во/цена). op в data задаёт шаг."""
     wait = State()
+
+
+# Анти-залипание: «висящий» ввод биржи протухает, чтобы случайно набранное позже
+# число не было проглочено как сделка (юзер давно ушёл с экрана биржи).
+_BINPUT_TTL_SECONDS = 600
+
+
+async def _arm_input(state: FSMContext, **data) -> None:
+    """Взвести ожидание ввода биржи со штампом времени (для TTL-протухания)."""
+    await state.set_state(BInput.wait)
+    await state.update_data(ts=datetime.now(timezone.utc).isoformat(), **data)
+
+
+def _input_stale(data: dict) -> bool:
+    ts = data.get("ts")
+    if not ts:
+        return False
+    try:
+        age = (datetime.now(timezone.utc) - datetime.fromisoformat(ts)).total_seconds()
+    except (ValueError, TypeError):
+        return False
+    return age > _BINPUT_TTL_SECONDS
 
 
 def _parse_qty(text: str, cap: int) -> int | None:
@@ -288,8 +312,7 @@ async def cb_buy_prompt(callback: CallbackQuery, session: AsyncSession,
     if cap <= 0:
         await callback.answer("Не хватает золота даже на одну штуку.", show_alert=True)
         return
-    await state.set_state(BInput.wait)
-    await state.update_data(op="buy_qty", order_id=order.id)
+    await _arm_input(state, op="buy_qty", order_id=order.id)
     await callback.message.answer(
         f"🛒 Сколько купить {_gname(order.good)}? До {cap} шт "
         f"(по {order.unit_price}🪙). Введи число или «всё».",
@@ -316,8 +339,7 @@ async def cb_fill_prompt(callback: CallbackQuery, session: AsyncSession,
     if cap <= 0:
         await callback.answer("Нет такого товара в погребе.", show_alert=True)
         return
-    await state.set_state(BInput.wait)
-    await state.update_data(op="fill_qty", order_id=order.id)
+    await _arm_input(state, op="fill_qty", order_id=order.id)
     await callback.message.answer(
         f"📤 Сколько продать {_gname(order.good)} в заявку? До {cap} шт "
         f"(по {order.unit_price}🪙). Введи число или «всё».",
@@ -363,8 +385,7 @@ async def cb_sell_good(callback: CallbackQuery, session: AsyncSession,
     if stock <= 0:
         await callback.answer("Этого товара уже нет.", show_alert=True)
         return
-    await state.set_state(BInput.wait)
-    await state.update_data(op="sell_qty", good=good)
+    await _arm_input(state, op="sell_qty", good=good)
     await callback.message.answer(
         f"📤 Сколько продать {_gname(good)}? До {stock} шт. Введи число или «всё».",
         reply_markup=kb.bourse_cancel_kb())
@@ -412,8 +433,7 @@ async def cb_bid_good(callback: CallbackQuery, session: AsyncSession,
     if cap <= 0:
         await callback.answer("Маловато золота даже на одну штуку.", show_alert=True)
         return
-    await state.set_state(BInput.wait)
-    await state.update_data(op="bid_qty", good=good)
+    await _arm_input(state, op="bid_qty", good=good)
     await callback.message.answer(
         f"📣 Сколько {_gname(good)} хочешь купить? До {cap} шт. Введи число или «всё».",
         reply_markup=kb.bourse_cancel_kb())
@@ -691,6 +711,9 @@ async def cb_input_cancel(callback: CallbackQuery, session: AsyncSession,
 async def on_bourse_input(message: Message, session: AsyncSession,
                           state: FSMContext) -> None:
     data = await state.get_data()
+    if _input_stale(data):  # давно висящий ввод — игрок ушёл; не глотаем сообщение
+        await state.clear()
+        return
     op = data.get("op")
     player = await repo.get_player(session, message.from_user.id, for_update=True)
     if player is None or player.tavern is None:
@@ -713,7 +736,7 @@ async def on_bourse_input(message: Message, session: AsyncSession,
             await message.answer(f"Не понял. Число до {cap} или «всё».", reply_markup=cancel)
             return
         lo, hi = bourse.price_floor(good), bourse.price_ceil(good)
-        await state.update_data(op="sell_price", qty=qty)
+        await _arm_input(state, op="sell_price", qty=qty)  # обновляем штамп времени
         await message.answer(
             f"💰 Цена за штуку {_gname(good)} (коридор {lo}–{hi} 🪙)? Введи число.",
             reply_markup=cancel)
@@ -745,7 +768,7 @@ async def on_bourse_input(message: Message, session: AsyncSession,
             await message.answer(f"Не понял. Число до {cap} или «всё».", reply_markup=cancel)
             return
         lo, hi = bourse.price_floor(good), bourse.price_ceil(good)
-        await state.update_data(op="bid_price", qty=qty)
+        await _arm_input(state, op="bid_price", qty=qty)  # обновляем штамп времени
         await message.answer(
             f"💰 Цена за штуку (коридор {lo}–{hi} 🪙)? Залог = кол-во × цена.",
             reply_markup=cancel)
