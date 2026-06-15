@@ -1389,13 +1389,18 @@ RESOURCE_INSTRUMENTAL = {
     "ore": "рудой",
     "clay": "глиной",
     "herbs": "травами",
+    "salt": "солью",
+    "fish": "рыбой",
+    "milk": "молоком",
 }
 
 
 def expedition_returned(resources: list) -> str:
     """resources: список ключей ресурсов вернувшихся бригад."""
     names = ", ".join(
-        f"{RESOURCE_EMOJI[r]} {RESOURCE_INSTRUMENTAL[r]}" for r in resources
+        f"{RESOURCE_EMOJI.get(r, '📦')} "
+        f"{RESOURCE_INSTRUMENTAL.get(r, RESOURCE_NAMES.get(r, r))}"
+        for r in resources
     )
     return (
         f"🎒 <b>Бригады вернулись!</b>\n"
