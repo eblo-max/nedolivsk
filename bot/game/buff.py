@@ -99,7 +99,9 @@ def refresh(player, now: datetime | None = None) -> None:
     granted = player.bonus_next_at
     if granted is not None and granted.tzinfo is None:
         granted = granted.replace(tzinfo=timezone.utc)
-    if granted is None or granted < reset:
+    # Корректный маркер — это рубеж дня (всегда <= now). granted > now означает
+    # старое значение прежней логики (время+24ч) — нормализуем, выдав бонус.
+    if granted is None or granted < reset or granted > now:
         player.bonus_kind = random.choice(POOL)
         player.bonus_offered_at = now
         player.bonus_next_at = reset  # маркер дня выдачи

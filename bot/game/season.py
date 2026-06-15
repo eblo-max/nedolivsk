@@ -8,7 +8,9 @@ from datetime import date, datetime, timezone
 
 from bot.game import balance
 
-_EPOCH = date(2026, 1, 1)
+# Калибровка: эпоха сдвинута так, чтобы 15.06.2026 был первым днём ЛЕТА
+# (день 7 цикла = индекс 1). Порядок сезонов сохранён: Весна→Лето→Осень→Зима.
+_EPOCH = date(2026, 6, 8)
 _YEAR_DAYS = balance.SEASON_LENGTH_DAYS * 4
 
 
