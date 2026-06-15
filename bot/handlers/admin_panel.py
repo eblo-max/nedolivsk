@@ -5,7 +5,7 @@
 кулдауны/бонус/god-режим/сброс/удаление. Точные значения — через ввод (FSM).
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html import escape
 
 from aiogram import F, Router
@@ -14,14 +14,19 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config import settings
 from bot.db import repo
-from bot.db.models import CityState, KnownChat, Player, Tavern
-from bot.game import balance, buff, buildings, combat, items, production, season
+from bot.db.models import CityState, KnownChat, MarketOrder, Player, Tavern
+from bot.game import (
+    balance, buff, buildings, combat, inventory, items, market, production, season,
+)
 from bot.game import world as wld
+
+# Ресурсы, которые можно раздавать (сырьё + полуфабрикаты) — анти-опечатка.
+_GIVABLE = set(balance.RESOURCES) | {"malt", "flour", "ingot"}
 
 router = Router()
 
@@ -109,11 +114,14 @@ def _home_kb() -> InlineKeyboardBuilder:
     kb = InlineKeyboardBuilder()
     kb.button(text="👥 Игроки", callback_data="adm:list:0")
     kb.button(text="🔍 Найти игрока", callback_data="adm:find")
+    kb.button(text="📊 Аналитика", callback_data="adm:stats")
+    kb.button(text="🎁 Раздать всем", callback_data="adm:grantall")
+    kb.button(text="📣 Рассылка", callback_data="adm:cast")
     kb.button(text="📜 Логи", callback_data="adm:logs:all:0")
     kb.button(text="🌍 Мир и события", callback_data="adm:world")
     kb.button(text="🏙 Города/чаты", callback_data="adm:cities")
     kb.button(text="🔄 Обновить", callback_data="adm:home")
-    kb.adjust(2, 1, 2, 1)
+    kb.adjust(2, 2, 2, 2, 1)
     return kb
 
 
@@ -737,6 +745,122 @@ async def cb_plog(cb: CallbackQuery, session: AsyncSession) -> None:
     await cb.answer()
 
 
+# ── Аналитика (экономика / активность / по чатам) ──────────────────────────
+async def _stats_text(session: AsyncSession) -> str:
+    now = _now()
+    players = await session.scalar(select(func.count(Player.id))) or 0
+    gold_sum = await session.scalar(select(func.coalesce(func.sum(Player.gold), 0))) or 0
+    avg = (gold_sum // players) if players else 0
+
+    rich = (await session.execute(
+        select(Player).order_by(Player.gold.desc()).limit(3))).scalars().all()
+
+    async def _seen(days):
+        return await session.scalar(select(func.count(Player.id)).where(
+            Player.last_seen_at.is_not(None),
+            Player.last_seen_at >= now - timedelta(days=days))) or 0
+    d1, d7, d30 = await _seen(1), await _seen(7), await _seen(30)
+    new1 = await session.scalar(select(func.count(Player.id)).where(
+        Player.created_at >= now - timedelta(days=1))) or 0
+
+    world = await repo.get_or_create_world(session)
+    gluts = sorted(
+        ((g, v) for g, v in (world.market or {}).items() if g != "_t"),
+        key=lambda kv: -abs(kv[1]))[:6]
+    mkt_lines = []
+    for g, glut in gluts:
+        f = market.factor(world, g)
+        nm = production.GOODS[g].name if g in production.GOODS else g
+        arrow = "📉" if glut > 0 else "📈"
+        mkt_lines.append(f"  {arrow} {nm}: {round((f - 1) * 100):+d}% (перекос {int(glut)})")
+
+    border = await session.scalar(
+        select(func.count(MarketOrder.id)).where(MarketOrder.qty > 0)) or 0
+    bvol = await session.scalar(select(func.coalesce(
+        func.sum(MarketOrder.qty * MarketOrder.unit_price), 0))
+        .where(MarketOrder.qty > 0)) or 0
+
+    titles = {c.chat_id: c.title for c in
+              (await session.execute(select(KnownChat))).scalars().all()}
+    chat_rows = (await session.execute(
+        select(Player.chat_id, func.count(Player.id),
+               func.coalesce(func.sum(Player.gold), 0))
+        .group_by(Player.chat_id)
+        .order_by(func.coalesce(func.sum(Player.gold), 0).desc()).limit(8))).all()
+    chat_lines = []
+    for cid, n, g in chat_rows:
+        nm = "личка" if cid is None else (titles.get(cid) or str(cid))
+        chat_lines.append(
+            f"  {escape(str(nm))[:22]}: {n} игр., {int(g):,}🪙".replace(",", " "))
+
+    parts = ["📊 <b>АНАЛИТИКА НЕДОЛИВСКА</b>", ""]
+    parts += [
+        "💰 <b>Экономика</b>",
+        f"  Золота в мире: {gold_sum:,}".replace(",", " ") + f" (в среднем {avg:,}/игрок)".replace(",", " "),
+        "  Богачи: " + (", ".join(f"{escape(p.first_name or str(p.id))} {p.gold:,}".replace(",", " ") for p in rich[:3]) or "—"),
+        f"  Биржа: {border} лотов, оборот ~{int(bvol):,}🪙".replace(",", " "),
+    ]
+    parts += ["", "🏪 <b>Рынок (перекосы цен)</b>"] + (mkt_lines or ["  ровно, без перекосов"])
+    parts += ["", "🟢 <b>Активность</b>",
+              f"  За сутки: {d1} · за 7д: {d7} · за 30д: {d30}",
+              f"  Новичков за сутки: {new1}"]
+    parts += ["", "💬 <b>По чатам (золото)</b>"] + (chat_lines or ["  нет данных"])
+    return "\n".join(parts)
+
+
+@router.callback_query(F.data == "adm:stats")
+async def cb_stats(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _guard_cb(cb):
+        return
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔄 Обновить", callback_data="adm:stats")
+    kb.button(text="🏠 В меню", callback_data="adm:home")
+    kb.adjust(2)
+    await _edit(cb, await _stats_text(session), kb)
+    await cb.answer()
+
+
+# ── Раздать всем / Рассылка ─────────────────────────────────────────────────
+@router.callback_query(F.data == "adm:grantall")
+async def cb_grantall(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _guard_cb(cb):
+        return
+    n = await session.scalar(select(func.count(Player.id))) or 0
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🪙 Золото всем", callback_data="adm:giveall:gold")
+    kb.button(text="📦 Ресурс всем", callback_data="adm:giveall:res")
+    kb.button(text="🏠 В меню", callback_data="adm:home")
+    kb.adjust(2, 1)
+    await _edit(cb, (
+        "🎁 <b>РАЗДАТЬ ВСЕМ</b>\n\n"
+        f"Игроков в мире: <b>{n}</b>.\n"
+        "Золото — добавится к текущему у каждого; ресурс — на склад каждому. "
+        "Можно и отнять (минус)."
+    ), kb)
+    await cb.answer()
+
+
+@router.callback_query(F.data.startswith("adm:giveall:"))
+async def cb_giveall(cb: CallbackQuery, state: FSMContext) -> None:
+    if not await _guard_cb(cb):
+        return
+    field = "grant_gold_all" if cb.data.split(":")[2] == "gold" else "grant_res_all"
+    await state.set_state(AdmInput.wait)
+    await state.update_data(pid=0, field=field)
+    await cb.message.answer(_PROMPTS[field])
+    await cb.answer()
+
+
+@router.callback_query(F.data == "adm:cast")
+async def cb_cast(cb: CallbackQuery, state: FSMContext) -> None:
+    if not await _guard_cb(cb):
+        return
+    await state.set_state(AdmInput.wait)
+    await state.update_data(pid=0, field="cast_dm")
+    await cb.message.answer(_PROMPTS["cast_dm"])
+    await cb.answer()
+
+
 # ── Ввод точных значений (FSM) ─────────────────────────────────────────────
 class AdmInput(StatesGroup):
     wait = State()
@@ -749,6 +873,12 @@ _PROMPTS = {
     "res": "Введи: <code>ресурс количество</code> (напр. <code>wood 500</code>).\n"
            f"Ресурсы: {', '.join(balance.RESOURCES)}, malt, flour, ingot",
     "find": "Введи Telegram ID или @username игрока:",
+    "grant_gold_all": "Сколько золота раздать КАЖДОМУ игроку? (число; минус — отнять)",
+    "grant_res_all": "Что раздать ВСЕМ: <code>ресурс количество</code> "
+                     "(напр. <code>wood 200</code>).\nРесурсы: "
+                     + ", ".join(balance.RESOURCES) + ", malt, flour, ingot",
+    "cast_dm": "Введи текст рассылки — уйдёт В ЛИЧКУ всем игрокам "
+               "(можно с HTML-разметкой):",
 }
 
 
@@ -800,6 +930,55 @@ async def on_input(message: Message, state: FSMContext, session: AsyncSession) -
                              reply_markup=_card_kb(player).as_markup())
         return
 
+    # ── Массовые операции (на всех игроков) ──
+    if field == "cast_dm":
+        if not raw:
+            await message.answer("Пустой текст — отменено.",
+                                 reply_markup=_home_kb().as_markup())
+            return
+        ids = [r[0] for r in (await session.execute(select(Player.id))).all()]
+        for uid in ids:
+            repo.queue_notify(session, uid, raw)
+        repo.add_log(session, "admin", message.from_user.id,
+                     f"📣 рассылка в личку: {len(ids)} игрокам")
+        await message.answer(
+            f"📣 В очередь поставлено {len(ids)} сообщений — разойдутся в "
+            "ближайшие минуты (по мере отправки).",
+            reply_markup=_home_kb().as_markup())
+        return
+
+    if field == "grant_gold_all":
+        if not raw.lstrip("-").isdigit():
+            await message.answer("Нужно число.", reply_markup=_home_kb().as_markup())
+            return
+        amt = int(raw)
+        await session.execute(
+            update(Player).values(gold=func.greatest(0, Player.gold + amt)))
+        n = await session.scalar(select(func.count(Player.id))) or 0
+        repo.add_log(session, "admin", message.from_user.id,
+                     f"🪙 раздал {amt:+} золота всем ({n})")
+        await message.answer(f"🪙 Раздал {amt:+} золота всем игрокам ({n}).",
+                             reply_markup=_home_kb().as_markup())
+        return
+
+    if field == "grant_res_all":
+        name, _, amt_s = raw.partition(" ")
+        res = name.strip().lower()
+        if res not in _GIVABLE or not amt_s.strip().lstrip("-").isdigit():
+            await message.answer(
+                "Формат: <code>ресурс количество</code>, ресурс из списка.",
+                reply_markup=_home_kb().as_markup())
+            return
+        amt = int(amt_s.strip())
+        players = (await session.execute(select(Player))).scalars().all()
+        for p in players:
+            inventory.add(p, res, amt)
+        repo.add_log(session, "admin", message.from_user.id,
+                     f"📦 раздал {res} {amt:+} всем ({len(players)})")
+        await message.answer(f"📦 Раздал {res} {amt:+} всем игрокам ({len(players)}).",
+                             reply_markup=_home_kb().as_markup())
+        return
+
     pid = int(data.get("pid", 0))
     player = await session.get(Player, pid, with_for_update=True)
     if player is None:
@@ -810,7 +989,6 @@ async def on_input(message: Message, state: FSMContext, session: AsyncSession) -
         if field == "res":
             name, _, amt = raw.partition(" ")
             player_inv_amt = int(amt.strip())
-            from bot.game import inventory
             cur = inventory.get(player, name.strip())
             # задаём абсолютное значение
             inventory.add(player, name.strip(), player_inv_amt - cur)
