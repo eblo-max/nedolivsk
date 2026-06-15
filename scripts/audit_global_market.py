@@ -211,6 +211,35 @@ check("лимит скупки конечен (анти-перекачка)", 0 
 check("окно лимита разумное (1..24ч)", 1 <= balance.BOURSE_BUY_WINDOW_H <= 24)
 check("налог-сток делает перекачку убыточной", balance.BOURSE_SALE_TAX > 0)
 
+# ── 9. Полнота словарей по ресурсам (ловим «забыли новый ресурс») ────────────
+print("9. Все ресурсы покрыты во всех обязательных словарях")
+from bot.game import production as prodmod
+# (имя_словаря, словарь) — должны содержать КАЖДЫЙ ресурс из RESOURCES.
+required = {
+    "balance.RESOURCE_NAMES": balance.RESOURCE_NAMES,
+    "balance.RESOURCE_EMOJI": balance.RESOURCE_EMOJI,
+    "balance.EXPEDITION_YIELD": balance.EXPEDITION_YIELD,
+    "balance.RESOURCE_PRICE": balance.RESOURCE_PRICE,
+    "texts.RESOURCE_INSTRUMENTAL": texts.RESOURCE_INSTRUMENTAL,
+}
+for name, d in required.items():
+    missing = [r for r in balance.RESOURCES if r not in d]
+    check(f"{name}: все {len(balance.RESOURCES)} ресурсов", not missing)
+    if missing:
+        print("      нет ключей:", missing)
+# Полуфабрикаты (солод/мука/слиток) — в своих словарях и в ценах для ВВП.
+semis = list(balance.GOODS_NAMES)
+for name, d in {"balance.GOODS_EMOJI": balance.GOODS_EMOJI,
+                "balance.RESOURCE_PRICE(semis)": balance.RESOURCE_PRICE}.items():
+    miss = [s for s in semis if s not in d]
+    check(f"{name}: все полуфабрикаты", not miss)
+    if miss:
+        print("      нет ключей:", miss)
+# Товары (напитки/еда) — у каждого есть имя и цена (рендер/ВВП не упадут).
+check("production.GOODS: у всех есть .name и .price",
+      all(getattr(g, "name", None) and getattr(g, "price", None) is not None
+          for g in prodmod.GOODS.values()))
+
 print()
 if fails:
     print(f"{FAIL} ПРОВАЛЕНО проверок: {fails}")
