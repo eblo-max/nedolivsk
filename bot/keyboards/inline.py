@@ -419,60 +419,27 @@ def bourse_list_kb(orders, page: int, total: int, cat: str,
 
 
 def bourse_order_kb(order, player) -> InlineKeyboardMarkup:
-    """Карточка лота ПРОДАЖИ: купить пресетами / всё (в пределах золота)."""
+    """Карточка лота ПРОДАЖИ: одна кнопка — ввести количество для покупки."""
     kb = InlineKeyboardBuilder()
-    afford = player.gold // order.unit_price if order.unit_price > 0 else 0
-    maxbuy = min(order.qty, afford)
-    for n in (x for x in balance.BOURSE_QTY_PRESETS if x < maxbuy):
-        kb.button(text=f"Купить {n}", callback_data=f"bbuy:{order.id}:{n}")
-    if maxbuy > 0:
-        kb.button(text=f"Купить всё ({maxbuy})", callback_data=f"bbuy:{order.id}:all",
-                  style="success")
+    kb.button(text="🛒 Купить", callback_data=f"bbuyq:{order.id}", style="success")
     kb.button(text="↩️ К лотам", callback_data="bourse:0:all")
-    kb.adjust(2, 1, 1)
+    kb.adjust(1)
     return kb.as_markup()
 
 
 def bourse_bid_kb(order, tavern) -> InlineKeyboardMarkup:
-    """Карточка ЗАЯВКИ «куплю»: продать ей из погреба пресетами / всё."""
+    """Карточка ЗАЯВКИ «куплю»: одна кнопка — ввести количество для продажи."""
     kb = InlineKeyboardBuilder()
-    stock = int((tavern.products or {}).get(order.good, 0))
-    maxsell = min(order.qty, stock)
-    for n in (x for x in balance.BOURSE_QTY_PRESETS if x < maxsell):
-        kb.button(text=f"Продать {n}", callback_data=f"bfill:{order.id}:{n}")
-    if maxsell > 0:
-        kb.button(text=f"Продать всё ({maxsell})", callback_data=f"bfill:{order.id}:all",
-                  style="success")
+    kb.button(text="📤 Продать", callback_data=f"bfillq:{order.id}", style="success")
     kb.button(text="↩️ К заявкам", callback_data="blb:0:all")
-    kb.adjust(2, 1, 1)
-    return kb.as_markup()
-
-
-def _qty_kb(good: str, cap: int, prefix: str, back_cb: str) -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    seen = set()
-    for n in balance.BOURSE_QTY_PRESETS:
-        q = min(n, cap, balance.BOURSE_QTY_MAX)
-        if q > 0 and q not in seen:
-            seen.add(q)
-            kb.button(text=f"{q} шт", callback_data=f"{prefix}:{good}:{q}")
-    allq = min(cap, balance.BOURSE_QTY_MAX)
-    if allq > 0 and allq not in seen:
-        kb.button(text=f"Максимум ({allq})", callback_data=f"{prefix}:{good}:{allq}")
-    kb.button(text="↩️ Назад", callback_data=back_cb)
-    kb.adjust(2)
-    return kb.as_markup()
-
-
-def _price_kb(good: str, qty: int, prices: list[int], prefix: str,
-              back_cb: str) -> InlineKeyboardMarkup:
-    labels = ("Дёшево", "По рынку", "Дорого")
-    kb = InlineKeyboardBuilder()
-    for idx, p in enumerate(prices):
-        lab = labels[idx] if idx < len(labels) else f"×{idx}"
-        kb.button(text=f"{lab} · {p} 🪙/шт", callback_data=f"{prefix}:{good}:{qty}:{idx}")
-    kb.button(text="↩️ Назад", callback_data=back_cb)
     kb.adjust(1)
+    return kb.as_markup()
+
+
+def bourse_cancel_kb() -> InlineKeyboardMarkup:
+    """Отмена свободного ввода количества/цены."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="↩️ Отмена", callback_data="binputcancel")
     return kb.as_markup()
 
 
@@ -489,14 +456,6 @@ def bourse_sell_goods_kb(tavern) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def bourse_sell_qty_kb(good: str, stock: int) -> InlineKeyboardMarkup:
-    return _qty_kb(good, stock, "bsq", "bsell")
-
-
-def bourse_sell_price_kb(good: str, qty: int, prices: list[int]) -> InlineKeyboardMarkup:
-    return _price_kb(good, qty, prices, "bsp", f"bsg:{good}")
-
-
 def bourse_bid_goods_kb() -> InlineKeyboardMarkup:
     """Что хочешь купить — любой товар каталога."""
     from bot.game import production as prod
@@ -506,14 +465,6 @@ def bourse_bid_goods_kb() -> InlineKeyboardMarkup:
     _back_to_auction(kb)
     kb.adjust(2)
     return kb.as_markup()
-
-
-def bourse_bid_qty_kb(good: str, max_qty: int) -> InlineKeyboardMarkup:
-    return _qty_kb(good, max_qty, "bbq", "bbidnew")
-
-
-def bourse_bid_price_kb(good: str, qty: int, prices: list[int]) -> InlineKeyboardMarkup:
-    return _price_kb(good, qty, prices, "bbp", f"bbg:{good}")
 
 
 def bourse_mine_kb(orders) -> InlineKeyboardMarkup:

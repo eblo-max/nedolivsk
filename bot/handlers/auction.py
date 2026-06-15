@@ -1,7 +1,9 @@
 """Аукцион: выставление лота и просмотр торгов (асинхронный сбыт)."""
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +16,28 @@ from bot.handlers import common
 from bot.keyboards import inline as kb
 
 router = Router()
+
+_QTY_ALL = {"всё", "все", "all", "max", "максимум"}
+
+
+class BInput(StatesGroup):
+    """Свободный ввод числа на бирже (кол-во/цена). op в data задаёт шаг."""
+    wait = State()
+
+
+def _parse_qty(text: str, cap: int) -> int | None:
+    t = (text or "").strip().lower()
+    if t in _QTY_ALL:
+        return cap if cap > 0 else None
+    if t.isdigit():
+        v = min(int(t), cap)
+        return v if v > 0 else None
+    return None
+
+
+def _parse_price(text: str) -> int | None:
+    t = (text or "").strip()
+    return int(t) if t.isdigit() and int(t) > 0 else None
 
 
 async def _player(callback: CallbackQuery, session: AsyncSession, *, lock: bool = False):
@@ -32,7 +56,9 @@ async def _city(callback: CallbackQuery, session: AsyncSession, player: Player):
 
 
 @router.callback_query(F.data == "auction")
-async def cb_auction(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_auction(callback: CallbackQuery, session: AsyncSession,
+                     state: FSMContext) -> None:
+    await state.clear()  # сбросить незавершённый ввод кол-ва/цены
     player = await _player(callback, session)
     if player is None:
         return
@@ -241,92 +267,59 @@ async def cb_buy_order(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("bbuy:"))
-async def cb_buy_from_sell(callback: CallbackQuery, session: AsyncSession) -> None:
-    """Купить из лота продажи: золото покупателя → товар в погреб, золото продавцу."""
-    player = await _player(callback, session, lock=True)
+@router.callback_query(F.data.startswith("bbuyq:"))
+async def cb_buy_prompt(callback: CallbackQuery, session: AsyncSession,
+                        state: FSMContext) -> None:
+    """Покупка из лота: спросить КОЛИЧЕСТВО (свободный ввод)."""
+    player = await _player(callback, session)
     if player is None:
         return
-    _, oid, qarg = callback.data.split(":")
-    order = await repo.get_order(session, int(oid), lock=True)
+    order = await repo.get_order(session, int(callback.data.split(":", 1)[1]))
     if order is None or order.qty <= 0 or order.side != "sell":
         await callback.answer("Лот уже разобрали.", show_alert=True)
         return
     if order.seller_id == player.id:
         await callback.answer("Это твой лот.", show_alert=True)
         return
-    want = order.qty if qarg == "all" else int(qarg)
-    qty = max(0, min(want, order.qty,
-                     player.gold // order.unit_price if order.unit_price else 0))
-    if qty <= 0:
-        await callback.answer("Не хватает золота.", show_alert=True)
+    cap = min(order.qty, player.gold // order.unit_price if order.unit_price else 0)
+    if cap <= 0:
+        await callback.answer("Не хватает золота даже на одну штуку.", show_alert=True)
         return
-    cost = qty * order.unit_price
-    good, nm = order.good, _gname(order.good)
-    player.gold -= cost
-    _give(player.tavern, good, qty)
-    net = bourse.net_to_seller(cost)
-    seller = await repo.get_player(session, order.seller_id, for_update=True)
-    if seller is not None:
-        seller.gold += net
-        repo.add_log(session, "player", seller.id,
-                     f"🏪 продал на бирже {qty}×{nm} за {net}🪙")
-        repo.queue_notify(session, seller.id,
-                          f"🛒 На бирже купили твой товар: {qty}×{nm} → +{net} 🪙")
-    order.qty -= qty
-    if order.qty <= 0:
-        await repo.delete_order(session, order.id)
-    repo.add_log(session, "player", player.id, f"🏪 купил на бирже {qty}×{nm} за {cost}🪙")
-    await _market_nudge(session, _chat_id(callback, player), good, qty)
-    await _render_list(callback, session, player, "sell", "all", 0)
-    await callback.answer(f"Куплено {qty}×{nm} за {cost}🪙")
+    await state.set_state(BInput.wait)
+    await state.update_data(op="buy_qty", order_id=order.id)
+    await callback.message.answer(
+        f"🛒 Сколько купить {_gname(order.good)}? До {cap} шт "
+        f"(по {order.unit_price}🪙). Введи число или «всё».",
+        reply_markup=kb.bourse_cancel_kb())
+    await callback.answer()
 
 
-@router.callback_query(F.data.startswith("bfill:"))
-async def cb_fill_buy(callback: CallbackQuery, session: AsyncSession) -> None:
-    """Продать в заявку «куплю»: товар из погреба → покупателю, золото из залога."""
-    player = await _player(callback, session, lock=True)
+@router.callback_query(F.data.startswith("bfillq:"))
+async def cb_fill_prompt(callback: CallbackQuery, session: AsyncSession,
+                         state: FSMContext) -> None:
+    """Продажа в заявку: спросить КОЛИЧЕСТВО."""
+    player = await _player(callback, session)
     if player is None:
         return
-    _, oid, qarg = callback.data.split(":")
-    order = await repo.get_order(session, int(oid), lock=True)
+    order = await repo.get_order(session, int(callback.data.split(":", 1)[1]))
     if order is None or order.qty <= 0 or order.side != "buy":
         await callback.answer("Заявку уже закрыли.", show_alert=True)
         return
     if order.seller_id == player.id:
         await callback.answer("Это твоя заявка.", show_alert=True)
         return
-    # Владелец заявки должен существовать и иметь погреб — иначе товар «в никуда».
-    buyer = await repo.get_player(session, order.seller_id, for_update=True)
-    if buyer is None or buyer.tavern is None:
-        await repo.delete_order(session, order.id)  # протухшая сиротская заявка
-        await callback.answer("Заявка протухла — хозяин сгинул.", show_alert=True)
-        await _render_list(callback, session, player, "buy", "all", 0)
+    stock = int((player.tavern.products or {}).get(order.good, 0))
+    cap = min(order.qty, stock)
+    if cap <= 0:
+        await callback.answer("Нет такого товара в погребе.", show_alert=True)
         return
-    good, nm = order.good, _gname(order.good)
-    stock = int((player.tavern.products or {}).get(good, 0))
-    want = order.qty if qarg == "all" else int(qarg)
-    qty = max(0, min(want, order.qty, stock))
-    if qty <= 0:
-        await callback.answer("Нет столько товара в погребе.", show_alert=True)
-        return
-    gross = qty * order.unit_price
-    net = bourse.net_to_seller(gross)
-    bourse.freeze(player.tavern, good, qty)   # списать у продавца
-    player.gold += net                        # ему — за вычетом налога
-    _give(buyer.tavern, good, qty)            # товар покупателю (из залога оплачено)
-    repo.queue_notify(session, buyer.id,
-                      f"📥 По твоей заявке доставили {qty}×{nm} "
-                      f"(из залога списано {gross} 🪙)")
-    repo.add_log(session, "player", buyer.id, f"📥 заявка: получил {qty}×{nm}")
-    order.qty -= qty
-    if order.qty <= 0:
-        await repo.delete_order(session, order.id)
-    repo.add_log(session, "player", player.id,
-                 f"🏪 продал по заявке {qty}×{nm} за {net}🪙")
-    await _market_nudge(session, _chat_id(callback, player), good, qty)
-    await _render_list(callback, session, player, "buy", "all", 0)
-    await callback.answer(f"Продано {qty}×{nm} → +{net}🪙")
+    await state.set_state(BInput.wait)
+    await state.update_data(op="fill_qty", order_id=order.id)
+    await callback.message.answer(
+        f"📤 Сколько продать {_gname(order.good)} в заявку? До {cap} шт "
+        f"(по {order.unit_price}🪙). Введи число или «всё».",
+        reply_markup=kb.bourse_cancel_kb())
+    await callback.answer()
 
 
 # ── Создание лота продажи ───────────────────────────────────────────────────
@@ -354,75 +347,23 @@ async def cb_sell_new(callback: CallbackQuery, session: AsyncSession) -> None:
 
 
 @router.callback_query(F.data.startswith("bsg:"))
-async def cb_sell_good(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_sell_good(callback: CallbackQuery, session: AsyncSession,
+                       state: FSMContext) -> None:
+    """Выбран товар — спросить КОЛИЧЕСТВО (свободный ввод)."""
     player = await _player(callback, session)
     if player is None:
         return
     good = callback.data.split(":", 1)[1]
-    stock = int((player.tavern.products or {}).get(good, 0))
+    stock = min(int((player.tavern.products or {}).get(good, 0)), balance.BOURSE_QTY_MAX)
     if stock <= 0:
         await callback.answer("Этого товара уже нет.", show_alert=True)
         return
-    await common.caption_edit(callback.message, texts.bourse_pick_qty(good, stock),
-                              kb.bourse_sell_qty_kb(good, stock))
+    await state.set_state(BInput.wait)
+    await state.update_data(op="sell_qty", good=good)
+    await callback.message.answer(
+        f"📤 Сколько продать {_gname(good)}? До {stock} шт. Введи число или «всё».",
+        reply_markup=kb.bourse_cancel_kb())
     await callback.answer()
-
-
-@router.callback_query(F.data.startswith("bsq:"))
-async def cb_sell_qty(callback: CallbackQuery, session: AsyncSession) -> None:
-    player = await _player(callback, session)
-    if player is None:
-        return
-    _, good, q = callback.data.split(":")
-    await common.caption_edit(
-        callback.message, texts.bourse_pick_price(good, int(q)),
-        kb.bourse_sell_price_kb(good, int(q), bourse.price_tiers(good)))
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("bsp:"))
-async def cb_sell_create(callback: CallbackQuery, session: AsyncSession) -> None:
-    player = await _player(callback, session, lock=True)
-    if player is None:
-        return
-    _, good, q, idx = callback.data.split(":")
-    qty, idx = min(int(q), balance.BOURSE_QTY_MAX), int(idx)
-    chat_id = _chat_id(callback, player)
-    if chat_id is None:
-        await callback.answer("Биржа — в общем чате.", show_alert=True)
-        return
-    prices = bourse.price_tiers(good)
-    if not 0 <= idx < len(prices):
-        await callback.answer()
-        return
-    price = prices[idx]
-    stock = int((player.tavern.products or {}).get(good, 0))
-    qty = min(qty, stock)
-    if qty <= 0 or not bourse.valid_price(good, price):
-        await callback.answer("Не вышло выставить (товар/цена).", show_alert=True)
-        return
-    nm = _gname(good)
-    matched = await _match_sell(session, player, chat_id, good, qty, price)  # авто-сведение
-    remaining = qty - matched
-    listed = 0
-    if remaining > 0:
-        if await repo.count_seller_orders(session, player.id, "sell") < balance.BOURSE_MAX_ORDERS:
-            bourse.freeze(player.tavern, good, remaining)
-            repo.create_order(session, chat_id, player.id, good, remaining, price, side="sell")
-            listed = remaining
-    if matched:
-        await _market_nudge(session, chat_id, good, matched)
-    repo.add_log(session, "player", player.id,
-                 f"📤 продажа {qty}×{nm} по {price}🪙 (свёл {matched}, выставил {listed})")
-    await _back_auction(callback, session, player)
-    parts = []
-    if matched:
-        parts.append(f"свёл сразу {matched}")
-    if listed:
-        parts.append(f"выставил {listed}")
-    if remaining and not listed:
-        parts.append(f"{remaining} осталось в погребе (лимит лотов)")
-    await callback.answer(f"{nm}: " + (", ".join(parts) if parts else "ничего"))
 
 
 # ── Создание заявки «куплю» ─────────────────────────────────────────────────
@@ -446,74 +387,23 @@ async def cb_bid_new(callback: CallbackQuery, session: AsyncSession) -> None:
 
 
 @router.callback_query(F.data.startswith("bbg:"))
-async def cb_bid_good(callback: CallbackQuery, session: AsyncSession) -> None:
+async def cb_bid_good(callback: CallbackQuery, session: AsyncSession,
+                      state: FSMContext) -> None:
+    """Выбран товар для заявки — спросить КОЛИЧЕСТВО."""
     player = await _player(callback, session)
     if player is None:
         return
     good = callback.data.split(":", 1)[1]
-    max_qty = min(balance.BOURSE_QTY_MAX, player.gold // bourse.price_floor(good))
-    if max_qty <= 0:
+    cap = min(balance.BOURSE_QTY_MAX, player.gold // bourse.price_floor(good))
+    if cap <= 0:
         await callback.answer("Маловато золота даже на одну штуку.", show_alert=True)
         return
-    await common.caption_edit(callback.message, texts.bourse_bid_qty(good, max_qty),
-                              kb.bourse_bid_qty_kb(good, max_qty))
+    await state.set_state(BInput.wait)
+    await state.update_data(op="bid_qty", good=good)
+    await callback.message.answer(
+        f"📣 Сколько {_gname(good)} хочешь купить? До {cap} шт. Введи число или «всё».",
+        reply_markup=kb.bourse_cancel_kb())
     await callback.answer()
-
-
-@router.callback_query(F.data.startswith("bbq:"))
-async def cb_bid_qty(callback: CallbackQuery, session: AsyncSession) -> None:
-    player = await _player(callback, session)
-    if player is None:
-        return
-    _, good, q = callback.data.split(":")
-    await common.caption_edit(
-        callback.message, texts.bourse_pick_price(good, int(q), buy=True),
-        kb.bourse_bid_price_kb(good, int(q), bourse.price_tiers(good)))
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("bbp:"))
-async def cb_bid_create(callback: CallbackQuery, session: AsyncSession) -> None:
-    player = await _player(callback, session, lock=True)
-    if player is None:
-        return
-    _, good, q, idx = callback.data.split(":")
-    qty, idx = min(int(q), balance.BOURSE_QTY_MAX), int(idx)
-    chat_id = _chat_id(callback, player)
-    if chat_id is None:
-        await callback.answer("Биржа — в общем чате.", show_alert=True)
-        return
-    prices = bourse.price_tiers(good)
-    if not 0 <= idx < len(prices):
-        await callback.answer()
-        return
-    price = prices[idx]
-    if not bourse.valid_price(good, price) or qty <= 0:
-        await callback.answer("Цена/кол-во вне правил.", show_alert=True)
-        return
-    nm = _gname(good)
-    matched, remaining = await _match_buy(session, player, chat_id, good, qty, price)
-    listed = 0
-    if remaining > 0:  # остаток — в залог и в книгу
-        affordable = player.gold // price if price > 0 else 0
-        listed = min(remaining, affordable)
-        if listed > 0 and await repo.count_seller_orders(
-                session, player.id, "buy") < balance.BOURSE_MAX_ORDERS:
-            player.gold -= listed * price
-            repo.create_order(session, chat_id, player.id, good, listed, price, side="buy")
-        else:
-            listed = 0
-    if matched:
-        await _market_nudge(session, chat_id, good, matched)
-    repo.add_log(session, "player", player.id,
-                 f"📣 куплю {qty}×{nm} по {price}🪙 (свёл {matched}, заявка {listed})")
-    await _back_auction(callback, session, player)
-    parts = []
-    if matched:
-        parts.append(f"купил сразу {matched}")
-    if listed:
-        parts.append(f"заявка на {listed} (залог {listed * price}🪙)")
-    await callback.answer(f"{nm}: " + (", ".join(parts) if parts else "ничего не вышло"))
 
 
 # ── Мои лоты / отмена ───────────────────────────────────────────────────────
@@ -661,3 +551,226 @@ async def _back_auction(callback: CallbackQuery, session: AsyncSession,
         callback.message, images.named_image("auction"),
         texts.auction_screen(player.tavern, city),
         kb.auction_kb(player.tavern), callback.from_user.id)
+
+
+# ── Исполнители сделок (вызываются из обработчика ввода) ─────────────────────
+async def _do_buy(session: AsyncSession, player: Player, chat_id: int | None,
+                  order, qty: int) -> str:
+    cost = qty * order.unit_price
+    good, nm = order.good, _gname(order.good)
+    player.gold -= cost
+    _give(player.tavern, good, qty)
+    net = bourse.net_to_seller(cost)
+    seller = await repo.get_player(session, order.seller_id, for_update=True)
+    if seller is not None:
+        seller.gold += net
+        repo.add_log(session, "player", seller.id, f"🏪 продал на бирже {qty}×{nm}")
+        repo.queue_notify(session, seller.id,
+                          f"🛒 На бирже купили твой товар: {qty}×{nm} → +{net} 🪙")
+    order.qty -= qty
+    if order.qty <= 0:
+        await repo.delete_order(session, order.id)
+    repo.add_log(session, "player", player.id, f"🏪 купил на бирже {qty}×{nm} за {cost}🪙")
+    await _market_nudge(session, chat_id, good, qty)
+    return f"Куплено {qty}×{nm} за {cost} 🪙."
+
+
+async def _do_fill(session: AsyncSession, player: Player, chat_id: int | None,
+                   order, qty: int, buyer: Player) -> str:
+    good, nm = order.good, _gname(order.good)
+    gross = qty * order.unit_price
+    net = bourse.net_to_seller(gross)
+    bourse.freeze(player.tavern, good, qty)
+    player.gold += net
+    _give(buyer.tavern, good, qty)
+    repo.queue_notify(session, buyer.id,
+                      f"📥 По твоей заявке доставили {qty}×{nm} (из залога {gross} 🪙)")
+    repo.add_log(session, "player", buyer.id, f"📥 заявка: получил {qty}×{nm}")
+    order.qty -= qty
+    if order.qty <= 0:
+        await repo.delete_order(session, order.id)
+    repo.add_log(session, "player", player.id, f"🏪 продал по заявке {qty}×{nm} за {net}🪙")
+    await _market_nudge(session, chat_id, good, qty)
+    return f"Продано {qty}×{nm} → +{net} 🪙."
+
+
+async def _do_create_sell(session: AsyncSession, player: Player, chat_id: int,
+                          good: str, qty: int, price: int) -> str:
+    nm = _gname(good)
+    matched = await _match_sell(session, player, chat_id, good, qty, price)
+    remaining = qty - matched
+    listed = 0
+    if remaining > 0 and await repo.count_seller_orders(
+            session, player.id, "sell") < balance.BOURSE_MAX_ORDERS:
+        bourse.freeze(player.tavern, good, remaining)
+        repo.create_order(session, chat_id, player.id, good, remaining, price, side="sell")
+        listed = remaining
+    if matched:
+        await _market_nudge(session, chat_id, good, matched)
+    repo.add_log(session, "player", player.id,
+                 f"📤 продажа {qty}×{nm} по {price}🪙 (свёл {matched}, выставил {listed})")
+    parts = []
+    if matched:
+        parts.append(f"свёл сразу {matched}")
+    if listed:
+        parts.append(f"выставил {listed} по {price}🪙")
+    if remaining and not listed:
+        parts.append(f"{remaining} в погребе (лимит лотов)")
+    return f"📤 {nm}: " + (", ".join(parts) if parts else "ничего")
+
+
+async def _do_create_buy(session: AsyncSession, player: Player, chat_id: int,
+                         good: str, qty: int, price: int) -> str:
+    nm = _gname(good)
+    matched, remaining = await _match_buy(session, player, chat_id, good, qty, price)
+    listed = 0
+    if remaining > 0:
+        affordable = player.gold // price if price > 0 else 0
+        listed = min(remaining, affordable)
+        if listed > 0 and await repo.count_seller_orders(
+                session, player.id, "buy") < balance.BOURSE_MAX_ORDERS:
+            player.gold -= listed * price
+            repo.create_order(session, chat_id, player.id, good, listed, price, side="buy")
+        else:
+            listed = 0
+    if matched:
+        await _market_nudge(session, chat_id, good, matched)
+    repo.add_log(session, "player", player.id,
+                 f"📣 куплю {qty}×{nm} по {price}🪙 (свёл {matched}, заявка {listed})")
+    parts = []
+    if matched:
+        parts.append(f"купил сразу {matched}")
+    if listed:
+        parts.append(f"заявка на {listed} (залог {listed * price}🪙)")
+    return f"📣 {nm}: " + (", ".join(parts) if parts else "ничего не вышло")
+
+
+# ── Свободный ввод количества/цены ──────────────────────────────────────────
+@router.callback_query(F.data == "binputcancel")
+async def cb_input_cancel(callback: CallbackQuery, session: AsyncSession,
+                          state: FSMContext) -> None:
+    await state.clear()
+    player = await _player(callback, session)
+    if player is not None:
+        await _back_auction(callback, session, player)
+    await callback.answer("Отменено")
+
+
+@router.message(BInput.wait)
+async def on_bourse_input(message: Message, session: AsyncSession,
+                          state: FSMContext) -> None:
+    data = await state.get_data()
+    op = data.get("op")
+    player = await repo.get_player(session, message.from_user.id, for_update=True)
+    if player is None or player.tavern is None:
+        await state.clear()
+        return
+    is_group = message.chat.type in ("group", "supergroup")
+    chat_id = message.chat.id if is_group else player.chat_id
+    if chat_id is None:
+        await state.clear()
+        await message.answer("Биржа — в общем чате. Заходи через «гг».")
+        return
+    raw = message.text or ""
+    cancel = kb.bourse_cancel_kb()
+
+    if op == "sell_qty":
+        good = data["good"]
+        cap = min(int((player.tavern.products or {}).get(good, 0)), balance.BOURSE_QTY_MAX)
+        qty = _parse_qty(raw, cap)
+        if not qty:
+            await message.answer(f"Не понял. Число до {cap} или «всё».", reply_markup=cancel)
+            return
+        lo, hi = bourse.price_floor(good), bourse.price_ceil(good)
+        await state.update_data(op="sell_price", qty=qty)
+        await message.answer(
+            f"💰 Цена за штуку {_gname(good)} (коридор {lo}–{hi} 🪙)? Введи число.",
+            reply_markup=cancel)
+        return
+
+    if op == "sell_price":
+        good, qty = data["good"], data["qty"]
+        price = _parse_price(raw)
+        if price is None or not bourse.valid_price(good, price):
+            lo, hi = bourse.price_floor(good), bourse.price_ceil(good)
+            await message.answer(f"Цена вне коридора {lo}–{hi}. Введи число.",
+                                 reply_markup=cancel)
+            return
+        qty = min(qty, int((player.tavern.products or {}).get(good, 0)))
+        await state.clear()
+        if qty <= 0:
+            await message.answer("Товара уже нет.", reply_markup=kb.auction_kb(player.tavern))
+            return
+        summary = await _do_create_sell(session, player, chat_id, good, qty, price)
+        await message.answer(summary, reply_markup=kb.auction_kb(player.tavern))
+        return
+
+    if op == "bid_qty":
+        good = data["good"]
+        cap = min(balance.BOURSE_QTY_MAX, player.gold // bourse.price_floor(good))
+        qty = _parse_qty(raw, cap)
+        if not qty:
+            await message.answer(f"Не понял. Число до {cap} или «всё».", reply_markup=cancel)
+            return
+        lo, hi = bourse.price_floor(good), bourse.price_ceil(good)
+        await state.update_data(op="bid_price", qty=qty)
+        await message.answer(
+            f"💰 Цена за штуку (коридор {lo}–{hi} 🪙)? Залог = кол-во × цена.",
+            reply_markup=cancel)
+        return
+
+    if op == "bid_price":
+        good, qty = data["good"], data["qty"]
+        price = _parse_price(raw)
+        if price is None or not bourse.valid_price(good, price):
+            lo, hi = bourse.price_floor(good), bourse.price_ceil(good)
+            await message.answer(f"Цена вне коридора {lo}–{hi}. Введи число.",
+                                 reply_markup=cancel)
+            return
+        await state.clear()
+        summary = await _do_create_buy(session, player, chat_id, good, qty, price)
+        await message.answer(summary, reply_markup=kb.auction_kb(player.tavern))
+        return
+
+    if op == "buy_qty":
+        order = await repo.get_order(session, data["order_id"], lock=True)
+        if order is None or order.qty <= 0 or order.side != "sell" \
+                or order.seller_id == player.id:
+            await state.clear()
+            await message.answer("Лот недоступен.", reply_markup=kb.auction_kb(player.tavern))
+            return
+        cap = min(order.qty, player.gold // order.unit_price if order.unit_price else 0)
+        qty = _parse_qty(raw, cap)
+        if not qty:
+            await message.answer(f"Не понял. Число до {cap} или «всё».", reply_markup=cancel)
+            return
+        await state.clear()
+        summary = await _do_buy(session, player, chat_id, order, qty)
+        await message.answer(summary, reply_markup=kb.auction_kb(player.tavern))
+        return
+
+    if op == "fill_qty":
+        order = await repo.get_order(session, data["order_id"], lock=True)
+        if order is None or order.qty <= 0 or order.side != "buy" \
+                or order.seller_id == player.id:
+            await state.clear()
+            await message.answer("Заявка недоступна.", reply_markup=kb.auction_kb(player.tavern))
+            return
+        buyer = await repo.get_player(session, order.seller_id, for_update=True)
+        if buyer is None or buyer.tavern is None:
+            await repo.delete_order(session, order.id)
+            await state.clear()
+            await message.answer("Заявка протухла — хозяин сгинул.",
+                                 reply_markup=kb.auction_kb(player.tavern))
+            return
+        cap = min(order.qty, int((player.tavern.products or {}).get(order.good, 0)))
+        qty = _parse_qty(raw, cap)
+        if not qty:
+            await message.answer(f"Не понял. Число до {cap} или «всё».", reply_markup=cancel)
+            return
+        await state.clear()
+        summary = await _do_fill(session, player, chat_id, order, qty, buyer)
+        await message.answer(summary, reply_markup=kb.auction_kb(player.tavern))
+        return
+
+    await state.clear()
