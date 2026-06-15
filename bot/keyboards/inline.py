@@ -351,13 +351,116 @@ def market_kb() -> InlineKeyboardMarkup:
 
 def auction_kb(tavern) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    sizes = []
     if tavern.auction:
         kb.button(text="🔄 Обновить торги", callback_data="auction")
-        kb.button(text="🚫 Снять лот", callback_data="auc_cancel", style="danger")
+        kb.button(text="🚫 Снять лот (NPC)", callback_data="auc_cancel", style="danger")
+        sizes += [1, 1]
     else:
-        kb.button(text="🛒 Выставить лот", callback_data="auc_new", style="success")
+        kb.button(text="🔨 Аукцион NPC — выставить", callback_data="auc_new",
+                  style="success")
+        sizes.append(1)
+    # Городская биржа (P2P)
+    kb.button(text="🛒 Купить на бирже", callback_data="bourse:0")
+    kb.button(text="📤 Продать на бирже", callback_data="bsell", style="success")
+    kb.button(text="📦 Мои лоты на бирже", callback_data="bmine")
     kb.button(text="🏪 Рынок", callback_data="market")
     kb.button(text="🏠 К таверне", callback_data="tavern")
+    kb.adjust(*sizes, 2, 1, 1, 1)
+    return kb.as_markup()
+
+
+def _back_to_auction(kb: InlineKeyboardBuilder) -> None:
+    kb.button(text="↩️ К торгам", callback_data="auction")
+
+
+def bourse_list_kb(orders, page: int, total: int) -> InlineKeyboardMarkup:
+    """Список чужих лотов биржи: кнопка на каждый + пагинация."""
+    from bot.game import production as prod
+    kb = InlineKeyboardBuilder()
+    for o in orders:
+        g = prod.GOODS.get(o.good)
+        emoji = g.emoji if g else "📦"
+        kb.button(text=f"{emoji} {o.qty}шт × {o.unit_price}🪙",
+                  callback_data=f"bord:{o.id}")
+    sizes = [1] * len(orders)
+    nav = []
+    if page > 0:
+        kb.button(text="◀️", callback_data=f"bourse:{page - 1}")
+        nav.append(1)
+    if (page + 1) * balance.BOURSE_PAGE < total:
+        kb.button(text="▶️", callback_data=f"bourse:{page + 1}")
+        nav.append(1)
+    _back_to_auction(kb)
+    kb.adjust(*sizes, len(nav) if nav else 1, 1)
+    return kb.as_markup()
+
+
+def bourse_order_kb(order, player) -> InlineKeyboardMarkup:
+    """Карточка лота: покупка пресетами и «всё» (в пределах золота/наличия)."""
+    kb = InlineKeyboardBuilder()
+    afford = player.gold // order.unit_price if order.unit_price > 0 else 0
+    maxbuy = min(order.qty, afford)
+    presets = [n for n in balance.BOURSE_QTY_PRESETS if n < maxbuy]
+    for n in presets:
+        kb.button(text=f"Купить {n}", callback_data=f"bbuy:{order.id}:{n}")
+    if maxbuy > 0:
+        kb.button(text=f"Купить всё ({maxbuy})", callback_data=f"bbuy:{order.id}:all",
+                  style="success")
+    kb.button(text="↩️ К лотам", callback_data="bourse:0")
+    kb.adjust(2, 1, 1)
+    return kb.as_markup()
+
+
+def bourse_sell_goods_kb(tavern) -> InlineKeyboardMarkup:
+    from bot.game import bourse
+    from bot.game import production as prod
+    kb = InlineKeyboardBuilder()
+    for good in bourse.sellable_goods(tavern):
+        g = prod.GOODS[good]
+        stock = (tavern.products or {}).get(good, 0)
+        kb.button(text=f"{g.emoji} {g.name} ({stock})", callback_data=f"bsg:{good}")
+    _back_to_auction(kb)
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def bourse_sell_qty_kb(good: str, stock: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    seen = set()
+    for n in balance.BOURSE_QTY_PRESETS:
+        q = min(n, stock, balance.BOURSE_QTY_MAX)
+        if q > 0 and q not in seen:
+            seen.add(q)
+            kb.button(text=f"{q} шт", callback_data=f"bsq:{good}:{q}")
+    allq = min(stock, balance.BOURSE_QTY_MAX)
+    if allq not in seen:
+        kb.button(text=f"Всё ({allq})", callback_data=f"bsq:{good}:{allq}")
+    kb.button(text="↩️ Назад", callback_data="bsell")
+    kb.adjust(2)
+    return kb.as_markup()
+
+
+def bourse_sell_price_kb(good: str, qty: int, prices: list[int]) -> InlineKeyboardMarkup:
+    labels = ("Дёшево", "По рынку", "Дорого")
+    kb = InlineKeyboardBuilder()
+    for idx, p in enumerate(prices):
+        lab = labels[idx] if idx < len(labels) else f"×{idx}"
+        kb.button(text=f"{lab} · {p} 🪙/шт", callback_data=f"bsp:{good}:{qty}:{idx}")
+    kb.button(text="↩️ Назад", callback_data=f"bsg:{good}")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def bourse_mine_kb(orders) -> InlineKeyboardMarkup:
+    from bot.game import production as prod
+    kb = InlineKeyboardBuilder()
+    for o in orders:
+        g = prod.GOODS.get(o.good)
+        emoji = g.emoji if g else "📦"
+        kb.button(text=f"🚫 Снять: {emoji} {o.qty}×{o.unit_price}🪙",
+                  callback_data=f"bcancel:{o.id}", style="danger")
+    _back_to_auction(kb)
     kb.adjust(1)
     return kb.as_markup()
 

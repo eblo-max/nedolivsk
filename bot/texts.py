@@ -1927,6 +1927,78 @@ def newbie_claimed(total: dict) -> str:
     return f"🎁 Получено: {_reward_str(total)}. Так держать, новосёл!"
 
 
+# ── Городская биржа (P2P) ───────────────────────────────────────────────────
+def _good_label(good: str) -> str:
+    from bot.game import production as prod
+    g = prod.GOODS.get(good)
+    return f"{g.emoji} {g.name}" if g else good
+
+
+def bourse_list(orders, names: dict, page: int, total: int) -> str:
+    lines = [f"🛒 <b>ГОРОДСКАЯ БИРЖА</b> · лотов: {total} · стр. {page + 1}", ""]
+    if not orders:
+        lines.append("<i>Пусто. Никто ничего не выставил — будь первым "
+                     "(📤 Продать на бирже).</i>")
+    for o in orders:
+        who = escape(names.get(o.seller_id, "кто-то"))
+        lines.append(
+            f"{_good_label(o.good)}: {o.qty}шт × {o.unit_price}🪙 "
+            f"(= {o.qty * o.unit_price}) · от {who}")
+    if orders:
+        lines += ["", "<i>Жми на лот, чтобы купить. Товар ляжет в твой погреб.</i>"]
+    return "\n".join(lines)
+
+
+def bourse_order(order, seller_name: str, player: Player) -> str:
+    afford = player.gold // order.unit_price if order.unit_price > 0 else 0
+    return "\n".join([
+        "🛒 <b>ЛОТ БИРЖИ</b>",
+        "",
+        f"{_good_label(order.good)} — {order.qty} шт по {order.unit_price} 🪙/шт",
+        f"Весь лот: <b>{order.qty * order.unit_price} 🪙</b>",
+        f"Продавец: {escape(seller_name)}",
+        "",
+        f"🪙 У тебя {player.gold} — хватит на {afford} шт.",
+        "<i>Покупаешь сколько надо, остаток лота останется другим.</i>",
+    ])
+
+
+def bourse_sell_intro(tavern, slots_left: int) -> str:
+    return "\n".join([
+        "📤 <b>ПРОДАТЬ НА БИРЖЕ</b>",
+        "",
+        f"Свободных лотов: {slots_left}/{balance.BOURSE_MAX_ORDERS}",
+        "",
+        "Выбери товар из погреба. Цену поставишь в рыночном коридоре, "
+        f"биржа берёт налог <b>{int(balance.BOURSE_SALE_TAX * 100)}%</b> с продажи.",
+        "<i>Товар заморозится в лоте, пока кто-то не купит или ты не снимешь.</i>",
+    ])
+
+
+def bourse_pick_qty(good: str, stock: int) -> str:
+    return (f"📤 <b>{_good_label(good)}</b>\n"
+            f"В погребе: {stock}\n\nСколько выставить на продажу?")
+
+
+def bourse_pick_price(good: str, qty: int) -> str:
+    from bot.game import bourse
+    lo, hi = bourse.price_floor(good), bourse.price_ceil(good)
+    return (f"📤 <b>{_good_label(good)}</b> · {qty} шт\n\n"
+            f"Ценовой коридор: <b>{lo}–{hi}</b> 🪙/шт "
+            "(чтоб не баловались перекачкой). Выбери цену:")
+
+
+def bourse_mine(orders) -> str:
+    lines = ["📦 <b>МОИ ЛОТЫ НА БИРЖЕ</b>", ""]
+    if not orders:
+        lines.append("<i>Активных лотов нет. Выстави товар — 📤 Продать на бирже.</i>")
+    for o in orders:
+        lines.append(f"{_good_label(o.good)}: {o.qty}шт × {o.unit_price}🪙")
+    if orders:
+        lines += ["", "<i>Снимешь лот — замороженный товар вернётся в погреб.</i>"]
+    return "\n".join(lines)
+
+
 def bonus_screen(player: Player) -> str:
     """Экран ежедневного бонуса: что выпало, эффект, сколько до сгорания."""
     from bot.game import buff as buffmod

@@ -4,8 +4,8 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
-    Chronicle, CityState, KnownChat, LogEntry, LootDrop, Player, Tavern,
-    WorldState,
+    Chronicle, CityState, KnownChat, LogEntry, LootDrop, MarketOrder, Player,
+    Tavern, WorldState,
 )
 from bot.game import balance
 
@@ -172,6 +172,67 @@ async def cleanup_logs(session: AsyncSession, keep: int = 3000) -> None:
     )).scalar()
     if threshold is not None:
         await session.execute(delete(LogEntry).where(LogEntry.id <= threshold))
+
+
+# ── Городская биржа (P2P) ───────────────────────────────────────────────
+def create_order(
+    session: AsyncSession, chat_id: int, seller_id: int,
+    good: str, qty: int, unit_price: int,
+) -> MarketOrder:
+    order = MarketOrder(chat_id=chat_id, seller_id=seller_id,
+                        good=good, qty=qty, unit_price=unit_price)
+    session.add(order)
+    return order
+
+
+async def open_orders(
+    session: AsyncSession, chat_id: int, exclude_seller: int,
+    limit: int, offset: int = 0,
+) -> list[MarketOrder]:
+    """Чужие активные лоты города (свои не показываем — себе не продашь)."""
+    stmt = (
+        select(MarketOrder)
+        .where(MarketOrder.chat_id == chat_id,
+               MarketOrder.seller_id != exclude_seller,
+               MarketOrder.qty > 0)
+        .order_by(MarketOrder.id.desc())
+        .limit(limit).offset(offset)
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def count_open_orders(
+    session: AsyncSession, chat_id: int, exclude_seller: int
+) -> int:
+    return await session.scalar(
+        select(func.count(MarketOrder.id)).where(
+            MarketOrder.chat_id == chat_id,
+            MarketOrder.seller_id != exclude_seller,
+            MarketOrder.qty > 0)
+    ) or 0
+
+
+async def count_seller_orders(session: AsyncSession, seller_id: int) -> int:
+    return await session.scalar(
+        select(func.count(MarketOrder.id)).where(MarketOrder.seller_id == seller_id)
+    ) or 0
+
+
+async def seller_orders(session: AsyncSession, seller_id: int) -> list[MarketOrder]:
+    return list((await session.execute(
+        select(MarketOrder).where(MarketOrder.seller_id == seller_id)
+        .order_by(MarketOrder.id.desc())
+    )).scalars().all())
+
+
+async def get_order(
+    session: AsyncSession, order_id: int, *, lock: bool = False
+) -> MarketOrder | None:
+    return await session.get(MarketOrder, order_id, with_for_update=lock)
+
+
+async def delete_order(session: AsyncSession, order_id: int) -> None:
+    await session.execute(delete(MarketOrder).where(MarketOrder.id == order_id))
 
 
 async def recent_chronicle(

@@ -149,6 +149,23 @@ class LootDrop(Base):
     )
 
 
+class MarketOrder(Base):
+    """Лот городской биржи (P2P): игрок выставил товар по фикс-цене, другой
+    игрок покупает. Товар заморожен (списан из погреба продавца). Скоуп — чат."""
+
+    __tablename__ = "market_orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    seller_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    good: Mapped[str] = mapped_column(String(16))
+    qty: Mapped[int] = mapped_column()
+    unit_price: Mapped[int] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class LogEntry(Base):
     """Журнал событий: действия игроков и админа (для админ-панели)."""
 
