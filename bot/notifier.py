@@ -378,6 +378,17 @@ async def _notify_returned(bot: Bot) -> None:
             except Exception:  # noqa: BLE001 — заблокировал бота и т.п.
                 logger.warning("Утренний пуш бонуса игроку %s не доставлен", pid)
 
+        # Outbox: отложенная личка (биржа: «твой лот купили» и т.п.).
+        notes = await repo.pop_notifications(session, 50)
+        if notes:
+            for n in notes:
+                try:
+                    await bot.send_message(n.user_id, n.text)
+                except Exception:  # noqa: BLE001 — заблокировал бота и т.п.
+                    logger.warning("Outbox игроку %s не доставлен", n.user_id)
+            await repo.delete_notifications(session, [n.id for n in notes])
+            await session.commit()
+
         # Анонсы мировых событий в общие чаты (после коммита состояния).
         if fair_event or season_changed or holiday_new:
             chat_ids = await repo.all_chat_ids(session)

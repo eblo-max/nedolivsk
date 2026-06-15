@@ -4,8 +4,8 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
-    Chronicle, CityState, KnownChat, LogEntry, LootDrop, MarketOrder, Player,
-    Tavern, WorldState,
+    Chronicle, CityState, KnownChat, LogEntry, LootDrop, MarketOrder,
+    Notification, Player, Tavern, WorldState,
 )
 from bot.game import balance
 
@@ -174,47 +174,74 @@ async def cleanup_logs(session: AsyncSession, keep: int = 3000) -> None:
         await session.execute(delete(LogEntry).where(LogEntry.id <= threshold))
 
 
-# ── Городская биржа (P2P) ───────────────────────────────────────────────
+# ── Отложенные уведомления (outbox) ──────────────────────────────────────
+def queue_notify(session: AsyncSession, user_id: int, text: str) -> None:
+    """Положить личку игроку в очередь (атомарно со сделкой; шлёт нотифаер)."""
+    session.add(Notification(user_id=user_id, text=text[:512]))
+
+
+async def pop_notifications(
+    session: AsyncSession, limit: int = 50
+) -> list[Notification]:
+    return list((await session.execute(
+        select(Notification).order_by(Notification.id).limit(limit)
+    )).scalars().all())
+
+
+async def delete_notifications(session: AsyncSession, ids: list[int]) -> None:
+    if ids:
+        await session.execute(
+            delete(Notification).where(Notification.id.in_(ids)))
+
+
+# ── Городская биржа (P2P): двусторонний ордербук ──────────────────────────
 def create_order(
     session: AsyncSession, chat_id: int, seller_id: int,
-    good: str, qty: int, unit_price: int,
+    good: str, qty: int, unit_price: int, side: str = "sell",
 ) -> MarketOrder:
-    order = MarketOrder(chat_id=chat_id, seller_id=seller_id,
+    order = MarketOrder(chat_id=chat_id, seller_id=seller_id, side=side,
                         good=good, qty=qty, unit_price=unit_price)
     session.add(order)
     return order
 
 
-async def open_orders(
-    session: AsyncSession, chat_id: int, exclude_seller: int,
-    limit: int, offset: int = 0,
-) -> list[MarketOrder]:
-    """Чужие активные лоты города (свои не показываем — себе не продашь)."""
-    stmt = (
-        select(MarketOrder)
-        .where(MarketOrder.chat_id == chat_id,
-               MarketOrder.seller_id != exclude_seller,
-               MarketOrder.qty > 0)
-        .order_by(MarketOrder.id.desc())
-        .limit(limit).offset(offset)
+def _orders_q(chat_id: int, exclude_seller: int, side: str,
+              goods: list[str] | None):
+    stmt = select(MarketOrder).where(
+        MarketOrder.chat_id == chat_id,
+        MarketOrder.seller_id != exclude_seller,
+        MarketOrder.qty > 0,
+        MarketOrder.side == side,
     )
+    if goods is not None:
+        stmt = stmt.where(MarketOrder.good.in_(goods))
+    return stmt
+
+
+async def open_orders(
+    session: AsyncSession, chat_id: int, exclude_seller: int, side: str,
+    *, goods: list[str] | None = None, limit: int = 6, offset: int = 0,
+) -> list[MarketOrder]:
+    """Чужие активные лоты стороны side (свои не показываем). goods — фильтр."""
+    stmt = (_orders_q(chat_id, exclude_seller, side, goods)
+            .order_by(MarketOrder.id.desc()).limit(limit).offset(offset))
     return list((await session.execute(stmt)).scalars().all())
 
 
 async def count_open_orders(
-    session: AsyncSession, chat_id: int, exclude_seller: int
+    session: AsyncSession, chat_id: int, exclude_seller: int, side: str,
+    *, goods: list[str] | None = None,
+) -> int:
+    sub = _orders_q(chat_id, exclude_seller, side, goods).subquery()
+    return await session.scalar(select(func.count()).select_from(sub)) or 0
+
+
+async def count_seller_orders(
+    session: AsyncSession, seller_id: int, side: str
 ) -> int:
     return await session.scalar(
         select(func.count(MarketOrder.id)).where(
-            MarketOrder.chat_id == chat_id,
-            MarketOrder.seller_id != exclude_seller,
-            MarketOrder.qty > 0)
-    ) or 0
-
-
-async def count_seller_orders(session: AsyncSession, seller_id: int) -> int:
-    return await session.scalar(
-        select(func.count(MarketOrder.id)).where(MarketOrder.seller_id == seller_id)
+            MarketOrder.seller_id == seller_id, MarketOrder.side == side)
     ) or 0
 
 

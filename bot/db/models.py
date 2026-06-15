@@ -150,17 +150,33 @@ class LootDrop(Base):
 
 
 class MarketOrder(Base):
-    """Лот городской биржи (P2P): игрок выставил товар по фикс-цене, другой
-    игрок покупает. Товар заморожен (списан из погреба продавца). Скоуп — чат."""
+    """Лот городской биржи (P2P). side='sell' — владелец продаёт (товар заморожен
+    в погребе); side='buy' — владелец покупает (золото qty*unit_price в эскроу).
+    seller_id — id владельца-создателя лота. Скоуп — чат."""
 
     __tablename__ = "market_orders"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
-    seller_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    seller_id: Mapped[int] = mapped_column(BigInteger, index=True)  # владелец лота
+    side: Mapped[str] = mapped_column(String(8), default="sell")    # 'sell' | 'buy'
     good: Mapped[str] = mapped_column(String(16))
     qty: Mapped[int] = mapped_column()
     unit_price: Mapped[int] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Notification(Base):
+    """Отложенная личка игроку (outbox): кладём атомарно со сделкой, нотифаер
+    разбирает и шлёт — без сетевых вызовов под локами строк."""
+
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    text: Mapped[str] = mapped_column(String(512))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

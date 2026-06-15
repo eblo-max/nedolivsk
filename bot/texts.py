@@ -1934,44 +1934,83 @@ def _good_label(good: str) -> str:
     return f"{g.emoji} {g.name}" if g else good
 
 
-def bourse_list(orders, names: dict, page: int, total: int) -> str:
-    lines = [f"🛒 <b>ГОРОДСКАЯ БИРЖА</b> · лотов: {total} · стр. {page + 1}", ""]
+def bourse_list(orders, names: dict, page: int, total: int,
+                cat: str, side: str) -> str:
+    CAT_LABEL = {"all": "Всё", "drink": "Напитки", "food": "Еда"}
+    if side == "sell":
+        head = "🛒 <b>КУПИТЬ — лоты продажи</b>"
+        hint = "Жми на лот, чтобы купить. Товар ляжет в твой погреб."
+        empty = "Никто не продаёт. Сам выставь спрос — 📣 «Куплю»."
+    else:
+        head = "📥 <b>ЗАЯВКИ «КУПЛЮ»</b>"
+        hint = "Жми на заявку, чтобы продать ей товар из погреба."
+        empty = "Заявок нет. Сам выстави на продажу — 📤."
+    lines = [f"{head} · {CAT_LABEL[cat]} · лотов: {total} · стр. {page + 1}", ""]
     if not orders:
-        lines.append("<i>Пусто. Никто ничего не выставил — будь первым "
-                     "(📤 Продать на бирже).</i>")
+        lines.append(f"<i>{empty}</i>")
     for o in orders:
         who = escape(names.get(o.seller_id, "кто-то"))
+        verb = "от" if side == "sell" else "хочет"
         lines.append(
             f"{_good_label(o.good)}: {o.qty}шт × {o.unit_price}🪙 "
-            f"(= {o.qty * o.unit_price}) · от {who}")
+            f"(= {o.qty * o.unit_price}) · {verb} {who}")
     if orders:
-        lines += ["", "<i>Жми на лот, чтобы купить. Товар ляжет в твой погреб.</i>"]
+        lines += ["", f"<i>{hint}</i>"]
     return "\n".join(lines)
 
 
 def bourse_order(order, seller_name: str, player: Player) -> str:
     afford = player.gold // order.unit_price if order.unit_price > 0 else 0
     return "\n".join([
-        "🛒 <b>ЛОТ БИРЖИ</b>",
+        "🛒 <b>ЛОТ ПРОДАЖИ</b>",
         "",
         f"{_good_label(order.good)} — {order.qty} шт по {order.unit_price} 🪙/шт",
         f"Весь лот: <b>{order.qty * order.unit_price} 🪙</b>",
         f"Продавец: {escape(seller_name)}",
         "",
         f"🪙 У тебя {player.gold} — хватит на {afford} шт.",
-        "<i>Покупаешь сколько надо, остаток лота останется другим.</i>",
+        "<i>Покупаешь сколько надо, остаток останется другим.</i>",
+    ])
+
+
+def bourse_bid(order, owner_name: str, tavern) -> str:
+    from bot.game import bourse
+    stock = int((tavern.products or {}).get(order.good, 0))
+    can = min(order.qty, stock)
+    net = bourse.net_to_seller(order.unit_price)
+    return "\n".join([
+        "📥 <b>ЗАЯВКА «КУПЛЮ»</b>",
+        "",
+        f"{_good_label(order.good)} — нужно {order.qty} шт по {order.unit_price} 🪙/шт",
+        f"Тебе на руки: <b>{net} 🪙/шт</b> "
+        f"(после налога {int(balance.BOURSE_SALE_TAX * 100)}%)",
+        f"Заявку выставил: {escape(owner_name)}",
+        "",
+        f"📦 В погребе {_good_label(order.good)}: {stock} → продашь до {can} шт.",
     ])
 
 
 def bourse_sell_intro(tavern, slots_left: int) -> str:
     return "\n".join([
-        "📤 <b>ПРОДАТЬ НА БИРЖЕ</b>",
+        "📤 <b>ВЫСТАВИТЬ ПРОДАЖУ</b>",
         "",
-        f"Свободных лотов: {slots_left}/{balance.BOURSE_MAX_ORDERS}",
+        f"Свободных лотов продажи: {slots_left}/{balance.BOURSE_MAX_ORDERS}",
         "",
-        "Выбери товар из погреба. Цену поставишь в рыночном коридоре, "
-        f"биржа берёт налог <b>{int(balance.BOURSE_SALE_TAX * 100)}%</b> с продажи.",
-        "<i>Товар заморозится в лоте, пока кто-то не купит или ты не снимешь.</i>",
+        "Выбери товар из погреба. Цена — в рыночном коридоре, "
+        f"биржа берёт <b>{int(balance.BOURSE_SALE_TAX * 100)}%</b> с продажи.",
+        "<i>Товар заморозится в лоте, пока не купят или не снимешь.</i>",
+    ])
+
+
+def bourse_bid_intro(player: Player, slots_left: int) -> str:
+    return "\n".join([
+        "📣 <b>ВЫСТАВИТЬ ЗАЯВКУ «КУПЛЮ»</b>",
+        "",
+        f"Свободных заявок: {slots_left}/{balance.BOURSE_MAX_ORDERS}",
+        f"🪙 В мошне: {player.gold}",
+        "",
+        "Выбери товар, кол-во и цену. Золото (кол-во × цена) заморозится "
+        "в залог и достанется тому, кто продаст; вернётся при отмене.",
     ])
 
 
@@ -1980,22 +2019,30 @@ def bourse_pick_qty(good: str, stock: int) -> str:
             f"В погребе: {stock}\n\nСколько выставить на продажу?")
 
 
-def bourse_pick_price(good: str, qty: int) -> str:
+def bourse_bid_qty(good: str, max_qty: int) -> str:
+    return (f"📣 <b>{_good_label(good)}</b>\n"
+            f"По карману максимум: {max_qty} шт\n\nСколько хочешь купить?")
+
+
+def bourse_pick_price(good: str, qty: int, *, buy: bool = False) -> str:
     from bot.game import bourse
     lo, hi = bourse.price_floor(good), bourse.price_ceil(good)
-    return (f"📤 <b>{_good_label(good)}</b> · {qty} шт\n\n"
+    head = "📣" if buy else "📤"
+    return (f"{head} <b>{_good_label(good)}</b> · {qty} шт\n\n"
             f"Ценовой коридор: <b>{lo}–{hi}</b> 🪙/шт "
-            "(чтоб не баловались перекачкой). Выбери цену:")
+            "(анти-перекачка). Выбери цену:")
 
 
 def bourse_mine(orders) -> str:
     lines = ["📦 <b>МОИ ЛОТЫ НА БИРЖЕ</b>", ""]
     if not orders:
-        lines.append("<i>Активных лотов нет. Выстави товар — 📤 Продать на бирже.</i>")
+        lines.append("<i>Активных лотов нет.</i>")
     for o in orders:
-        lines.append(f"{_good_label(o.good)}: {o.qty}шт × {o.unit_price}🪙")
+        tag = "📤 продаю" if o.side == "sell" else "📣 куплю"
+        lines.append(f"{tag}: {_good_label(o.good)} {o.qty}шт × {o.unit_price}🪙")
     if orders:
-        lines += ["", "<i>Снимешь лот — замороженный товар вернётся в погреб.</i>"]
+        lines += ["", "<i>Снимешь: товар (продажа) или залог-золото (куплю) "
+                  "вернётся тебе.</i>"]
     return "\n".join(lines)
 
 

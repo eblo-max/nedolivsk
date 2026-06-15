@@ -59,6 +59,11 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS bonus_push_on VARCHAR(10)"
         ))
+        # Биржа: сторона лота (продажа/покупка)
+        await conn.execute(text(
+            "ALTER TABLE market_orders ADD COLUMN IF NOT EXISTS "
+            "side VARCHAR(8) NOT NULL DEFAULT 'sell'"
+        ))
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "expedition_resource VARCHAR(16)"

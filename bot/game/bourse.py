@@ -76,3 +76,12 @@ def net_to_seller(gross: int) -> int:
 
 def tax_amount(gross: int) -> int:
     return gross - net_to_seller(gross)
+
+
+def category_goods(cat: str) -> list[str] | None:
+    """Фильтр списка по категории: drink/food → список ключей, all → None."""
+    if cat == "drink":
+        return list(prod.DRINKS)
+    if cat == "food":
+        return list(prod.FOODS)
+    return None
