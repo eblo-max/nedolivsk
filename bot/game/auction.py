@@ -10,7 +10,9 @@
 import random
 from datetime import datetime, timedelta, timezone
 
-from bot.game import balance, buff, market, npc, production as prod, story_state, trade
+from bot.game import (
+    balance, buff, market, npc, production as prod, story_state, trade, worldevent,
+)
 from bot.game import world as wld
 
 
@@ -144,7 +146,8 @@ def settle(player, tavern, world) -> dict | None:
     top, bidder = lot.get("top_bid"), lot.get("top_bidder")
     tavern.auction = {}
     if top and bidder:
-        gold = int(qty * top * buff.sale_mult(player))  # баф «Барыжья хватка»
+        gold = int(qty * top * buff.sale_mult(player)
+                   * worldevent.sale_mult(player))      # баф + погода (Лихорадка/Буря)
         player.gold += gold
         story_state.adjust_faction(player, "merchants", 1)
         market.add_supply(world, good, int(qty * balance.MARKET_WHOLESALE_WEIGHT))

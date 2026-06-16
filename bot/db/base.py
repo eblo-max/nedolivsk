@@ -238,3 +238,13 @@ async def create_tables() -> None:
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "dm_news BOOLEAN NOT NULL DEFAULT FALSE"
         ))
+        # Мировое событие (погода/экономика): одно активное + кулдаун.
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS event_kind VARCHAR(16)"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS event_until TIMESTAMPTZ"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS event_next_at TIMESTAMPTZ"
+        ))

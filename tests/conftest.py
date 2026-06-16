@@ -7,11 +7,12 @@
 from types import SimpleNamespace
 
 
-def make_player(level=5, equipment=None, gold=0, inventory=None, pid=1, name="Тест"):
+def make_player(level=5, equipment=None, gold=0, inventory=None, pid=1, name="Тест",
+                created_at=None):
     return SimpleNamespace(
         id=pid, first_name=name, level=level, equipment=equipment or {},
         gold=gold, inventory=inventory or {},
-        buff_kind=None, buff_until=None, hp=35, hp_at=None,
+        buff_kind=None, buff_until=None, hp=35, hp_at=None, created_at=created_at,
     )
 
 

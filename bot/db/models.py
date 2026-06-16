@@ -120,6 +120,10 @@ class WorldState(Base):
     media_ids: Mapped[dict] = mapped_column(JSONB, default=dict)
     # Время последней биржевой сводки в чаты (дайджест новых лотов раз в N минут).
     bourse_announced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Мировое событие (погода/экономика): одно активное на весь мир.
+    event_kind: Mapped[str | None] = mapped_column(String(16))
+    event_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    event_next_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class KnownChat(Base):

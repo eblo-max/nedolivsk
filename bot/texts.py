@@ -1103,6 +1103,10 @@ def _world_lines(chat_id, seasonmod, citymod) -> list[str]:
     else:
         w1 = f"{s.emoji} {s.name} — спрос обычный"
     out = [w1]
+    from bot.game import worldevent
+    ev = worldevent.active()
+    if ev is not None:   # активное мировое событие — первым, с таймером
+        out.insert(0, f"{ev.emoji} {ev.name} — ещё {_fmt_left_h(worldevent.active_until())}")
     if wld.is_fair():
         out.append(f"🎪 Ярмарка — ещё {_fmt_minutes(wld.fair_minutes_left())}")
     mood = citymod.cached_mood(chat_id)
@@ -1721,6 +1725,11 @@ def bourse_news(sells: list, buys: list) -> str:
         "🏪 Рынок → 🛒 Купить · 📥 Заявки</i>",
     ]
     return "\n".join(parts)
+
+
+def worldevent_announce(ev) -> str:
+    """Анонс мирового события в чаты/личку (трактирный стиль)."""
+    return f"{ev.emoji} <b>{ev.name.upper()}</b>\n«{ev.blurb}»"
 
 
 def market_pulse_announce(cit) -> str:

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from bot.db.models import Player, Tavern
 from bot.game import (
-    balance, buff, inventory, items, newbie, perks, production, season,
+    balance, buff, inventory, items, newbie, perks, production, season, worldevent,
 )
 
 
@@ -78,6 +78,7 @@ def start_expedition(player: Player, tavern: Tavern, resource: str) -> Expeditio
     player.gold -= pay
     hours = (balance.EXPEDITION_HOURS * items.speed_multiplier(equipment)
              * buff.expedition_speed_mult(player)   # баф «Быстрые ноги»
+             * worldevent.exp_speed_mult(player)    # погода (Вёдро/Ненастье)
              * newbie.speed_mult(player))           # поблажка новичку (с грейс-окном)
     exps.append({
         "resource": resource,
@@ -103,6 +104,7 @@ def claim_expeditions(player: Player) -> list[tuple[str, int, bool]]:
         amount = balance.expedition_yield(resource, level, player.region)
         amount = int(amount * items.yield_multiplier(equipment, resource)
                      * season.yield_mult(resource) * buff.yield_mult(player)
+                     * worldevent.harvest_mult(player)  # погода (Урожай/Стужа/Засуха)
                      * newbie.yield_mult(player))  # поблажка новичку (с грейс-окном)
         luck = (items.combat_stats(equipment)["luck"] + perks.luck_bonus(player)
                 + buff.luck_bonus(player))  # баф «Фартовый день»
@@ -149,7 +151,7 @@ def collect_income(
 
     mult = items.income_multiplier(getattr(player, "equipment", None))
     passive = int(tavern.income_rate * hours * mult * perks.passive_mult(player)
-                  * buff.gold_mult(player))
+                  * buff.gold_mult(player) * worldevent.income_mult(player))
 
     order, premium_unsold = _retail_demand(
         tavern, hours, demand_mult, perks.food_mult(player))
@@ -235,7 +237,8 @@ def retail_total(want: dict | None, player: Player | None = None) -> int:
     совпала с фактически начисленной в apply_retail."""
     base = sum(int(q) * production.GOODS[k].price
                for k, q in (want or {}).items() if k in production.GOODS)
-    return int(base * buff.gold_mult(player)) if player is not None else base
+    return (int(base * buff.gold_mult(player) * worldevent.income_mult(player))
+            if player is not None else base)
 
 
 def apply_retail(player: Player, tavern: Tavern, want: dict | None):
@@ -254,7 +257,7 @@ def apply_retail(player: Player, tavern: Tavern, want: dict | None):
             gold += n * production.GOODS[key].price
     if not sold:
         return {}, 0, 0
-    gold = int(gold * buff.gold_mult(player))  # баф «Бойкая касса»
+    gold = int(gold * buff.gold_mult(player) * worldevent.income_mult(player))
     tavern.products = products
     player.gold += gold
     total = sum(sold.values())

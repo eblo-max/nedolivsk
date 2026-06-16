@@ -12,7 +12,7 @@ import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from bot.game import balance, buff, inventory
+from bot.game import balance, buff, inventory, worldevent
 
 
 def _scaled_inputs(base: dict, level: int) -> dict:
@@ -152,7 +152,7 @@ def _now() -> datetime:
 
 def _ready_at(player, *, hours: float = 0, minutes: float = 0) -> str:
     """Время готовности партии с учётом бафа «Спорая варка» (−20% времени)."""
-    m = buff.prod_speed_mult(player)
+    m = buff.prod_speed_mult(player) * worldevent.prod_speed_mult(player)  # +Ненастье
     return (_now() + timedelta(hours=hours * m, minutes=minutes * m)).isoformat()
 
 

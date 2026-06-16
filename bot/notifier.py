@@ -418,6 +418,34 @@ async def _notify_returned(bot: Bot) -> None:
             world_news.append("🎪 <b>Ярмарка открылась!</b> Спрос на товары взлетел — "
                               "сбывай, пока берут.")
 
+        # Мировое событие (погода/экономика): одно за раз, ~1/сутки. Старт → анонс
+        # в чаты+личку; истекло → снять и назначить кулдаун до следующего.
+        from bot.game import worldevent
+        ev_until = world.event_until
+        if ev_until is not None and ev_until.tzinfo is None:
+            ev_until = ev_until.replace(tzinfo=timezone.utc)
+        ev_next = world.event_next_at
+        if ev_next is not None and ev_next.tzinfo is None:
+            ev_next = ev_next.replace(tzinfo=timezone.utc)
+        cd_hrs = random.uniform(balance.WORLDEVENT_COOLDOWN_MIN_HOURS,
+                                balance.WORLDEVENT_COOLDOWN_MAX_HOURS)
+        if world.event_kind and ev_until is not None and now >= ev_until:
+            world.event_kind = None
+            world.event_until = None
+            world.event_next_at = now + timedelta(hours=cd_hrs)
+        elif not world.event_kind:
+            if ev_next is None:                       # первичная пауза (не палим сразу)
+                world.event_next_at = now + timedelta(hours=cd_hrs)
+            elif now >= ev_next:                      # кулдаун прошёл — катим новое
+                e = worldevent.EVENTS[worldevent.roll()]
+                world.event_kind = e.id
+                world.event_until = now + timedelta(hours=e.hours)
+                world.event_next_at = None
+                txt = texts.worldevent_announce(e)
+                world_news.append(txt)
+                for cid in await repo.all_chat_ids(session):
+                    city_events.append((cid, txt))
+
         # Биржевая сводка: раз в N минут — свежие лоты во все чаты (биржа глобальна).
         # Берём ордера с прошлой сводки, ещё живые на стакане; мгновенно сведённые
         # уже удалены и не попадут. Текст копим — шлём ПОСЛЕ коммита.
@@ -495,6 +523,7 @@ async def _notify_returned(bot: Bot) -> None:
 
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода
+        worldevent.set_active(world.event_kind, world.event_until)  # кэш мир-события
         for city in cities:
             citymod.refresh_cache(city, now)  # кэш ситуаций для экранов
 
