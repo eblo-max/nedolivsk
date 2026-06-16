@@ -942,10 +942,18 @@ async def cb_raid_spawn(cb: CallbackQuery, session: AsyncSession) -> None:
         if sent is not None:
             msgs[str(cid)] = sent.message_id
     boss.messages = msgs  # запоминаем сообщения — нотифаер правит отсчёт/HP
+    raid.set_active(boss.id)  # меню таверны сразу покажет кнопку «Рейд-босс»
+    # Личечным игрокам — пуш-анонс (живой экран откроют кнопкой «Рейд-босс» в меню).
+    from datetime import timedelta
+    cut = _now() - timedelta(days=7)
+    pids = [r[0] for r in (await session.execute(
+        select(Player.id).where(Player.last_seen_at >= cut))).all()]
+    for uid in pids:
+        repo.queue_notify(session, uid, texts.raid_push_dm(boss))
     kb = InlineKeyboardBuilder()
     kb.button(text="🏠 В меню", callback_data="adm:home")
     await _edit(cb, f"⚔️ {spec.emoji} {spec.name} призван — сбор {raid.GATHER_MINUTES} "
-                    f"мин, разослан в {len(msgs)} из {len(chat_ids)} чатов.", kb)
+                    f"мин. В чаты: {len(msgs)}/{len(chat_ids)}. Пуш в личку: {len(pids)}.", kb)
     await cb.answer("Босс призван! Идёт сбор.")
 
 
@@ -957,6 +965,7 @@ async def cb_raid_kill(cb: CallbackQuery, session: AsyncSession) -> None:
     if boss is not None:
         boss.status = "expired"
         _alog(cb, session, f"⚔️ снят рейд-босс {boss.boss_key}")
+    raid.set_active(None)  # убрать кнопку «Рейд-босс» из меню
     await cb.answer("Босс снят.")
     await cb_raid_menu(cb, session)
 

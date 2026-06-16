@@ -96,6 +96,21 @@ def _drop_apply(winner, drop: dict | None) -> str:
     return ""
 
 
+@router.callback_query(F.data == "raidopen")
+async def cb_raid_open(cb: CallbackQuery, session: AsyncSession) -> None:
+    """Открыть экран рейда из меню (личечные игроки): свежий панель-ролик по тапу."""
+    boss = await repo.get_active_raid(session)
+    if boss is None:
+        await cb.answer("Рейд уже закончился — в другой раз!", show_alert=True)
+        return
+    if boss.status == "gathering":
+        caption, markup = texts.raid_gather_screen(boss), raid_gather_kb(boss.id)
+    else:
+        caption, markup = texts.raid_screen(boss), raid_kb(boss.id)
+    await send_raid_announce(cb.bot, cb.message.chat.id, boss, caption, markup)
+    await cb.answer()
+
+
 @router.callback_query(F.data.startswith("raidref:"))
 async def cb_raid_refresh(cb: CallbackQuery, session: AsyncSession) -> None:
     boss = await repo.get_raid(session, int(cb.data.split(":", 1)[1]))
@@ -194,6 +209,7 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
     # Фиксируем награды и ОТПУСКАЕМ локи (босс/игроки) ДО сетевых правок в Telegram —
     # иначе чужие клики «Бить» ждут весь цикл рассылки (как в hunt.py перед анимацией).
     await session.commit()
+    raid.set_active(None)  # босс мёртв — убрать кнопку «Рейд-босс» из меню
     await cb.answer("💀 БОСС ПОВЕРЖЕН!", show_alert=True)
     # Правим анонс во ВСЕХ чатах, где висел босс: экран победы, кнопки убираем
     # (иначе в других чатах осталась бы живая «Бить» по мёртвому боссу). Без спама

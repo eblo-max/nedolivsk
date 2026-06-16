@@ -348,7 +348,8 @@ async def _notify_returned(bot: Bot) -> None:
         # (messages, text, markup|None, is_video) — видео правим подписью, текст текстом
         raid_edits: list[tuple[dict, str, object, bool]] = []
         from bot import images as imgmod
-        for boss in await repo.live_raids(session):
+        live_raids = await repo.live_raids(session)
+        for boss in live_raids:
             spec = raidmod.BOSSES.get(boss.boss_key)
             if spec is None:
                 continue
@@ -377,6 +378,9 @@ async def _notify_returned(bot: Bot) -> None:
                 boss.status = "expired"                      # не добили — ушёл
                 raid_edits.append((dict(boss.messages or {}),
                                    texts.raid_expired(boss), None, is_vid))
+        # Кэш для кнопки «Рейд-босс» в меню: какой босс ещё жив (или None).
+        raidmod.set_active(next(
+            (b.id for b in live_raids if b.status in ("gathering", "active")), None))
 
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
 

@@ -67,11 +67,14 @@ def regions_kb() -> InlineKeyboardMarkup:
 
 
 def tavern_kb(player: Player) -> InlineKeyboardMarkup:
-    from bot.game import buff, newbie, story_state
+    from bot.game import buff, newbie, raid as raidmod, story_state
 
     kb = InlineKeyboardBuilder()
     sizes: list[int] = []
 
+    if raidmod.active_id() is not None:  # идёт глобальный рейд-босс — в бой!
+        kb.button(text="⚔️ РЕЙД-БОСС — В БОЙ!", callback_data="raidopen", style="danger")
+        sizes.append(1)
     if newbie.visible(player, player.tavern):  # грамота новосёла (до ур.2)
         ready = newbie.claimable(player, player.tavern)
         kb.button(text="📜 Грамота новосёла 🎁" if ready else "📜 Грамота новосёла",

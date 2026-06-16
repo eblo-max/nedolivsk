@@ -81,6 +81,20 @@ BOSSES: dict[str, Boss] = {
 }
 
 
+# Лёгкий кэш «есть ли живой рейд» — чтобы меню таверны рисовало кнопку без
+# запроса к БД на каждый рендер. Ставит спавн (сразу) и нотифаер (раз в тик).
+_active_raid_id: int | None = None
+
+
+def set_active(raid_id: int | None) -> None:
+    global _active_raid_id
+    _active_raid_id = raid_id
+
+
+def active_id() -> int | None:
+    return _active_raid_id
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
