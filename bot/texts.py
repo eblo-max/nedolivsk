@@ -1673,24 +1673,34 @@ def trade_cancelled() -> str:
 
 
 def bourse_news(sells: list, buys: list) -> str:
-    """Сводка свежих лотов биржи в чаты. sells/buys: [(good, qty, price)]."""
+    """Сводка свежих лотов биржи в чаты (верстка как на главном экране).
+    sells/buys: [(good, qty, price)]."""
     from bot.game import production as prod
 
-    def fmt(items: list) -> str:
-        parts = []
-        for good, qty, price in items:
-            g = prod.GOODS.get(good)
-            nm = f"{g.emoji} {g.name}" if g else good
-            parts.append(f"{nm} ×{qty} по {price}🪙")
-        return " · ".join(parts)
+    def line(good: str, qty: int, price: int) -> str:
+        g = prod.GOODS.get(good)
+        nm = f"{g.emoji} {g.name}" if g else good
+        return f"└ {nm} ×{qty} — по {price}🪙"
 
-    lines = ["🆕 <b>Биржа Недоливска — свежие лоты:</b>"]
+    parts = [
+        "🪙 <b>БИРЖА НЕДОЛИВСКА</b>",
+        "свежий товар на торгу",
+        "",
+        _HRULE,
+    ]
     if sells:
-        lines.append(f"📤 Продают: {fmt(sells)}")
+        parts.append("<b>НЕСУТ НА ПРОДАЖУ</b>")
+        parts += [line(*s) for s in sells]
     if buys:
-        lines.append(f"📣 Скупают: {fmt(buys)}")
-    lines.append("<i>Биржа в таверне (🏪 Рынок → 🛒/📥) — налетай, пока не разобрали!</i>")
-    return "\n".join(lines)
+        parts.append("<b>СКУПАЮТ НА КОРНЮ</b>")
+        parts += [line(*b) for b in buys]
+    parts += [
+        _HRULE,
+        "",
+        "<i>Кто проворен — при барыше, кто зевает — глотает пыль.\n"
+        "🏪 Рынок → 🛒 Купить · 📥 Заявки</i>",
+    ]
+    return "\n".join(parts)
 
 
 def market_pulse_announce(cit) -> str:
