@@ -9,7 +9,6 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import effects, texts
 from bot.db import repo
 from bot.game import inventory, loot
 
@@ -38,7 +37,6 @@ async def cb_loot(callback: CallbackQuery, session: AsyncSession) -> None:
         else:
             stored = False  # выиграл ресурс, но кабака нет — некуда деть
 
-    name = callback.from_user.first_name or "Кто-то"
     if out["kind"] == "resource":
         from bot.game import balance
         what = f"{out['qty']}× {balance.RESOURCE_NAMES.get(out['res'], out['res'])}"
@@ -47,12 +45,10 @@ async def cb_loot(callback: CallbackQuery, session: AsyncSession) -> None:
     else:
         what = "хлам"
     repo.add_log(session, "player", callback.from_user.id, f"🤲 поднял подкидыш: {what}")
-    try:  # подкидыш — текстовое сообщение бота, правим на месте
-        await callback.message.edit_text(texts.loot_claimed(name, out, stored),
-                                          reply_markup=None)
+    try:  # подобрали — убираем сообщение из чата (анти-флуд)
+        await callback.message.delete()
     except TelegramBadRequest:
         pass
-    await effects.react_msg(callback.message, "🔥")  # 👀 → 🔥: добычу урвали
 
     if out["kind"] == "resource" and stored:
         await callback.answer(f"+{out['qty']} на склад!")

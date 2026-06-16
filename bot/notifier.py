@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from aiogram import Bot
 from sqlalchemy import func, select
 
-from bot import announce, effects, panels, texts
+from bot import announce, autoclean, effects, panels, texts
 from bot.db import repo
 from bot.db.base import session_factory
 from bot.handlers import common
@@ -46,6 +46,9 @@ async def _notify(bot: Bot, player: Player, text: str, markup) -> None:
             what=f"увед→чат{player.chat_id}")
         if msg is not None:
             panels.claim(msg, player.id)  # кнопку жмёт только владелец
+            # Личное уведомление в общий чат гасим через 5 мин (анти-флуд): клик
+            # владельца продлит его как обычную панель (PanelGuard).
+            autoclean.schedule_message(msg, after=300)
             return
         # в чат не ушло (бота нет/чат удалён) — пробуем личку
     await deliver(lambda: bot.send_message(player.id, text, reply_markup=markup),
@@ -539,11 +542,13 @@ async def _notify_returned(bot: Bot) -> None:
                 what=f"ситуация→{chat_id}")
             await effects.react_msg(msg, "🔥")  # «жизнь» городу
         # Биржевая сводка (после коммита): свежие лоты — во все чаты.
+        # Гасим через 10 мин (анти-флуд): следующая сводка всё равно свежее.
         if bourse_news_text:
             for chat_id in await repo.all_chat_ids(session):
-                await deliver(
+                msg = await deliver(
                     lambda cid=chat_id, t=bourse_news_text: bot.send_message(cid, t),
                     what=f"биржа→{chat_id}")
+                autoclean.schedule_message(msg, after=600)
         # Подкидыш — постим после коммита (строка уже сохранена, id известен).
         orphaned: list[int] = []
         for chat_id, drop_id in loot_to_post:
@@ -556,6 +561,9 @@ async def _notify_returned(bot: Bot) -> None:
                 orphaned.append(drop_id)  # не блокируем чат осиротевшей строкой
             else:
                 await effects.react_msg(msg, "👀")  # «ой, что-то упало»
+                # Не подобрали за срок жизни — гасим (мёртвая кнопка не висит).
+                autoclean.schedule_message(
+                    msg, after=balance.LOOT_EXPIRE_MINUTES * 60)
         if orphaned:
             for drop_id in orphaned:
                 await repo.delete_loot(session, drop_id)

@@ -22,25 +22,28 @@ DELETE_AFTER_SECONDS = 120
 _tasks: dict[tuple[int, int], asyncio.Task] = {}
 
 
-def schedule(bot: Bot, chat_id: int, message_id: int) -> None:
-    """Запланировать удаление сообщения; повторный вызов сбрасывает отсчёт."""
+def schedule(bot: Bot, chat_id: int, message_id: int,
+             after: int = DELETE_AFTER_SECONDS) -> None:
+    """Запланировать удаление сообщения через `after` сек; повтор сбрасывает отсчёт."""
     key = (chat_id, message_id)
     old = _tasks.get(key)
     if old is not None and not old.done():
         old.cancel()
-    _tasks[key] = asyncio.create_task(_delete_later(bot, chat_id, message_id))
+    _tasks[key] = asyncio.create_task(_delete_later(bot, chat_id, message_id, after))
 
 
-def schedule_message(message: Message | None) -> None:
+def schedule_message(message: Message | None,
+                     after: int = DELETE_AFTER_SECONDS) -> None:
     """То же, но из объекта сообщения и только для общих чатов."""
     if message is not None and panels.is_group(message):
-        schedule(message.bot, message.chat.id, message.message_id)
+        schedule(message.bot, message.chat.id, message.message_id, after)
 
 
-async def _delete_later(bot: Bot, chat_id: int, message_id: int) -> None:
+async def _delete_later(bot: Bot, chat_id: int, message_id: int,
+                        after: int = DELETE_AFTER_SECONDS) -> None:
     key = (chat_id, message_id)
     try:
-        await asyncio.sleep(DELETE_AFTER_SECONDS)
+        await asyncio.sleep(after)
         try:
             await bot.delete_message(chat_id, message_id)
         except Exception:  # noqa: BLE001 — уже удалено / нет прав / бота кикнули
