@@ -49,6 +49,15 @@ async def count_known_chats(session: AsyncSession) -> int:
     return await session.scalar(select(func.count(KnownChat.chat_id))) or 0
 
 
+async def bourse_orders_since(session: AsyncSession, since, limit: int = 200):
+    """Ордера биржи, созданные позже `since` и ещё живые на стакане (для сводки
+    в чаты). Мгновенно заматчившиеся уже удалены — в выборку не попадут."""
+    return list((await session.execute(
+        select(MarketOrder).where(MarketOrder.created_at > since)
+        .order_by(MarketOrder.created_at).limit(limit)
+    )).scalars().all())
+
+
 # ── Рейд-босс (глобальный, один активный) ───────────────────────────────────
 async def get_active_raid(
     session: AsyncSession, *, lock: bool = False

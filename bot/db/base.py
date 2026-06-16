@@ -224,3 +224,7 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE notifications ALTER COLUMN text TYPE VARCHAR(1024)"
         ))
+        # Биржевая сводка новых лотов в чаты — метка времени последней рассылки.
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS bourse_announced_at TIMESTAMPTZ"
+        ))

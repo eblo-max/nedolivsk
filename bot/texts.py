@@ -1672,6 +1672,27 @@ def trade_cancelled() -> str:
     return "Передумал продавать — купец пожал плечами и потопал дальше."
 
 
+def bourse_news(sells: list, buys: list) -> str:
+    """Сводка свежих лотов биржи в чаты. sells/buys: [(good, qty, price)]."""
+    from bot.game import production as prod
+
+    def fmt(items: list) -> str:
+        parts = []
+        for good, qty, price in items:
+            g = prod.GOODS.get(good)
+            nm = f"{g.emoji} {g.name}" if g else good
+            parts.append(f"{nm} ×{qty} по {price}🪙")
+        return " · ".join(parts)
+
+    lines = ["🆕 <b>Биржа Недоливска — свежие лоты:</b>"]
+    if sells:
+        lines.append(f"📤 Продают: {fmt(sells)}")
+    if buys:
+        lines.append(f"📣 Скупают: {fmt(buys)}")
+    lines.append("<i>Биржа в таверне (🏪 Рынок → 🛒/📥) — налетай, пока не разобрали!</i>")
+    return "\n".join(lines)
+
+
 def market_pulse_announce(cit) -> str:
     """Анонс в чат: горожанин качнул рынок своими делами."""
     good, delta, verb = cit.pulse

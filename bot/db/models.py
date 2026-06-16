@@ -116,6 +116,8 @@ class WorldState(Base):
     # Кэш Telegram file_id статичных картинок/видео: {"имя:размер": file_id}.
     # Переживает деплой (ФС Railway эфемерна) → медиа не грузятся заново каждый раз.
     media_ids: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Время последней биржевой сводки в чаты (дайджест новых лотов раз в N минут).
+    bourse_announced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class KnownChat(Base):

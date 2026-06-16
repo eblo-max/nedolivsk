@@ -397,6 +397,32 @@ async def _notify_returned(bot: Bot) -> None:
                 city_events.append((cid, texts.market_pulse_announce(cit)))
                 await repo.add_chronicle(session, cid, texts.market_pulse_chron(cit))
 
+        # Биржевая сводка: раз в N минут — свежие лоты во все чаты (биржа глобальна).
+        # Берём ордера с прошлой сводки, ещё живые на стакане; мгновенно сведённые
+        # уже удалены и не попадут. Текст копим — шлём ПОСЛЕ коммита.
+        bourse_news_text = None
+        bdelta = timedelta(minutes=balance.BOURSE_DIGEST_MINUTES)
+        blast = world.bourse_announced_at
+        if blast is not None and blast.tzinfo is None:
+            blast = blast.replace(tzinfo=timezone.utc)
+        if blast is None or now - blast >= bdelta:
+            orders = await repo.bourse_orders_since(session, blast or (now - bdelta))
+            world.bourse_announced_at = now
+            agg: dict[str, dict[str, list]] = {"sell": {}, "buy": {}}
+            for o in orders:
+                side = o.side if o.side in ("sell", "buy") else "sell"
+                cur = agg[side].get(o.good)
+                if cur is None:
+                    agg[side][o.good] = [o.qty, o.unit_price]
+                else:
+                    cur[0] += o.qty
+                    cur[1] = (min(cur[1], o.unit_price) if side == "sell"
+                              else max(cur[1], o.unit_price))
+            sells = [(g, v[0], v[1]) for g, v in list(agg["sell"].items())[:6]]
+            buys = [(g, v[0], v[1]) for g, v in list(agg["buy"].items())[:6]]
+            if sells or buys:
+                bourse_news_text = texts.bourse_news(sells, buys)
+
         # Симуляция фракций — по чатам (фракции/ситуации остаются ЛОКАЛЬНЫМИ).
         for city in cities:
             for kind, sit in citymod.advance(city, now):
@@ -495,6 +521,12 @@ async def _notify_returned(bot: Bot) -> None:
                 lambda cid=chat_id, t=text: bot.send_message(cid, t),
                 what=f"ситуация→{chat_id}")
             await effects.react_msg(msg, "🔥")  # «жизнь» городу
+        # Биржевая сводка (после коммита): свежие лоты — во все чаты.
+        if bourse_news_text:
+            for chat_id in await repo.all_chat_ids(session):
+                await deliver(
+                    lambda cid=chat_id, t=bourse_news_text: bot.send_message(cid, t),
+                    what=f"биржа→{chat_id}")
         # Подкидыш — постим после коммита (строка уже сохранена, id известен).
         orphaned: list[int] = []
         for chat_id, drop_id in loot_to_post:
