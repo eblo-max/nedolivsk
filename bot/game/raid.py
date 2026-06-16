@@ -34,6 +34,7 @@ class Boss:
     gear_pool: tuple        # из каких предметов может выпасть снаряга с этого босса
     gear_tier_weights: tuple = (80, 18, 2)   # веса ярусов ★/★★/★★★ выпавшей снаряги
     cooldown_min: int = 6   # пауза между ударами одного игрока
+    armor: int = 0          # «толща» босса: гасит часть урона за удар (max(1, dmg-armor))
     video: str = ""         # имя ролика в assets/<video>.mp4 (анонс-видео); "" = текст
 
 
@@ -61,7 +62,7 @@ BOSSES: dict[str, Boss] = {
         (("res:grain", 520, ("grain", 20, 40)), ("res:hops", 320, ("hops", 15, 30)),
          ("gold", 145, (60, 120)), ("gear", 15, None)),
         gear_pool=("rat_crown", "rat_pelt", "rat_tail"),
-        gear_tier_weights=(82, 16, 2), cooldown_min=5, video="rat_king"),
+        gear_tier_weights=(82, 16, 2), cooldown_min=5, armor=3, video="rat_king"),
     "bog_troll": Boss(
         "bog_troll", "👹", "Болотный Тролль", 180, 700, 900,
         "Гора смрадного мяса по пояс в тине. Каждый шаг — как телега с навозом, "
@@ -69,7 +70,7 @@ BOSSES: dict[str, Boss] = {
         (("res:ore", 480, ("ore", 25, 50)), ("ingot", 300, (10, 20)),
          ("gold", 185, (150, 300)), ("gear", 35, None)),
         gear_pool=("troll_club", "troll_hide", "troll_eye"),
-        gear_tier_weights=(50, 42, 8), cooldown_min=6, video="bog_troll"),
+        gear_tier_weights=(50, 42, 8), cooldown_min=6, armor=8, video="bog_troll"),
     "dragon": Boss(
         "dragon", "🐲", "Древний Змей", 350, 1800, 2600,
         "Древний, злой и голодный до золота. Накроет тенью пол-Недоливска, дохнёт "
@@ -77,7 +78,7 @@ BOSSES: dict[str, Boss] = {
         (("ingot", 480, (25, 45)), ("res:honey", 300, ("honey", 30, 60)),
          ("gold", 150, (300, 600)), ("gear", 70, None)),
         gear_pool=("dragon_fang", "dragon_scale", "dragon_heart"),
-        gear_tier_weights=(14, 50, 36), cooldown_min=7, video="dragon"),
+        gear_tier_weights=(14, 50, 36), cooldown_min=7, armor=15, video="dragon"),
 }
 
 
@@ -160,6 +161,12 @@ def cooldown_left(boss, player_id: int, now: datetime | None = None) -> int:
     except (ValueError, TypeError):
         return 0
     return max(0, int(cd - (now or _now()).timestamp() + last.timestamp()))
+
+
+def mitigate(boss_key: str, raw: int) -> int:
+    """Срезать «толщей» босса: max(1, урон − броня). Слабый бьёт еле-еле,
+    снаряга/уровень — решают. Урон всегда ≥1 (чтоб не было нулевых ударов)."""
+    return max(1, raw - BOSSES[boss_key].armor)
 
 
 def apply_hit(boss, player, dmg: int, now: datetime | None = None) -> None:

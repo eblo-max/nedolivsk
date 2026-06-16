@@ -177,7 +177,8 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.answer(f"Переведи дух — удар через {left // 60 + 1} мин.", show_alert=True)
         return
 
-    dmg, crit = raid.player_damage(player)
+    raw, crit = raid.player_damage(player)
+    dmg = raid.mitigate(boss.boss_key, raw)   # «толща» босса гасит часть урона
     raid.apply_hit(boss, player, dmg, now)
     repo.add_log(session, "player", player.id, f"⚔️ рейд: −{dmg} HP боссу")
 
@@ -186,7 +187,8 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
         # сообщения/ответа (429, «query too old») откатил бы записанный удар.
         await session.commit()
         await _render(cb, boss)
-        await _safe_answer(cb, texts.raid_hit_toast(dmg, crit, boss.hp, boss.max_hp))
+        await _safe_answer(
+            cb, texts.raid_hit_toast(dmg, crit, boss.hp, boss.max_hp, soaked=raw - dmg))
         return
 
     # ── Босс повержен: раздаём награду ──

@@ -2509,8 +2509,11 @@ def raid_screen(boss) -> str:
         f"«{spec.blurb}»",
         "",
         f"{raid.hp_bar(boss.hp, boss.max_hp)}  {pct}%",
-        f"❤️ {max(0, boss.hp)} / {boss.max_hp} HP",
+        f"❤️ {max(0, boss.hp)} / {boss.max_hp} HP · 🛡 броня {spec.armor}",
         f"⚔️ В деле: {fighters} · ⏳ уйдёт через {_fmt_left_h(boss.ends_at)}",
+        "",
+        "<i>🛡 Толстая шкура гасит удар — голыми руками еле царапнёшь. "
+        "Снаряга и уровень бьют по-настоящему.</i>",
         "",
         "<i>⚔️ Лупи по «Бить» и не отлынивай — кто в деле, тот и в доле! Завалим "
         "всем миром: золото разделим меж бойцов, а кому-то одному с туши падёт "
@@ -2519,9 +2522,10 @@ def raid_screen(boss) -> str:
     ])
 
 
-def raid_hit_toast(dmg: int, crit: bool, hp: int, max_hp: int) -> str:
+def raid_hit_toast(dmg: int, crit: bool, hp: int, max_hp: int, soaked: int = 0) -> str:
     head = f"💥 КРИТ! −{dmg} HP" if crit else f"🗡 −{dmg} HP"
-    return f"{head} · у босса осталось {max(0, hp)}/{max_hp}"
+    soak = f" (🛡 −{soaked} в броню)" if soaked > 0 else ""
+    return f"{head}{soak} · у босса осталось {max(0, hp)}/{max_hp}"
 
 
 def raid_dead(boss, top: list, winner_name: str | None, drop_line: str) -> str:
