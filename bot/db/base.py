@@ -233,3 +233,8 @@ async def create_tables() -> None:
             "ALTER TABLE raid_boss ADD COLUMN IF NOT EXISTS "
             "state JSONB NOT NULL DEFAULT '{}'::jsonb"
         ))
+        # Одиночке — вести мира в ЛС (опционально).
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "dm_news BOOLEAN NOT NULL DEFAULT FALSE"
+        ))

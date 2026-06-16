@@ -394,6 +394,7 @@ async def _notify_returned(bot: Bot) -> None:
             (b.id for b in live_raids if b.status in ("gathering", "active")), None))
 
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
+        world_news: list[str] = []  # глобальные вести для DM-дайджеста одиночкам
 
         # ЕДИНЫЙ рынок: масштаб (число активных чатов) для адаптивных порогов цены,
         # затем впитывание перекоса + редкий пульс — двигает цену всего мира сразу.
@@ -404,9 +405,18 @@ async def _notify_returned(bot: Bot) -> None:
             cit = npc.random_pulser()
             good, delta, _verb = cit.pulse
             marketmod.nudge(world, good, delta)
+            world_news.append(texts.market_pulse_announce(cit))
             for cid in await repo.all_chat_ids(session):
                 city_events.append((cid, texts.market_pulse_announce(cit)))
                 await repo.add_chronicle(session, cid, texts.market_pulse_chron(cit))
+        # Глобальные события — и в DM-дайджест одиночкам (сезон/праздник/ярмарка).
+        if season_changed:
+            world_news.append(texts.season_announce(season.SEASONS[cur_season]))
+        if holiday_new:
+            world_news.append(texts.holiday_announce(hol))
+        if fair_event == "open":
+            world_news.append("🎪 <b>Ярмарка открылась!</b> Спрос на товары взлетел — "
+                              "сбывай, пока берут.")
 
         # Биржевая сводка: раз в N минут — свежие лоты во все чаты (биржа глобальна).
         # Берём ордера с прошлой сводки, ещё живые на стакане; мгновенно сведённые
@@ -463,6 +473,19 @@ async def _notify_returned(bot: Bot) -> None:
                 continue
             drop = await repo.create_loot(session, chat_id)
             loot_to_post.append((chat_id, drop.id))
+        # Подкидыш одиночкам (без группы, активным за сутки) — персонально в ЛС.
+        dm_loot_to_post: list[tuple[int, int]] = []
+        solo_cut = now - timedelta(days=1)
+        solo_ids = [r[0] for r in (await session.execute(
+            select(Player.id).where(Player.chat_id.is_(None),
+                                    Player.last_seen_at >= solo_cut))).all()]
+        for uid in solo_ids:
+            if random.random() >= balance.LOOT_DROP_CHANCE:
+                continue
+            if await repo.has_active_loot(session, uid):
+                continue
+            drop = await repo.create_loot(session, uid)
+            dm_loot_to_post.append((uid, drop.id))
 
         # Сброс новых file_id медиа в БД (переживут деплой → без повторной загрузки).
         pending = common.pending_file_ids()
@@ -564,6 +587,29 @@ async def _notify_returned(bot: Bot) -> None:
                 # Не подобрали за срок жизни — гасим (мёртвая кнопка не висит).
                 autoclean.schedule_message(
                     msg, after=balance.LOOT_EXPIRE_MINUTES * 60)
+        # Подкидыш одиночкам — в их ЛС (на пикапе удаляется, иначе гаснет по сроку).
+        for uid, drop_id in dm_loot_to_post:
+            drop_text = texts.loot_drop(loot.flavor())
+            msg = await deliver(
+                lambda u=uid, did=drop_id, t=drop_text: bot.send_message(
+                    u, t, reply_markup=loot_kb(did)),
+                what=f"подкидыш-лс→{uid}")
+            if msg is None:
+                orphaned.append(drop_id)
+            else:
+                autoclean.schedule(bot, uid, msg.message_id,
+                                   after=balance.LOOT_EXPIRE_MINUTES * 60)
+        # Вести мира — в ЛС одиночкам, кто включил (активным за неделю), одним письмом.
+        if world_news:
+            news_cut = now - timedelta(days=7)
+            news_ids = [r[0] for r in (await session.execute(
+                select(Player.id).where(
+                    Player.chat_id.is_(None), Player.dm_news.is_(True),
+                    Player.last_seen_at >= news_cut))).all()]
+            digest = "🌍 <b>ВЕСТИ ИЗ НЕДОЛИВСКА</b>\n\n" + "\n\n".join(world_news)
+            for uid in news_ids:
+                await deliver(lambda u=uid, t=digest: bot.send_message(u, t),
+                              what=f"вести-лс→{uid}")
         if orphaned:
             for drop_id in orphaned:
                 await repo.delete_loot(session, drop_id)

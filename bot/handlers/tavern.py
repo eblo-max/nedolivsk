@@ -70,6 +70,19 @@ async def cb_tavern(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "dmnews")
+async def cb_dmnews(callback: CallbackQuery, session: AsyncSession) -> None:
+    """Одиночка переключает вести мира в ЛС (подкидыши и так шлём всем без группы)."""
+    player = await _get_player(callback, session, lock=True)
+    if player is None:
+        return
+    player.dm_news = not bool(player.dm_news)
+    await _show_tavern(callback, player)
+    await callback.answer(
+        "🌍 Вести мира теперь приходят в ЛС!" if player.dm_news
+        else "Вести мира в ЛС выключены.", show_alert=True)
+
+
 @router.callback_query(F.data == "newbie")
 async def cb_newbie(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _get_player(callback, session)

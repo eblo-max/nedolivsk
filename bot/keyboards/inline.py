@@ -75,6 +75,11 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     if raidmod.active_id() is not None:  # идёт глобальный рейд-босс — в бой!
         kb.button(text="⚔️ РЕЙД-БОСС — В БОЙ!", callback_data="raidopen", style="danger")
         sizes.append(1)
+    if player.chat_id is None:  # одиночка — переключатель вестей мира в ЛС
+        on = getattr(player, "dm_news", False)
+        kb.button(text=f"🌍 Вести мира в ЛС: {'✅' if on else '❌'}",
+                  callback_data="dmnews")
+        sizes.append(1)
     if newbie.visible(player, player.tavern):  # грамота новосёла (до ур.2)
         ready = newbie.claimable(player, player.tavern)
         kb.button(text="📜 Грамота новосёла 🎁" if ready else "📜 Грамота новосёла",
