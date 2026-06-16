@@ -21,7 +21,7 @@ RESOURCE_NAMES = {
 }
 RESOURCE_EMOJI = {
     "wood": "🪵", "grain": "🌾", "hops": "🌿", "water": "💧", "honey": "🍯",
-    "berries": "🍒", "game": "🥩", "ore": "⛏", "clay": "🟤", "herbs": "🌶",
+    "berries": "🍒", "game": "🥩", "ore": "⛏️", "clay": "🟤", "herbs": "🌶️",
     "salt": "🧂", "fish": "🐟", "milk": "🥛", "stone": "🪨",
 }
 
