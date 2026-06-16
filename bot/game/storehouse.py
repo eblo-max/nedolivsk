@@ -26,7 +26,7 @@ SPRITES = {
     "wood": "derevo", "grain": "zerno", "hops": "xmel", "water": "voda",
     "honey": "med", "berries": "yagodi", "game": "dich", "ore": "ruda",
     "clay": "glina", "herbs": "trava",
-    "salt": "sol", "fish": "ryba", "milk": "moloko", "stone": "kamen",
+    "salt": "salt", "fish": "ryba", "milk": "moloko", "stone": "kamen",
 }
 _sprite_cache: dict[str, "Image.Image | None"] = {}
 
@@ -49,12 +49,12 @@ def _sprite(res: str) -> "Image.Image | None":
 # Ячейки (x1, y1, x2, y2) на фоне 1024×1024 — нижняя половина каждой клетки
 # (под впечатанной подписью), 5 столбцов × 3 строки.
 CELLS = {
-    1: (172, 372, 289, 470), 2: (313, 372, 430, 470), 3: (454, 372, 571, 470),
-    4: (595, 372, 712, 470), 5: (736, 372, 853, 470),
-    6: (172, 562, 289, 660), 7: (313, 562, 430, 660), 8: (454, 562, 571, 660),
-    9: (595, 562, 712, 660), 10: (736, 562, 853, 660),
-    11: (172, 752, 289, 850), 12: (313, 752, 430, 850), 13: (454, 752, 571, 850),
-    14: (595, 752, 712, 850), 15: (736, 752, 853, 850),
+    1: (164, 329, 281, 445), 2: (297, 329, 425, 445), 3: (441, 329, 584, 445),
+    4: (600, 329, 728, 445), 5: (744, 329, 860, 445),
+    6: (164, 532, 281, 648), 7: (297, 532, 425, 648), 8: (441, 532, 584, 648),
+    9: (600, 532, 728, 648), 10: (744, 532, 860, 648),
+    11: (164, 736, 281, 856), 12: (297, 736, 425, 856), 13: (441, 736, 584, 856),
+    14: (600, 736, 728, 856), 15: (744, 736, 860, 856),
 }
 # Ячеек хватает на все ресурсы — overflow в текст больше не нужен.
 SHOWN_RESOURCES = RESOURCES[:len(CELLS)]
@@ -125,8 +125,8 @@ def render(inventory: dict | None) -> bytes:
         qf = _fit_font(d, qty, w - 6, 30, 14, bold=True)
         l, t, r, b = d.textbbox((0, 0), qty, font=qf)
         num_w, num_h = r - l, b - t
-        ih_max = h - num_h - gap - 4     # высота под иконку (остаток после числа)
-        scale = min((w - 12) / sprite.width, ih_max / sprite.height)
+        ih_max = h - num_h - gap         # высота под иконку (остаток после числа)
+        scale = min((w - 6) / sprite.width, ih_max / sprite.height)
         sp = sprite.resize(
             (max(1, int(sprite.width * scale)), max(1, int(sprite.height * scale))),
             Image.Resampling.LANCZOS)
