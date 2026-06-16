@@ -1,8 +1,10 @@
-"""Рендер складской ведомости: вписывает ресурсы и их количество в ячейки
-картинки assets/tablica.png (5×2 = 10 ячеек, по числу ресурсов Яруса 0).
+"""Рендер складской ведомости: вписывает КОЛИЧЕСТВО в ячейки картинки
+assets/tablica.png (5×3 = 15 ячеек). Названия ресурсов и иконки — уже на самой
+картинке (впечатаны), код рисует только число под подписью.
 
-Ячейка i (1..10) ← ресурс i из balance.RESOURCES. Кэш потокобезопасный
-(render крутится в asyncio.to_thread, на складе бывает много игроков).
+Ячейка i (1..14) ← ресурс i из balance.RESOURCES (порядок совпадает с подписями
+на картинке). 15-я ячейка — запасная (пустая). Кэш потокобезопасный (render
+крутится в asyncio.to_thread, на складе бывает много игроков).
 """
 
 import io
@@ -12,49 +14,25 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from bot.game.balance import RESOURCE_NAMES, RESOURCES
+from bot.game.balance import RESOURCES
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
 BG_FILE = ASSETS_DIR / "tablica.png"
-RESURS_DIR = ASSETS_DIR / "resurs"
 
-# id ресурса -> имя файла иконки (assets/resurs/<name>.png, прозрачный фон)
-SPRITES = {
-    "wood": "derevo", "grain": "zerno", "hops": "xmel", "water": "voda",
-    "honey": "med", "berries": "yagodi", "game": "dich", "ore": "ruda",
-    "clay": "glina", "herbs": "trava",
-}
-_sprite_cache: dict[str, "Image.Image | None"] = {}
-
-
-def _sprite(res: str) -> "Image.Image | None":
-    """Иконка ресурса, обрезанная по непрозрачной области. Кэшируется."""
-    if res in _sprite_cache:
-        return _sprite_cache[res]
-    name = SPRITES.get(res)
-    p = RESURS_DIR / f"{name}.png" if name else None
-    img = None
-    if p and p.is_file():
-        im = Image.open(p).convert("RGBA")
-        solid = im.getchannel("A").point(lambda v: 255 if v > 40 else 0)
-        bbox = solid.getbbox()
-        img = im.crop(bbox) if bbox else im
-    _sprite_cache[res] = img
-    return img
-
-# Ячейки (x1, y1, x2, y2) на фоне 1024x1024 — сняты автодетектом по заливке.
+# Ячейки (x1, y1, x2, y2) на фоне 1024×1024 — нижняя половина каждой клетки
+# (под впечатанной подписью), 5 столбцов × 3 строки.
 CELLS = {
-    1: (210, 402, 288, 513), 2: (336, 402, 423, 513), 3: (468, 402, 552, 513),
-    4: (600, 402, 687, 513), 5: (738, 402, 812, 513),
-    6: (210, 590, 288, 695), 7: (336, 590, 423, 695), 8: (468, 590, 552, 695),
-    9: (600, 590, 687, 695), 10: (738, 590, 812, 695),
+    1: (172, 391, 289, 480), 2: (313, 391, 430, 480), 3: (454, 391, 571, 480),
+    4: (595, 391, 712, 480), 5: (736, 391, 853, 480),
+    6: (172, 581, 289, 671), 7: (313, 581, 430, 671), 8: (454, 581, 571, 671),
+    9: (595, 581, 712, 671), 10: (736, 581, 853, 671),
+    11: (172, 772, 289, 861), 12: (313, 772, 430, 861), 13: (454, 772, 571, 861),
+    14: (595, 772, 712, 861), 15: (736, 772, 853, 861),
 }
-# На картинке-ведомости только len(CELLS) ячеек. Ресурсы сверх — показываем
-# текстом в подписи к складу (см. texts.storehouse_caption).
+# Ячеек хватает на все ресурсы — overflow в текст больше не нужен.
 SHOWN_RESOURCES = RESOURCES[:len(CELLS)]
 OVERFLOW_RESOURCES = RESOURCES[len(CELLS):]
 
-NAME_COLOR = (70, 40, 12)
 QTY_COLOR = (120, 45, 18)
 
 _CACHE_MAX = 32
@@ -106,29 +84,11 @@ def render(inventory: dict | None) -> bytes:
     d = ImageDraw.Draw(base)
     for idx, res in enumerate(SHOWN_RESOURCES, 1):
         x1, y1, x2, y2 = CELLS[idx]
-        cx, w, h = (x1 + x2) // 2, x2 - x1, y2 - y1
+        cx, cy, w = (x1 + x2) // 2, (y1 + y2) // 2, x2 - x1
         qty = str(int(inv.get(res, 0)))
-
-        sprite = _sprite(res)
-        if sprite is not None:
-            iw_max, ih_max = w - 8, int(h * 0.60)
-            scale = min(iw_max / sprite.width, ih_max / sprite.height)
-            sp = sprite.resize(
-                (max(1, int(sprite.width * scale)), max(1, int(sprite.height * scale))),
-                Image.Resampling.LANCZOS,
-            )
-            px = x1 + (w - sp.width) // 2
-            py = y1 + 6 + (ih_max - sp.height) // 2
-            base.alpha_composite(sp, (px, py))
-        else:  # нет иконки — пишем название текстом
-            name = RESOURCE_NAMES[res]
-            nf = _fit_font(d, name, w - 4, 22, 11)
-            d.text((cx - d.textlength(name, font=nf) / 2, y1 + h * 0.28),
-                   name, font=nf, fill=NAME_COLOR)
-
-        qf = _fit_font(d, qty, w - 6, 34, 16, bold=True)
-        qw = d.textlength(qty, font=qf)
-        d.text((cx - qw / 2, y1 + h * 0.66), qty, font=qf, fill=QTY_COLOR)
+        qf = _fit_font(d, qty, w - 6, 44, 18, bold=True)
+        l, t, r, b = d.textbbox((0, 0), qty, font=qf)  # центрируем число в ячейке
+        d.text((cx - (r - l) / 2 - l, cy - (b - t) / 2 - t), qty, font=qf, fill=QTY_COLOR)
 
     out = io.BytesIO()
     base.convert("RGB").save(out, "JPEG", quality=88, optimize=True)

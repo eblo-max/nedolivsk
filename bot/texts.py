@@ -1313,8 +1313,9 @@ def warehouse_screen(player: Player, tavern: Tavern) -> str:
 
 
 def storehouse_caption(player: Player, tavern: Tavern) -> str:
-    """Короткая подпись к складской ведомости (ресурсы — на самой картинке).
-    Ресурсы, не влезшие в 10 ячеек картинки, перечисляем текстом."""
+    """Короткая подпись к складской ведомости (ресурсы и числа — на картинке).
+    Если ресурсов больше, чем ячеек, остаток перечислили бы текстом (сейчас все
+    влезают — overflow пуст)."""
     from bot.game import storehouse as sh
     parts = [
         f"📦 <b>СКЛАД «{escape(tavern.name.upper())}»</b>",
