@@ -8,6 +8,12 @@ from bot.game import balance, inventory, logic
 from bot.game import world as wld
 from bot.game.balance import RESOURCE_EMOJI, RESOURCE_NAMES
 
+# Единая подпись-ссылка на канал новостей/обновлений (добавляется к ключевым экранам).
+CHANNEL_FOOTER = (
+    "\n\n📣 Новости и обновы по игре — "
+    "<a href=\"https://t.me/nedolivsk\">@nedolivsk</a>"
+)
+
 WELCOME = (
     "🍺 <b>НЕДОЛИВСК. ДОБРО ПОЖАЛОВАТЬ, ЧЁ УЖ.</b>\n"
     "<blockquote>Сраный городишко, где эль разбавляют мочой, посуду моют раз "
@@ -87,7 +93,7 @@ COMMANDS_SCREEN = (
     "В личке всё на кнопках; слэш-меню: <code>/start /bonus /market /auction "
     "/hunt /top /map /help</code>.\n"
     "<i>Чужую панель не лапай — жмёт только хозяин.</i>"
-)
+) + CHANNEL_FOOTER
 
 ASK_TAVERN_NAME = (
     "📜 Как обзовёшь свою забегаловку?\n\n"
@@ -138,7 +144,7 @@ GROUP_HELP = (
     "• <b>гг репутация</b> — как тебя знают горожане\n"
     "• <b>гг правила</b> — как вообще играть\n"
     "Кнопки чужой панели жать нельзя — только хозяин."
-)
+) + CHANNEL_FOOTER
 
 RULES = (
     "🍺 <b>НЕДОЛИВСК — КАК ПОДНЯТЬ КАБАК</b>\n"
@@ -242,7 +248,7 @@ RULES = (
     "«гг помощь»). Готово что-то — уведомление с кнопкой придёт в чат. "
     "Забудешь зайти — напомним.</blockquote>\n"
     "<tg-spoiler>P.S. Трезвым тут делать нечего.</tg-spoiler>"
-)
+) + CHANNEL_FOOTER
 
 ALREADY_REGISTERED = "У тебя уже есть кабак, забыл? Вот он:"
 
