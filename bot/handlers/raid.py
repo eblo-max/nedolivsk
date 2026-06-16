@@ -10,7 +10,6 @@
 from datetime import datetime, timezone
 
 from aiogram import Bot, F, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,7 +63,15 @@ async def _render(cb: CallbackQuery, boss) -> None:
             await msg.edit_caption(caption=text, reply_markup=markup)
         else:
             await msg.edit_text(text, reply_markup=markup)
-    except TelegramBadRequest:
+    except Exception:  # noqa: BLE001 — перерисовка косметическая, не должна ронять хендлер
+        pass
+
+
+async def _safe_answer(cb: CallbackQuery, text: str = "", *, alert: bool = False) -> None:
+    """Ответ на колбэк, который НЕ должен откатывать транзакцию (query too old / 429)."""
+    try:
+        await cb.answer(text, show_alert=alert)
+    except Exception:  # noqa: BLE001
         pass
 
 
@@ -135,8 +142,9 @@ async def cb_raid_join(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.answer("Ты уже записан — жди начала битвы!", show_alert=True)
         return
     repo.add_log(session, "player", player.id, "⚔️ записался в рейд")
+    await session.commit()  # фиксируем запись ДО косметики (сбой UI не откатит)
     await _render(cb, boss)
-    await cb.answer("Ты в рейде! Как босс дойдёт — врежем все вместе.", show_alert=True)
+    await _safe_answer(cb, "Ты в рейде! Как босс дойдёт — врежем все вместе.", alert=True)
 
 
 @router.callback_query(F.data.startswith("raidhit:"))
@@ -174,8 +182,11 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
     repo.add_log(session, "player", player.id, f"⚔️ рейд: −{dmg} HP боссу")
 
     if not raid.is_dead(boss):
+        # ФИКСИРУЕМ урон в БД ДО косметической отрисовки — иначе сбой правки
+        # сообщения/ответа (429, «query too old») откатил бы записанный удар.
+        await session.commit()
         await _render(cb, boss)
-        await cb.answer(texts.raid_hit_toast(dmg, crit, boss.hp, boss.max_hp))
+        await _safe_answer(cb, texts.raid_hit_toast(dmg, crit, boss.hp, boss.max_hp))
         return
 
     # ── Босс повержен: раздаём награду ──
@@ -213,7 +224,7 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
     # иначе чужие клики «Бить» ждут весь цикл рассылки (как в hunt.py перед анимацией).
     await session.commit()
     raid.set_active(None)  # босс мёртв — убрать кнопку «Рейд-босс» из меню
-    await cb.answer("💀 БОСС ПОВЕРЖЕН!", show_alert=True)
+    await _safe_answer(cb, "💀 БОСС ПОВЕРЖЕН!", alert=True)
     # Правим анонс во ВСЕХ чатах, где висел босс: экран победы, кнопки убираем
     # (иначе в других чатах осталась бы живая «Бить» по мёртвому боссу). Без спама
     # в посторонние чаты — только туда, где он реально появлялся.
