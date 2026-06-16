@@ -2422,23 +2422,25 @@ def raid_gather_screen(boss) -> str:
     if spec is None:
         return "⚔️ Рейд-босс приближается"
     return "\n".join([
-        f"{spec.emoji} <b>ГЛОБАЛЬНЫЙ БОСС: {spec.name.upper()}</b>",
+        "⚔️🔥 <b>ВСЕМ КАБАКАМ ТРЕВОГА!</b>",
+        f"{spec.emoji} На Недоливск прёт <b>{spec.name.upper()}</b>",
         "",
         f"«{spec.blurb}»",
         "",
         f"⏳ До битвы: <b>{_fmt_left_h(boss.gather_until)}</b>",
-        f"🛡 Записалось бойцов: <b>{raid.registered_count(boss)}</b>",
+        f"🛡 В строю уже: <b>{raid.registered_count(boss)}</b>",
         "",
-        "<i>Жми «⚔️ Присоединиться» — соберёмся всем миром. Бить смогут только "
-        "записавшиеся. Золото — поровну на всех, кто бил, а кому-то одному (если "
-        "повезёт) — редкий трофей, вплоть до эксклюзивной снаряги с босса.</i>",
+        "<i>⚔️ Жми «Присоединиться» и вставай в строй — бить будут только "
+        "записавшиеся. Завалим — золото разделим меж бойцов, а одному счастливчику "
+        "с туши падёт легендарный трофей, какого не купить и не сковать. Не зевай — "
+        "таких не каждый день валят!</i>",
     ])
 
 
 def raid_fight_ping() -> str:
-    return ("⚔️ <b>Босс пришёл — БЕЙ!</b> Открой чат, где собирались, и лупи по "
-            "кнопке «Бить». Золото — поровну на всех бойцов, а одному счастливчику "
-            "перепадёт эксклюзивный трофей.")
+    return ("⚔️ <b>ОН ЗДЕСЬ — босс дошёл, пора БИТЬ!</b> Лети в чат, где собирались, "
+            "и долби «Бить» без передышки. Кто в деле — тот и в доле: золото меж "
+            "бойцов, а кому-то одному с туши падёт легендарный трофей. Не отсиживайся!")
 
 
 def raid_no_show(boss) -> str:
@@ -2446,7 +2448,8 @@ def raid_no_show(boss) -> str:
     spec = raid.BOSSES.get(boss.boss_key)
     name = spec.name if spec else "Босс"
     return (f"{spec.emoji if spec else '⚔️'} <b>{name} не дождался.</b>\n"
-            "Никто не собрался на бой — тварь развернулась и ушла. Позор.")
+            "Ни одна душа не вышла на бой — тварь презрительно фыркнула и уползла. "
+            "Позорище на весь Недоливск.")
 
 
 def raid_screen(boss) -> str:
@@ -2458,17 +2461,18 @@ def raid_screen(boss) -> str:
     fighters = len(boss.contributions or {})
     pct = round(100 * max(0, boss.hp) / boss.max_hp) if boss.max_hp else 0
     return "\n".join([
-        f"{spec.emoji} <b>РЕЙД-БОСС: {spec.name.upper()}</b>",
+        f"⚔️ <b>РУБИЛОВО: {spec.name.upper()}</b> {spec.emoji}",
         "",
         f"«{spec.blurb}»",
         "",
         f"{raid.hp_bar(boss.hp, boss.max_hp)}  {pct}%",
         f"❤️ {max(0, boss.hp)} / {boss.max_hp} HP",
-        f"⚔️ Бойцов: {fighters} · ⏳ уйдёт через {_fmt_left_h(boss.ends_at)}",
+        f"⚔️ В деле: {fighters} · ⏳ уйдёт через {_fmt_left_h(boss.ends_at)}",
         "",
-        "<i>Жми «⚔️ Бить» — лупи всем миром. Золото делится поровну между всеми, "
-        "кто ударил, а одному случайному из них (равный шанс!) перепадёт редкий "
-        "трофей — вплоть до эксклюзивной снаряги, которой не купить и не сковать.</i>",
+        "<i>⚔️ Лупи по «Бить» и не отлынивай — кто в деле, тот и в доле! Завалим "
+        "всем миром: золото разделим меж бойцов, а кому-то одному с туши падёт "
+        "легендарная снаряга, какой не купить и не сковать. Дожимаем, пока тварь "
+        "не сдохла!</i>",
     ])
 
 
@@ -2483,14 +2487,14 @@ def raid_dead(boss, top: list, winner_name: str | None, drop_line: str) -> str:
     spec = raid.BOSSES.get(boss.boss_key)
     name = spec.name if spec else "Босс"
     emoji = spec.emoji if spec else "⚔️"
-    lines = [f"{emoji} <b>{name.upper()} ПОВЕРЖЕН!</b>",
-             "", "Всем миром завалили тушу. Кто рубился:"]
+    lines = [f"💀{emoji} <b>{name.upper()} ПОВЕРЖЕН!</b>",
+             "", "Всем миром завалили зверюгу — кабаки гудят! Кто рубился:"]
     if top:
         lines += [f"  ⚔️ {escape(n)} — {d} урона" for n, d in top[:5]]
     lines.append("")
-    lines.append("💰 Золото — <b>поровну на всех</b>, кто бил. Гляньте мошну.")
+    lines.append("💰 Золото — <b>поровну на всех</b>, кто махал. Гляньте мошну.")
     if winner_name and drop_line:
-        lines.append(f"🎁 Редкий трофей выпал <b>{escape(winner_name)}</b>: {drop_line}")
+        lines.append(f"🎁 Легендарный трофей урвал <b>{escape(winner_name)}</b>: {drop_line}")
     return "\n".join(lines)
 
 
@@ -2500,4 +2504,5 @@ def raid_expired(boss) -> str:
     name = spec.name if spec else "Босс"
     emoji = spec.emoji if spec else "⚔️"
     return (f"{emoji} <b>{name} ушёл.</b>\n"
-            "Не добили вовремя — тварь уползла зализывать раны. В другой раз шевелитесь живее.")
+            "Провозились — тварь огрызнулась и уползла зализывать раны, унеся всю "
+            "добычу. В другой раз шевелитесь живее, мямли.")
