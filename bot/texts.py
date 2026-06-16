@@ -1141,20 +1141,28 @@ def _pending_income(tavern: Tavern) -> int:
     return int(tavern.income_rate * hours) if hours > 0 else 0
 
 
+_FIGSP = " "  # цифро-широкий пробел: ширина = ширине цифры (выравнивание колонок)
+
+
 def _storage_lines(player: Player) -> list[str]:
-    """ВСЕ ресурсы в ФИКСИРОВАННОЙ сетке 2 столбика — у каждого своё место, чтобы
-    при добыче/трате ничего не «прыгало» (меняются только числа)."""
+    """ВСЕ ресурсы в ФИКСИРОВАННОЙ сетке 2 столбика — у каждого своё место (ничего
+    не «прыгает», меняются только числа). Число стоит вплотную к значку, а хвост
+    добивается цифро-широким пробелом — так начало 2-го столбца выровнено в Telegram."""
     inv = player.inventory or {}
     res = balance.RESOURCES
     half = (len(res) + 1) // 2
+    width = max((len(str(inv.get(r, 0))) for r in res), default=1)
 
-    def cell(r: str) -> str:
-        return f"{RESOURCE_EMOJI[r]} {inv.get(r, 0)}"
+    def cell(r: str, pad: bool) -> str:
+        n = str(inv.get(r, 0))
+        s = f"{RESOURCE_EMOJI[r]} {n}"
+        return s + _FIGSP * (width - len(n)) if pad else s
 
     rows = []
     for i in range(half):
         j = i + half
-        rows.append(f"{cell(res[i])} · {cell(res[j])}" if j < len(res) else cell(res[i]))
+        rows.append(f"{cell(res[i], True)} · {cell(res[j], False)}"
+                    if j < len(res) else cell(res[i], False))
     return rows
 
 
