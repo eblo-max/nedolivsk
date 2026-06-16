@@ -198,8 +198,11 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
                 drop_line = f"{rarity} — {got}" if rarity else got
                 repo.queue_notify(session, winner.id,
                                   f"🎁 С босса тебе выпал {rarity} трофей: {got}")
+    # В список «кто рубился» — только реально бившие (dmg>0). Записавшиеся, но не
+    # ударившие, награды не получают и в списке не маячат нулями.
     top = sorted(((r.get("name", str(p)), r.get("dmg", 0))
-                  for p, r in (boss.contributions or {}).items()),
+                  for p, r in (boss.contributions or {}).items()
+                  if r.get("dmg", 0) > 0),
                  key=lambda x: -x[1])
     text = texts.raid_dead(boss, top, winner_name, drop_line)
     msgs = dict(boss.messages or {})
