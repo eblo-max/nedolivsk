@@ -174,21 +174,30 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
     now = datetime.now(timezone.utc)
     left = raid.cooldown_left(boss, player.id, now)
     if left > 0:
-        await cb.answer(f"Переведи дух — удар через {left // 60 + 1} мин.", show_alert=True)
+        mins = left // 60 + 1
+        if raid.stunned(boss, player.id, now):
+            await cb.answer(f"😵 Оглушён рыком — в себя через {mins} мин.", show_alert=True)
+        else:
+            await cb.answer(f"Переведи дух — удар через {mins} мин.", show_alert=True)
         return
 
     raw, crit = raid.player_damage(player)
     dmg = raid.mitigate(boss.boss_key, raw)   # «толща» босса гасит часть урона
     raid.apply_hit(boss, player, dmg, now)
     repo.add_log(session, "player", player.id, f"⚔️ рейд: −{dmg} HP боссу")
+    second_wind = raid.maybe_second_wind(boss, now)   # S8: хил + оглушение на 30% HP
 
     if not raid.is_dead(boss):
         # ФИКСИРУЕМ урон в БД ДО косметической отрисовки — иначе сбой правки
         # сообщения/ответа (429, «query too old») откатил бы записанный удар.
         await session.commit()
         await _render(cb, boss)
-        await _safe_answer(
-            cb, texts.raid_hit_toast(dmg, crit, boss.hp, boss.max_hp, soaked=raw - dmg))
+        if second_wind:
+            await _safe_answer(cb, "🐲 ВТОРОЕ ДЫХАНИЕ! Босс воспрял и взревел — "
+                                   "все оглушены, бей дальше!", alert=True)
+        else:
+            await _safe_answer(
+                cb, texts.raid_hit_toast(dmg, crit, boss.hp, boss.max_hp, soaked=raw - dmg))
         return
 
     # ── Босс повержен: раздаём награду ──

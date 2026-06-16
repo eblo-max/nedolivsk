@@ -2503,6 +2503,9 @@ def raid_screen(boss) -> str:
         return "⚔️ Рейд-босс"
     fighters = len(boss.contributions or {})
     pct = round(100 * max(0, boss.hp) / boss.max_hp) if boss.max_hp else 0
+    stun = raid.stun_left(boss)
+    status = (f"😵 <b>РЁВ!</b> Босс оглушил — удар на паузе ~{stun // 60 + 1} мин"
+              if stun > 0 else None)
     return "\n".join([
         f"⚔️ <b>РУБИЛОВО: {spec.name.upper()}</b> {spec.emoji}",
         "",
@@ -2511,9 +2514,10 @@ def raid_screen(boss) -> str:
         f"{raid.hp_bar(boss.hp, boss.max_hp)}  {pct}%",
         f"❤️ {max(0, boss.hp)} / {boss.max_hp} HP · 🛡 броня {spec.armor}",
         f"⚔️ В деле: {fighters} · ⏳ уйдёт через {_fmt_left_h(boss.ends_at)}",
+        *([status] if status else []),
         "",
-        "<i>🛡 Толстая шкура гасит удар — голыми руками еле царапнёшь. "
-        "Снаряга и уровень бьют по-настоящему.</i>",
+        "<i>🛡 Толстая шкура гасит удар — голыми руками еле царапнёшь. И не "
+        "тяните: бросите бить — тварь затягивает раны. Снаряга и уровень решают.</i>",
         "",
         "<i>⚔️ Лупи по «Бить» и не отлынивай — кто в деле, тот и в доле! Завалим "
         "всем миром: золото разделим меж бойцов, а кому-то одному с туши падёт "

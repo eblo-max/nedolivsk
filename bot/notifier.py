@@ -374,10 +374,18 @@ async def _notify_returned(bot: Bot) -> None:
                     raid_edits.append((dict(boss.messages or {}),
                                        texts.raid_gather_screen(boss),
                                        raid_gather_kb(boss.id), is_vid))
-            elif boss.status == "active" and now >= (boss.ends_at or now):
-                boss.status = "expired"                      # не добили — ушёл
-                raid_edits.append((dict(boss.messages or {}),
-                                   texts.raid_expired(boss), None, is_vid))
+            elif boss.status == "active":
+                if now >= (boss.ends_at or now):
+                    boss.status = "expired"                  # не добили — ушёл
+                    raid_edits.append((dict(boss.messages or {}),
+                                       texts.raid_expired(boss), None, is_vid))
+                else:                                        # идёт бой: self-баффы
+                    healed = raidmod.regen_if_stalled(boss, now)   # E2 реген простоя
+                    roared = raidmod.roar_if_due(boss, now)        # D2 рык-оглушение
+                    if healed or roared:   # есть новость — перерисуем экран боя
+                        raid_edits.append((dict(boss.messages or {}),
+                                           texts.raid_screen(boss), raid_kb(boss.id),
+                                           is_vid))
         # Кэш для кнопки «Рейд-босс» в меню: какой босс ещё жив (или None).
         raidmod.set_active(next(
             (b.id for b in live_raids if b.status in ("gathering", "active")), None))

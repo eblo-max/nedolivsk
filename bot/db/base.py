@@ -228,3 +228,8 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS bourse_announced_at TIMESTAMPTZ"
         ))
+        # Боевое состояние рейд-босса: рык/реген/второе дыхание.
+        await conn.execute(text(
+            "ALTER TABLE raid_boss ADD COLUMN IF NOT EXISTS "
+            "state JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))

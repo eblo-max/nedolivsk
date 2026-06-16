@@ -18,6 +18,14 @@ from bot.game import balance, combat
 GATHER_MINUTES = 20      # сбор перед битвой
 FIGHT_HOURS = 1          # окно на добивание
 
+# Self-баффы/дебаффы босса в бою.
+STALL_REGEN_MINUTES = 3      # E2: нет ударов столько минут → босс лечится
+STALL_REGEN_PCT = 0.03       # E2: сколько max_hp реген за тик простоя
+ROAR_EVERY_MINUTES = 8       # D2: как часто босс ревёт (оглушает всех бьющих)
+ROAR_STUN_SECONDS = 120      # D2/S8: на сколько оглушает (доп. задержка удара)
+SECOND_WIND_AT = 0.30        # S8: порог HP, на котором срабатывает «второе дыхание»
+SECOND_WIND_HEAL_PCT = 0.20  # S8: на сколько max_hp лечится (один раз)
+
 
 @dataclass(frozen=True)
 class Boss:
@@ -150,17 +158,95 @@ def player_damage(player, rng: random.Random | None = None) -> tuple[int, bool]:
     return max(1, int(dmg)), crit
 
 
-def cooldown_left(boss, player_id: int, now: datetime | None = None) -> int:
-    """Секунд до следующего удара игрока (0 — можно бить)."""
-    rec = (boss.contributions or {}).get(str(player_id))
-    if not rec or not rec.get("last"):
+def _iso_left(iso: str | None, now: datetime) -> int:
+    """Секунд до момента iso (0 если прошёл/нет)."""
+    if not iso:
         return 0
-    cd = BOSSES[boss.boss_key].cooldown_min * 60
     try:
-        last = datetime.fromisoformat(rec["last"])
+        return max(0, int(datetime.fromisoformat(iso).timestamp() - now.timestamp()))
     except (ValueError, TypeError):
         return 0
-    return max(0, int(cd - (now or _now()).timestamp() + last.timestamp()))
+
+
+def stun_left(boss, now: datetime | None = None) -> int:
+    """Секунд оглушения босса (рык D2 / второе дыхание S8) — общий на всех."""
+    return _iso_left((boss.state or {}).get("stun_until"), now or _now())
+
+
+def cooldown_left(boss, player_id: int, now: datetime | None = None) -> int:
+    """Секунд до следующего удара: max(личный кулдаун, общее оглушение босса)."""
+    now = now or _now()
+    rec = (boss.contributions or {}).get(str(player_id))
+    personal = 0
+    if rec and isinstance(rec.get("last"), str):
+        cd = BOSSES[boss.boss_key].cooldown_min * 60
+        last_dt = datetime.fromisoformat(rec["last"]) + timedelta(seconds=cd)
+        personal = _iso_left(last_dt.isoformat(), now)
+    return max(personal, stun_left(boss, now))
+
+
+def stunned(boss, player_id: int, now: datetime | None = None) -> bool:
+    """Оглушение — главная причина ждать (рык/второе дыхание сильнее личного кд)."""
+    now = now or _now()
+    return stun_left(boss, now) >= cooldown_left(boss, player_id, now) > 0
+
+
+def _fight_start(boss) -> datetime:
+    if boss.ends_at is not None:
+        e = boss.ends_at
+        if e.tzinfo is None:
+            e = e.replace(tzinfo=timezone.utc)
+        return e - timedelta(hours=FIGHT_HOURS)
+    return _now()
+
+
+def last_hit_at(boss) -> datetime:
+    """Когда по боссу били в последний раз (для E2). Нет ударов — старт боя."""
+    times = [datetime.fromisoformat(r["last"]) for r in (boss.contributions or {}).values()
+             if isinstance(r.get("last"), str)]
+    return max(times) if times else _fight_start(boss)
+
+
+def regen_if_stalled(boss, now: datetime | None = None) -> int:
+    """E2: если по боссу не били STALL_REGEN_MINUTES — лечит часть HP. Вернёт сколько."""
+    now = now or _now()
+    if boss.max_hp <= 0 or boss.hp >= boss.max_hp:
+        return 0
+    if (now - last_hit_at(boss)).total_seconds() < STALL_REGEN_MINUTES * 60:
+        return 0
+    heal = max(1, int(boss.max_hp * STALL_REGEN_PCT))
+    boss.hp = min(boss.max_hp, boss.hp + heal)
+    return heal
+
+
+def roar_if_due(boss, now: datetime | None = None) -> bool:
+    """D2: раз в ROAR_EVERY_MINUTES босс ревёт — оглушает всех бьющих. True — взревел."""
+    now = now or _now()
+    last = (boss.state or {}).get("last_roar")
+    base = datetime.fromisoformat(last) if isinstance(last, str) else _fight_start(boss)
+    if (now - base).total_seconds() < ROAR_EVERY_MINUTES * 60:
+        return False
+    st = dict(boss.state or {})
+    st["stun_until"] = (now + timedelta(seconds=ROAR_STUN_SECONDS)).isoformat()
+    st["last_roar"] = now.isoformat()
+    boss.state = st
+    return True
+
+
+def maybe_second_wind(boss, now: datetime | None = None) -> bool:
+    """S8: один раз на ≤30% HP — хил + рык (оглушение всех). True — сработало."""
+    now = now or _now()
+    st = boss.state or {}
+    if st.get("second_wind") or boss.max_hp <= 0:
+        return False
+    if not (0 < boss.hp <= boss.max_hp * SECOND_WIND_AT):
+        return False
+    boss.hp = min(boss.max_hp, boss.hp + int(boss.max_hp * SECOND_WIND_HEAL_PCT))
+    st = dict(boss.state or {})
+    st["second_wind"] = True
+    st["stun_until"] = (now + timedelta(seconds=ROAR_STUN_SECONDS)).isoformat()
+    boss.state = st
+    return True
 
 
 def mitigate(boss_key: str, raw: int) -> int:

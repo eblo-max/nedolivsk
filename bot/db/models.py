@@ -221,6 +221,8 @@ class RaidBoss(Base):
     hp: Mapped[int] = mapped_column(default=0)
     contributions: Mapped[dict] = mapped_column(JSONB, default=dict)
     messages: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Боевое состояние: {stun_until, last_roar, second_wind} — рык/реген/второе дыхание.
+    state: Mapped[dict] = mapped_column(JSONB, default=dict)
     status: Mapped[str] = mapped_column(String(10), default="gathering")
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
