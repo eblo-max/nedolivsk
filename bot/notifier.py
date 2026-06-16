@@ -448,8 +448,14 @@ async def _notify_returned(bot: Bot) -> None:
         notes = await repo.pop_notifications(session, 50)
         if notes:
             for n in notes:
-                await deliver(lambda nn=n: bot.send_message(nn.user_id, nn.text),
-                              what=f"outbox→{n.user_id}")
+                if n.photo:        # рассылка с картинкой: фото + подпись
+                    await deliver(
+                        lambda nn=n: bot.send_photo(
+                            nn.user_id, nn.photo, caption=nn.text or None),
+                        what=f"outbox-photo→{n.user_id}")
+                else:
+                    await deliver(lambda nn=n: bot.send_message(nn.user_id, nn.text),
+                                  what=f"outbox→{n.user_id}")
             await repo.delete_notifications(session, [n.id for n in notes])
             await session.commit()
 

@@ -217,3 +217,10 @@ async def create_tables() -> None:
         await conn.execute(text(
             "UPDATE taverns SET map_slot = NULL WHERE map_slot IS NOT NULL AND map_slot < 1000"
         ))
+        # Рассылка с картинкой: file_id фото в очереди личек + шире текст под подпись.
+        await conn.execute(text(
+            "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS photo VARCHAR(256)"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE notifications ALTER COLUMN text TYPE VARCHAR(1024)"
+        ))

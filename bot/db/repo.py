@@ -212,9 +212,11 @@ async def cleanup_logs(session: AsyncSession, keep: int = 3000) -> None:
 
 
 # ── Отложенные уведомления (outbox) ──────────────────────────────────────
-def queue_notify(session: AsyncSession, user_id: int, text: str) -> None:
-    """Положить личку игроку в очередь (атомарно со сделкой; шлёт нотифаер)."""
-    session.add(Notification(user_id=user_id, text=text[:512]))
+def queue_notify(session: AsyncSession, user_id: int, text: str,
+                 photo: str | None = None) -> None:
+    """Положить личку игроку в очередь (атомарно со сделкой; шлёт нотифаер).
+    photo — file_id картинки: тогда уйдёт фото с подписью (text)."""
+    session.add(Notification(user_id=user_id, text=text[:1024], photo=photo))
 
 
 async def pop_notifications(

@@ -977,10 +977,10 @@ _PROMPTS = {
     "grant_res_all": "Что раздать ВСЕМ: <code>ресурс количество</code> "
                      "(напр. <code>wood 200</code>).\nРесурсы: "
                      + ", ".join(balance.RESOURCES) + ", malt, flour, ingot",
-    "cast_dm": "Введи текст рассылки — уйдёт В ЛИЧКУ тем, кто открывал бота "
-               "в ЛС (можно с HTML-разметкой):",
-    "cast_chats": "Введи текст рассылки — уйдёт ВО ВСЕ ЧАТЫ с ботом "
-                  "(можно с HTML-разметкой):",
+    "cast_dm": "Пришли текст рассылки — уйдёт В ЛИЧКУ тем, кто открывал бота "
+               "в ЛС. Можно с HTML-разметкой, либо ФОТО с подписью:",
+    "cast_chats": "Пришли текст рассылки — уйдёт ВО ВСЕ ЧАТЫ с ботом. "
+                  "Можно с HTML-разметкой, либо ФОТО с подписью:",
 }
 
 
@@ -1012,7 +1012,10 @@ async def on_input(message: Message, state: FSMContext, session: AsyncSession) -
         return
     data = await state.get_data()
     field = data.get("field")
-    raw = (message.text or "").strip()
+    # У фото текст лежит в caption, а не в text. Берём оба + сам file_id картинки —
+    # чтобы рассылку можно было слать постом с картинкой.
+    raw = (message.text or message.caption or "").strip()
+    photo_id = message.photo[-1].file_id if message.photo else None
     await state.clear()
 
     if field == "find":
@@ -1034,32 +1037,38 @@ async def on_input(message: Message, state: FSMContext, session: AsyncSession) -
 
     # ── Массовые операции (на всех игроков) ──
     if field == "cast_chats":
-        if not raw:
-            await message.answer("Пустой текст — отменено.",
+        if not raw and not photo_id:
+            await message.answer("Пусто — отменено (пришли текст или фото).",
                                  reply_markup=_home_kb().as_markup())
             return
+        cap = raw[:1024]  # подпись к фото ограничена Telegram (1024)
         chat_ids = await repo.all_chat_ids(session)
         sent = 0
         for cid in chat_ids:
-            if await deliver(lambda c=cid: message.bot.send_message(c, raw),
-                             what=f"cast→{cid}") is not None:
+            if photo_id:
+                f = lambda c=cid: message.bot.send_photo(c, photo_id, caption=cap or None)
+            else:
+                f = lambda c=cid: message.bot.send_message(c, raw)
+            if await deliver(f, what=f"cast→{cid}") is not None:
                 sent += 1
         repo.add_log(session, "admin", message.from_user.id,
-                     f"📣 рассылка в чаты: {sent}/{len(chat_ids)}")
+                     f"📣 рассылка в чаты{'(фото)' if photo_id else ''}: "
+                     f"{sent}/{len(chat_ids)}")
         await message.answer(f"📣 Отправлено в {sent} из {len(chat_ids)} чатов.",
                              reply_markup=_home_kb().as_markup())
         return
 
     if field == "cast_dm":
-        if not raw:
-            await message.answer("Пустой текст — отменено.",
+        if not raw and not photo_id:
+            await message.answer("Пусто — отменено (пришли текст или фото).",
                                  reply_markup=_home_kb().as_markup())
             return
         ids = [r[0] for r in (await session.execute(select(Player.id))).all()]
         for uid in ids:
-            repo.queue_notify(session, uid, raw)
+            repo.queue_notify(session, uid, raw[:1024], photo=photo_id)
         repo.add_log(session, "admin", message.from_user.id,
-                     f"📣 рассылка в личку: {len(ids)} игрокам")
+                     f"📣 рассылка в личку{'(фото)' if photo_id else ''}: "
+                     f"{len(ids)} игрокам")
         await message.answer(
             f"📣 В очередь поставлено {len(ids)} сообщений — разойдутся в "
             "ближайшие минуты (по мере отправки).",
