@@ -103,9 +103,14 @@ def _drop_apply(winner, drop: dict | None) -> str:
     return ""
 
 
+_DM_PANEL_CAP = 400  # сколько личных панелей ведём вживую (анти-флуд правок)
+
+
 @router.callback_query(F.data == "raidopen")
 async def cb_raid_open(cb: CallbackQuery, session: AsyncSession) -> None:
-    """Открыть экран рейда из меню (личечные игроки): свежий панель-ролик по тапу."""
+    """Открыть экран рейда из меню (личечные игроки). Панель регистрируется в
+    boss.messages (ключ = id чата-лички) — нотифаер правит её вживую, как чатовые:
+    сам идёт отсчёт сбора → «БЕЙ» → «ПОВЕРЖЕН», без кнопки «Обновить»."""
     boss = await repo.get_active_raid(session)
     if boss is None:
         await cb.answer("Рейд уже закончился — в другой раз!", show_alert=True)
@@ -114,7 +119,24 @@ async def cb_raid_open(cb: CallbackQuery, session: AsyncSession) -> None:
         caption, markup = texts.raid_gather_screen(boss), raid_gather_kb(boss.id)
     else:
         caption, markup = texts.raid_screen(boss), raid_kb(boss.id)
-    await send_raid_announce(cb.bot, cb.message.chat.id, boss, caption, markup)
+    chat_id = cb.message.chat.id
+    key = str(chat_id)
+    existing = (boss.messages or {}).get(key)
+    is_vid = raid_video(boss.boss_key) is not None
+    if existing is not None:   # уже есть живая панель — обновим её, не плодим новых
+        await deliver(lambda: edit_raid_announce(cb.bot, chat_id, existing, is_vid,
+                                                 caption, markup), what="raid-open-edit")
+        await cb.answer()
+        return
+    sent = await send_raid_announce(cb.bot, chat_id, boss, caption, markup)
+    # Регистрируем панель для живых правок (под локом — JSONB мутирует много кто).
+    if sent is not None:
+        locked = await repo.get_raid(session, boss.id, lock=True)
+        if locked is not None and locked.status in ("gathering", "active"):
+            msgs = dict(locked.messages or {})
+            if len(msgs) < _DM_PANEL_CAP:
+                msgs[key] = sent.message_id
+                locked.messages = msgs
     await cb.answer()
 
 
