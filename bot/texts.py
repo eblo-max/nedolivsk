@@ -1142,13 +1142,20 @@ def _pending_income(tavern: Tavern) -> int:
 
 
 def _storage_lines(player: Player) -> list[str]:
-    """Все ненулевые ресурсы значками, разбитые по 7 в строку (без простыни)."""
+    """ВСЕ ресурсы в ФИКСИРОВАННОЙ сетке 2 столбика — у каждого своё место, чтобы
+    при добыче/трате ничего не «прыгало» (меняются только числа)."""
     inv = player.inventory or {}
-    parts = [f"{RESOURCE_EMOJI[r]} {inv[r]}"
-             for r in balance.RESOURCES if inv.get(r, 0) > 0]
-    if not parts:
-        return ["пусто"]
-    return [" · ".join(parts[i:i + 7]) for i in range(0, len(parts), 7)]
+    res = balance.RESOURCES
+    half = (len(res) + 1) // 2
+
+    def cell(r: str) -> str:
+        return f"{RESOURCE_EMOJI[r]} {inv.get(r, 0)}"
+
+    rows = []
+    for i in range(half):
+        j = i + half
+        rows.append(f"{cell(res[i])} · {cell(res[j])}" if j < len(res) else cell(res[i]))
+    return rows
 
 
 def _upgrade_pct(player: Player, tavern: Tavern) -> int | None:
