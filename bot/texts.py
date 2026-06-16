@@ -2487,8 +2487,25 @@ def _raid_loot_lines() -> list[str]:
     ]
 
 
+def _raid_roster_lines(boss, limit: int = 12) -> list[str]:
+    """Список записавшихся по именам (для экрана сбора/боя). Пусто — никто ещё.
+    Имена экранируем (HTML) и режем длинные; при толпе показываем «и ещё N»."""
+    recs = list((boss.contributions or {}).values())
+    if not recs:
+        return ["<i>— пока никто, будь первым!</i>"]
+    names = []
+    for r in recs[:limit]:
+        nm = escape(str(r.get("name") or "боец"))
+        names.append(nm[:24] + "…" if len(nm) > 25 else nm)
+    extra = len(recs) - len(names)
+    out = ["  • " + n for n in names]
+    if extra > 0:
+        out.append(f"  • <i>…и ещё {extra}</i>")
+    return out
+
+
 def raid_gather_screen(boss) -> str:
-    """Фаза сбора: обратный отсчёт + сколько бойцов записалось."""
+    """Фаза сбора: обратный отсчёт + кто записался (поимённо)."""
     from bot.game import raid
     spec = raid.BOSSES.get(boss.boss_key)
     if spec is None:
@@ -2500,7 +2517,8 @@ def raid_gather_screen(boss) -> str:
         f"«{spec.blurb}»",
         "",
         f"⏳ До битвы: <b>{_fmt_left_h(boss.gather_until)}</b>",
-        f"🛡 В строю уже: <b>{raid.registered_count(boss)}</b>",
+        f"🛡 В строю уже <b>{raid.registered_count(boss)}</b>:",
+        *_raid_roster_lines(boss),
         "",
         *_raid_loot_lines(),
         "",
