@@ -422,6 +422,15 @@ async def _notify_returned(bot: Bot) -> None:
             buys = [(g, v[0], v[1]) for g, v in list(agg["buy"].items())[:6]]
             if sells or buys:
                 bourse_news_text = texts.bourse_news(sells, buys)
+                # Личечным игрокам (без домашнего чата), кто СЕЙЧАС за ботом, —
+                # сводку в личку. Окно ≈ интервал дайджеста: пока играешь —
+                # видишь, ушёл — не заваливаем (пинги не копятся в простое).
+                online = now - timedelta(minutes=balance.BOURSE_DIGEST_MINUTES + 5)
+                dm_ids = [r[0] for r in (await session.execute(
+                    select(Player.id).where(Player.chat_id.is_(None),
+                                            Player.last_seen_at >= online))).all()]
+                for uid in dm_ids:
+                    repo.queue_notify(session, uid, bourse_news_text)
 
         # Симуляция фракций — по чатам (фракции/ситуации остаются ЛОКАЛЬНЫМИ).
         for city in cities:
