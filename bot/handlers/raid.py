@@ -103,14 +103,14 @@ def _drop_apply(winner, drop: dict | None) -> str:
     return ""
 
 
-_DM_PANEL_CAP = 400  # сколько личных панелей ведём вживую (анти-флуд правок)
-
-
 @router.callback_query(F.data == "raidopen")
 async def cb_raid_open(cb: CallbackQuery, session: AsyncSession) -> None:
     """Открыть экран рейда из меню (личечные игроки). Панель регистрируется в
     boss.messages (ключ = id чата-лички) — нотифаер правит её вживую, как чатовые:
-    сам идёт отсчёт сбора → «БЕЙ» → «ПОВЕРЖЕН», без кнопки «Обновить»."""
+    сам идёт отсчёт сбора → «БЕЙ» → «ПОВЕРЖЕН», без кнопки «Обновить».
+
+    ВАЖНО: панель пишем АТОМАРНЫМ SQL (только messages), а НЕ read-modify-write
+    босса — иначе устаревший снимок contributions затирал вклады бойцов."""
     boss = await repo.get_active_raid(session)
     if boss is None:
         await cb.answer("Рейд уже закончился — в другой раз!", show_alert=True)
@@ -120,8 +120,7 @@ async def cb_raid_open(cb: CallbackQuery, session: AsyncSession) -> None:
     else:
         caption, markup = texts.raid_screen(boss), raid_kb(boss.id)
     chat_id = cb.message.chat.id
-    key = str(chat_id)
-    existing = (boss.messages or {}).get(key)
+    existing = (boss.messages or {}).get(str(chat_id))
     is_vid = raid_video(boss.boss_key) is not None
     if existing is not None:   # уже есть живая панель — обновим её, не плодим новых
         await deliver(lambda: edit_raid_announce(cb.bot, chat_id, existing, is_vid,
@@ -129,14 +128,8 @@ async def cb_raid_open(cb: CallbackQuery, session: AsyncSession) -> None:
         await cb.answer()
         return
     sent = await send_raid_announce(cb.bot, chat_id, boss, caption, markup)
-    # Регистрируем панель для живых правок (под локом — JSONB мутирует много кто).
-    if sent is not None:
-        locked = await repo.get_raid(session, boss.id, lock=True)
-        if locked is not None and locked.status in ("gathering", "active"):
-            msgs = dict(locked.messages or {})
-            if len(msgs) < _DM_PANEL_CAP:
-                msgs[key] = sent.message_id
-                locked.messages = msgs
+    if sent is not None:       # атомарно (не трогая contributions!) — см. docstring
+        await repo.add_raid_panel(session, boss.id, str(chat_id), sent.message_id)
     await cb.answer()
 
 
@@ -225,12 +218,14 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
     # ── Босс повержен: раздаём награду ──
     boss.status = "dead"
     plan = raid.settle(boss)
-    for pid, gold in plan["gold"].items():
+    # Игроков лочим строго по возрастанию id — единый порядок локов во всём боте
+    # (как lock_players на бирже), иначе встречная блокировка → дедлок в Postgres.
+    for pid in sorted(plan["gold"]):
         p = await repo.get_player(session, pid, for_update=True)
         if p is not None:
-            p.gold += gold
+            p.gold += plan["gold"][pid]
             repo.queue_notify(session, pid,
-                              f"⚔️ Босс повержен! Твоя доля добычи: +{gold} 🪙")
+                              f"⚔️ Босс повержен! Твоя доля добычи: +{plan['gold'][pid]} 🪙")
     drop_line, winner_name = "", None
     if plan["winner"] is not None:
         winner = await repo.get_player(session, plan["winner"], for_update=True)

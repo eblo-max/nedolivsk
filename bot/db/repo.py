@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
@@ -75,7 +75,8 @@ async def get_active_raid(
 ) -> RaidBoss | None:
     """Живой босс (фаза сбора ИЛИ битвы). Один на весь мир."""
     stmt = (select(RaidBoss)
-            .where(RaidBoss.status.in_(("gathering", "active"))).limit(1))
+            .where(RaidBoss.status.in_(("gathering", "active")))
+            .order_by(RaidBoss.id.desc()).limit(1))   # детерминизм: всегда самый свежий
     if lock:
         stmt = stmt.with_for_update()
     return (await session.execute(stmt)).scalar_one_or_none()
@@ -92,6 +93,20 @@ async def get_raid(
     session: AsyncSession, raid_id: int, *, lock: bool = False
 ) -> RaidBoss | None:
     return await session.get(RaidBoss, raid_id, with_for_update=lock)
+
+
+async def add_raid_panel(
+    session: AsyncSession, boss_id: int, key: str, message_id: int
+) -> None:
+    """Атомарно вписать личную панель игрока в messages босса — ТОЛЬКО поле messages,
+    через jsonb-слияние. НЕ читаем-перезаписываем босса целиком: иначе устаревший
+    снимок contributions из этой сессии затёр бы вклады бойцов (потеря урона)."""
+    await session.execute(
+        text("UPDATE raid_boss SET messages = COALESCE(messages, '{}'::jsonb) "
+             "|| jsonb_build_object(:k, to_jsonb(CAST(:m AS integer))) "
+             "WHERE id = :id AND status IN ('gathering', 'active')"),
+        {"k": str(key), "m": int(message_id), "id": int(boss_id)},
+    )
 
 
 def create_raid(session: AsyncSession, boss_key: str, gather_until) -> RaidBoss:

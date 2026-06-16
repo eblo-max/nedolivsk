@@ -260,7 +260,12 @@ def apply_hit(boss, player, dmg: int, now: datetime | None = None) -> None:
     now = now or _now()
     c = dict(boss.contributions or {})
     pid = str(player.id)
-    rec = c.get(pid) or {"dmg": 0, "hits": 0, "name": player.first_name or pid}
+    # ВАЖНО: rec — СВЕЖАЯ копия (dict(...)), а не общий вложенный объект. Если
+    # менять вложенный словарь «на месте», он же сидит в снимке SQLAlchemy для
+    # сравнения — снимок «портится», новое значение кажется равным старому, и
+    # колонка contributions НЕ пишется (урон теряется, хотя hp снимается). Копия
+    # рвёт эту связь: новое значение реально отличается от снимка → запись идёт.
+    rec = dict(c.get(pid) or {"dmg": 0, "hits": 0, "name": player.first_name or pid})
     rec["dmg"] = int(rec.get("dmg", 0)) + dmg
     rec["hits"] = int(rec.get("hits", 0)) + 1
     rec["last"] = now.isoformat()
