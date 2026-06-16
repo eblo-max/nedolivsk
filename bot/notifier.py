@@ -422,11 +422,9 @@ async def _notify_returned(bot: Bot) -> None:
         # цикла — в worldevent.advance (мутирует world); старт → анонс в чаты+личку.
         from bot.game import worldevent
         started = worldevent.advance(world, now)
-        if started is not None:
-            txt = texts.worldevent_announce(started)
-            world_news.append(txt)
-            for cid in await repo.all_chat_ids(session):
-                city_events.append((cid, txt))
+        # анонс события шлём ПОСЛЕ коммита через announce.world_event (чаты + ВСЕ
+        # активные одиночки, не только подписчики дайджеста).
+        we_text = texts.worldevent_announce(started) if started is not None else None
 
         # Биржевая сводка: раз в N минут — свежие лоты во все чаты (биржа глобальна).
         # Берём ордера с прошлой сводки, ещё живые на стакане; мгновенно сведённые
@@ -542,6 +540,10 @@ async def _notify_returned(bot: Bot) -> None:
                                   what=f"outbox→{n.user_id}")
             await repo.delete_notifications(session, [n.id for n in notes])
             await session.commit()
+
+        # Мировое событие (погода/экономика) — анонс в чаты + ЛС всем одиночкам.
+        if we_text:
+            await announce.world_event(bot, session, we_text, now)
 
         # Анонсы мировых событий в общие чаты (после коммита состояния).
         if fair_event or season_changed or holiday_new:

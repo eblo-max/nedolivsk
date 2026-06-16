@@ -256,6 +256,7 @@ def _card_kb(player: Player) -> InlineKeyboardBuilder:
     kb.button(text="📈 задать", callback_data=f"adm:set:{i}:level")
     kb.button(text="📦 +500 ресурсов", callback_data=f"adm:resall:{i}:500")
     kb.button(text="📦 задать ресурс", callback_data=f"adm:set:{i}:res")
+    kb.button(text="🍺 Выдать товар", callback_data=f"adm:set:{i}:goods")
     kb.button(text="❤️ Полный HP", callback_data=f"adm:heal:{i}")
     kb.button(text="⏱ Снять кулдауны", callback_data=f"adm:cool:{i}")
     kb.button(text="🎁 Выдать бонус", callback_data=f"adm:bonus:{i}")
@@ -267,7 +268,7 @@ def _card_kb(player: Player) -> InlineKeyboardBuilder:
     kb.button(text="📜 История игрока", callback_data=f"adm:plog:{i}:0")
     kb.button(text="↻ Обновить", callback_data=f"adm:p:{i}")
     kb.button(text="👥 К списку", callback_data="adm:list:0")
-    kb.adjust(4, 2, 2, 2, 2, 2, 2, 2, 1, 2)
+    kb.adjust(4, 2, 2, 3, 2, 2, 2, 2, 1, 2)
     return kb
 
 
@@ -620,21 +621,90 @@ def _back_kb(pid: int) -> InlineKeyboardBuilder:
 async def cb_world(cb: CallbackQuery, session: AsyncSession) -> None:
     if not await _guard_cb(cb):
         return
+    from bot.game import worldevent
     s = season.current()
+    ev = worldevent.active()
     txt = "\n".join([
         "🌍 <b>МИР И СОБЫТИЯ</b>",
         "",
         f"Сезон: {s.emoji} {s.name} (спрос ×{s.demand_mult:g})",
         f"Ярмарка: {'идёт' if wld.is_fair() else 'нет'}",
+        f"Погода: {ev.emoji + ' ' + ev.name if ev else 'ясно'}",
         "",
-        "<i>Запустить ярмарку вручную — кнопка ниже.</i>",
+        "<i>Запустить ярмарку или погодное событие — кнопками ниже.</i>",
     ])
     kb = InlineKeyboardBuilder()
     kb.button(text="🎪 Открыть ярмарку", callback_data="adm:fair")
+    kb.button(text="🌦 Погода / события", callback_data="adm:weather")
     kb.button(text="🏠 В меню", callback_data="adm:home")
     kb.adjust(1)
     await _edit(cb, txt, kb)
     await cb.answer()
+
+
+@router.callback_query(F.data == "adm:weather")
+async def cb_weather(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _guard_cb(cb):
+        return
+    from bot.game import worldevent
+    ev = worldevent.active()
+    lines = ["🌦 <b>ПОГОДА / СОБЫТИЯ</b>", "",
+             f"Сейчас: {ev.emoji + ' ' + ev.name if ev else 'ясно (события нет)'}",
+             "", "<i>Жми событие — запустится сразу на весь мир с анонсом.</i>"]
+    kb = InlineKeyboardBuilder()
+    if ev is not None:
+        kb.button(text="🌤 Снять событие", callback_data="adm:weatheroff")
+    for eid, e in worldevent.EVENTS.items():
+        kb.button(text=f"{e.emoji} {e.name}", callback_data=f"adm:weather:{eid}")
+    kb.button(text="🏠 В меню", callback_data="adm:home")
+    kb.adjust(*([1] if ev else []), 2, 2, 2, 2, 1, 1)
+    await _edit(cb, "\n".join(lines), kb)
+    await cb.answer()
+
+
+@router.callback_query(F.data == "adm:weatheroff")
+async def cb_weather_off(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _guard_cb(cb):
+        return
+    from datetime import timedelta
+
+    from bot.db import repo
+    from bot.game import worldevent
+    world = await repo.get_or_create_world(session)
+    world.event_kind = None
+    world.event_until = None
+    world.event_next_at = _now() + timedelta(hours=balance.WORLDEVENT_COOLDOWN_MIN_HOURS)
+    worldevent.set_active(None)
+    _alog(cb, session, "🌤 снял мировое событие")
+    await cb.answer("Событие снято.")
+    await cb_weather(cb, session)
+
+
+@router.callback_query(F.data.startswith("adm:weather:"))
+async def cb_weather_set(cb: CallbackQuery, session: AsyncSession) -> None:
+    if not await _guard_cb(cb):
+        return
+    from datetime import timedelta
+
+    from bot import announce
+    from bot.db import repo
+    from bot.game import worldevent
+    eid = cb.data.split(":", 2)[2]
+    e = worldevent.EVENTS.get(eid)
+    if e is None:
+        await cb.answer("Нет такого события.", show_alert=True)
+        return
+    now = _now()
+    world = await repo.get_or_create_world(session)
+    world.event_kind = eid
+    world.event_until = now + timedelta(hours=e.hours)
+    world.event_next_at = None
+    await session.flush()
+    worldevent.set_active(eid, world.event_until)
+    await announce.world_event(cb.bot, session, texts.worldevent_announce(e), now)
+    _alog(cb, session, f"🌦 запустил событие {eid} ({e.hours}ч)")
+    await cb.answer(f"{e.emoji} {e.name} запущено — анонс разослан!", show_alert=True)
+    await cb_weather(cb, session)
 
 
 @router.callback_query(F.data == "adm:fair")
@@ -981,6 +1051,8 @@ _PROMPTS = {
     "level": f"Введи уровень (1–{balance.MAX_LEVEL}):",
     "res": "Введи: <code>ресурс количество</code> (напр. <code>wood 500</code>).\n"
            f"Ресурсы: {', '.join(balance.RESOURCES)}, malt, flour, ingot",
+    "goods": "Введи: <code>товар количество</code> (напр. <code>ale2 5</code>) — "
+             "добавится в погреб.\nТовары: " + ", ".join(production.GOODS),
     "find": "Введи Telegram ID или @username игрока:",
     "grant_gold_all": "Сколько золота раздать КАЖДОМУ игроку? (число; минус — отнять)",
     "grant_res_all": "Что раздать ВСЕМ: <code>ресурс количество</code> "
@@ -1130,6 +1202,15 @@ async def on_input(message: Message, state: FSMContext, session: AsyncSession) -
             # задаём абсолютное значение
             inventory.add(player, name.strip(), player_inv_amt - cur)
             note = f"📦 {name.strip()} = {player_inv_amt}"
+        elif field == "goods":
+            name, _, amt = raw.partition(" ")
+            name = name.strip()
+            if name not in production.GOODS or player.tavern is None:
+                raise ValueError
+            prods = dict(player.tavern.products or {})
+            prods[name] = max(0, prods.get(name, 0) + int(amt.strip()))  # добавляем
+            player.tavern.products = prods
+            note = f"🍺 {production.GOODS[name].name} = {prods[name]}"
         else:
             val = int(raw)
             if field == "gold":

@@ -39,3 +39,26 @@ async def broadcast_fair(
         else:
             await deliver(lambda cid=chat_id: bot.send_message(cid, text),
                           what=f"ярмарка→{chat_id}")
+
+
+async def world_event(bot: Bot, session, text: str, now: datetime) -> None:
+    """Анонс мирового события: во все чаты (гаснет ~5 мин) + в ЛС ВСЕМ активным
+    одиночкам (без домашнего чата, заходили за неделю) — независимо от тумблера."""
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from bot import autoclean
+    from bot.db import repo
+    from bot.db.models import Player
+
+    for cid in await repo.all_chat_ids(session):
+        msg = await deliver(lambda c=cid: bot.send_message(c, text),
+                            what=f"погода→{cid}")
+        autoclean.schedule_message(msg, after=300)
+    cut = now - timedelta(days=7)
+    ids = [r[0] for r in (await session.execute(
+        select(Player.id).where(Player.chat_id.is_(None),
+                                Player.last_seen_at >= cut))).all()]
+    for uid in ids:
+        await deliver(lambda u=uid: bot.send_message(u, text), what=f"погода-лс→{uid}")
