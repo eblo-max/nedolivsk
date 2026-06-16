@@ -18,6 +18,33 @@ from bot.game.balance import RESOURCES
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent.parent / "assets"
 BG_FILE = ASSETS_DIR / "tablica.png"
+RESURS_DIR = ASSETS_DIR / "resurs"
+
+# id ресурса -> файл иконки (assets/resurs/<name>.png, прозрачный фон). Нет файла —
+# ячейка покажет только число (соль/рыба/молоко/камень — иконки в работе).
+SPRITES = {
+    "wood": "derevo", "grain": "zerno", "hops": "xmel", "water": "voda",
+    "honey": "med", "berries": "yagodi", "game": "dich", "ore": "ruda",
+    "clay": "glina", "herbs": "trava",
+    "salt": "sol", "fish": "ryba", "milk": "moloko", "stone": "kamen",
+}
+_sprite_cache: dict[str, "Image.Image | None"] = {}
+
+
+def _sprite(res: str) -> "Image.Image | None":
+    """Иконка ресурса, обрезанная по непрозрачной области. Кэшируется."""
+    if res in _sprite_cache:
+        return _sprite_cache[res]
+    name = SPRITES.get(res)
+    p = RESURS_DIR / f"{name}.png" if name else None
+    img = None
+    if p and p.is_file():
+        im = Image.open(p).convert("RGBA")
+        bbox = im.getchannel("A").point(lambda v: 255 if v > 40 else 0).getbbox()
+        img = im.crop(bbox) if bbox else im
+    _sprite_cache[res] = img
+    return img
+
 
 # Ячейки (x1, y1, x2, y2) на фоне 1024×1024 — нижняя половина каждой клетки
 # (под впечатанной подписью), 5 столбцов × 3 строки.
@@ -84,11 +111,24 @@ def render(inventory: dict | None) -> bytes:
     d = ImageDraw.Draw(base)
     for idx, res in enumerate(SHOWN_RESOURCES, 1):
         x1, y1, x2, y2 = CELLS[idx]
-        cx, cy, w = (x1 + x2) // 2, (y1 + y2) // 2, x2 - x1
+        cy, w, h = (y1 + y2) // 2, x2 - x1, y2 - y1
         qty = str(int(inv.get(res, 0)))
-        qf = _fit_font(d, qty, w - 6, 44, 18, bold=True)
-        l, t, r, b = d.textbbox((0, 0), qty, font=qf)  # центрируем число в ячейке
-        d.text((cx - (r - l) / 2 - l, cy - (b - t) / 2 - t), qty, font=qf, fill=QTY_COLOR)
+        sprite = _sprite(res)
+        if sprite is not None:
+            # значок слева, число справа — ровный «инвентарный» вид
+            iw_max, ih_max = int(w * 0.50), h - 6
+            scale = min(iw_max / sprite.width, ih_max / sprite.height)
+            sp = sprite.resize(
+                (max(1, int(sprite.width * scale)), max(1, int(sprite.height * scale))),
+                Image.Resampling.LANCZOS)
+            base.alpha_composite(sp, (x1 + 4, y1 + (h - sp.height) // 2))
+            nbox_x, nbox_w = x1 + int(w * 0.52), int(w * 0.46)
+        else:  # нет иконки — число по центру всей ячейки
+            nbox_x, nbox_w = x1, w
+        qf = _fit_font(d, qty, nbox_w - 4, 40, 16, bold=True)
+        l, t, r, b = d.textbbox((0, 0), qty, font=qf)
+        nx = nbox_x + (nbox_w - (r - l)) // 2 - l
+        d.text((nx, cy - (b - t) / 2 - t), qty, font=qf, fill=QTY_COLOR)
 
     out = io.BytesIO()
     base.convert("RGB").save(out, "JPEG", quality=88, optimize=True)
