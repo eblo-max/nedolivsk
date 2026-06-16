@@ -50,6 +50,44 @@ def test_speed_tradeoff_shield_direction():
     assert worldevent.exp_speed_mult(make_player(level=10)) == 1.25
 
 
+def test_advance_full_lifecycle():
+    """Полный цикл: пауза → старт → активно → истечение → пауза → новый старт."""
+    import random as _r
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from bot.game import worldevent as we
+
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    world = SimpleNamespace(event_kind=None, event_until=None, event_next_at=None)
+    rng = _r.Random(1)
+
+    # 1) первый тик — не палит сразу, ставит кулдаун
+    assert we.advance(world, now, rng) is None
+    assert world.event_kind is None and world.event_next_at is not None
+
+    # 2) до конца кулдауна — тишина
+    assert we.advance(world, now + timedelta(hours=1), rng) is None
+    assert world.event_kind is None
+
+    # 3) кулдаун прошёл — стартует событие
+    t = world.event_next_at + timedelta(minutes=1)
+    started = we.advance(world, t, rng)
+    assert started is not None and world.event_kind == started.id
+    assert world.event_until > t and world.event_next_at is None
+
+    # 4) пока активно — то же событие, не сбрасывается
+    assert we.advance(world, world.event_until - timedelta(minutes=1), rng) is None
+    assert world.event_kind == started.id
+
+    # 5) истекло — снимается, ставится новый кулдаун
+    assert we.advance(world, world.event_until + timedelta(seconds=1), rng) is None
+    assert world.event_kind is None and world.event_next_at is not None
+
+    # 6) следующий кулдаун прошёл — новое событие
+    again = we.advance(world, world.event_next_at + timedelta(minutes=1), rng)
+    assert again is not None and world.event_kind == again.id
+
+
 def test_roll_valid_and_set_balanced():
     r = random.Random(1)
     assert {worldevent.roll(r) for _ in range(500)} <= set(worldevent.EVENTS)

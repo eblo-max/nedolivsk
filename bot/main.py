@@ -82,6 +82,8 @@ async def _load_media_cache() -> None:
     async with session_factory() as session:
         world = await repo.get_or_create_world(session)
         common.load_file_ids(world.media_ids)
+        from bot.game import worldevent  # активное мир-событие — в кэш сразу на старте
+        worldevent.set_active(world.event_kind, world.event_until)
 
 
 async def main() -> None:

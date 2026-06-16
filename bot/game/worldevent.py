@@ -11,9 +11,9 @@ trade). Активное событие держит лёгкий кэш (ста
 
 import random
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from bot.game import story_state
+from bot.game import balance, story_state
 
 
 @dataclass(frozen=True)
@@ -90,6 +90,41 @@ def roll(rng: random.Random | None = None) -> str:
     rng = rng or random
     ids = list(EVENTS)
     return rng.choices(ids, weights=[EVENTS[i].weight for i in ids])[0]
+
+
+def _aware(dt: datetime | None) -> datetime | None:
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def advance(world, now: datetime, rng: random.Random | None = None) -> "WEvent | None":
+    """Прокрутить мировое событие (мутирует world.event_kind/until/next):
+      активно и истекло → снять + назначить кулдаун;
+      нет события и кулдаун прошёл → катнуть новое (вернуть его для анонса).
+    Кэш активного ставит вызывающий ПОСЛЕ коммита (set_active). Чистая логика —
+    тестируется без БД."""
+    rng = rng or random
+    until = _aware(world.event_until)
+    nxt = _aware(world.event_next_at)
+    cd = timedelta(hours=rng.uniform(balance.WORLDEVENT_COOLDOWN_MIN_HOURS,
+                                     balance.WORLDEVENT_COOLDOWN_MAX_HOURS))
+    if world.event_kind:
+        if until is not None and now >= until:        # событие кончилось
+            world.event_kind = None
+            world.event_until = None
+            world.event_next_at = now + cd
+        return None
+    if nxt is None:                                    # первичная пауза — не палим сразу
+        world.event_next_at = now + cd
+        return None
+    if now >= nxt:                                     # кулдаун прошёл — новое событие
+        e = EVENTS[roll(rng)]
+        world.event_kind = e.id
+        world.event_until = now + timedelta(hours=e.hours)
+        world.event_next_at = None
+        return e
+    return None
 
 
 def _ch(player, val: float, higher_better: bool) -> float:
