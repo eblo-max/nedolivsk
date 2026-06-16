@@ -50,6 +50,18 @@ def test_speed_tradeoff_shield_direction():
     assert worldevent.exp_speed_mult(make_player(level=10)) == 1.25
 
 
+def test_effect_summary_readable_for_all_events():
+    for e in worldevent.EVENTS.values():
+        s = worldevent.effect_summary(e)
+        assert s and "%" in s                         # у каждого есть понятный эффект
+    # трейд-офф «стужа»: и минус добычи, и плюс дохода
+    s = worldevent.effect_summary(worldevent.EVENTS["frost"])
+    assert "−15% добыча" in s and "+15% доход" in s
+    # «ненастье»: вылазки медленнее (+), варка быстрее (−)
+    s = worldevent.effect_summary(worldevent.EVENTS["rain"])
+    assert "+25% время вылазок" in s and "−20% время варки" in s
+
+
 def test_advance_full_lifecycle():
     """Полный цикл: пауза → старт → активно → истечение → пауза → новый старт."""
     import random as _r

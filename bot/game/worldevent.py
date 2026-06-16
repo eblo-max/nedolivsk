@@ -85,6 +85,27 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def effect_summary(e: WEvent) -> str:
+    """Человекочитаемые последствия события из каналов: «−15% добыча, +15% доход».
+    Время вылазок/варки: <1 — быстрее (показываем −%), >1 — медленнее (+%)."""
+    parts: list[str] = []
+
+    def higher_better(mult: float, label: str) -> None:
+        if mult != 1.0:
+            parts.append(f"{'+' if mult > 1 else '−'}{round(abs(mult - 1) * 100)}% {label}")
+
+    def lower_better(mult: float, label: str) -> None:  # время: меньше = выгода
+        if mult != 1.0:
+            parts.append(f"{'−' if mult < 1 else '+'}{round(abs(mult - 1) * 100)}% {label}")
+
+    higher_better(e.income, "доход")
+    higher_better(e.harvest, "добыча")
+    higher_better(e.sale, "сбыт")
+    lower_better(e.exp_speed, "время вылазок")
+    lower_better(e.prod_speed, "время варки")
+    return ", ".join(parts)
+
+
 def roll(rng: random.Random | None = None) -> str:
     """Случайное событие по весам."""
     rng = rng or random
