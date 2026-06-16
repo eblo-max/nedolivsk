@@ -513,6 +513,7 @@ async def _match_sell(session: AsyncSession, player: Player,
     remaining = qty
     bids = await repo.best_buy_orders(session, good, ask, player.id,
                                       limit=balance.BOURSE_MATCH_MAX)
+    await repo.lock_players(session, [bo.seller_id for bo in bids])  # анти-дедлок
     for bo in bids:
         if remaining <= 0:
             break
@@ -546,6 +547,7 @@ async def _match_buy(session: AsyncSession, player: Player,
     remaining = qty
     asks = await repo.best_sell_orders(session, good, bid, player.id,
                                        limit=balance.BOURSE_MATCH_MAX)
+    await repo.lock_players(session, [so.seller_id for so in asks])  # анти-дедлок
     for so in asks:
         if remaining <= 0:
             break

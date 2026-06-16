@@ -58,6 +58,17 @@ async def bourse_orders_since(session: AsyncSession, since, limit: int = 200):
     )).scalars().all())
 
 
+async def lock_players(session: AsyncSession, ids: list[int]) -> None:
+    """Захватить строки игроков в ЕДИНОМ порядке (по возрастанию id) — анти-дедлок
+    при сведении биржи (золотое правило: локи в консистентном порядке по ключу)."""
+    if not ids:
+        return
+    await session.execute(
+        select(Player.id).where(Player.id.in_(sorted(set(ids))))
+        .order_by(Player.id).with_for_update()
+    )
+
+
 # ── Рейд-босс (глобальный, один активный) ───────────────────────────────────
 async def get_active_raid(
     session: AsyncSession, *, lock: bool = False
