@@ -9,10 +9,13 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot import autoclean, texts
 from bot.db import repo
 from bot.game import inventory, loot
 
 router = Router()
+
+LOOT_RESULT_SECONDS = 10  # сколько висит «что выпало» перед авто-удалением
 
 
 @router.callback_query(F.data.startswith("loot:"))
@@ -45,8 +48,14 @@ async def cb_loot(callback: CallbackQuery, session: AsyncSession) -> None:
     else:
         what = "хлам"
     repo.add_log(session, "player", callback.from_user.id, f"🤲 поднял подкидыш: {what}")
-    try:  # подобрали — убираем сообщение из чата (анти-флуд)
-        await callback.message.delete()
+
+    # Показываем, ЧТО выпало, прямо в сообщении и гасим через 10 сек (анти-флуд).
+    name = callback.from_user.first_name or "Кто-то"
+    try:
+        await callback.message.edit_text(texts.loot_claimed(name, out, stored),
+                                          reply_markup=None)
+        autoclean.schedule(callback.message.bot, callback.message.chat.id,
+                           callback.message.message_id, after=LOOT_RESULT_SECONDS)
     except TelegramBadRequest:
         pass
 
