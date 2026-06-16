@@ -11,18 +11,18 @@ REGIONS = {
 RESOURCES = (
     "wood", "grain", "hops", "water", "honey",
     "berries", "game", "ore", "clay", "herbs",
-    "salt", "fish", "milk",
+    "salt", "fish", "milk", "stone",
 )
 RESOURCE_NAMES = {
     "wood": "Древесина", "grain": "Зерно", "hops": "Хмель",
     "water": "Вода", "honey": "Мёд", "berries": "Ягоды",
     "game": "Дичь", "ore": "Руда", "clay": "Глина", "herbs": "Травы",
-    "salt": "Соль", "fish": "Рыба", "milk": "Молоко",
+    "salt": "Соль", "fish": "Рыба", "milk": "Молоко", "stone": "Камень",
 }
 RESOURCE_EMOJI = {
     "wood": "🪵", "grain": "🌾", "hops": "🌿", "water": "💧", "honey": "🍯",
-    "berries": "🍒", "game": "🥩", "ore": "⛏", "clay": "🪨", "herbs": "🌶",
-    "salt": "🧂", "fish": "🐟", "milk": "🥛",
+    "berries": "🍒", "game": "🥩", "ore": "⛏", "clay": "🟤", "herbs": "🌶",
+    "salt": "🧂", "fish": "🐟", "milk": "🥛", "stone": "🪨",
 }
 
 # Полуфабрикаты (не добываются вылазками, но имеют имя и ценность):
@@ -49,6 +49,7 @@ EXPEDITION_YIELD = {  # (база на 1-м уровне, прирост за у
     "salt": (10, 2),
     "fish": (14, 3),
     "milk": (12, 3),
+    "stone": (12, 3),
 }
 WORKER_PAY_PER_LEVEL = 10  # плата работникам за вылазку: 10 * уровень таверны
 # Прирост добычи за уровень множится на это: плата бригадам растёт ×уровень, и
@@ -303,13 +304,17 @@ def worker_pay(level: int) -> int:
 
 
 def upgrade_cost(level: int) -> dict:
-    """Стоимость перехода с level на level+1 (вариант B: ~3× к прежнему)."""
-    return {
+    """Стоимость перехода с level на level+1 (вариант B: ~3× к прежнему).
+    С 5-го уровня в стройку идёт КАМЕНЬ — крепкие стены под большую таверну."""
+    cost = {
         "gold": 250 * level * level,
         "wood": 75 * level,
         "grain": 60 * level,
         "hops": 40 * level,
     }
+    if level >= 5:  # переход 5→6 и выше требует камня
+        cost["stone"] = 40 * level
+    return cost
 
 
 def stats_for_level(level: int) -> dict:
@@ -328,9 +333,9 @@ def reputation_for_upgrade(new_level: int) -> int:
 # ===== ВВП (валовый продукт таверны) =====
 # Рыночные цены ресурсов в золоте — обратно пропорциональны лёгкости добычи
 RESOURCE_PRICE = {
-    "water": 1.0, "wood": 2.0, "clay": 2.0, "grain": 2.5, "berries": 3.0,
-    "milk": 3.0, "fish": 4.0, "hops": 4.0, "herbs": 4.5, "salt": 5.0,
-    "honey": 6.0, "game": 6.5, "ore": 7.0,
+    "water": 1.0, "wood": 2.0, "clay": 2.0, "stone": 2.5, "grain": 2.5,
+    "berries": 3.0, "milk": 3.0, "fish": 4.0, "hops": 4.0, "herbs": 4.5,
+    "salt": 5.0, "honey": 6.0, "game": 6.5, "ore": 7.0,
     # полуфабрикаты (для ВВП): передел не создаёт богатства сам по себе —
     # его создаёт только продажа готового товара.
     "malt": 3.1,    # 10🌾→8 солода: 10×2.5/8 ≈ 3.1

@@ -52,7 +52,7 @@ CATALOG: dict[str, Building] = {
         id="kitchen", emoji="🍖", name="Кухня",
         description="Вертел скрипит, жир капает в огонь. Сытый гость пьёт "
                     "дольше и платит охотнее.",
-        cost={"gold": 1000, "wood": 120, "clay": 60},
+        cost={"gold": 1000, "wood": 120, "clay": 60, "stone": 50},
         build_hours=2, unlocks="блюда — отдельный спрос на сытость",
         image="kyxnya",
     ),
@@ -68,14 +68,14 @@ CATALOG: dict[str, Building] = {
         id="smelter", emoji="🔩", name="Горн",
         description="Угли пышут, меха хрипят. Руда плавится в слитки — "
                     "из них кузнец и куёт доброе железо.",
-        cost={"gold": 900, "wood": 100, "clay": 100},
+        cost={"gold": 900, "wood": 100, "clay": 100, "stone": 90},
         build_hours=2, unlocks="слитки из руды (дешевле снаряга)", image="gorn",
     ),
     "bakery": Building(
         id="bakery", emoji="🥖", name="Пекарня",
         description="Печь дышит жаром, пахнет хлебом на всю улицу. "
                     "Из муки — хлеб да пироги, и гость сыт.",
-        cost={"gold": 1000, "wood": 120, "clay": 80},
+        cost={"gold": 1000, "wood": 120, "clay": 80, "stone": 60},
         build_hours=2, requires=("mill",), unlocks="хлеб и пироги из муки",
         image="pekarnya",
     ),

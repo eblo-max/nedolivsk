@@ -1141,11 +1141,14 @@ def _pending_income(tavern: Tavern) -> int:
     return int(tavern.income_rate * hours) if hours > 0 else 0
 
 
-def _storage_line(player: Player) -> str:
+def _storage_lines(player: Player) -> list[str]:
+    """Все ненулевые ресурсы значками, разбитые по 7 в строку (без простыни)."""
     inv = player.inventory or {}
     parts = [f"{RESOURCE_EMOJI[r]} {inv[r]}"
              for r in balance.RESOURCES if inv.get(r, 0) > 0]
-    return " · ".join(parts[:6]) if parts else "пусто"
+    if not parts:
+        return ["пусто"]
+    return [" · ".join(parts[i:i + 7]) for i in range(0, len(parts), 7)]
 
 
 def _upgrade_pct(player: Player, tavern: Tavern) -> int | None:
@@ -1153,7 +1156,7 @@ def _upgrade_pct(player: Player, tavern: Tavern) -> int | None:
         return None
     cost = balance.upgrade_cost(tavern.level)
     pcts = []
-    for k in ("gold", "wood", "grain", "hops"):
+    for k in cost:  # учитываем все позиции (с ур.5 — и камень)
         have = player.gold if k == "gold" else inventory.get(player, k)
         need = cost.get(k, 0)
         pcts.append(min(1.0, have / need) if need else 1.0)
@@ -1252,7 +1255,7 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
         ]),
         "",
         *_branch("СКЛАД", [
-            _storage_line(player),
+            *_storage_lines(player),
             f"🛢 Погреб — {_cellar_line(tavern)}",
         ]),
         "",
@@ -1268,7 +1271,7 @@ def _upgrade_need_block(player: Player, tavern: Tavern) -> list[str]:
     cost = balance.upgrade_cost(tavern.level)
     emoji = {"gold": "🪙", **RESOURCE_EMOJI}
     lines = []
-    for key in ("gold", "wood", "grain", "hops"):
+    for key in cost:  # все позиции стоимости (с ур.5 добавляется камень)
         have = player.gold if key == "gold" else inventory.get(player, key)
         mark = "✅" if have >= cost[key] else "❌"
         lines.append(f"{emoji[key]} {have} / {cost[key]} {mark}")
@@ -1392,6 +1395,7 @@ RESOURCE_INSTRUMENTAL = {
     "salt": "солью",
     "fish": "рыбой",
     "milk": "молоком",
+    "stone": "камнем",
 }
 
 
