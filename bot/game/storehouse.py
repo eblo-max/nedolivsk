@@ -49,12 +49,12 @@ def _sprite(res: str) -> "Image.Image | None":
 # Ячейки (x1, y1, x2, y2) на фоне 1024×1024 — нижняя половина каждой клетки
 # (под впечатанной подписью), 5 столбцов × 3 строки.
 CELLS = {
-    1: (172, 391, 289, 480), 2: (313, 391, 430, 480), 3: (454, 391, 571, 480),
-    4: (595, 391, 712, 480), 5: (736, 391, 853, 480),
-    6: (172, 581, 289, 671), 7: (313, 581, 430, 671), 8: (454, 581, 571, 671),
-    9: (595, 581, 712, 671), 10: (736, 581, 853, 671),
-    11: (172, 772, 289, 861), 12: (313, 772, 430, 861), 13: (454, 772, 571, 861),
-    14: (595, 772, 712, 861), 15: (736, 772, 853, 861),
+    1: (172, 372, 289, 470), 2: (313, 372, 430, 470), 3: (454, 372, 571, 470),
+    4: (595, 372, 712, 470), 5: (736, 372, 853, 470),
+    6: (172, 562, 289, 660), 7: (313, 562, 430, 660), 8: (454, 562, 571, 660),
+    9: (595, 562, 712, 660), 10: (736, 562, 853, 660),
+    11: (172, 752, 289, 850), 12: (313, 752, 430, 850), 13: (454, 752, 571, 850),
+    14: (595, 752, 712, 850), 15: (736, 752, 853, 850),
 }
 # Ячеек хватает на все ресурсы — overflow в текст больше не нужен.
 SHOWN_RESOURCES = RESOURCES[:len(CELLS)]
@@ -109,26 +109,32 @@ def render(inventory: dict | None) -> bytes:
 
     base = Image.open(BG_FILE).convert("RGBA")
     d = ImageDraw.Draw(base)
+    gap = 3
     for idx, res in enumerate(SHOWN_RESOURCES, 1):
         x1, y1, x2, y2 = CELLS[idx]
-        cy, w, h = (y1 + y2) // 2, x2 - x1, y2 - y1
+        cx, cy, w, h = (x1 + x2) // 2, (y1 + y2) // 2, x2 - x1, y2 - y1
         qty = str(int(inv.get(res, 0)))
         sprite = _sprite(res)
-        if sprite is not None:
-            # значок слева, число справа — ровный «инвентарный» вид
-            iw_max, ih_max = int(w * 0.50), h - 6
-            scale = min(iw_max / sprite.width, ih_max / sprite.height)
-            sp = sprite.resize(
-                (max(1, int(sprite.width * scale)), max(1, int(sprite.height * scale))),
-                Image.Resampling.LANCZOS)
-            base.alpha_composite(sp, (x1 + 4, y1 + (h - sp.height) // 2))
-            nbox_x, nbox_w = x1 + int(w * 0.52), int(w * 0.46)
-        else:  # нет иконки — число по центру всей ячейки
-            nbox_x, nbox_w = x1, w
-        qf = _fit_font(d, qty, nbox_w - 4, 40, 16, bold=True)
+        if sprite is None:               # без иконки — число по центру ячейки
+            qf = _fit_font(d, qty, w - 6, min(44, h - 4), 16, bold=True)
+            l, t, r, b = d.textbbox((0, 0), qty, font=qf)
+            d.text((cx - (r - l) / 2 - l, cy - (b - t) / 2 - t), qty, font=qf,
+                   fill=QTY_COLOR)
+            continue
+        # иконка + число СТЕКОМ, центрируем группу целиком в ячейке
+        qf = _fit_font(d, qty, w - 6, 30, 14, bold=True)
         l, t, r, b = d.textbbox((0, 0), qty, font=qf)
-        nx = nbox_x + (nbox_w - (r - l)) // 2 - l
-        d.text((nx, cy - (b - t) / 2 - t), qty, font=qf, fill=QTY_COLOR)
+        num_w, num_h = r - l, b - t
+        ih_max = h - num_h - gap - 4     # высота под иконку (остаток после числа)
+        scale = min((w - 12) / sprite.width, ih_max / sprite.height)
+        sp = sprite.resize(
+            (max(1, int(sprite.width * scale)), max(1, int(sprite.height * scale))),
+            Image.Resampling.LANCZOS)
+        group_h = sp.height + gap + num_h
+        gtop = y1 + (h - group_h) // 2
+        base.alpha_composite(sp, (cx - sp.width // 2, gtop))
+        d.text((cx - num_w / 2 - l, gtop + sp.height + gap - t), qty, font=qf,
+               fill=QTY_COLOR)
 
     out = io.BytesIO()
     base.convert("RGB").save(out, "JPEG", quality=88, optimize=True)
