@@ -167,6 +167,33 @@ CATALOG: dict[str, Item] = {
             cost={"gold": 750, "wood": 10, "grain": 25, "hops": 20},
             craft_hours=4, pay_discount_pct=15, luck=2,
         ),
+        # ═══════ КОМПОНЕНТНАЯ СНАРЯГА (Фаза 2): куётся из охот-трофеев (шкура/
+        # клык/жила/перстень), закрывает разрыв между стартовой кузней и снарягой
+        # боссов. craftable=True (ярусы — больше охоты), но слабее топ-снаряги ★★★.
+        Item(
+            id="fur_coat", slot="chest", name="Меховая доха",
+            description="Шкуры зверья мехом внутрь. Тепло, и удар держит — не фартук.",
+            cost={"gold": 1500, "ingot": 4, "hide": 6},
+            craft_hours=5, armor=14, income_pct=2, sprite="bronya",
+        ),
+        Item(
+            id="fang_cleaver", slot="weapon", name="Клычный тесак",
+            description="Звериные клыки в рукоять. Рвёт мясо и спор не хуже ковша.",
+            cost={"gold": 1800, "ingot": 4, "fang": 5},
+            craft_hours=6, damage=22, crit=5, sprite="oruzhie",
+        ),
+        Item(
+            id="swift_boots", slot="boots", name="Сапоги-скороходы",
+            description="Прошиты звериными жилами. Бегут — не угонишься, и фарт при тебе.",
+            cost={"gold": 900, "ingot": 2, "sinew": 4},
+            craft_hours=4, speed_pct=10, luck=4,
+        ),
+        Item(
+            id="prestige_ring", slot="talisman", name="Перстень-диковина",
+            description="Снят с атамана. Блестит так, что и удача, и купцы косятся.",
+            cost={"gold": 2000, "ingot": 6, "ring": 1},
+            craft_hours=6, income_pct=5, luck=8,
+        ),
         # ═══════ ЭКСКЛЮЗИВ РЕЙД-БОССОВ (craftable=False, только выбить) ═══════
         # Статы множатся на ярус; падают рандомным ярусом, ★★★ — редчайшее.
         # cost — прокси-стоимость для ВВП (не куётся, цена символическая).

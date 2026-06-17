@@ -138,7 +138,8 @@ STRATEGIES = {
         plan=[("smelter", "ingot")], build_order=["smelter"],
         expedition_focus=["wood", "grain", "hops", "ore"],
         hunt=True, hunt_min_wr=65,
-        craft_order=["master_axe", "kovsh", "fartuk", "oak_shield", "leather_cap"],
+        craft_order=["master_axe", "fartuk", "fang_cleaver", "fur_coat",
+                     "swift_boots", "kovsh", "oak_shield", "leather_cap"],
         upgrade=True),
     "builder": Strategy(
         name="Строитель-рашер", sessions_per_day=4,
@@ -607,6 +608,8 @@ def hunt_matrix():
         "топор★+фартук★": {"right_hand": "master_axe:1", "chest": "fartuk:1"},
         "ковш★ полный★": {"weapon": "kovsh:1", "chest": "fartuk:1", "left_hand": "oak_shield:1",
                           "head": "leather_cap:1"},
+        "тесак★ компон": {"weapon": "fang_cleaver:1", "chest": "fur_coat:1",
+                          "left_hand": "oak_shield:1", "head": "leather_cap:1"},
         "ковш★★★ (мастер)": {"weapon": "kovsh:3", "chest": "fartuk:3", "left_hand": "oak_shield:3",
                              "head": "leather_cap:3"},
         "снаряга дракона": {"weapon": "dragon_fang:3", "chest": "dragon_scale:3",
