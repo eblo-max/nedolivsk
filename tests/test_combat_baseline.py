@@ -23,11 +23,22 @@ FULL = {"weapon": "kovsh:1", "chest": "fartuk:1",
 MASTER = {slot: entry.split(":")[0] + ":3" for slot, entry in FULL.items()}
 
 
-def test_naked_does_starters_not_viper():
-    """Голыми руками — мелочь берётся, а Гадюка (спайк-урон) нет: ранний обрыв."""
-    assert _wr(NAKED, "zayac") >= 95
-    assert _wr(NAKED, "lisa") >= 85
-    assert _wr(NAKED, "gadyuka") <= 15
+def test_naked_smooth_gradient_no_cliff():
+    """Голыми руками (Фаза 1.5, логистика): плавный градиент — заяц верняк, лиса
+    средне, гадюка рискованно. Никаких жёстких 0/100 на старте."""
+    z, lisa, g = _wr(NAKED, "zayac"), _wr(NAKED, "lisa"), _wr(NAKED, "gadyuka")
+    assert z >= 95
+    assert 50 <= lisa <= 90        # лиса — не гарант и не стена
+    assert 0 < g <= 25             # гадюка рискованна, но НЕ жёсткий 0
+    assert z > lisa > g            # монотонно сложнее
+
+
+def test_winrate_is_smooth_not_binary():
+    """Ядро Фазы 1.5: на среднем ките много «середин» (1-99%), а не только 0/100."""
+    kit = FULL
+    wrs = [_wr(kit, eid) for eid in combat.ENEMY]
+    middles = sum(1 for w in wrs if 5 < w < 95)
+    assert middles >= 3, f"кривая снова бинарная: {wrs}"
 
 
 def test_gear_monotonic_per_enemy():

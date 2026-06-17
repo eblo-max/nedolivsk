@@ -152,55 +152,87 @@ def _dodge_pct(stats: dict) -> int:
                    stats.get("luck", 0) * balance.HUNT_LUCK_DODGE_PER))
 
 
+def _combat_dps(stats: dict, enemy: Enemy, hp: int):
+    """Ожидаемые урон/раунд игрока (pdps) и зверя по игроку (edps), и время-до-
+    убийства обеих сторон — из ВСЕХ статов. Общий движок для шанса и прогноза."""
+    dmg = balance.BASE_DAMAGE + stats.get("damage", 0)
+    crit = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0)) / 100
+    dodge = min(balance.HUNT_LUCK_DODGE_CAP,
+                stats.get("luck", 0) * balance.HUNT_LUCK_DODGE_PER) / 100
+    tmult = stats.get("dmg_taken_mult", 1.0)
+    # крит ×2 И пробивает броню зверя; обычный удар — за вычетом брони
+    pdps = (1 - crit) * max(1, dmg - enemy.armor) + crit * 2 * dmg
+    mit = balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + stats.get("armor", 0))
+    edps = max(0.1, enemy.attack * mit * tmult * (1 - dodge))
+    t_kill = enemy.hp / max(0.1, pdps)      # раундов добить зверя
+    t_die = hp / edps                       # раундов до своей смерти
+    return pdps, edps, t_kill, t_die
+
+
+def win_chance(stats: dict, enemy: Enemy, start_hp: int | None = None) -> float:
+    """Гладкий шанс победы (0..1) — логистика от отношения времени-до-убийства,
+    с учётом ВСЕХ статов обеих сторон и потолка раундов. Без жёстких 0/100."""
+    hp = balance.BASE_HP if start_hp is None else start_hp
+    _pdps, _edps, t_kill, t_die = _combat_dps(stats, enemy, hp)
+    # не успел добить за HUNT_MAX_ROUNDS — поражение (overwhelmed): живучесть капается
+    r = min(t_die, balance.HUNT_MAX_ROUNDS) / t_kill
+    k = balance.HUNT_WINRATE_K
+    return r ** k / (r ** k + 1)
+
+
 def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
             rng: random.Random | None = None) -> Fight:
-    """Прогон боя по статам снаряги от заданного HP (по умолч. полный BASE_HP)."""
+    """Бой: ИСХОД — гладкая логистика win_chance (все статы); раунды — антураж
+    (реальные числа ударов) для анимации, согласованный с исходом."""
     rng = rng or random
+    php0 = balance.BASE_HP if start_hp is None else start_hp
+    won = rng.random() < win_chance(stats, enemy, php0)
     dmg, crit_pct, parmor = _player_offense(stats)
     dodge_pct = _dodge_pct(stats)
-    php = balance.BASE_HP if start_hp is None else start_hp
-    ehp = enemy.hp
     v = balance.HUNT_DMG_VARIANCE
-    mit = balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + parmor)  # убывающая броня
-    tmult = stats.get("dmg_taken_mult", 1.0)  # баф «Толстая шкура» (<1 — крепче)
+    mit = balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + parmor)
+    tmult = stats.get("dmg_taken_mult", 1.0)
+    php, ehp = php0, enemy.hp
     rounds = crits = dealt = 0
     log = []
-    while ehp > 0 and php > 0 and rounds < balance.HUNT_MAX_ROUNDS:
+    while ehp > 0 and rounds < balance.HUNT_MAX_ROUNDS:
         rounds += 1
         crit = rng.randint(1, 100) <= crit_pct
-        # Крит ПРОБИВАЕТ броню зверя (урон без её вычета) + ×2; обычный — за вычетом.
         base = dmg if crit else max(1, dmg - enemy.armor)
         hit = max(1, round(base * rng.uniform(1 - v, 1 + v)))
         if crit:
             hit *= 2
             crits += 1
         ehp -= hit
+        if not won:
+            ehp = max(1, ehp)        # в проигрыше зверь не «умирает» в антураже
         dealt += hit
         ed = 0
         if ehp > 0:
-            if rng.randint(1, 100) <= dodge_pct:    # удача → уворот: удар мимо
-                ed = 0
-            else:
+            if rng.randint(1, 100) > dodge_pct:   # удача → уворот: иначе бьёт
                 ed = max(1, round(enemy.attack * mit * tmult * rng.uniform(1 - v, 1 + v)))
             php -= ed
+            if won:
+                php = max(1, php)    # в победе не «умираешь» в антураже
         log.append({"pd": hit, "crit": crit, "ed": ed,
                     "php": max(0, php), "ehp": max(0, ehp)})
-    win = ehp <= 0 and php > 0
-    overwhelmed = ehp > 0 and rounds >= balance.HUNT_MAX_ROUNDS
-    return Fight(win, rounds, crits, dealt, max(0, php), overwhelmed, log)
+        if not won and php <= 0:
+            break
+    hp_left = max(1, php) if won else 0
+    overwhelmed = (not won) and ehp > 0
+    return Fight(won, rounds, crits, dealt, hp_left, overwhelmed, log)
 
 
 def forecast(stats: dict, enemy: Enemy, start_hp: int | None = None,
-             n: int = 160, rng: random.Random | None = None) -> tuple[int, int]:
-    """Прогноз исхода от текущего HP: (шанс победы %, средне-остаточное HP)."""
-    rng = rng or random
-    wins = hp_sum = 0
-    for _ in range(n):
-        f = resolve(stats, enemy, start_hp, rng)
-        if f.win:
-            wins += 1
-            hp_sum += f.hp_left
-    return round(wins * 100 / n), (round(hp_sum / wins) if wins else 0)
+             n: int = 0, rng: random.Random | None = None) -> tuple[int, int]:
+    """Прогноз: (шанс победы %, оценка остаточного HP при победе). Гладкая
+    логистика от всех статов — мгновенно, без Монте-Карло (n/rng не нужны,
+    оставлены для совместимости вызовов)."""
+    hp = balance.BASE_HP if start_hp is None else start_hp
+    p = win_chance(stats, enemy, hp)
+    _pdps, edps, t_kill, _t_die = _combat_dps(stats, enemy, hp)
+    est_hp = max(1, round(hp - t_kill * edps)) if p > 0 else 0
+    return round(p * 100), est_hp
 
 
 def threat(win_pct: int) -> tuple[str, str]:
