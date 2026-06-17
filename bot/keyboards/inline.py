@@ -343,9 +343,10 @@ def hunt_menu_kb(player) -> InlineKeyboardMarkup:
     if combat.can_heal(player):
         kb.button(text="🍖 Подлечиться", callback_data="healmenu", style="success")
         sizes.append(1)
-    for e in combat.ENEMIES:
+    beasts = combat.huntable(getattr(player, "region", None))   # +зверь своего региона
+    for e in beasts:
         kb.button(text=f"{e.emoji} {e.name}", callback_data=f"hbeast:{e.id}")
-    n = len(combat.ENEMIES)
+    n = len(beasts)
     sizes += [2] * (n // 2) + ([1] if n % 2 else [])
     kb.button(text="🧍 К персонажу", callback_data="character")
     sizes.append(1)

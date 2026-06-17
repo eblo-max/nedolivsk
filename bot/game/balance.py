@@ -33,13 +33,16 @@ RESOURCE_EMOJI = {
 GOODS_NAMES = {
     "malt": "Солод", "flour": "Мука", "ingot": "Слиток",
     "hide": "Шкура", "fang": "Клык", "sinew": "Жила", "ring": "Перстень-диковина",
+    # региональные компоненты (Фаза 4): с уникального зверя своего региона
+    "pelt": "Рысий мех", "tusk": "Секачий клык", "chitin": "Хитин",
 }
 GOODS_EMOJI = {
     "malt": "🌱", "flour": "🥣", "ingot": "🔩",
     "hide": "🟫", "fang": "🦷", "sinew": "🪢", "ring": "💍",
+    "pelt": "🐾", "tusk": "🐗", "chitin": "🦂",
 }
 # Охот-компоненты (для проверок «не продаётся в лавке», дропа и т.п.).
-HUNT_COMPONENTS = ("hide", "fang", "sinew", "ring")
+HUNT_COMPONENTS = ("hide", "fang", "sinew", "ring", "pelt", "tusk", "chitin")
 
 # Стартовые запасы новой таверны
 STARTING_INVENTORY = {"wood": 10, "grain": 10, "hops": 5}
@@ -398,6 +401,7 @@ RESOURCE_PRICE = {
     "ingot": 10.5,  # 6⛏→4 слитка: 6×7.0/4 ≈ 10.5
     # охот-компоненты (для ВВП и любых будущих продаж): ценность ∝ редкости дропа.
     "hide": 6.0, "fang": 9.0, "sinew": 5.0, "ring": 45.0,
+    "pelt": 8.0, "tusk": 8.0, "chitin": 8.0,   # региональные — паритетная цена
 }
 
 

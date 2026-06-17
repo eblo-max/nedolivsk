@@ -1831,10 +1831,11 @@ def hunt_menu(player) -> str:
     if not ready:
         parts += ["", f"🩸 Ранен — отлёживаешься, в строй через {_fmt_minutes(mins)}"]
     prey = []
-    for e in combat.ENEMIES:
+    for e in combat.huntable(getattr(player, "region", None)):   # +зверь своего региона
         wp, _ = combat.forecast(st, e, chp, 120)   # шансы от текущего HP
         tcol, _lbl = combat.threat(wp)
-        prey.append(f"{tcol} {e.emoji} {e.name} — ❤{e.hp}")
+        reg = " 🗺" if e.region else ""             # пометка регионального зверя
+        prey.append(f"{tcol} {e.emoji} {e.name}{reg} — ❤{e.hp}")
     parts += ["", *_branch("ЗВЕРЬЁ (цвет — твои шансы)", prey)]
     parts += ["", "<i>Жми на зверя — покажу расклад по твоим статам и добычу.</i>"]
     return "\n".join(parts)

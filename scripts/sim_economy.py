@@ -495,7 +495,7 @@ def _hunt_session(p: SimPlayer, s: Strategy, now_h: float, rng: random.Random):
         if p.hp < min_hp:
             break
         best, best_ev = None, 0.0
-        for e in combat.ENEMIES:
+        for e in combat.huntable(p.region):       # общие + зверь региона игрока
             wr, _ = hunt_forecast(p, e, rng)
             if wr < s.hunt_min_wr:
                 continue

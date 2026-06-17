@@ -105,3 +105,42 @@ def test_elite_drops_guaranteed_components_and_rare_ring():
         got_comp = got_comp or res.get("hide", 0) > 0
         got_ring = got_ring or res.get("ring", 0) > 0
     assert got_comp and got_ring
+
+
+# ── Фаза 4: регионализация ──────────────────────────────────────────────
+REGION_BEAST = {"north_wilds": "lynx", "green_valleys": "tusker", "red_wastes": "scorpion"}
+
+
+def test_region_filter_shows_common_plus_own_beast():
+    common = [e.id for e in combat.ENEMIES if not e.region]
+    for region, beast in REGION_BEAST.items():
+        ids = [e.id for e in combat.huntable(region)]
+        assert set(common) <= set(ids)                 # все общие доступны
+        assert beast in ids                            # свой региональный — да
+        others = {b for r, b in REGION_BEAST.items() if r != region}
+        assert not (others & set(ids))                 # чужие региональные — нет
+
+
+def test_regional_beasts_drop_unique_component():
+    comp = {"lynx": "pelt", "tusker": "tusk", "scorpion": "chitin"}
+    for bid, c in comp.items():
+        rng = random.Random(3)
+        assert any(c in combat.roll_loot(combat.ENEMY[bid], 0, rng)["res"]
+                   for _ in range(400))
+
+
+def test_regional_belts_parity_identical_stats():
+    belts = ("lynx_belt", "tusk_belt", "chitin_belt")
+    stats = [tuple(sorted(items.combat_stats({"belt": f"{b}:1"}).items())) for b in belts]
+    assert len(set(stats)) == 1                        # статы ИДЕНТИЧНЫ (паритет)
+    # каждый требует компонент своего региона
+    for b, c in zip(belts, ("pelt", "tusk", "chitin"), strict=True):
+        assert c in items.CATALOG[b].cost
+
+
+def test_regional_beasts_difficulty_parity():
+    """Сложность троих региональных — в узкой полосе (паритет усилия за компонент)."""
+    kit = {"weapon": "fang_cleaver:1", "chest": "fur_coat:1",
+           "left_hand": "oak_shield:1", "head": "leather_cap:1"}
+    wrs = [_wr_enemy(kit, combat.ENEMY[b]) for b in REGION_BEAST.values()]
+    assert max(wrs) - min(wrs) <= 15, f"асимметрия регионов: {wrs}"

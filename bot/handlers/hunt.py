@@ -81,8 +81,8 @@ async def cb_hunt_beast(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         return
     enemy = combat.ENEMY.get(callback.data.split(":", 1)[1])
-    if enemy is None:
-        await callback.answer()
+    if enemy is None or (enemy.region and enemy.region != player.region):
+        await callback.answer("Этот зверь водится не в твоём краю.", show_alert=True)
         return
     await _render(callback, texts.hunt_detail(player, enemy),
                   kb.hunt_detail_kb(enemy.id), video=enemy.video or None)
@@ -128,6 +128,10 @@ async def cb_hunt_fight(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         return
     enemy_id = callback.data.split(":", 1)[1]
+    _e = combat.ENEMY.get(enemy_id)
+    if _e is not None and _e.region and _e.region != player.region:
+        await callback.answer("Этот зверь водится не в твоём краю.", show_alert=True)
+        return
     res = combat.hunt(player, enemy_id)
     if not res.ok:
         if res.reason == "lowhp":
