@@ -60,14 +60,15 @@ def test_loot_gear_only_from_boss_pool_and_rarity_scales():
                 seen.add(d["item_id"]); gear_hits += 1
                 assert 1 <= d["tier"] <= 3
         assert seen <= pool and seen                      # только из пула босса
-    # снаряга реже всего и растёт с тиром босса
+    # Инверсия по сложности: лёгкий босс роняет снарягу ЧАЩЕ (слабую), дракон —
+    # реже всего (его снаряга сильнейшая → редкий престиж-трофей).
     def rate(key):
         r = random.Random(99)
         g = sum(raid.settle(make_boss(key, status="dead",
                 contributions={"1": {"dmg": 9, "hits": 1, "name": "a"}}), r)["drop"]["kind"] == "gear"
                 for _ in range(30000))
         return g / 30000
-    assert rate("rat_king") < rate("bog_troll") < rate("dragon")
+    assert rate("rat_king") > rate("bog_troll") > rate("dragon")
 
 
 # ── броня (mitigate) ───────────────────────────────────────────────────────
@@ -135,10 +136,12 @@ def test_cooldown_takes_max_of_personal_and_stun():
 
 
 def test_gear_drop_pct_matches_loot_weights():
-    # веса лута в промилле (сумма 1000) → % снаряги = вес/10
-    assert raid.gear_drop_pct("rat_king") == 1.5
-    assert raid.gear_drop_pct("bog_troll") == 3.5
-    assert raid.gear_drop_pct("dragon") == 7.0
+    # веса лута в промилле (сумма 1000) → % снаряги = вес/10.
+    # Инверсия по сложности: лёгкий босс щедрее на (слабую) снарягу, дракон — редок.
+    assert raid.gear_drop_pct("rat_king") == 8.0
+    assert raid.gear_drop_pct("bog_troll") == 5.0
+    assert raid.gear_drop_pct("dragon") == 3.0
+    assert raid.gear_drop_pct("rat_king") > raid.gear_drop_pct("dragon")  # лёгкий > сильный
     assert raid.gear_drop_pct("нет такого") == 0.0
 
 
@@ -151,7 +154,7 @@ def test_gather_announce_states_loot_rules():
                         contributions={})
     s = texts.raid_gather_screen(b)
     assert "ДОБЫЧА" in s                                   # блок добычи есть
-    assert "~7%" in s                                      # честный шанс снаряги
+    assert "~3%" in s                                      # честный шанс снаряги (дракон редок)
     assert "поровну" in s                                  # золото делится
     assert "реально нанёс урон" in s                       # доля — только бившим
     assert "<blockquote expandable>" in s                  # лор спрятан под разворот
