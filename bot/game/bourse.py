@@ -20,7 +20,10 @@ from bot.game import production as prod
 
 
 def base_price(good: str) -> int:
-    return prod.GOODS[good].price if good in prod.GOODS else 0
+    if good not in prod.GOODS:
+        return 0
+    from bot.game import worldevent  # ленивый импорт — без цикла
+    return max(1, round(prod.GOODS[good].price * worldevent.good_price_mult(good)))
 
 
 def price_floor(good: str) -> int:

@@ -1109,10 +1109,16 @@ def _world_lines(chat_id, seasonmod, citymod) -> list[str]:
     else:
         w1 = f"{s.emoji} {s.name} — спрос обычный"
     out = [w1]
-    from bot.game import worldevent
+    from bot.game import production, worldevent
     ev = worldevent.active()
     if ev is not None:   # активное мировое событие — первым, с таймером и эффектом
-        out.insert(0, f"{ev.emoji} {ev.name} ({worldevent.effect_summary(ev)}) — "
+        summ = worldevent.effect_summary(ev)
+        fg = worldevent.fashion_good()
+        if fg:           # мода на товар — показываем его имя и премию к цене
+            g = production.GOODS.get(fg)
+            gname = g.name if g else fg
+            summ = f"🔥 в моде {gname} +{round((ev.good_price - 1) * 100)}% цена"
+        out.insert(0, f"{ev.emoji} {ev.name} ({summ}) — "
                       f"ещё {_fmt_left_h(worldevent.active_until())}")
     if wld.is_fair():
         out.append(f"🎪 Ярмарка — ещё {_fmt_minutes(wld.fair_minutes_left())}")
@@ -1491,6 +1497,12 @@ def income_success(r, player=None) -> str:
     amult = logic.assortment_mult(r.order)
     if r.order and amult > 1.0:
         mods.append(f"🍽 Богатое меню ({len(r.order)} вида) — +{round((amult - 1) * 100)}% выручки")
+    from bot.game import worldevent
+    fg = worldevent.fashion_good()
+    if r.order and fg in (r.order or {}):
+        g = prod.GOODS.get(fg)
+        mods.append(f"🔥 В моде {g.name if g else fg} — "
+                    f"+{round((worldevent.active().good_price - 1) * 100)}% цена")
     if mods:
         parts += ["", *_branch("ОБСТАНОВКА", mods)]
     tail = []
@@ -1531,6 +1543,11 @@ def retail_sold(sold: dict, gold: int, rep: int, skim: int = 0,
         parts.append(f"⭐ +{rep} к репутации за бойкую торговлю")
     if rep_left is not None:   # видно прогресс, даже если +0 за эту продажу
         parts.append(f"📣 До следующей +1 репутации — ещё <b>{rep_left}</b> порций")
+    from bot.game import worldevent
+    fg = worldevent.fashion_good()
+    if fg in (sold or {}):     # модный товар ушёл по премиальной цене
+        g = prod.GOODS.get(fg)
+        parts.append(f"🔥 {g.name if g else fg} в моде — ушёл с наценкой!")
     return "\n".join(parts)
 
 
@@ -1744,9 +1761,17 @@ def bourse_news(sells: list, buys: list) -> str:
     return "\n".join(parts)
 
 
-def worldevent_announce(ev) -> str:
-    """Анонс мирового события в чаты/личку (трактирный стиль) + последствия."""
+def worldevent_announce(ev, good_id: str | None = None) -> str:
+    """Анонс мирового события в чаты/личку (трактирный стиль) + последствия.
+    Для моды (good_id) — называем товар и премию к его цене."""
     from bot.game import worldevent
+    from bot.game import production as prod
+    if good_id and ev.good_price != 1.0:
+        g = prod.GOODS.get(good_id)
+        gname = f"{g.emoji} {g.name}" if g else good_id
+        return (f"{ev.emoji} <b>{ev.name.upper()}: {gname.upper()}</b>\n«{ev.blurb}»\n"
+                f"📊 <b>спрос на {gname} — цена +{round((ev.good_price - 1) * 100)}% "
+                f"и в кабаке, и на бирже</b>")
     return (f"{ev.emoji} <b>{ev.name.upper()}</b>\n«{ev.blurb}»\n"
             f"📊 <b>{worldevent.effect_summary(ev)}</b>")
 

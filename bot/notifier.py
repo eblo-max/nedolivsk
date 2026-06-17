@@ -424,7 +424,8 @@ async def _notify_returned(bot: Bot) -> None:
         started = worldevent.advance(world, now)
         # анонс события шлём ПОСЛЕ коммита через announce.world_event (чаты + ВСЕ
         # активные одиночки, не только подписчики дайджеста).
-        we_text = texts.worldevent_announce(started) if started is not None else None
+        we_text = (texts.worldevent_announce(started, world.event_good)
+                   if started is not None else None)
 
         # Биржевая сводка: раз в N минут — свежие лоты во все чаты (биржа глобальна).
         # Берём ордера с прошлой сводки, ещё живые на стакане; мгновенно сведённые
@@ -503,7 +504,8 @@ async def _notify_returned(bot: Bot) -> None:
 
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода
-        worldevent.set_active(world.event_kind, world.event_until)  # кэш мир-события
+        worldevent.set_active(world.event_kind, world.event_until,
+                              world.event_good)  # кэш мир-события
         for city in cities:
             citymod.refresh_cache(city, now)  # кэш ситуаций для экранов
 

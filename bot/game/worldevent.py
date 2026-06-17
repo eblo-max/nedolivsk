@@ -31,6 +31,9 @@ class WEvent:
     sale: float = 1.0
     exp_speed: float = 1.0
     prod_speed: float = 1.0
+    # Спрос-событие («мода»): премия к ЦЕНЕ одного случайного товара (рознице и
+    # бирже разом). >1 — товар в моде. Конкретный товар хранится в world.event_good.
+    good_price: float = 1.0
 
 
 EVENTS: dict[str, WEvent] = {
@@ -61,16 +64,23 @@ EVENTS: dict[str, WEvent] = {
     "plague": WEvent("plague", "🦠", "Поветрие",
                      "Хворь разогнала гостей — самое время делать товар впрок.",
                      5, income=0.85),
+    # ── спрос-событие (мода на товар) ──
+    "fashion": WEvent("fashion", "🔥", "Ажиотаж",
+                      "Весь Недоливск вдруг помешался на одном товаре — он в цене, "
+                      "налетай: вари, скупай на бирже и сбывай втридорога!",
+                      5, weight=16, good_price=1.5),
 }
 
-# Лёгкий кэш активного события (id + конец) — ставит нотифаер раз в тик.
+# Лёгкий кэш активного события (id + конец + трендовый товар) — ставит нотифаер раз в тик.
 _active_id: str | None = None
 _active_until: datetime | None = None
+_active_good: str | None = None
 
 
-def set_active(event_id: str | None, until: datetime | None = None) -> None:
-    global _active_id, _active_until
-    _active_id, _active_until = event_id, until
+def set_active(event_id: str | None, until: datetime | None = None,
+               good: str | None = None) -> None:
+    global _active_id, _active_until, _active_good
+    _active_id, _active_until, _active_good = event_id, until, good
 
 
 def active() -> WEvent | None:
@@ -79,6 +89,20 @@ def active() -> WEvent | None:
 
 def active_until() -> datetime | None:
     return _active_until
+
+
+def fashion_good() -> str | None:
+    """ID товара, на который сейчас мода (или None)."""
+    e = active()
+    return _active_good if (e is not None and e.good_price != 1.0) else None
+
+
+def good_price_mult(good: str) -> float:
+    """Премия к цене товара от моды (рознице и бирже). 1.0 — товар не в моде."""
+    e = active()
+    if e is not None and e.good_price != 1.0 and good == _active_good:
+        return e.good_price
+    return 1.0
 
 
 def _now() -> datetime:
@@ -103,6 +127,8 @@ def effect_summary(e: WEvent) -> str:
     higher_better(e.sale, "сбыт")
     lower_better(e.exp_speed, "время вылазок")
     lower_better(e.prod_speed, "время варки")
+    if e.good_price != 1.0:   # мода: премия к цене конкретного товара
+        parts.append(f"+{round((e.good_price - 1) * 100)}% цена модного товара")
     return ", ".join(parts)
 
 
@@ -111,6 +137,31 @@ def roll(rng: random.Random | None = None) -> str:
     rng = rng or random
     ids = list(EVENTS)
     return rng.choices(ids, weights=[EVENTS[i].weight for i in ids])[0]
+
+
+def _pct(v: float) -> str:
+    return f"+{round((v - 1) * 100)}%" if v > 1 else f"−{round((1 - v) * 100)}%"
+
+
+def _spd(v: float, label: str) -> str:
+    return (f"{label} быстрее на {round((1 - v) * 100)}%" if v < 1
+            else f"{label} медленнее на {round((v - 1) * 100)}%")
+
+
+def describe(e: "WEvent") -> str:
+    """Человекочитаемые последствия события (для экрана таверны), в одну строку."""
+    parts = []
+    if e.income != 1.0:
+        parts.append(f"🪙 доход {_pct(e.income)}")
+    if e.harvest != 1.0:
+        parts.append(f"⛏ добыча {_pct(e.harvest)}")
+    if e.sale != 1.0:
+        parts.append(f"💰 сбыт {_pct(e.sale)}")
+    if e.exp_speed != 1.0:
+        parts.append("🦵 " + _spd(e.exp_speed, "вылазки"))
+    if e.prod_speed != 1.0:
+        parts.append("🍺 " + _spd(e.prod_speed, "варка"))
+    return " · ".join(parts)
 
 
 def _aware(dt: datetime | None) -> datetime | None:
@@ -134,6 +185,7 @@ def advance(world, now: datetime, rng: random.Random | None = None) -> "WEvent |
         if until is not None and now >= until:        # событие кончилось
             world.event_kind = None
             world.event_until = None
+            world.event_good = None
             world.event_next_at = now + cd
         return None
     if nxt is None:                                    # первичная пауза — не палим сразу
@@ -144,8 +196,15 @@ def advance(world, now: datetime, rng: random.Random | None = None) -> "WEvent |
         world.event_kind = e.id
         world.event_until = now + timedelta(hours=e.hours)
         world.event_next_at = None
+        world.event_good = _pick_good(rng) if e.good_price != 1.0 else None
         return e
     return None
+
+
+def _pick_good(rng: random.Random) -> str:
+    """Случайный товар для моды (лениво импортируем каталог — без цикла импорта)."""
+    from bot.game import production as prod
+    return rng.choice(list(prod.GOODS))
 
 
 def _ch(player, val: float, higher_better: bool) -> float:

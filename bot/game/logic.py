@@ -246,6 +246,12 @@ def _retail_demand(
     return want, premium_unsold, premium_left
 
 
+def unit_price(good: str) -> int:
+    """Розничная цена за единицу с учётом моды (спрос-событие поднимает ЦЕНУ
+    трендового товара). Без моды — обычная цена из каталога."""
+    return max(1, round(production.GOODS[good].price * worldevent.good_price_mult(good)))
+
+
 def assortment_mult(sold: dict | None) -> float:
     """Рычаг 2: бонус за широкое меню — +ASSORTMENT_STEP за каждый ВИД товара,
     РЕАЛЬНО проданный за этот сбыт, сверх первого, до потолка ASSORTMENT_MAX.
@@ -261,7 +267,7 @@ def retail_total(want: dict | None, player: Player | None = None) -> int:
     """Выручка от сбыта по фиксированным ценам (для показа на подтверждении).
     С игроком — учитывает баф «Бойкая касса», мировое событие и бонус ассортимента,
     чтобы показанная сумма совпала с фактически начисленной в apply_retail."""
-    base = sum(int(q) * production.GOODS[k].price
+    base = sum(int(q) * unit_price(k)
                for k, q in (want or {}).items() if k in production.GOODS)
     if player is None:
         return base
@@ -303,7 +309,7 @@ def apply_retail(player: Player, tavern: Tavern, want: dict | None):
         if n > 0:
             products[key] -= n
             sold[key] = n
-            gold += n * production.GOODS[key].price
+            gold += n * unit_price(key)
     if not sold:
         return {}, 0, 0
     gold = int(gold * buff.gold_mult(player) * worldevent.income_mult(player)

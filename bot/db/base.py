@@ -257,3 +257,6 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS event_next_at TIMESTAMPTZ"
         ))
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS event_good VARCHAR(16)"
+        ))

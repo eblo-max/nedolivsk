@@ -83,7 +83,7 @@ async def _load_media_cache() -> None:
         world = await repo.get_or_create_world(session)
         common.load_file_ids(world.media_ids)
         from bot.game import worldevent  # активное мир-событие — в кэш сразу на старте
-        worldevent.set_active(world.event_kind, world.event_until)
+        worldevent.set_active(world.event_kind, world.event_until, world.event_good)
 
 
 async def main() -> None:

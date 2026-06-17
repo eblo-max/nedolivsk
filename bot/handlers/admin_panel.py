@@ -699,9 +699,17 @@ async def cb_weather_set(cb: CallbackQuery, session: AsyncSession) -> None:
     world.event_kind = eid
     world.event_until = now + timedelta(hours=e.hours)
     world.event_next_at = None
+    # Мода — выбираем случайный товар (как в авто-цикле); иначе сбрасываем.
+    if e.good_price != 1.0:
+        import random as _r
+        from bot.game import production as _prod
+        world.event_good = _r.choice(list(_prod.GOODS))
+    else:
+        world.event_good = None
     await session.flush()
-    worldevent.set_active(eid, world.event_until)
-    await announce.world_event(cb.bot, session, texts.worldevent_announce(e), now)
+    worldevent.set_active(eid, world.event_until, world.event_good)
+    await announce.world_event(cb.bot, session,
+                               texts.worldevent_announce(e, world.event_good), now)
     _alog(cb, session, f"🌦 запустил событие {eid} ({e.hours}ч)")
     await cb.answer(f"{e.emoji} {e.name} запущено — анонс разослан!", show_alert=True)
     await cb_weather(cb, session)

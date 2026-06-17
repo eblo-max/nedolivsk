@@ -124,6 +124,7 @@ class WorldState(Base):
     event_kind: Mapped[str | None] = mapped_column(String(16))
     event_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     event_next_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    event_good: Mapped[str | None] = mapped_column(String(16))  # товар «в моде» (спрос-событие)
 
 
 class KnownChat(Base):

@@ -100,6 +100,28 @@ def test_advance_full_lifecycle():
     assert again is not None and world.event_kind == again.id
 
 
+def test_fashion_targets_one_good_in_retail_and_bourse():
+    from bot.game import bourse, logic
+    wine_plain = logic.unit_price("wine")
+    bourse_plain = bourse.base_price("wine")
+    worldevent.set_active("fashion", None, "wine")
+    prem = worldevent.EVENTS["fashion"].good_price
+    assert worldevent.fashion_good() == "wine"
+    assert worldevent.good_price_mult("wine") == prem
+    assert worldevent.good_price_mult("ale1") == 1.0          # прочие товары не дорожают
+    assert logic.unit_price("wine") > wine_plain             # розница дороже в моду
+    assert bourse.base_price("wine") > bourse_plain          # и на бирже дороже
+    assert logic.unit_price("ale1") == 5                     # не-модный без изменений
+
+
+def test_no_fashion_neutral():
+    worldevent.set_active("harvest", None)                    # не-мода
+    assert worldevent.fashion_good() is None
+    assert worldevent.good_price_mult("wine") == 1.0
+    worldevent.set_active(None)
+    assert worldevent.good_price_mult("wine") == 1.0
+
+
 def test_roll_valid_and_set_balanced():
     r = random.Random(1)
     assert {worldevent.roll(r) for _ in range(500)} <= set(worldevent.EVENTS)
