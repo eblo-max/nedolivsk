@@ -2567,26 +2567,65 @@ def _raid_roster_lines(boss, limit: int = 12) -> list[str]:
     return out
 
 
+# Тон под каждого босса: (шапка-тревога, вводная строка с именем, боевой клич).
+_RAID_FLAVOR: dict[str, tuple[str, str, str]] = {
+    "rat_king": (
+        "🐀 <b>ОПЯТЬ ЭТА ТВАРЬ ИЗ ПОДПОЛА!</b>",
+        "Вылез <b><u>Крысиный Король</u></b> — жрёт всё, что плохо лежит.",
+        "Налетай всем кабаком, пока гадина кассу не сожрала. Кто по углам "
+        "прятался — тот и без сыра.",
+    ),
+    "bog_troll": (
+        "👹 <b>С БОЛОТ ПОТЯНУЛО СМРАДОМ…</b>",
+        "На город прёт <b><u>Болотный Тролль</u></b>. Земля дрожит.",
+        "Вставайте стеной — поодиночке эта груда втопчет в тину. Только всем "
+        "миром свалим.",
+    ),
+    "dragon": (
+        "🐲 <b>НЕБО ПОЧЕРНЕЛО. ОН ПРОСНУЛСЯ.</b>",
+        "Из-за гор идёт <b><u>ДРЕВНИЙ ЗМЕЙ</u></b> — и пахнет концом.",
+        "Все до единого — в бой. Завтра либо пьём за победу, либо наливать "
+        "будет некому.",
+    ),
+}
+
+
+def _raid_flavor(boss_key: str, spec) -> tuple[str, str, str]:
+    return _RAID_FLAVOR.get(boss_key, (
+        "⚔️🔥 <b>ВСЕМ КАБАКАМ ТРЕВОГА!</b>",
+        f"{spec.emoji} На Недоливск прёт <b>{spec.name.upper()}</b>.",
+        "Жми «Присоединиться» — бьют только записавшиеся.",
+    ))
+
+
+def _raid_loot_box(boss_key: str) -> str:
+    """Компактная сводка добычи (моноширинно) + честный % на снарягу."""
+    from bot.game import raid
+    pct = raid.gear_drop_pct(boss_key)
+    return ("🎁 <b>ДОБЫЧА</b>\n"
+            "<pre>🪙 золото : поровну всем бойцам\n"
+            "🎲 трофей : 1 случайному из них\n"
+            f"👑 снаряга: шанс ~{pct:g}%, иначе ресурсы</pre>")
+
+
 def raid_gather_screen(boss) -> str:
-    """Фаза сбора: обратный отсчёт + кто записался (поимённо)."""
+    """Фаза сбора: тон под босса + правила добычи + кто записался (поимённо)."""
     from bot.game import raid
     spec = raid.BOSSES.get(boss.boss_key)
     if spec is None:
         return "⚔️ Рейд-босс приближается"
+    header, lead, cta = _raid_flavor(boss.boss_key, spec)
     return "\n".join([
-        "⚔️🔥 <b>ВСЕМ КАБАКАМ ТРЕВОГА!</b>",
-        f"{spec.emoji} На Недоливск прёт <b>{spec.name.upper()}</b>",
-        "",
-        f"«{spec.blurb}»",
-        "",
-        f"⏳ До битвы: <b>{_fmt_left_h(boss.gather_until)}</b>",
-        f"🛡 В строю уже <b>{raid.registered_count(boss)}</b>:",
+        header,
+        lead,
+        f"<blockquote expandable>{escape(spec.blurb)}</blockquote>",
+        f"⏳ Сбор: <b>{_fmt_left_h(boss.gather_until)}</b>   "
+        f"🛡 В строю: <b>{raid.registered_count(boss)}</b>",
         *_raid_roster_lines(boss),
-        "",
-        *_raid_loot_lines(),
-        "",
-        "<i>⚔️ Жми «Присоединиться» и вставай в строй — бить будут только "
-        "записавшиеся. Не зевай — таких не каждый день валят!</i>",
+        _raid_loot_box(boss.boss_key),
+        "<i>⚠️ Доля — только тем, кто реально нанёс урон. "
+        "Записался, но не бил — пролетаешь.</i>",
+        f"<i>⚔️ {cta}</i>",
     ])
 
 
@@ -2594,12 +2633,15 @@ def raid_push_dm(boss) -> str:
     """Пуш-анонс в личку при старте сбора (живой экран — кнопкой в меню таверны)."""
     from bot.game import raid
     spec = raid.BOSSES.get(boss.boss_key)
-    nm = spec.name if spec else "Босс"
-    emoji = spec.emoji if spec else "⚔️"
-    return (f"⚔️🔥 <b>ВСЕМ КАБАКАМ ТРЕВОГА!</b>\n"
-            f"{emoji} На Недоливск прёт <b>{nm}</b> — идёт сбор, ~20 минут на «вступить».\n\n"
-            "Открой кабак и жми <b>«⚔️ РЕЙД-БОСС — В БОЙ!»</b> в меню — соберёмся "
-            "всем миром и завалим тушу. С неё кому-то падёт легендарный трофей!")
+    if spec is None:
+        return "⚔️ Рейд-босс приближается — открой кабак!"
+    header, lead, _cta = _raid_flavor(boss.boss_key, spec)
+    pct = raid.gear_drop_pct(boss.boss_key)
+    return (f"{header}\n{lead}\n\n"
+            "Идёт сбор (~20 мин). Открой кабак и жми "
+            "<b>«⚔️ РЕЙД-БОСС — В БОЙ!»</b> в меню.\n"
+            f"🪙 золото — поровну всем, кто бил; 🎲 одному с туши трофей "
+            f"(эксклюзив-снаряга ~{pct:g}%, нигде не выбить).")
 
 
 def raid_fight_ping() -> str:

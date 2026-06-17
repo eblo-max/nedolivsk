@@ -90,6 +90,17 @@ BOSSES: dict[str, Boss] = {
 }
 
 
+def gear_drop_pct(boss_key: str) -> float:
+    """Шанс (%), что бонус-дроп победителю окажется ЭКСКЛЮЗИВНОЙ снарягой.
+    Считается из весов лута (промилле, сумма 1000) — для анонса/прозрачности."""
+    spec = BOSSES.get(boss_key)
+    if spec is None:
+        return 0.0
+    total = sum(w for _, w, _ in spec.loot)
+    gear = sum(w for tag, w, _ in spec.loot if tag == "gear")
+    return round(100 * gear / total, 1) if total else 0.0
+
+
 # Лёгкий кэш «есть ли живой рейд» — чтобы меню таверны рисовало кнопку без
 # запроса к БД на каждый рендер. Ставит спавн (сразу) и нотифаер (раз в тик).
 _active_raid_id: int | None = None

@@ -132,3 +132,26 @@ def test_cooldown_takes_max_of_personal_and_stun():
                      contributions={"1": {"dmg": 0}})
     assert raid.cooldown_left(boss, 1, now) >= 80          # ждать из-за стана
     assert raid.stunned(boss, 1, now) is True
+
+
+def test_gear_drop_pct_matches_loot_weights():
+    # веса лута в промилле (сумма 1000) → % снаряги = вес/10
+    assert raid.gear_drop_pct("rat_king") == 1.5
+    assert raid.gear_drop_pct("bog_troll") == 3.5
+    assert raid.gear_drop_pct("dragon") == 7.0
+    assert raid.gear_drop_pct("нет такого") == 0.0
+
+
+def test_gather_announce_states_loot_rules():
+    from types import SimpleNamespace
+    from datetime import datetime, timezone, timedelta
+    from bot import texts
+    b = SimpleNamespace(boss_key="dragon",
+                        gather_until=datetime.now(timezone.utc) + timedelta(minutes=8),
+                        contributions={})
+    s = texts.raid_gather_screen(b)
+    assert "ДОБЫЧА" in s                                   # блок добычи есть
+    assert "~7%" in s                                      # честный шанс снаряги
+    assert "поровну" in s                                  # золото делится
+    assert "реально нанёс урон" in s                       # доля — только бившим
+    assert "<blockquote expandable>" in s                  # лор спрятан под разворот
