@@ -185,7 +185,7 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     pending = story_state.get_retail(player)
     if pending:  # уже висит нерешённый заказ — сперва реши его (не копим заново)
         await _kassa(callback, texts.retail_prompt(pending, player),
-                     kb.retail_kb(logic.retail_total(pending, player, player.tavern)))
+                     kb.retail_kb(logic.retail_total(pending, player)))
         await callback.answer()
         return
 
@@ -225,7 +225,7 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     if result.order:
         story_state.set_retail(player, result.order)
         await _kassa(callback, texts.income_success(result, player),
-                     kb.retail_kb(logic.retail_total(result.order, player, player.tavern)))
+                     kb.retail_kb(logic.retail_total(result.order, player)))
         await callback.answer(f"Пассив +{result.gold - result.skim} 🪙")
         return
 
@@ -264,7 +264,7 @@ async def cb_retail_open(callback: CallbackQuery, session: AsyncSession) -> None
         await callback.answer("Гости уже разошлись.", show_alert=True)
         return
     await _safe_edit(callback, texts.retail_prompt(want, player),
-                     kb.retail_kb(logic.retail_total(want, player, player.tavern)))
+                     kb.retail_kb(logic.retail_total(want, player)))
     await callback.answer()
 
 

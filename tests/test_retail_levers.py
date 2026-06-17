@@ -39,22 +39,29 @@ def test_premium_threshold_is_the_cutoff():
     assert left == 0
 
 
-# ── Рычаг 2: бонус за ассортимент ───────────────────────────────────────────
-def test_assortment_steps_up():
-    assert logic.assortment_mult(_tavern({"ale1": 5})) == 1.0          # один вид
-    m3 = logic.assortment_mult(_tavern({"ale1": 5, "bread": 5, "roast": 5}))
-    assert abs(m3 - (1 + 2 * balance.ASSORTMENT_STEP)) < 1e-9          # три вида
+# ── Рычаг 2: бонус за ассортимент (по РЕАЛЬНО проданному, не по складу) ──────
+def test_assortment_steps_up_by_sold_kinds():
+    assert logic.assortment_mult({"ale1": 5}) == 1.0                  # один вид продан
+    m3 = logic.assortment_mult({"ale1": 5, "bread": 5, "roast": 5})
+    assert abs(m3 - (1 + 2 * balance.ASSORTMENT_STEP)) < 1e-9         # три вида
 
 
-def test_assortment_capped_and_none_safe():
+def test_assortment_capped_and_empty_safe():
     many = {g: 5 for g in list(production.GOODS)[:12]}
-    assert logic.assortment_mult(_tavern(many)) == balance.ASSORTMENT_MAX
-    assert logic.assortment_mult(None) == 1.0                         # без таверны — нейтрально
+    assert logic.assortment_mult(many) == balance.ASSORTMENT_MAX      # потолок
+    assert logic.assortment_mult(None) == 1.0
+    assert logic.assortment_mult({}) == 1.0
+
+
+def test_assortment_not_farmable_by_unsold_tokens():
+    # 1 проданный вид = бонуса нет, даже если на складе лежат жетоны (склад не в счёт)
+    assert logic.assortment_mult({"ale1": 100}) == 1.0
 
 
 def test_assortment_raises_revenue_preview():
     player = SimpleNamespace(buff_kind=None, buff_until=None, tavern=None)
-    want = {"ale3": 4}
-    base = logic.retail_total(want)                                   # без множителей
-    rich = logic.retail_total(want, player, _tavern({"ale3": 4, "wine": 2, "pie": 2}))
-    assert rich > base                                               # широкое меню — выручка выше
+    sold_many = {"ale3": 2, "wine": 2, "pie": 2, "cheese": 2}         # четыре вида
+    plain = logic.retail_total(sold_many)                            # базовая цена
+    with_mult = logic.retail_total(sold_many, player)               # с ассортиментом
+    assert logic.assortment_mult(sold_many) > 1.0
+    assert with_mult > plain                                        # множитель применён

@@ -1452,7 +1452,7 @@ def income_success(r, player=None) -> str:
     ]
     if r.order:
         base = logic.retail_total(r.order)
-        total = logic.retail_total(r.order, player, getattr(player, "tavern", None))
+        total = logic.retail_total(r.order, player)
         items = [
             f"{prod.GOODS[k].emoji} {prod.GOODS[k].name} — {n} × {prod.GOODS[k].price}"
             f" = {n * prod.GOODS[k].price} 🪙"
@@ -1488,15 +1488,16 @@ def income_success(r, player=None) -> str:
     elif r.season_demand <= 0.98:
         mods.append(f"{r.season_label} — −{round((1 - r.season_demand) * 100)}% спрос")
 
-    amult = logic.assortment_mult(getattr(player, "tavern", None))
+    amult = logic.assortment_mult(r.order)
     if r.order and amult > 1.0:
-        mods.append(f"🍽 Богатое меню — +{round((amult - 1) * 100)}% выручки")
+        mods.append(f"🍽 Богатое меню ({len(r.order)} вида) — +{round((amult - 1) * 100)}% выручки")
     if mods:
         parts += ["", *_branch("ОБСТАНОВКА", mods)]
     tail = []
-    if r.rep_loss:
-        tail.append(f"🍷 Богачи ушли ({r.premium_left}) — не нашлось дорогого пойла: "
-                    f"<b>−{r.rep_loss} ⭐</b>. Держи вино/крепкое (можно докупить на бирже).")
+    if r.premium_missed:
+        tail.append(f"🍷 Богачи ушли ({r.premium_left}) — не нашлось дорогого пойла, "
+                    f"<b>упущено ~{r.premium_missed} 🪙</b>. Держи вино/крепкое "
+                    f"(можно докупить на бирже).")
     if r.premium_unsold:
         tail.append("⚠️ Состоятельных мало — дорогое не разбирают")
     if r.spoiled:
@@ -1542,7 +1543,7 @@ def retail_prompt(want: dict, player=None) -> str:
     from bot.game import logic
     from bot.game import production as prod
     base = logic.retail_total(want)
-    total = logic.retail_total(want, player, getattr(player, "tavern", None))
+    total = logic.retail_total(want, player)
     items = [
         f"{prod.GOODS[k].emoji} {prod.GOODS[k].name} — {n} × {prod.GOODS[k].price}"
         f" = {n * prod.GOODS[k].price} 🪙"

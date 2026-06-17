@@ -6,8 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 from bot.db.models import Player, Tavern
 from bot.game import (
-    balance, buff, inventory, items, newbie, perks, production, season,
-    story_state, worldevent,
+    balance, buff, inventory, items, newbie, perks, production, season, worldevent,
 )
 
 
@@ -130,7 +129,7 @@ class IncomeResult:
     rep_gain: int = 0
     premium_unsold: bool = False   # остался премиум — состоятельных мало
     premium_left: int = 0          # богачей ушло — не было дорогого пойла
-    rep_loss: int = 0              # репутация, потерянная на ушедших богачах
+    premium_missed: int = 0        # ~упущенная выручка с ушедших богачей
     fair: bool = False             # доход собран во время ярмарки
     skim: int = 0                  # доля, утекшая из-за городской ситуации
     city_label: str = ""           # активная городская ситуация (для показа)
@@ -171,22 +170,15 @@ def collect_income(
     player.gold += passive  # пассив — сразу, без подтверждения
     tavern.last_income_at = now
 
-    # Рычаг 1: богачи пришли, дорогого пойла не нашлось — ушли, репутация просела.
-    # Не бьём новичков (щит) и не казним пустой кабак (наливал ли вообще напитки).
-    rep_loss = 0
-    had_drinks = any(k in production.DRINKS and v > 0
-                     for k, v in (tavern.products or {}).items())
-    if premium_left > 0 and had_drinks and not story_state.is_shielded(player, now):
-        rep_loss = min(balance.PREMIUM_LEAVE_MAX_LOSS,
-                       premium_left // balance.PREMIUM_LEAVE_DIV)
-        if rep_loss:
-            tavern.reputation = max(0, tavern.reputation - rep_loss)
-            player.reputation = max(0, player.reputation - rep_loss)
+    # Рычаг 1: богачи пришли, дорогого пойла не нашлось — ушли НЕобслуженными.
+    # Это упущенная выручка (а не штраф репутации): показываем ~сколько недозаработал,
+    # чтобы мотивировать держать/докупать премиум, без наказания и без фарма.
+    premium_missed = premium_left * balance.PREMIUM_MIN_PRICE
 
     return IncomeResult(
         ok=True, gold=passive, passive=passive, order=order or None,
         spoiled=spoiled or None, premium_unsold=premium_unsold,
-        premium_left=premium_left, rep_loss=rep_loss,
+        premium_left=premium_left, premium_missed=premium_missed,
     )
 
 
@@ -254,19 +246,18 @@ def _retail_demand(
     return want, premium_unsold, premium_left
 
 
-def assortment_mult(tavern) -> float:
-    """Рычаг 2: бонус за широкое меню — +ASSORTMENT_STEP за каждый ВИД товара
-    в погребе сверх первого, до потолка ASSORTMENT_MAX. Стимул докупать
-    разнообразие (в т.ч. чужих регионов), а не лить одну позицию."""
-    if tavern is None:
-        return 1.0
-    distinct = sum(1 for k, v in (tavern.products or {}).items()
+def assortment_mult(sold: dict | None) -> float:
+    """Рычаг 2: бонус за широкое меню — +ASSORTMENT_STEP за каждый ВИД товара,
+    РЕАЛЬНО проданный за этот сбыт, сверх первого, до потолка ASSORTMENT_MAX.
+    Считаем по проданному (а не по складу), чтобы нельзя было фармить бонус
+    1-штучными «жетонами», что лежат непроданными. Стимул держать живое меню."""
+    distinct = sum(1 for k, v in (sold or {}).items()
                    if k in production.GOODS and v > 0)
     return min(balance.ASSORTMENT_MAX,
                1.0 + balance.ASSORTMENT_STEP * max(0, distinct - 1))
 
 
-def retail_total(want: dict | None, player: Player | None = None, tavern=None) -> int:
+def retail_total(want: dict | None, player: Player | None = None) -> int:
     """Выручка от сбыта по фиксированным ценам (для показа на подтверждении).
     С игроком — учитывает баф «Бойкая касса», мировое событие и бонус ассортимента,
     чтобы показанная сумма совпала с фактически начисленной в apply_retail."""
@@ -275,7 +266,7 @@ def retail_total(want: dict | None, player: Player | None = None, tavern=None) -
     if player is None:
         return base
     return int(base * buff.gold_mult(player) * worldevent.income_mult(player)
-               * assortment_mult(tavern))
+               * assortment_mult(want))
 
 
 def add_goods_rep_progress(player: Player, tavern: Tavern, points: int) -> int:
@@ -315,9 +306,8 @@ def apply_retail(player: Player, tavern: Tavern, want: dict | None):
             gold += n * production.GOODS[key].price
     if not sold:
         return {}, 0, 0
-    # assortment_mult читаем ДО переприсваивания tavern.products (меню «как было»).
     gold = int(gold * buff.gold_mult(player) * worldevent.income_mult(player)
-               * assortment_mult(tavern))
+               * assortment_mult(sold))   # бонус за число РЕАЛЬНО проданных видов
     tavern.products = products
     player.gold += gold
     total = sum(sold.values())
