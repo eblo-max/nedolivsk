@@ -101,7 +101,9 @@ def _drop_apply(winner, drop: dict | None) -> str:
     if drop["kind"] == "res":
         inventory.add(winner, drop["res"], drop["qty"])
         from bot.game import balance
-        return f"{balance.RESOURCE_NAMES.get(drop['res'], drop['res'])} ×{drop['qty']}"
+        res = drop["res"]
+        ico = balance.RESOURCE_EMOJI.get(res, "📦")
+        return f"{ico} {balance.RESOURCE_NAMES.get(res, res)} ×{drop['qty']}"
     if drop["kind"] == "gear":
         item = items.CATALOG.get(drop["item_id"])
         if item is None:
