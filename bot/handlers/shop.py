@@ -7,7 +7,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import texts
+from bot import images, texts
 from bot.db import repo
 from bot.game import balance, inventory, logic, shop
 from bot.handlers import common
@@ -17,9 +17,11 @@ router = Router()
 
 
 async def _show(callback: CallbackQuery, text: str, markup) -> None:
-    """Редактируем ТЕКУЩУЮ панель на месте (подпись фото/текст) — без новых окон,
-    чтобы не плодить «устаревшие» сообщения (как делают биржа/аукцион)."""
-    await common.caption_edit(callback.message, text, markup)
+    """Лавка скупщика на месте, на картинке купца (а не складской — заходят-то
+    со склада). show_image_panel сам подменит фон и отступит к тексту, если файла нет."""
+    await common.show_image_panel(
+        callback.message, images.named_image("kypec"),
+        text, markup, callback.from_user.id)
     await callback.answer()
 
 
