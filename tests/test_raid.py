@@ -153,8 +153,8 @@ def test_gather_announce_states_loot_rules():
                         gather_until=datetime.now(timezone.utc) + timedelta(minutes=8),
                         contributions={})
     s = texts.raid_gather_screen(b)
-    assert "ДОБЫЧА" in s                                   # блок добычи есть
+    assert "Добыча" in s                                   # блок добычи есть
     assert "~3%" in s                                      # честный шанс снаряги (дракон редок)
     assert "поровну" in s                                  # золото делится
-    assert "реально нанёс урон" in s                       # доля — только бившим
+    assert "реально бил" in s                              # доля — только бившим
     assert "<blockquote expandable>" in s                  # лор спрятан под разворот

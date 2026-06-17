@@ -2640,13 +2640,13 @@ def _raid_flavor(boss_key: str) -> tuple[str, str]:
 
 
 def _raid_loot_box(boss_key: str) -> str:
-    """Компактная сводка добычи (моноширинно) + честный % на снарягу."""
+    """Сводка добычи аккуратным списком (блок-цитата) + честный % на снарягу."""
     from bot.game import raid
     pct = raid.gear_drop_pct(boss_key)
-    return ("🎁 <b>ДОБЫЧА</b>\n"
-            "<pre>🪙 золото : поровну всем бойцам\n"
-            "🎲 трофей : 1 случайному из них\n"
-            f"👑 снаряга: шанс ~{pct:g}%, иначе ресурсы</pre>")
+    return ("<blockquote>Добыча с туши:\n"
+            "• золото — поровну всем, кто бил\n"
+            "• трофей — одному случайному из них\n"
+            f"• снаряга — шанс ~{pct:g}% (иначе ресурсы)</blockquote>")
 
 
 def raid_gather_screen(boss) -> str:
@@ -2657,21 +2657,20 @@ def raid_gather_screen(boss) -> str:
         return "⚔️ Рейд-босс приближается"
     tagline, cta = _raid_flavor(boss.boss_key)
     return "\n".join([
-        f"{spec.emoji} <b>{spec.name.upper()}</b>",
+        f"{spec.emoji} <b>{spec.name}</b>",
         f"<i>{tagline}</i>",
         "",
         f"<blockquote expandable>{escape(spec.blurb)}</blockquote>",
         "",
-        f"⚔️ <b>{_fmt_left_h(boss.gather_until)}</b> до битвы · "
-        f"в строю <b>{raid.registered_count(boss)}</b> ⚔️",
+        f"До битвы: <b>{_fmt_left_h(boss.gather_until)}</b> · "
+        f"в строю: <b>{raid.registered_count(boss)}</b>",
         *_raid_roster_lines(boss),
         "",
         _raid_loot_box(boss.boss_key),
         "",
-        "<i>⚠️ Доля — только тем, кто реально нанёс урон. "
-        "Записался, но не бил — пролетаешь.</i>",
+        "Награду получает только тот, кто реально бил.",
         "",
-        f"<i>⚔️ {cta}</i>",
+        f"<i>{cta}</i>",
     ])
 
 
@@ -2683,12 +2682,12 @@ def raid_push_dm(boss) -> str:
         return "⚔️ Рейд-босс приближается — открой кабак!"
     tagline, _cta = _raid_flavor(boss.boss_key)
     pct = raid.gear_drop_pct(boss.boss_key)
-    return (f"{spec.emoji} <b>{spec.name.upper()}</b>\n"
+    return (f"{spec.emoji} <b>{spec.name}</b>\n"
             f"<i>{tagline}</i>\n\n"
             "Идёт сбор (~20 мин). Открой кабак и жми "
-            "<b>«⚔️ РЕЙД-БОСС — В БОЙ!»</b> в меню.\n"
-            f"🪙 золото — поровну всем, кто бил; 🎲 одному с туши трофей "
-            f"(эксклюзив-снаряга ~{pct:g}%, нигде не выбить).")
+            "<b>«⚔️ РЕЙД-БОСС — В БОЙ!»</b> в меню.\n\n"
+            f"Золото — поровну всем, кто бил; трофей — одному с туши "
+            f"(снаряга редка, ~{pct:g}%).")
 
 
 def raid_fight_ping() -> str:
@@ -2718,22 +2717,20 @@ def raid_screen(boss) -> str:
     status = (f"😵 <b>РЁВ!</b> Босс оглушил — удар на паузе ~{stun // 60 + 1} мин"
               if stun > 0 else None)
     return "\n".join([
-        f"{spec.emoji} <b>{spec.name.upper()}</b>",
-        "<i>⚔️ Рубилово — добиваем тварь!</i>",
+        f"{spec.emoji} <b>{spec.name}</b>",
+        "<i>Рубилово — добиваем.</i>",
         "",
         f"<blockquote expandable>{escape(spec.blurb)}</blockquote>",
         "",
         f"{raid.hp_bar(boss.hp, boss.max_hp)}  {pct}%",
-        f"❤️ {max(0, boss.hp)} / {boss.max_hp} HP · 🛡 броня {spec.armor}",
-        f"⚔️ в деле <b>{fighters}</b> · уйдёт через <b>{_fmt_left_h(boss.ends_at)}</b> ⚔️",
+        f"HP: <b>{max(0, boss.hp)} / {boss.max_hp}</b> · броня <b>{spec.armor}</b>",
+        f"в деле: <b>{fighters}</b> · уйдёт через <b>{_fmt_left_h(boss.ends_at)}</b>",
         *([status] if status else []),
         "",
         _raid_loot_box(boss.boss_key),
         "",
-        "<i>🛡 Толстая шкура гасит удар — голыми руками еле царапнёшь. И не "
-        "тяните: бросите бить — тварь затягивает раны.</i>",
-        "",
-        "<i>⚔️ Лупи по «Бить» — дожимаем, пока тварь не сдохла!</i>",
+        "<i>Лупи по «Бить» — дожимаем. Толстая шкура гасит удар, "
+        "а простой тварь лечит.</i>",
     ])
 
 
