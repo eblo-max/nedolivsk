@@ -72,10 +72,15 @@ def test_loot_gear_only_from_boss_pool_and_rarity_scales():
 
 
 # ── броня (mitigate) ───────────────────────────────────────────────────────
-def test_mitigate_floor_and_scaling():
-    assert raid.mitigate("dragon", 5) == 1                 # слабый удар гасится в 1
-    assert raid.mitigate("rat_king", 100) == 100 - raid.BOSSES["rat_king"].armor
+def test_mitigate_percentage_and_scaling():
+    from bot.game import balance
+    # процентная толща (как на охоте): даже слабый удар проходит >1, не топится в 1
+    assert raid.mitigate("dragon", 5) > 1
+    # выше броня → меньше проходит при одинаковом сыром уроне
     assert raid.mitigate("dragon", 100) < raid.mitigate("rat_king", 100)
+    # формула: round(raw × K/(K+броня)), пол 1
+    k, a = balance.HUNT_ARMOR_K, raid.BOSSES["dragon"].armor
+    assert raid.mitigate("dragon", 100) == max(1, round(100 * k / (k + a)))
 
 
 def test_hp_scales_with_turnout_and_floor():
