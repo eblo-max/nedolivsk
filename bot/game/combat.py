@@ -38,6 +38,7 @@ class Enemy:
     blurb: str = ""              # чем грозит / на кого идти
     video: str = ""              # имя видео в assets/<video>.mp4 (бой и просмотр)
     region: str = ""             # "" — везде; иначе эксклюзив региона (Фаза 4)
+    traits: tuple = ()           # черты-слабости (Фаза 5): "venom" | "evasive"
 
 
 # Бестиарий: от мелочи (голыми руками) до атамана (только топ-снаряга).
@@ -52,16 +53,17 @@ ENEMIES = [
           blurb="Юркая, но кусачая. Шкурка ценится.", video="lisa"),
     Enemy("gadyuka", "🐍", "Гадюка", 28, 9, 0, (15, 30),
           (Drop("herbs", 3, 6), Drop("game", 2, 3, 12)),
-          blurb="Бьёт больно и метко — броня тут не спасёт. Яд идёт в зелья.",
-          video="zmeya"),
+          blurb="Ядовита — броня не спасёт, только уворот (удача). Яд идёт в зелья.",
+          video="zmeya", traits=("venom",)),
     Enemy("olen", "🦌", "Олень", 54, 7, 1, (18, 34),
           (Drop("game", 6, 10), Drop("herbs", 3, 5, 25),
            Drop("hide", 1, 2, 35), Drop("sinew", 1, 2, 20)),
           blurb="Мяса много, отпор слабый. Шкура и жилы идут в дело.", video="olen"),
-    Enemy("volk", "🐺", "Волк", 46, 8, 2, (16, 32),
+    Enemy("volk", "🐺", "Волк", 40, 7, 2, (16, 32),
           (Drop("game", 4, 7), Drop("herbs", 2, 4, 15),
            Drop("fang", 1, 2, 30), Drop("sinew", 1, 2, 25)),
-          blurb="Кусается всерьёз. Клык — на доброе оружие.", video="volk"),
+          blurb="Кусается всерьёз и юлит — броня не добьёт, нужен урон.",
+          video="volk", traits=("evasive",)),
     Enemy("kaban", "🐗", "Кабан", 66, 9, 6, (25, 50),
           (Drop("game", 7, 12), Drop("herbs", 3, 5, 20),
            Drop("hide", 1, 2, 30), Drop("fang", 1, 1, 20)),
@@ -87,18 +89,19 @@ ENEMIES = [
     # ═══ РЕГИОНАЛЬНЫЕ ЗВЕРИ (Фаза 4): эксклюзив региона, каждый — свой архетип
     # и свой компонент (мех/клык/хитин) для регионального пояса. Сложность
     # паритетная (см. шлюз в симуляторе). Видео нет → фолбэк на картинку охоты.
-    Enemy("lynx", "🐆", "Рысь", 76, 14, 1, (40, 80),
+    Enemy("lynx", "🐆", "Рысь", 58, 12, 1, (40, 80),
           (Drop("game", 4, 7), Drop("fang", 1, 2, 30), Drop("pelt", 1, 2, 40)),
-          rep=1, region="north_wilds",
-          blurb="Тайга. Стремительная и злая — бьёт больно, уворот и крит выручат."),
+          rep=1, region="north_wilds", traits=("evasive",),
+          blurb="Тайга. Стремительна — уводит удары; нужен высокий урон/крит."),
     Enemy("tusker", "🐗", "Вепрь-секач", 88, 9, 8, (45, 90),
           (Drop("game", 8, 12), Drop("hide", 1, 2, 35), Drop("tusk", 1, 2, 40)),
           rep=1, region="green_valleys",
           blurb="Долины. Бронированный кабанище — сырой урон вязнет, крит пробивает."),
-    Enemy("scorpion", "🦂", "Степной Скорпион", 74, 12, 7, (40, 85),
+    Enemy("scorpion", "🦂", "Степной Скорпион", 66, 8, 7, (40, 85),
           (Drop("herbs", 3, 6), Drop("fang", 1, 1, 25), Drop("chitin", 1, 2, 45)),
-          rep=1, region="red_wastes",
-          blurb="Пустоши. Панцирь и жало — броня и фарт против яда."),
+          rep=1, region="red_wastes", traits=("venom",),
+          blurb="Пустоши. Жало ядовито (броня не спасёт — нужна удача), "
+                "а панцирь пробивает крит."),
 ]
 ENEMY = {e.id: e for e in ENEMIES}
 
@@ -181,9 +184,13 @@ def _combat_dps(stats: dict, enemy: Enemy, hp: int):
     dodge = min(balance.HUNT_LUCK_DODGE_CAP,
                 stats.get("luck", 0) * balance.HUNT_LUCK_DODGE_PER) / 100
     tmult = stats.get("dmg_taken_mult", 1.0)
+    traits = getattr(enemy, "traits", ())
     # крит ×2 И пробивает броню зверя; обычный удар — за вычетом брони
     pdps = (1 - crit) * max(1, dmg - enemy.armor) + crit * 2 * dmg
-    mit = balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + stats.get("armor", 0))
+    if "evasive" in traits:                 # увёртлив: часть ударов мимо → нужен урон/крит
+        pdps *= (1 - balance.HUNT_EVASION)
+    # ядовит: атака игнорирует твою броню (чистый урон) → спасает только уворот-удача
+    mit = 1.0 if "venom" in traits else balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + stats.get("armor", 0))
     edps = max(0.1, enemy.attack * mit * tmult * (1 - dodge))
     t_kill = enemy.hp / max(0.1, pdps)      # раундов добить зверя
     t_die = hp / edps                       # раундов до своей смерти

@@ -1861,16 +1861,27 @@ def heal_menu(player) -> str:
     return "\n".join(parts)
 
 
+# Подсказки-слабости (Фаза 5): что РЕАЛЬНО работает против черты зверя.
+_TRAIT_HINT = {
+    "venom": "☠ Ядовит — бьёт сквозь броню (она бесполезна). Спасает уворот "
+             "(удача) или быстрый занос уроном/критом.",
+    "evasive": "💨 Увёртлив — уводит часть твоих ударов. Броня не добьёт его: "
+               "нужен высокий урон/крит.",
+}
+
+
 def hunt_detail(player, enemy) -> str:
     st, _dmg, _crit, combat = _hunter_stats(player)
     chp = combat.current_hp(player)
     wp, avg = combat.forecast(st, enemy, chp, 200)
     tcol, lbl = combat.threat(wp)
 
+    ico = {**RESOURCE_EMOJI, **balance.GOODS_EMOJI}     # +компоненты (шкура/клык/…)
+    nmn = {**RESOURCE_NAMES, **balance.GOODS_NAMES}
     guar, rare = [], []
     for d in enemy.drops:
         if d.res:
-            nm = f"{RESOURCE_EMOJI.get(d.res, '📦')} {RESOURCE_NAMES.get(d.res, d.res)}"
+            nm = f"{ico.get(d.res, '📦')} {nmn.get(d.res, d.res)}"
             rng_s = f"{d.lo}" if d.lo == d.hi else f"{d.lo}–{d.hi}"
             line = f"{nm} {rng_s}"
         else:
@@ -1894,6 +1905,11 @@ def hunt_detail(player, enemy) -> str:
             f"⚔ Атака — {enemy.attack}",
             f"🛡 Броня — {enemy.armor}",
         ]),
+    ]
+    hints = [_TRAIT_HINT[t] for t in getattr(enemy, "traits", ()) if t in _TRAIT_HINT]
+    if hints:
+        parts += ["", *_branch("⚠ ОСОБЕННОСТЬ", hints)]
+    parts += [
         "",
         *_branch("ТВОЙ РАСКЛАД", odds),
         "",

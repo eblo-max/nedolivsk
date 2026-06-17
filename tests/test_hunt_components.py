@@ -144,3 +144,42 @@ def test_regional_beasts_difficulty_parity():
            "left_hand": "oak_shield:1", "head": "leather_cap:1"}
     wrs = [_wr_enemy(kit, combat.ENEMY[b]) for b in REGION_BEAST.values()]
     assert max(wrs) - min(wrs) <= 15, f"асимметрия регионов: {wrs}"
+
+
+# ── Фаза 5: черты-слабости ──────────────────────────────────────────────
+from dataclasses import replace  # noqa: E402
+
+
+def _wc(stats, enemy):
+    return combat.win_chance(stats, enemy)
+
+
+def test_venom_bypasses_player_armor():
+    """Ядовитый бьёт сквозь броню: армор НЕ помогает против него (а против
+    обычного — помогает)."""
+    base = replace(combat.ENEMY["kaban"], traits=())
+    venom = replace(base, traits=("venom",))
+    naked = {"damage": 10}
+    armored = {"damage": 10, "armor": 30}
+    # против обычного броня заметно поднимает шанс
+    assert _wc(armored, base) > _wc(naked, base) + 0.05
+    # против ядовитого броня почти не помогает (бьёт сквозь)
+    assert _wc(armored, venom) < _wc(armored, base)            # ядовитый опаснее
+    assert abs(_wc(armored, venom) - _wc(naked, venom)) < 0.05  # броня ≈ бесполезна
+
+
+def test_evasive_reduces_player_damage():
+    """Увёртливый уводит часть ударов → шанс ниже, чем у идентичного обычного."""
+    base = replace(combat.ENEMY["olen"], traits=())
+    evasive = replace(base, traits=("evasive",))
+    stats = {"damage": 10, "armor": 10}
+    assert _wc(stats, evasive) < _wc(stats, base)
+
+
+def test_brief_shows_trait_weakness():
+    from types import SimpleNamespace
+    from bot import texts
+    p = SimpleNamespace(equipment={"weapon": "kovsh:1"}, hp=35, hp_at=None,
+                        buff_kind=None, buff_until=None, tavern=None, region="red_wastes")
+    assert "Ядовит" in texts.hunt_detail(p, combat.ENEMY["scorpion"])
+    assert "Увёртлив" in texts.hunt_detail(p, combat.ENEMY["lynx"])
