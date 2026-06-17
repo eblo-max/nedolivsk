@@ -259,6 +259,10 @@ async def create_tables() -> None:
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "ref_tier INTEGER NOT NULL DEFAULT 0"
         ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "onboard_nudged BOOLEAN NOT NULL DEFAULT FALSE"
+        ))
         # Мировое событие (погода/экономика): одно активное + кулдаун.
         await conn.execute(text(
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS event_kind VARCHAR(16)"

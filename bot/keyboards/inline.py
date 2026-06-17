@@ -226,6 +226,13 @@ def idle_nudge_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def onboard_nudge_kb() -> InlineKeyboardMarkup:
+    """Кнопка «завести кабак» из дожима онбординга."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏗 Завести кабак", callback_data="create_tavern", style="success")
+    return kb.as_markup()
+
+
 def bonus_push_kb() -> InlineKeyboardMarkup:
     """Кнопка из утреннего пуша — сразу к экрану бонуса дня."""
     kb = InlineKeyboardBuilder()

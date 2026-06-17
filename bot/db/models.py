@@ -74,6 +74,8 @@ class Player(Base):
     referred_by: Mapped[int | None] = mapped_column(BigInteger)
     ref_rewarded: Mapped[bool] = mapped_column(default=False)
     ref_tier: Mapped[int] = mapped_column(default=0)
+    # Онбординг-дожим: завёл аккаунт, но кабак не открыл — подтолкнули один раз.
+    onboard_nudged: Mapped[bool] = mapped_column(default=False)
 
     # Ежедневный бонус («опохмел»): claimable-предложение (bonus_kind) висит 24ч
     # и сгорает; активный баф (buff_kind) действует 4ч; bonus_next_at — когда

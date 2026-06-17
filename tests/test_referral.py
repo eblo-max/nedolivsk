@@ -79,3 +79,10 @@ def test_tier_bonus_at_threshold():
     # need × базовая выдача + один тир-бонус за прохождение вехи
     assert r["gold_delta"] == need * balance.REFERRAL_INVITER_GOLD + bonus
     assert r["ref_tier"] == 1
+
+
+def test_onboard_nudge_text_variants():
+    from bot import texts
+    assert "кабак" in texts.onboard_nudge(False).lower()
+    assert "друг" in texts.onboard_nudge(True).lower()      # приглашённому — про зазыв
+    assert texts.onboard_nudge(True) != texts.onboard_nudge(False)

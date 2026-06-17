@@ -26,7 +26,7 @@ from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import (
     bonus_push_kb, buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb,
-    idle_nudge_kb, loot_kb, raid_gather_kb, raid_kb,
+    idle_nudge_kb, loot_kb, onboard_nudge_kb, raid_gather_kb, raid_kb,
 )
 
 CHECK_INTERVAL_SECONDS = 60
@@ -195,6 +195,22 @@ async def _notify_returned(bot: Bot) -> None:
             if tier > player.nudge_tier:
                 player.nudge_tier = tier
                 idle_nudges.append((player.id, tier))
+
+        # Онбординг-дожим: завёл аккаунт, но кабак так и не открыл — подтолкнуть
+        # ОДИН раз (флаг onboard_nudged). Только тех, кто ещё в досягаемости лички.
+        onboard_nudges: list[tuple[int, bool]] = []
+        res_ob = await session.execute(
+            select(Player).where(
+                Player.onboard_nudged.is_(False),
+                Player.created_at < now - timedelta(minutes=balance.ONBOARD_NUDGE_AFTER_MIN),
+                Player.last_seen_at.is_not(None),
+                Player.last_seen_at >= now - timedelta(days=2),
+                Player.id.not_in(select(Tavern.player_id)),
+            ).with_for_update(skip_locked=True)
+        )
+        for player in res_ob.scalars().all():
+            player.onboard_nudged = True
+            onboard_nudges.append((player.id, player.referred_by is not None))
 
         from bot.game import buildings as bld
 
@@ -520,6 +536,13 @@ async def _notify_returned(bot: Bot) -> None:
                 lambda p=pid, t=tier: bot.send_message(
                     p, texts.idle_nudge(t), reply_markup=idle_nudge_kb()),
                 what=f"простой→{pid}")
+
+        # Онбординг-дожим — строго в личку, один раз (флаг уже зафиксирован).
+        for pid, referred in onboard_nudges:
+            await deliver(
+                lambda p=pid, r=referred: bot.send_message(
+                    p, texts.onboard_nudge(r), reply_markup=onboard_nudge_kb()),
+                what=f"онбординг→{pid}")
 
         # Утренний пуш «бонус готов» — в личку (маркер дня уже зафиксирован).
         for pid in bonus_push_targets:
