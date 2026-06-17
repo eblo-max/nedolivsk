@@ -18,7 +18,7 @@ from bot.db import repo
 from bot.game import inventory, items, raid
 from bot.handlers import common
 from bot.keyboards.inline import raid_gather_kb, raid_kb
-from bot.sender import deliver
+from bot.sender import claim_edit, deliver
 
 router = Router()
 
@@ -51,13 +51,17 @@ async def edit_raid_announce(bot: Bot, chat_id: int, msg_id: int, is_video: bool
         caption, chat_id=chat_id, message_id=msg_id, reply_markup=markup)
 
 
-async def _render(cb: CallbackQuery, boss) -> None:
-    """Перерисовать сообщение под текущую фазу (подпись видео либо текст)."""
+async def _render(cb: CallbackQuery, boss, *, throttle: bool = True) -> None:
+    """Перерисовать сообщение под текущую фазу (подпись видео либо текст).
+    throttle=True — косметика на удар/запись: частые правки одного сообщения
+    схлопываем (анти-флуд), состояние догонит следующий клик или тик нотифаера."""
+    msg: Message = cb.message
+    if throttle and not claim_edit(msg.chat.id, msg.message_id):
+        return
     if boss.status == "gathering":
         text, markup = texts.raid_gather_screen(boss), raid_gather_kb(boss.id)
     else:
         text, markup = texts.raid_screen(boss), raid_kb(boss.id)
-    msg: Message = cb.message
     try:
         if msg.video:
             await msg.edit_caption(caption=text, reply_markup=markup)
