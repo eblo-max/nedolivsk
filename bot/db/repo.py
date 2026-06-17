@@ -517,3 +517,54 @@ async def top_sellers(
         .order_by(Tavern.auction_sold.desc(), Tavern.id).limit(limit)
     )
     return list(result.all())
+
+
+# ── Зазывала (рефералка) ──────────────────────────────────────────────────────
+async def count_referrals(session: AsyncSession, inviter_id: int) -> int:
+    """Сколько друзей этот игрок реально привёл (активировали кабак)."""
+    return await session.scalar(
+        select(func.count()).select_from(Player)
+        .where(Player.referred_by == inviter_id, Player.ref_rewarded.is_(True))
+    ) or 0
+
+
+async def top_referrers(
+    session: AsyncSession, limit: int = 10
+) -> list[tuple[Player, int]]:
+    """Топ зазывал: игроки по числу приведённых (активированных) друзей."""
+    sub = (select(Player.referred_by.label("inv"), func.count().label("n"))
+           .where(Player.referred_by.isnot(None), Player.ref_rewarded.is_(True))
+           .group_by(Player.referred_by).subquery())
+    rows = await session.execute(
+        select(Player, sub.c.n).join(sub, Player.id == sub.c.inv)
+        .order_by(sub.c.n.desc(), Player.id).limit(limit))
+    return list(rows.all())
+
+
+async def grant_referral_rewards(session: AsyncSession, invitee: Player) -> dict | None:
+    """Выдать награды зазывалы при АКТИВАЦИИ новичка (завёл кабак). Строго один раз.
+    Платим пригласившему (золото+репутация) и новичку (подъёмные), плюс тир-бонусы
+    за вехи (5/10/25 друзей). Возвращает {'invitee_gold': N} для сообщения новичку."""
+    if invitee.referred_by is None or invitee.ref_rewarded:
+        return None
+    invitee.ref_rewarded = True            # помечаем сразу (даже если пригласивший пропал)
+    referrer = await session.get(Player, invitee.referred_by, with_for_update=True)
+    if referrer is None or referrer.id == invitee.id:
+        return None
+    invitee.gold += balance.REFERRAL_INVITEE_GOLD
+    referrer.gold += balance.REFERRAL_INVITER_GOLD
+    referrer.reputation += balance.REFERRAL_INVITER_REP
+    if referrer.tavern is not None:
+        referrer.tavern.reputation += balance.REFERRAL_INVITER_REP
+    queue_notify(session, referrer.id,
+                 f"🍻 Твой зазыв сработал — новый кабатчик в Недоливске! "
+                 f"+{balance.REFERRAL_INVITER_GOLD} 🪙 и +{balance.REFERRAL_INVITER_REP} ⭐.")
+    activated = await count_referrals(session, referrer.id)   # включая этого (уже помечен)
+    while (referrer.ref_tier < len(balance.REFERRAL_TIERS)
+           and activated >= balance.REFERRAL_TIERS[referrer.ref_tier][0]):
+        need, bonus = balance.REFERRAL_TIERS[referrer.ref_tier]
+        referrer.gold += bonus
+        referrer.ref_tier += 1
+        queue_notify(session, referrer.id,
+                     f"🏅 Зазывала: {need} друзей в деле — жирный бонус +{bonus} 🪙!")
+    return {"invitee_gold": balance.REFERRAL_INVITEE_GOLD}

@@ -27,6 +27,7 @@ from bot.handlers import (
     loot,
     raid,
     rating,
+    referral,
     start,
     story,
     tavern,
@@ -105,7 +106,8 @@ async def main() -> None:
         character.router,
         buildings.router, start.router, tavern.router, story.router,
         trade.router, auction.router, commands.router, loot.router,
-        hunt.router, raid.router, bonus.router, hub.router, group.router
+        hunt.router, raid.router, bonus.router, referral.router,
+        hub.router, group.router
     )
 
     notifier_task = asyncio.create_task(notifier_loop(bot))

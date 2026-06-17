@@ -247,6 +247,18 @@ async def create_tables() -> None:
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "dm_news BOOLEAN NOT NULL DEFAULT FALSE"
         ))
+        # Зазывала (рефералка): кто привёл, выдана ли награда, сколько тиров взято.
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS referred_by BIGINT"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "ref_rewarded BOOLEAN NOT NULL DEFAULT FALSE"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "ref_tier INTEGER NOT NULL DEFAULT 0"
+        ))
         # Мировое событие (погода/экономика): одно активное + кулдаун.
         await conn.execute(text(
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS event_kind VARCHAR(16)"

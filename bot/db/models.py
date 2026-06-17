@@ -69,6 +69,11 @@ class Player(Base):
     nudge_tier: Mapped[int] = mapped_column(default=0)
     # Одиночке (без домашнего чата) слать вести мира в ЛС — опционально (переключатель).
     dm_news: Mapped[bool] = mapped_column(default=False)
+    # Зазывала (рефералка): кто привёл, выдана ли награда пригласившему за этого
+    # новичка, и сколько тир-бонусов пригласивший уже получил (как зазывала).
+    referred_by: Mapped[int | None] = mapped_column(BigInteger)
+    ref_rewarded: Mapped[bool] = mapped_column(default=False)
+    ref_tier: Mapped[int] = mapped_column(default=0)
 
     # Ежедневный бонус («опохмел»): claimable-предложение (bonus_kind) висит 24ч
     # и сгорает; активный баф (buff_kind) действует 4ч; bonus_next_at — когда

@@ -122,7 +122,25 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     kb.button(text="🏗 Пристройки", callback_data="buildings")
     kb.button(text="🔨 Улучшить таверну", callback_data="upgrade")
     kb.button(text="ℹ️ О игре", callback_data="info")
-    kb.adjust(*sizes, 1, 2, 2, 2, 1)
+    kb.button(text="🍻 Позвать друга", callback_data="referral")
+    kb.adjust(*sizes, 1, 2, 2, 2, 1, 2)
+    return kb.as_markup()
+
+
+def referral_kb(share_url: str) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📤 Позвать друга", url=share_url)        # откроет шеринг Telegram
+    kb.button(text="🏆 Топ зазывал", callback_data="referrers")
+    kb.button(text="🏠 Таверна", callback_data="tavern")
+    kb.adjust(1, 2)
+    return kb.as_markup()
+
+
+def referrers_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="↩️ Назад", callback_data="referral")
+    kb.button(text="🏠 Таверна", callback_data="tavern")
+    kb.adjust(2)
     return kb.as_markup()
 
 
