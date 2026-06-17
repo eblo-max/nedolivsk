@@ -32,8 +32,9 @@ async def _player(
 
 
 async def _render(callback: CallbackQuery, caption: str, markup,
-                  video: str | None = None) -> None:
-    """Показать экран охоты. video задан → панель-видео (морфим); иначе фото/текст."""
+                  video: str | None = None, image: str = "oxota") -> None:
+    """Показать экран охоты. video задан → панель-видео (морфим); иначе статичная
+    картинка image (по умолчанию «oxota»; экран лечения шлёт «sklad» — погреб)."""
     msg = callback.message
     path = images.named_video(video) if video else None
     if path is not None:
@@ -58,10 +59,10 @@ async def _render(callback: CallbackQuery, caption: str, markup,
         common.remember_file_id(path, sent)
         panels.claim(sent, callback.from_user.id)
         return
-    # нет видео — меню/итог охоты на статичной картинке «oxota» (с видео уходим
-    # сюда же: show_image_panel сам пересоздаст панель из видео в фото).
+    # нет видео — статичная картинка экрана (с видео уходим сюда же:
+    # show_image_panel сам пересоздаст панель из видео в фото).
     await common.show_image_panel(
-        msg, images.named_image("oxota"), caption, markup, callback.from_user.id)
+        msg, images.named_image(image), caption, markup, callback.from_user.id)
 
 
 @router.callback_query(F.data == "hunt")
@@ -93,7 +94,7 @@ async def cb_heal_menu(callback: CallbackQuery, session: AsyncSession) -> None:
     player = await _player(callback, session)
     if player is None:
         return
-    await _render(callback, texts.heal_menu(player), kb.heal_kb(player))
+    await _render(callback, texts.heal_menu(player), kb.heal_kb(player), image="sklad")
     await callback.answer()
 
 
@@ -106,7 +107,7 @@ async def cb_heal_do(callback: CallbackQuery, session: AsyncSession) -> None:
     if res is None:
         await callback.answer("Нечем подлечиться или уже сыт.", show_alert=True)
         return
-    await _render(callback, texts.heal_menu(player), kb.heal_kb(player))
+    await _render(callback, texts.heal_menu(player), kb.heal_kb(player), image="sklad")
     await callback.answer(f"+{res['healed']} ❤")
 
 
