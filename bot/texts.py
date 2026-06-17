@@ -1965,7 +1965,10 @@ def hunt_anim_frames(res) -> list[str]:
     frames = [f"{head}\n\n<i>Сходишься вплотную…</i>"]
     acc: list[str] = []
     for rd in (f.log or [])[:4]:
-        s = f"⚔ Бьёшь на {rd['pd']}" + (" 💥 КРИТ!" if rd["crit"] else "")
+        if rd.get("miss"):
+            s = "💨 Промах — зверь увернулся!"
+        else:
+            s = f"⚔ Бьёшь на {rd['pd']}" + (" 💥 КРИТ!" if rd["crit"] else "")
         if rd["ed"]:
             s += f"\n{e.emoji} в ответ −{rd['ed']}"
         s += f"\n   <i>{e.name} ❤{rd['ehp']} · ты ❤{rd['php']}</i>"

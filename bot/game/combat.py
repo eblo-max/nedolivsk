@@ -218,7 +218,10 @@ def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
     dmg, crit_pct, parmor = _player_offense(stats)
     dodge_pct = _dodge_pct(stats)
     v = balance.HUNT_DMG_VARIANCE
-    mit = balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + parmor)
+    traits = getattr(enemy, "traits", ())
+    # антураж согласуем с чертами: ядовитый бьёт сквозь броню (mit=1), увёртливый
+    # уводит часть ударов (промах) — чтобы анимация не врала про механику.
+    mit = 1.0 if "venom" in traits else balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + parmor)
     tmult = stats.get("dmg_taken_mult", 1.0)
     php, ehp = php0, enemy.hp
     rounds = crits = dealt = 0
@@ -226,11 +229,15 @@ def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
     while ehp > 0 and rounds < balance.HUNT_MAX_ROUNDS:
         rounds += 1
         crit = rng.randint(1, 100) <= crit_pct
-        base = dmg if crit else max(1, dmg - enemy.armor)
-        hit = max(1, round(base * rng.uniform(1 - v, 1 + v)))
-        if crit:
-            hit *= 2
-            crits += 1
+        miss = "evasive" in traits and rng.random() < balance.HUNT_EVASION
+        if miss:
+            hit, crit = 0, False        # увёртливый ушёл от удара
+        else:
+            base = dmg if crit else max(1, dmg - enemy.armor)
+            hit = max(1, round(base * rng.uniform(1 - v, 1 + v)))
+            if crit:
+                hit *= 2
+                crits += 1
         ehp -= hit
         if not won:
             ehp = max(1, ehp)        # в проигрыше зверь не «умирает» в антураже
@@ -242,7 +249,7 @@ def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
             php -= ed
             if won:
                 php = max(1, php)    # в победе не «умираешь» в антураже
-        log.append({"pd": hit, "crit": crit, "ed": ed,
+        log.append({"pd": hit, "crit": crit, "miss": miss, "ed": ed,
                     "php": max(0, php), "ehp": max(0, ehp)})
         if not won and php <= 0:
             break

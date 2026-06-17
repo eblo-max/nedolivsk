@@ -3,6 +3,7 @@
 разбойник из стены 0% выходят в середину на «тесак★»).
 """
 import random
+import statistics
 
 from bot.game import balance, combat, items
 
@@ -183,3 +184,30 @@ def test_brief_shows_trait_weakness():
                         buff_kind=None, buff_until=None, tavern=None, region="red_wastes")
     assert "Ядовит" in texts.hunt_detail(p, combat.ENEMY["scorpion"])
     assert "Увёртлив" in texts.hunt_detail(p, combat.ENEMY["lynx"])
+
+
+def test_resolve_animation_reflects_traits():
+    """Аудит-фикс: анимация боя честна к чертам — ядовитый бьёт сквозь броню,
+    увёртливый даёт промахи."""
+    rng = random.Random(3)
+    st = {"damage": 14, "armor": 30}
+    seen_miss = any(r.get("miss") for _ in range(80)
+                    for r in combat.resolve({"damage": 14}, combat.ENEMY["volk"],
+                                            balance.BASE_HP, rng).log)
+    assert seen_miss
+    venom_ed = [r["ed"] for _ in range(300)
+                for r in combat.resolve(st, combat.ENEMY["scorpion"], balance.BASE_HP, rng).log
+                if r["ed"] > 0]
+    plain = replace(combat.ENEMY["scorpion"], traits=())
+    plain_ed = [r["ed"] for _ in range(300)
+                for r in combat.resolve(st, plain, balance.BASE_HP, rng).log if r["ed"] > 0]
+    assert statistics.mean(venom_ed) > statistics.mean(plain_ed)   # яд сквозь броню
+
+
+def test_forge_hides_other_region_belts():
+    from types import SimpleNamespace
+    from bot.keyboards.inline import forge_kb
+    p = SimpleNamespace(equipment={}, region="north_wilds")
+    txts = [b.text.lower() for row in forge_kb(p).inline_keyboard for b in row]
+    assert any("рысь" in t for t in txts)                       # свой пояс — есть
+    assert not any("клык" in t or "хитин" in t for t in txts)   # чужих нет

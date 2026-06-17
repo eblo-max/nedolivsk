@@ -278,6 +278,14 @@ CATALOG: dict[str, Item] = {
     ]
 }
 
+# Региональная снаряга (Фаза 4): id → регион. Куётся из компонента своего региона,
+# поэтому форж показывает игроку только ЕГО пояс (чужие скрафтить нельзя).
+REGION_GEAR = {
+    "lynx_belt": "north_wilds",
+    "tusk_belt": "green_valleys",
+    "chitin_belt": "red_wastes",
+}
+
 
 def equipped_items(equipment: dict | None) -> list[tuple[Item, int]]:
     """[(предмет, ярус), ...] — статы предмета умножаются на ярус."""

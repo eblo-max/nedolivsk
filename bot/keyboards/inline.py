@@ -610,13 +610,16 @@ def auction_price_kb(good: str, qty: int, prices: list[int]) -> InlineKeyboardMa
 
 
 def forge_kb(player: Player | None = None) -> InlineKeyboardMarkup:
-    from bot.game.items import CATALOG, TIER_STARS, equipped_tier
+    from bot.game.items import CATALOG, REGION_GEAR, TIER_STARS, equipped_tier
 
     equipment = getattr(player, "equipment", None) if player else None
+    region = getattr(player, "region", None) if player else None
     kb = InlineKeyboardBuilder()
     for item in CATALOG.values():
         if not item.craftable:        # эксклюзив боссов в кузнице не куётся
             continue
+        if item.id in REGION_GEAR and REGION_GEAR[item.id] != region:
+            continue                  # чужой региональный пояс — скрафтить нельзя, скрываем
         tier = equipped_tier(equipment, item.id)
         label = f"{item.name} {TIER_STARS[tier]}" if tier else item.name
         kb.button(text=label, callback_data=f"forge_item:{item.id}")
