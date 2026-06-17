@@ -504,10 +504,11 @@ def _hunt_session(p: SimPlayer, s: Strategy, now_h: float, rng: random.Random):
                 best, best_ev = e, ev
         if best is None:
             break
+        target = combat.maybe_elite(best.id, rng) or best   # редкая элита (Ф3)
         stats = dict(items.combat_stats(p.equipment))
-        f = combat.resolve(stats, best, int(p.hp), rng)
+        f = combat.resolve(stats, target, int(p.hp), rng)
         if f.win:
-            loot = combat.roll_loot(best, stats.get("luck", 0), rng)
+            loot = combat.roll_loot(target, stats.get("luck", 0), rng)
             p.gold += loot["gold"]
             p.faucet["охота"] += loot["gold"]
             for r, q in loot["res"].items():

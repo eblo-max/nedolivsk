@@ -67,3 +67,41 @@ def test_component_gear_weaker_than_boss_top():
     fang3 = items.combat_stats({"weapon": "fang_cleaver:3"})["damage"]
     dragon3 = items.combat_stats({"weapon": "dragon_fang:3"})["damage"]
     assert fang3 < dragon3
+
+
+# ── Фаза 3: редкие элиты ────────────────────────────────────────────────
+def _wr_enemy(equip, enemy, n=600, seed=1):
+    stats = dict(items.combat_stats(equip))
+    return combat.forecast(stats, enemy, balance.BASE_HP, n=n, rng=random.Random(seed))[0]
+
+
+def test_elite_roll_respects_chance(monkeypatch):
+    monkeypatch.setattr(balance, "HUNT_ELITE_CHANCE", 100)
+    assert combat.maybe_elite("olen", random.Random(1)).id == "olen_gold"
+    assert combat.maybe_elite("zayac", random.Random(1)) is None   # не у всех есть элита
+    monkeypatch.setattr(balance, "HUNT_ELITE_CHANCE", 0)
+    assert combat.maybe_elite("olen", random.Random(1)) is None
+
+
+def test_elite_is_jackpot_not_trap():
+    """Элита бьётся той же снарягой, что и базовый (винрейт ≈ базовому, не 0%),
+    и даёт больше золота — позитивный сюрприз, а не ловушка."""
+    kit = {"weapon": "kovsh:1", "chest": "fartuk:1",
+           "left_hand": "oak_shield:1", "head": "leather_cap:1"}
+    for base_id, elite in combat.ELITES.items():
+        base_wr = _wr_enemy(kit, combat.ENEMY[base_id])
+        if base_wr < 60:
+            continue   # сравниваем там, где базовый уверенно бьётся
+        assert _wr_enemy(kit, elite) >= base_wr - 25, f"{elite.id} — ловушка"
+        assert elite.gold[0] > combat.ENEMY[base_id].gold[1]   # золота заметно больше
+
+
+def test_elite_drops_guaranteed_components_and_rare_ring():
+    rng = random.Random(2)
+    el = combat.ELITES["olen"]
+    got_comp = got_ring = False
+    for _ in range(300):
+        res = combat.roll_loot(el, 0, rng)["res"]
+        got_comp = got_comp or res.get("hide", 0) > 0
+        got_ring = got_ring or res.get("ring", 0) > 0
+    assert got_comp and got_ring

@@ -1906,6 +1906,9 @@ def hunt_detail(player, enemy) -> str:
 def hunt_result(res) -> str:
     e, f = res.enemy, res.fight
     mx = balance.BASE_HP
+    ico = {**RESOURCE_EMOJI, **balance.GOODS_EMOJI}      # +компоненты (шкура/клык/…)
+    nm = {**RESOURCE_NAMES, **balance.GOODS_NAMES}
+    elite_head = ["✨ <b>РЕДКАЯ ДОБЫЧА — повезло!</b>", ""] if res.elite else []
     if f.win:
         loot = res.loot
         body = f"🗡 Уложил за {f.rounds} р."
@@ -1914,12 +1917,13 @@ def hunt_result(res) -> str:
         body += f" · осталось ❤{res.hp_now}/{mx} {_hp_bar(res.hp_now, mx)}"
         detail = [f"🪙 Золото — +{loot['gold']}"]
         for r, q in loot["res"].items():
-            detail.append(f"{RESOURCE_EMOJI.get(r, '📦')} {RESOURCE_NAMES.get(r, r)} — +{q}")
+            detail.append(f"{ico.get(r, '📦')} {nm.get(r, r)} — +{q}")
         if loot["rep"]:
             detail.append(f"⭐ Репутация — +{loot['rep']}")
         for t in loot["trophies"]:
             detail.append(f"🏆 {t}")
         return "\n".join([
+            *elite_head,
             f"🏹 <b>{e.emoji} {e.name.upper()} ПОВЕРЖЕН!</b>",
             "", body, "", *_branch("ДОБЫЧА", detail),
         ])

@@ -87,6 +87,37 @@ ENEMIES = [
 ENEMY = {e.id: e for e in ENEMIES}
 
 
+# ── Редкие элиты (Фаза 3): жирнее HP/золота, гарант-компоненты + шанс на перстень.
+# Появляются вместо обычного зверя с шансом HUNT_ELITE_CHANCE при охоте на него.
+# Бьются той же снарягой, что и базовый (просто дольше) — приятный джекпот, не
+# ловушка. ring@15% — альтернативный (редкий) источник престиж-компонента.
+# Элиты — жирная, но СМИРНАЯ добыча: много HP (бой дольше/эпичнее), но атака
+# НИЖЕ базового → винрейт ≈ как у обычного зверя (джекпот, а не ловушка-сюрприз).
+# Бьются той же снарягой; награда — ×3 золота, гарант-компоненты, перстень@15%.
+ELITES: dict[str, Enemy] = {
+    "olen": Enemy("olen_gold", "🦌", "✨ Золотой Олень", 72, 5, 1, (60, 110),
+                  (Drop("hide", 2, 3), Drop("sinew", 2, 3), Drop("ring", 1, 1, 15)),
+                  rep=2, blurb="Шкура отливает золотом, а сам смирный — добыча "
+                               "на зависть всему тракту."),
+    "volk": Enemy("volk_white", "🐺", "⚪ Белый Волк", 62, 6, 2, (55, 100),
+                  (Drop("fang", 2, 3), Drop("sinew", 2, 2), Drop("ring", 1, 1, 15)),
+                  rep=2, blurb="Снежный вожак-одиночка, матёрый и грузный. Клыки — "
+                               "на загляденье."),
+    "kaban": Enemy("kaban_rabid", "🐗", "💢 Бурый Секач", 88, 7, 5, (75, 140),
+                   (Drop("hide", 2, 3), Drop("fang", 2, 2), Drop("ring", 1, 1, 15)),
+                   rep=2, blurb="Разъелся на желудях до борова — неповоротлив, "
+                                "зато добра на нём прорва."),
+}
+
+
+def maybe_elite(enemy_id: str, rng: random.Random) -> Enemy | None:
+    """Ролл редкой элиты вместо обычного зверя (Фаза 3). None — обычная охота."""
+    elite = ELITES.get(enemy_id)
+    if elite and rng.randint(1, 100) <= balance.HUNT_ELITE_CHANCE:
+        return elite
+    return None
+
+
 @dataclass
 class Fight:
     win: bool
@@ -214,6 +245,7 @@ class HuntResult:
     loot: dict | None = None
     gold_lost: int = 0
     hp_now: int = 0
+    elite: bool = False        # попалась редкая элита (Фаза 3)
 
 
 def _now() -> datetime:
@@ -317,6 +349,10 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
     if not ready:
         return HuntResult(ok=False, reason="lowhp", minutes_left=mins)
 
+    elite = maybe_elite(enemy_id, rng)   # редкий джекпот вместо обычного зверя
+    if elite is not None:
+        enemy = elite
+
     stats = player_stats(player)  # снаряга + бафы (удача, толстая шкура)
     fight = resolve(stats, enemy, chp, rng)
     player.hp_at = now
@@ -334,11 +370,12 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
         player.hp = max(1, min(fight.hp_left, chp - balance.HUNT_EXERTION))
         _mark_recovery(player, now)
         return HuntResult(ok=True, enemy=enemy, fight=fight, loot=loot,
-                          hp_now=player.hp)
+                          hp_now=player.hp, elite=elite is not None)
 
     lost = player.gold // balance.HUNT_LOSS_GOLD_DIV  # щепотка золота при поражении
     player.gold -= lost
     player.hp = balance.HP_LOSS_FLOOR
     _mark_recovery(player, now)
     return HuntResult(ok=True, enemy=enemy, fight=fight, gold_lost=lost,
+                      elite=elite is not None,
                       hp_now=player.hp)
