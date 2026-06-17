@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import texts
 from bot.db import repo
+from bot.handlers import common
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -16,15 +17,8 @@ _SHARE_TEXT = "Айда в Недоливск — заведём кабаки и
 
 
 async def _show(callback: CallbackQuery, text: str, markup) -> None:
-    """Из фото-меню — новым сообщением; из текста — правкой на месте."""
-    msg = callback.message
-    try:
-        if msg.photo:
-            await msg.answer(text, reply_markup=markup)
-        else:
-            await msg.edit_text(text, reply_markup=markup)
-    except Exception:  # noqa: BLE001 — на всякий шлём новым сообщением
-        await msg.answer(text, reply_markup=markup)
+    """Редактируем текущую панель на месте — без новых «устаревающих» окон."""
+    await common.caption_edit(callback.message, text, markup)
     await callback.answer()
 
 

@@ -10,21 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import texts
 from bot.db import repo
 from bot.game import balance, inventory, logic, shop
+from bot.handlers import common
 from bot.keyboards import inline as kb
 
 router = Router()
 
 
 async def _show(callback: CallbackQuery, text: str, markup) -> None:
-    """Из фото-меню — новым сообщением; из текста — правкой на месте."""
-    msg = callback.message
-    try:
-        if msg.photo:
-            await msg.answer(text, reply_markup=markup)
-        else:
-            await msg.edit_text(text, reply_markup=markup)
-    except Exception:  # noqa: BLE001 — на всякий шлём новым сообщением
-        await msg.answer(text, reply_markup=markup)
+    """Редактируем ТЕКУЩУЮ панель на месте (подпись фото/текст) — без новых окон,
+    чтобы не плодить «устаревшие» сообщения (как делают биржа/аукцион)."""
+    await common.caption_edit(callback.message, text, markup)
     await callback.answer()
 
 
