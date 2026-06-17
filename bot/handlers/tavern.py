@@ -295,7 +295,8 @@ async def cb_retail_sell(callback: CallbackQuery, session: AsyncSession) -> None
         player.gold -= skim
     # Розница НЕ трогает единый оптовый рынок: гости пьют в своей таверне —
     # конечное потребление, замкнутый локальный контур.
-    await _safe_edit(callback, texts.retail_sold(sold, gold, rep, skim), kb.back_kb())
+    await _safe_edit(callback, texts.retail_sold(sold, gold, rep, skim,
+                     logic.retail_rep_left(player.tavern)), kb.back_kb())
     await callback.answer(f"+{gold - skim} 🪙")
 
 

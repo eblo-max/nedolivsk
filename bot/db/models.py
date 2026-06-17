@@ -280,6 +280,10 @@ class Tavern(Base):
     comfort: Mapped[int] = mapped_column(default=1)
     income_rate: Mapped[int] = mapped_column(default=10)  # золото в час
     reputation: Mapped[int] = mapped_column(default=0)
+    # Накопитель «молвы»: очки сбыта до следующей единицы репутации (остаток не
+    # пропадает между мелкими продажами). И счётчик проданного на бирже — рейтинг.
+    rep_progress: Mapped[int] = mapped_column(default=0)
+    auction_sold: Mapped[int] = mapped_column(default=0)
 
     upgrades: Mapped[dict] = mapped_column(JSONB, default=dict)
     buildings: Mapped[list] = mapped_column(JSONB, default=list)

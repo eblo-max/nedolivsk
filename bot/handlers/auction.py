@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot import images, panels, texts
 from bot.db import repo
 from bot.db.models import Player
-from bot.game import auction, balance, bourse, market
+from bot.game import auction, balance, bourse, logic, market
 from bot.game import production as prod
 from bot.handlers import common
 from bot.keyboards import inline as kb
@@ -457,6 +457,19 @@ async def cb_prices(callback: CallbackQuery, session: AsyncSession,
     await callback.answer()
 
 
+@router.callback_query(F.data == "sellers")
+async def cb_sellers(callback: CallbackQuery, session: AsyncSession,
+                     state: FSMContext) -> None:
+    await state.clear()
+    player = await _player(callback, session)
+    if player is None:
+        return
+    rows = await repo.top_sellers(session)
+    await common.caption_edit(callback.message, texts.sellers_screen(rows, player.id),
+                              kb.sellers_kb())
+    await callback.answer()
+
+
 @router.callback_query(F.data == "bmine")
 async def cb_mine(callback: CallbackQuery, session: AsyncSession,
                   state: FSMContext) -> None:
@@ -505,6 +518,15 @@ def _give(tavern, good: str, qty: int) -> None:
     tavern.products = prods
 
 
+def _seller_fame(seller: Player | None, qty: int) -> None:
+    """Продавцу за проданное на бирже — немного репутации (молва) и +счётчик
+    проданного (для рейтинга продавцов). Тихо пропускаем, если таверны нет."""
+    if seller is None or seller.tavern is None or qty <= 0:
+        return
+    logic.add_goods_rep_progress(seller, seller.tavern, qty * balance.REP_POINTS_AUCTION)
+    seller.tavern.auction_sold = int(seller.tavern.auction_sold or 0) + qty
+
+
 async def _match_sell(session: AsyncSession, player: Player,
                       good: str, qty: int, ask: int) -> int:
     """Свести новую ПРОДАЖУ со встречными заявками «куплю» со всего мира (цена >=
@@ -528,6 +550,7 @@ async def _match_sell(session: AsyncSession, player: Player,
         net = bourse.net_to_seller(gross)
         bourse.freeze(player.tavern, good, k)  # списать у продавца
         player.gold += net
+        _seller_fame(player, k)                # молва + рейтинг продавцу
         _give(buyer.tavern, good, k)           # покупателю (оплачено из залога)
         repo.queue_notify(session, buyer.id,
                           f"📥 По твоей заявке свели {k}×{nm} (из залога {gross} 🪙)")
@@ -566,6 +589,7 @@ async def _match_buy(session: AsyncSession, player: Player,
         seller = await repo.get_player(session, so.seller_id, for_update=True)
         if seller is not None:
             seller.gold += net
+            _seller_fame(seller, k)            # молва + рейтинг продавцу
             repo.queue_notify(session, seller.id,
                               f"🛒 Твой лот свели на бирже: {k}×{nm} → +{net} 🪙")
             repo.add_log(session, "player", seller.id, f"🛒 лот свёлся: {k}×{nm}")
@@ -610,6 +634,7 @@ async def _do_buy(session: AsyncSession, player: Player, chat_id: int | None,
     seller = await repo.get_player(session, order.seller_id, for_update=True)
     if seller is not None:
         seller.gold += net
+        _seller_fame(seller, qty)             # молва + рейтинг продавцу
         repo.add_log(session, "player", seller.id, f"🏪 продал на бирже {qty}×{nm}")
         repo.queue_notify(session, seller.id,
                           f"🛒 На бирже купили твой товар: {qty}×{nm} → +{net} 🪙")
@@ -628,6 +653,7 @@ async def _do_fill(session: AsyncSession, player: Player, chat_id: int | None,
     net = bourse.net_to_seller(gross)
     bourse.freeze(player.tavern, good, qty)
     player.gold += net
+    _seller_fame(player, qty)                 # молва + рейтинг продавцу
     _give(buyer.tavern, good, qty)
     repo.queue_notify(session, buyer.id,
                       f"📥 По твоей заявке доставили {qty}×{nm} (из залога {gross} 🪙)")

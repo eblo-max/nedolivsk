@@ -1504,7 +1504,8 @@ def income_success(r, player=None) -> str:
     return "\n".join(parts)
 
 
-def retail_sold(sold: dict, gold: int, rep: int, skim: int = 0) -> str:
+def retail_sold(sold: dict, gold: int, rep: int, skim: int = 0,
+                rep_left: int | None = None) -> str:
     from bot.game import production as prod
     items = [
         f"{prod.GOODS[k].emoji} {prod.GOODS[k].name} — {n} × {prod.GOODS[k].price}"
@@ -1521,6 +1522,8 @@ def retail_sold(sold: dict, gold: int, rep: int, skim: int = 0) -> str:
         parts.append(f"🥷 Утекло на сторону — −{skim}")
     if rep:
         parts.append(f"⭐ +{rep} к репутации за бойкую торговлю")
+    if rep_left is not None:   # видно прогресс, даже если +0 за эту продажу
+        parts.append(f"📣 До следующей +1 репутации — ещё <b>{rep_left}</b> порций")
     return "\n".join(parts)
 
 
@@ -2306,6 +2309,28 @@ def rating_screen(rows: list, total_gdp: int, total_taverns: int) -> str:
         "Не нашёл себя в списке? Так и запишем: "
         "пьёшь больше, чем зарабатываешь."
     )
+    return "\n".join(lines)
+
+
+def sellers_screen(rows: list, me: int | None = None) -> str:
+    """rows: [(Tavern, Player)] — продавцы по объёму проданного на бирже."""
+    lines = [
+        "🏪 <b>ЛУЧШИЕ КУПЦЫ НЕДОЛИВСКА</b>",
+        "<i>Кто больше всех наторговал на бирже</i>",
+        "",
+    ]
+    if not rows:
+        lines.append("Торг пока пуст — выставь лот и стань первым купцом города!")
+        return "\n".join(lines)
+    for i, (t, p) in enumerate(rows, 1):
+        medal = MEDALS.get(i, f"{i}.")
+        you = " 👈 <b>ты</b>" if me is not None and p.id == me else ""
+        lines.append(
+            f"{medal} <b>{escape(t.name)}</b> — продано <b>{t.auction_sold}</b> ед."
+            f"\n      хозяин: {escape(p.first_name or '—')}{you}"
+        )
+    lines.append("")
+    lines.append("<i>Торгуй на бирже — товар разбирают, а молва о тебе растёт.</i>")
     return "\n".join(lines)
 
 

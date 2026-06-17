@@ -241,6 +241,27 @@ def retail_total(want: dict | None, player: Player | None = None) -> int:
             if player is not None else base)
 
 
+def add_goods_rep_progress(player: Player, tavern: Tavern, points: int) -> int:
+    """Копит «очки молвы» в tavern.rep_progress; каждые REP_PROGRESS_PER_POINT очков →
+    +1 репутации игроку и таверне. Остаток сохраняется (мелкие продажи не пропадают).
+    Возвращает, сколько единиц репутации начислено этой продажей."""
+    if points <= 0:
+        return 0
+    prog = int(tavern.rep_progress or 0) + points
+    gain = prog // balance.REP_PROGRESS_PER_POINT
+    tavern.rep_progress = prog - gain * balance.REP_PROGRESS_PER_POINT
+    if gain:
+        tavern.reputation += gain
+        player.reputation += gain
+    return gain
+
+
+def retail_rep_left(tavern: Tavern) -> int:
+    """Сколько ещё ПОРЦИЙ гостям до следующей единицы репутации (для прогресс-строки)."""
+    left_points = balance.REP_PROGRESS_PER_POINT - int(tavern.rep_progress or 0)
+    return max(1, -(-left_points // balance.REP_POINTS_RETAIL))  # ceil-деление
+
+
 def apply_retail(player: Player, tavern: Tavern, want: dict | None):
     """Исполнить подтверждённый сбыт гостям. Возвращает (sold{}, gold, rep_gain).
     Перепроверяет наличие — продаёт не больше, чем сейчас в погребе."""
@@ -261,12 +282,11 @@ def apply_retail(player: Player, tavern: Tavern, want: dict | None):
     tavern.products = products
     player.gold += gold
     total = sum(sold.values())
-    rep_gain = total // balance.REP_PER_ALE_SOLD
-    if perks.has_fame(player):  # знаменитый кабак — слава со сбыта
+    rep_gain = add_goods_rep_progress(player, tavern, total * balance.REP_POINTS_RETAIL)
+    if perks.has_fame(player):  # знаменитый кабак — доп. слава со сбыта гостям
+        tavern.reputation += 1
+        player.reputation += 1
         rep_gain += 1
-    if rep_gain:
-        tavern.reputation += rep_gain
-        player.reputation += rep_gain
     return sold, gold, rep_gain
 
 

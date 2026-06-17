@@ -203,6 +203,15 @@ async def create_tables() -> None:
             "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS "
             "auction JSONB NOT NULL DEFAULT '{}'::jsonb"
         ))
+        # Репутация-молва: накопитель очков сбыта + счётчик проданного на бирже.
+        await conn.execute(text(
+            "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS "
+            "rep_progress INTEGER NOT NULL DEFAULT 0"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS "
+            "auction_sold INTEGER NOT NULL DEFAULT 0"
+        ))
         # Унификация ключей погреба: '1'/'2'/'3' эля -> 'ale1'/'ale2'/'ale3'
         await conn.execute(text(
             "UPDATE taverns SET products = (products - '1' - '2' - '3') "

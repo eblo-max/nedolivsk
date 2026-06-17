@@ -505,3 +505,15 @@ async def get_map_taverns(session: AsyncSession) -> list[tuple[Tavern, Player]]:
         select(Tavern, Player).join(Player, Tavern.player_id == Player.id)
     )
     return list(result.all())
+
+
+async def top_sellers(
+    session: AsyncSession, limit: int = 10
+) -> list[tuple[Tavern, Player]]:
+    """Рейтинг продавцов: таверны с наибольшим объёмом проданного на бирже."""
+    result = await session.execute(
+        select(Tavern, Player).join(Player, Tavern.player_id == Player.id)
+        .where(Tavern.auction_sold > 0)
+        .order_by(Tavern.auction_sold.desc(), Tavern.id).limit(limit)
+    )
+    return list(result.all())
