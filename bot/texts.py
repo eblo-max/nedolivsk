@@ -2541,15 +2541,6 @@ def _fmt_left_h(ends_at) -> str:
     return f"{h} ч" if h else f"{int(sec // 60)} мин"
 
 
-def _raid_loot_lines() -> list[str]:
-    """Блок «Добыча» тирами (без процентов — интрига сохранена)."""
-    return [
-        "🎁 <b>С туши:</b>",
-        "└ 🪙 золото — поровну ВСЕМ, кто бил",
-        "└ 🎲 трофей одному: 💎 эксклюзив-снаряга · 🔶 куш золота · 🌿 припасы",
-    ]
-
-
 def _raid_roster_lines(boss, limit: int = 12) -> list[str]:
     """Список записавшихся по именам (для экрана сбора/боя). Пусто — никто ещё.
     Имена экранируем (HTML) и режем длинные; при толпе показываем «и ещё N»."""
@@ -2568,32 +2559,30 @@ def _raid_roster_lines(boss, limit: int = 12) -> list[str]:
 
 
 # Тон под каждого босса: (шапка-тревога, вводная строка с именем, боевой клич).
-_RAID_FLAVOR: dict[str, tuple[str, str, str]] = {
+# Тон под каждого босса: (тэглайн — лёгкий курсив под именем, боевой клич).
+# Имя/эмодзи берём из спека — звучит ровно один раз, без капс-дубля.
+_RAID_FLAVOR: dict[str, tuple[str, str]] = {
     "rat_king": (
-        "🐀 <b>ОПЯТЬ ЭТА ТВАРЬ ИЗ ПОДПОЛА!</b>",
-        "Вылез <b><u>Крысиный Король</u></b> — жрёт всё, что плохо лежит.",
+        "Опять эта тварь из подпола.",
         "Налетай всем кабаком, пока гадина кассу не сожрала. Кто по углам "
         "прятался — тот и без сыра.",
     ),
     "bog_troll": (
-        "👹 <b>С БОЛОТ ПОТЯНУЛО СМРАДОМ…</b>",
-        "На город прёт <b><u>Болотный Тролль</u></b>. Земля дрожит.",
+        "С болот потянуло смрадом…",
         "Вставайте стеной — поодиночке эта груда втопчет в тину. Только всем "
         "миром свалим.",
     ),
     "dragon": (
-        "🐲 <b>НЕБО ПОЧЕРНЕЛО. ОН ПРОСНУЛСЯ.</b>",
-        "Из-за гор идёт <b><u>ДРЕВНИЙ ЗМЕЙ</u></b> — и пахнет концом.",
+        "Небо почернело — он проснулся.",
         "Все до единого — в бой. Завтра либо пьём за победу, либо наливать "
         "будет некому.",
     ),
 }
 
 
-def _raid_flavor(boss_key: str, spec) -> tuple[str, str, str]:
+def _raid_flavor(boss_key: str) -> tuple[str, str]:
     return _RAID_FLAVOR.get(boss_key, (
-        "⚔️🔥 <b>ВСЕМ КАБАКАМ ТРЕВОГА!</b>",
-        f"{spec.emoji} На Недоливск прёт <b>{spec.name.upper()}</b>.",
+        "На Недоливск идёт беда.",
         "Жми «Присоединиться» — бьют только записавшиеся.",
     ))
 
@@ -2614,17 +2603,22 @@ def raid_gather_screen(boss) -> str:
     spec = raid.BOSSES.get(boss.boss_key)
     if spec is None:
         return "⚔️ Рейд-босс приближается"
-    header, lead, cta = _raid_flavor(boss.boss_key, spec)
+    tagline, cta = _raid_flavor(boss.boss_key)
     return "\n".join([
-        header,
-        lead,
+        f"{spec.emoji} <b>{spec.name.upper()}</b>",
+        f"<i>{tagline}</i>",
+        "",
         f"<blockquote expandable>{escape(spec.blurb)}</blockquote>",
-        f"⏳ Сбор: <b>{_fmt_left_h(boss.gather_until)}</b>   "
-        f"🛡 В строю: <b>{raid.registered_count(boss)}</b>",
+        "",
+        f"⚔️ <b>{_fmt_left_h(boss.gather_until)}</b> до битвы · "
+        f"в строю <b>{raid.registered_count(boss)}</b> ⚔️",
         *_raid_roster_lines(boss),
+        "",
         _raid_loot_box(boss.boss_key),
+        "",
         "<i>⚠️ Доля — только тем, кто реально нанёс урон. "
         "Записался, но не бил — пролетаешь.</i>",
+        "",
         f"<i>⚔️ {cta}</i>",
     ])
 
@@ -2635,9 +2629,10 @@ def raid_push_dm(boss) -> str:
     spec = raid.BOSSES.get(boss.boss_key)
     if spec is None:
         return "⚔️ Рейд-босс приближается — открой кабак!"
-    header, lead, _cta = _raid_flavor(boss.boss_key, spec)
+    tagline, _cta = _raid_flavor(boss.boss_key)
     pct = raid.gear_drop_pct(boss.boss_key)
-    return (f"{header}\n{lead}\n\n"
+    return (f"{spec.emoji} <b>{spec.name.upper()}</b>\n"
+            f"<i>{tagline}</i>\n\n"
             "Идёт сбор (~20 мин). Открой кабак и жми "
             "<b>«⚔️ РЕЙД-БОСС — В БОЙ!»</b> в меню.\n"
             f"🪙 золото — поровну всем, кто бил; 🎲 одному с туши трофей "
@@ -2671,21 +2666,22 @@ def raid_screen(boss) -> str:
     status = (f"😵 <b>РЁВ!</b> Босс оглушил — удар на паузе ~{stun // 60 + 1} мин"
               if stun > 0 else None)
     return "\n".join([
-        f"⚔️ <b>РУБИЛОВО: {spec.name.upper()}</b> {spec.emoji}",
+        f"{spec.emoji} <b>{spec.name.upper()}</b>",
+        "<i>⚔️ Рубилово — добиваем тварь!</i>",
         "",
-        f"«{spec.blurb}»",
+        f"<blockquote expandable>{escape(spec.blurb)}</blockquote>",
         "",
         f"{raid.hp_bar(boss.hp, boss.max_hp)}  {pct}%",
         f"❤️ {max(0, boss.hp)} / {boss.max_hp} HP · 🛡 броня {spec.armor}",
-        f"⚔️ В деле: {fighters} · ⏳ уйдёт через {_fmt_left_h(boss.ends_at)}",
+        f"⚔️ в деле <b>{fighters}</b> · уйдёт через <b>{_fmt_left_h(boss.ends_at)}</b> ⚔️",
         *([status] if status else []),
         "",
-        *_raid_loot_lines(),
+        _raid_loot_box(boss.boss_key),
         "",
         "<i>🛡 Толстая шкура гасит удар — голыми руками еле царапнёшь. И не "
-        "тяните: бросите бить — тварь затягивает раны. Снаряга и уровень решают.</i>",
+        "тяните: бросите бить — тварь затягивает раны.</i>",
         "",
-        "<i>⚔️ Лупи по «Бить» и не отлынивай — дожимаем, пока тварь не сдохла!</i>",
+        "<i>⚔️ Лупи по «Бить» — дожимаем, пока тварь не сдохла!</i>",
     ])
 
 
