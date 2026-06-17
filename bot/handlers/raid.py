@@ -8,9 +8,11 @@
 """
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 from aiogram import Bot, F, Router
-from aiogram.types import CallbackQuery, Message
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import CallbackQuery, InputMediaPhoto, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import images, texts
@@ -42,8 +44,19 @@ async def send_raid_announce(bot: Bot, chat_id: int, boss, caption: str, markup)
 
 
 async def edit_raid_announce(bot: Bot, chat_id: int, msg_id: int, is_video: bool,
-                             caption: str, markup):
-    """Правка анонса: видео → подпись, текст → текст (markup=None убирает кнопки)."""
+                             caption: str, markup, image: Path | None = None):
+    """Правка анонса: видео → подпись, текст → текст (markup=None убирает кнопки).
+    image задан (экран победы) → подменяем медиа на баннер; для чисто-текстового
+    анонса медиа вставить нельзя → откатываемся в обычную правку текста."""
+    if image is not None:
+        try:
+            return await bot.edit_message_media(
+                InputMediaPhoto(media=common.cached_media(image),
+                                caption=common.clamp_caption(caption),
+                                parse_mode="HTML"),
+                chat_id=chat_id, message_id=msg_id, reply_markup=markup)
+        except TelegramBadRequest:
+            pass  # анонс без медиа (текст) — баннер не вставить, правим как текст
     if is_video:
         return await bot.edit_message_caption(
             chat_id=chat_id, message_id=msg_id, caption=caption, reply_markup=markup)
@@ -260,8 +273,9 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
     # Правим анонс во ВСЕХ чатах, где висел босс: экран победы, кнопки убираем
     # (иначе в других чатах осталась бы живая «Бить» по мёртвому боссу). Без спама
     # в посторонние чаты — только туда, где он реально появлялся.
+    win_img = images.named_image("pobeda")
     for cid_s, mid in msgs.items():
         await deliver(
             lambda c=int(cid_s), m=mid: edit_raid_announce(
-                cb.bot, c, m, is_video, text, None),
+                cb.bot, c, m, is_video, text, None, image=win_img),
             what=f"raid-dead→{cid_s}")

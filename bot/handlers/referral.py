@@ -6,7 +6,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import texts
+from bot import images, texts
 from bot.db import repo
 from bot.handlers import common
 from bot.keyboards import inline as kb
@@ -17,8 +17,10 @@ _SHARE_TEXT = "Айда в Недоливск — заведём кабаки и
 
 
 async def _show(callback: CallbackQuery, text: str, markup) -> None:
-    """Редактируем текущую панель на месте — без новых «устаревающих» окон."""
-    await common.caption_edit(callback.message, text, markup)
+    """Показ на месте, на картинке зазывалы — без новых «устаревающих» окон."""
+    await common.show_image_panel(
+        callback.message, images.named_image("priglashenie"),
+        text, markup, callback.from_user.id)
     await callback.answer()
 
 

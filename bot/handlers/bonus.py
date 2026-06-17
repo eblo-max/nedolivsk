@@ -1,15 +1,15 @@
 """Ежедневный бонус («опохмел»): экран, активация, команда /bonus."""
 
 from aiogram import F, Router
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import panels, texts
+from bot import images, panels, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import buff
+from bot.handlers import common
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -25,13 +25,10 @@ async def _player(callback: CallbackQuery, session: AsyncSession, *,
 
 
 async def _edit(callback: CallbackQuery, text: str, markup) -> None:
-    try:
-        if callback.message.photo:
-            await callback.message.edit_caption(caption=text, reply_markup=markup)
-        else:
-            await callback.message.edit_text(text, reply_markup=markup)
-    except TelegramBadRequest:
-        pass
+    """Экран опохмела на месте, на картинке похмельного утра."""
+    await common.show_image_panel(
+        callback.message, images.named_image("opoxmel"),
+        text, markup, callback.from_user.id)
 
 
 @router.callback_query(F.data == "bonus")
@@ -71,5 +68,13 @@ async def cmd_bonus(message: Message, session: AsyncSession) -> None:
         await message.answer("Сначала обзаведись кабаком: /start")
         return
     buff.refresh(player)
-    msg = await message.answer(texts.bonus_screen(player), reply_markup=kb.bonus_kb(player))
+    img = images.named_image("opoxmel")
+    caption = texts.bonus_screen(player)
+    if img is not None:
+        media = common.cached_media(img)
+        msg = await message.answer_photo(media, caption=common.clamp_caption(caption),
+                                         reply_markup=kb.bonus_kb(player))
+        common.remember_file_id(img, msg)
+    else:
+        msg = await message.answer(caption, reply_markup=kb.bonus_kb(player))
     panels.claim(msg, message.from_user.id)

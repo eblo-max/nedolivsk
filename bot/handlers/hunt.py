@@ -58,16 +58,10 @@ async def _render(callback: CallbackQuery, caption: str, markup,
         common.remember_file_id(path, sent)
         panels.claim(sent, callback.from_user.id)
         return
-    if msg.video:                            # уходим с видео на текстовый экран
-        panels.release(msg)
-        try:
-            await msg.delete()
-        except TelegramBadRequest:
-            pass
-        sent = await msg.answer(caption, reply_markup=markup)
-        panels.claim(sent, callback.from_user.id)
-        return
-    await common.caption_edit(msg, caption, markup)
+    # нет видео — меню/итог охоты на статичной картинке «oxota» (с видео уходим
+    # сюда же: show_image_panel сам пересоздаст панель из видео в фото).
+    await common.show_image_panel(
+        msg, images.named_image("oxota"), caption, markup, callback.from_user.id)
 
 
 @router.callback_query(F.data == "hunt")
