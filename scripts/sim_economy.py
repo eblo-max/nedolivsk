@@ -624,6 +624,30 @@ def hunt_matrix():
     return list(stages), rows
 
 
+def stat_probe():
+    """Маржинальный вклад каждого стата в средний винрейт по всем зверям.
+    Бампаем ОДИН стат у базового кита (ковш★+фартук★). База Фазы 0: сейчас урон/
+    броня двигают сильно, крит — слабо, удача — почти никак (только пол-крита)."""
+    base_eq = {"weapon": "kovsh:1", "chest": "fartuk:1"}
+
+    def mean_wr(extra: dict) -> float:
+        stats = dict(items.combat_stats(base_eq))
+        for k, v in extra.items():
+            stats[k] = stats.get(k, 0) + v
+        rng = random.Random(7)
+        wrs = [combat.forecast(stats, e, balance.BASE_HP, n=400, rng=rng)[0]
+               for e in combat.ENEMIES]
+        return sum(wrs) / len(wrs)
+
+    base = mean_wr({})
+    rows = [("базовый кит (ковш★+фартук★)", "—", round(base, 1))]
+    for label, extra in (("+8 урон", {"damage": 8}), ("+10 крит", {"crit": 10}),
+                         ("+10 броня", {"armor": 10}), ("+10 удача", {"luck": 10})):
+        m = mean_wr(extra)
+        rows.append((label, f"{m - base:+.1f}", round(m, 1)))
+    return rows
+
+
 def _ucost(r: str, L: int) -> float:
     """Плата бригаде за единицу ресурса (себестоимость добычи) — как в
     scripts/audit_production_margin (нейтральная зона)."""
@@ -785,6 +809,16 @@ def run(players: int, days: int, seed: int):
         top_f = max(faucet.items(), key=lambda x: x[1])[0] if faucet else "—"
         top_s = max(sink.items(), key=lambda x: x[1])[0] if sink else "—"
         md.append(f"| {r[0]} | {int(fa)} | {int(si)} | {int(net):+} | {top_f} | {top_s} |")
+
+    # — проба статов (Фаза 0: база перед тем, как крит/удача станут важны) —
+    md.append("\n## 2b. Проба статов: маржинальный вклад в средний винрейт\n")
+    md.append("Бампаем один стат у базового кита, смотрим Δ среднего винрейта по всем "
+              "зверям. Фаза-0 база: крит/удача двигают слабо — Фаза 1 это меняет "
+              "(крит→пробой брони, удача→уворот).\n")
+    md.append("| Изменение | Δ ср. винрейт | Ср. винрейт |")
+    md.append("|---|--:|--:|")
+    for r in stat_probe():
+        md.append(f"| {r[0]} | {r[1]} | {r[2]}% |")
 
     # — матрица охоты —
     md.append("\n## 3. Матрица охоты: винрейт (%) по снаряге\n")
