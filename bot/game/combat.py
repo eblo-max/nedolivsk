@@ -46,36 +46,36 @@ ENEMIES = [
     Enemy("zayac", "🐰", "Заяц", 8, 2, 0, (3, 12),
           (Drop("game", 2, 4),),
           blurb="Можно и голыми руками, если не жалко гордости.", video="zayc"),
-    Enemy("lisa", "🦊", "Лиса", 18, 5, 0, (10, 22),
+    Enemy("lisa", "🦊", "Лиса", 18, 4, 0, (10, 22),
           (Drop("game", 2, 4), Drop("herbs", 2, 3, 22)),
           blurb="Юркая, но кусачая. Шкурка ценится.", video="lisa"),
-    Enemy("gadyuka", "🐍", "Гадюка", 30, 10, 0, (15, 30),
+    Enemy("gadyuka", "🐍", "Гадюка", 28, 9, 0, (15, 30),
           (Drop("herbs", 3, 6), Drop("game", 2, 3, 12)),
           blurb="Бьёт больно и метко — броня тут не спасёт. Яд идёт в зелья.",
           video="zmeya"),
-    Enemy("olen", "🦌", "Олень", 52, 7, 0, (18, 34),
+    Enemy("olen", "🦌", "Олень", 54, 7, 1, (18, 34),
           (Drop("game", 6, 10), Drop("herbs", 3, 5, 25)),
           blurb="Мяса много, отпор слабый. Добрая дичь к столу.", video="olen"),
-    Enemy("volk", "🐺", "Волк", 48, 11, 0, (16, 32),
+    Enemy("volk", "🐺", "Волк", 46, 8, 2, (16, 32),
           (Drop("game", 4, 7), Drop("herbs", 2, 4, 15)),
           blurb="Кусается всерьёз. Без оружия лучше не лезть.", video="volk"),
-    Enemy("kaban", "🐗", "Кабан", 60, 13, 2, (25, 50),
+    Enemy("kaban", "🐗", "Кабан", 66, 9, 6, (25, 50),
           (Drop("game", 7, 12), Drop("herbs", 3, 5, 20)),
           blurb="Клыки. Нужен топор и хоть какая броня.", video="kaban"),
-    Enemy("vozhak", "🐺", "Вожак стаи", 88, 18, 3, (45, 85),
+    Enemy("vozhak", "🐺", "Вожак стаи", 88, 12, 4, (45, 85),
           (Drop("game", 8, 14), Drop("ore", 3, 5, 18),
            Drop("", chance=8, label="🦷 клык вожака на ремень")),
           rep=1, blurb="Матёрый, со стаей за спиной. Нужна снаряга."),
-    Enemy("medved", "🐻", "Медведь", 104, 21, 5, (45, 95),
+    Enemy("medved", "🐻", "Медведь", 104, 14, 9, (45, 95),
           (Drop("game", 10, 16), Drop("honey", 3, 6),
            Drop("herbs", 4, 8, 25)),
           rep=1, blurb="Задерёт неподготовленного. Броня обязательна.",
           video="medved"),
-    Enemy("razboy", "🗡", "Разбойник", 118, 28, 8, (90, 170),
+    Enemy("razboy", "🗡", "Разбойник", 112, 17, 6, (90, 170),
           (Drop("ore", 4, 8), Drop("herbs", 4, 8),
            Drop("", chance=15, label="🗡 трофейный кинжал разбойника")),
           rep=2, blurb="С оружием и злой. Только для крепкого бойца."),
-    Enemy("ataman", "👹", "Атаман", 210, 42, 12, (190, 360),
+    Enemy("ataman", "👹", "Атаман", 215, 30, 13, (190, 360),
           (Drop("ore", 8, 14), Drop("clay", 6, 10, 40),
            Drop("", chance=12, label="👑 перстень атамана (хвастать в чате)")),
           rep=4, blurb="Гроза тракта. Идут только мастера в полном железе.",
@@ -106,10 +106,16 @@ def player_stats(player) -> dict:
 
 
 def _player_offense(stats: dict) -> tuple[int, int, int]:
+    # Крит развязан с удачей (Фаза 1): крит-стат сам по себе, удача → уворот/добыча.
     dmg = balance.BASE_DAMAGE + stats.get("damage", 0)
-    crit_pct = min(balance.HUNT_CRIT_CAP,
-                   stats.get("crit", 0) + stats.get("luck", 0) // 2)
+    crit_pct = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0))
     return dmg, crit_pct, stats.get("armor", 0)
+
+
+def _dodge_pct(stats: dict) -> int:
+    """Шанс уворота от удара зверя (роль удачи): % = удача × коэф, до потолка."""
+    return int(min(balance.HUNT_LUCK_DODGE_CAP,
+                   stats.get("luck", 0) * balance.HUNT_LUCK_DODGE_PER))
 
 
 def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
@@ -117,6 +123,7 @@ def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
     """Прогон боя по статам снаряги от заданного HP (по умолч. полный BASE_HP)."""
     rng = rng or random
     dmg, crit_pct, parmor = _player_offense(stats)
+    dodge_pct = _dodge_pct(stats)
     php = balance.BASE_HP if start_hp is None else start_hp
     ehp = enemy.hp
     v = balance.HUNT_DMG_VARIANCE
@@ -126,8 +133,10 @@ def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
     log = []
     while ehp > 0 and php > 0 and rounds < balance.HUNT_MAX_ROUNDS:
         rounds += 1
-        hit = max(1, round(max(1, dmg - enemy.armor) * rng.uniform(1 - v, 1 + v)))
         crit = rng.randint(1, 100) <= crit_pct
+        # Крит ПРОБИВАЕТ броню зверя (урон без её вычета) + ×2; обычный — за вычетом.
+        base = dmg if crit else max(1, dmg - enemy.armor)
+        hit = max(1, round(base * rng.uniform(1 - v, 1 + v)))
         if crit:
             hit *= 2
             crits += 1
@@ -135,7 +144,10 @@ def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
         dealt += hit
         ed = 0
         if ehp > 0:
-            ed = max(1, round(enemy.attack * mit * tmult * rng.uniform(1 - v, 1 + v)))
+            if rng.randint(1, 100) <= dodge_pct:    # удача → уворот: удар мимо
+                ed = 0
+            else:
+                ed = max(1, round(enemy.attack * mit * tmult * rng.uniform(1 - v, 1 + v)))
             php -= ed
         log.append({"pd": hit, "crit": crit, "ed": ed,
                     "php": max(0, php), "ehp": max(0, ehp)})
