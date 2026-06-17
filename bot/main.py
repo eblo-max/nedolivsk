@@ -28,6 +28,7 @@ from bot.handlers import (
     raid,
     rating,
     referral,
+    shop,
     start,
     story,
     tavern,
@@ -106,7 +107,7 @@ async def main() -> None:
         character.router,
         buildings.router, start.router, tavern.router, story.router,
         trade.router, auction.router, commands.router, loot.router,
-        hunt.router, raid.router, bonus.router, referral.router,
+        hunt.router, raid.router, bonus.router, referral.router, shop.router,
         hub.router, group.router
     )
 

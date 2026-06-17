@@ -76,6 +76,8 @@ class Player(Base):
     ref_tier: Mapped[int] = mapped_column(default=0)
     # Онбординг-дожим: завёл аккаунт, но кабак не открыл — подтолкнули один раз.
     onboard_nudged: Mapped[bool] = mapped_column(default=False)
+    # Лавка скупщика: учёт покупок сырья в 24ч-окне (анти-абуз) {ресурс:{t,q}}.
+    shop_buys: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     # Ежедневный бонус («опохмел»): claimable-предложение (bonus_kind) висит 24ч
     # и сгорает; активный баф (buff_kind) действует 4ч; bonus_next_at — когда

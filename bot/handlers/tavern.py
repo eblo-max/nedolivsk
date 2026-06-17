@@ -340,7 +340,8 @@ async def cb_upgrade_confirm(callback: CallbackQuery, session: AsyncSession) -> 
             await callback.answer(texts.UPGRADE_MAX, show_alert=True)
         else:
             await _safe_edit(
-                callback, texts.upgrade_not_enough(result.cost, player), kb.back_kb()
+                callback, texts.upgrade_not_enough(result.cost, player),
+                kb.upgrade_short_kb()
             )
             await callback.answer()
         return

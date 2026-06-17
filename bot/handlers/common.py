@@ -274,7 +274,7 @@ async def show_warehouse_panel(
     message: Message, player: Player, owner_id: int | None = None
 ) -> Message:
     """Склад в текущем окне: складская ведомость с ресурсами (edit_media)."""
-    markup = kb.back_kb()
+    markup = kb.warehouse_kb()
     if storehouse.background_exists():
         media, key, need_capture = await sklad_media(player)
         caption = texts.storehouse_caption(player, player.tavern)

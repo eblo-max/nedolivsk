@@ -233,6 +233,55 @@ def onboard_nudge_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def warehouse_kb() -> InlineKeyboardMarkup:
+    """Склад: вход в лавку скупщика + назад."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🛒 Лавка скупщика", callback_data="shop")
+    kb.button(text="🏠 Таверна", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def shop_kb(player) -> InlineKeyboardMarkup:
+    """Лавка скупщика: сырьё по цене за единицу → выбор ресурса."""
+    from bot.game import balance as b
+    from bot.game import shop
+    kb = InlineKeyboardBuilder()
+    for res in shop.sellable():
+        emoji = b.RESOURCE_EMOJI.get(res, "📦")
+        name = b.RESOURCE_NAMES.get(res, res)
+        kb.button(text=f"{emoji} {name} · {shop.price(res)}", callback_data=f"shopbuy:{res}")
+    kb.button(text="📦 Склад", callback_data="warehouse")
+    kb.button(text="🏠 Таверна", callback_data="tavern")
+    kb.adjust(2)
+    return kb.as_markup()
+
+
+def shop_resource_kb(res: str, player) -> InlineKeyboardMarkup:
+    """Выбор количества покупки одного ресурса (пресеты + «макс»)."""
+    from bot.game import balance as b
+    from bot.game import shop
+    kb = InlineKeyboardBuilder()
+    mx = shop.max_affordable(player, res)
+    for q in b.SHOP_QTY_PRESETS:
+        if q <= mx:
+            kb.button(text=f"+{q}", callback_data=f"shopq:{res}:{q}")
+    if mx > 0:
+        kb.button(text=f"Макс ({mx})", callback_data=f"shopq:{res}:{mx}")
+    kb.button(text="↩️ В лавку", callback_data="shop")
+    kb.adjust(3, 1)
+    return kb.as_markup()
+
+
+def upgrade_short_kb() -> InlineKeyboardMarkup:
+    """Не хватило на апгрейд — предложить докупить сырьё в лавке за золото."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🛒 Докупить и улучшить", callback_data="shopfill", style="success")
+    kb.button(text="↩️ Назад", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def bonus_push_kb() -> InlineKeyboardMarkup:
     """Кнопка из утреннего пуша — сразу к экрану бонуса дня."""
     kb = InlineKeyboardBuilder()

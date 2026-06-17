@@ -2429,6 +2429,56 @@ def referrers_screen(rows: list, me: int | None = None) -> str:
     return "\n".join(lines)
 
 
+# ── Лавка скупщика ────────────────────────────────────────────────────────────
+def _res(res: str) -> str:
+    from bot.game import balance as b
+    return f"{b.RESOURCE_EMOJI.get(res, '📦')} {b.RESOURCE_NAMES.get(res, res)}"
+
+
+def shop_screen(player) -> str:
+    return (
+        "🛒 <b>Лавка скупщика</b>\n"
+        "<i>Бродячий торгаш продаёт сырьё втридорога — зато сразу, без бригад "
+        "и ожидания.</i>\n\n"
+        f"В мошне: <b>{player.gold}</b> золота.\n"
+        "Выбери ресурс и добери сколько нужно."
+    )
+
+
+def shop_resource(player, res: str) -> str:
+    from bot.game import shop
+    have = int((player.inventory or {}).get(res, 0))
+    room = shop.buy_room(player, res)
+    return (
+        f"🛒 <b>{_res(res)}</b> — <b>{shop.price(res)}</b> золота за единицу\n\n"
+        f"<blockquote>В запасе: <b>{have}</b>\n"
+        f"В мошне: <b>{player.gold}</b> золота\n"
+        f"Дневной лимит: ещё <b>{room}</b></blockquote>\n"
+        "Сколько берём?"
+    )
+
+
+def shop_bought(player, res: str, qty: int, cost: int) -> str:
+    have = int((player.inventory or {}).get(res, 0))
+    return (f"🛒 Куплено: <b>{_res(res)} ×{qty}</b> за <b>{cost}</b> золота.\n"
+            f"В запасе теперь <b>{have}</b>, в мошне <b>{player.gold}</b>.")
+
+
+def shop_cant_afford(res: str) -> str:
+    return (f"Не тянешь даже одну единицу {_res(res)} — или дневной лимит исчерпан. "
+            "Сходи в бой за золотом или дождись бригад.")
+
+
+def shop_fill_done(spent: int, level: int) -> str:
+    return (f"🛒 Докупил недостающее за <b>{spent}</b> золота — и кабак "
+            f"поднялся до <b>ур.{level}</b>! Гуляй, хозяин.")
+
+
+def shop_fill_poor(need: int, gold: int) -> str:
+    return (f"На докуп недостающего нужно <b>{need}</b> золота, а у тебя <b>{gold}</b>. "
+            "Не хватает даже на скупщика — добудь ещё или потряси бригады.")
+
+
 # ===== Персонаж и кузница =====
 
 def _item_bonus_line(item) -> str:
