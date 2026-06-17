@@ -6,7 +6,8 @@ from datetime import datetime, timedelta, timezone
 
 from bot.db.models import Player, Tavern
 from bot.game import (
-    balance, buff, inventory, items, newbie, perks, production, season, worldevent,
+    balance, buff, inventory, items, newbie, perks, production, season,
+    story_state, worldevent,
 )
 
 
@@ -128,6 +129,8 @@ class IncomeResult:
     spoiled: dict | None = None    # {ключ: скисло} — излишек погреба прокис
     rep_gain: int = 0
     premium_unsold: bool = False   # остался премиум — состоятельных мало
+    premium_left: int = 0          # богачей ушло — не было дорогого пойла
+    rep_loss: int = 0              # репутация, потерянная на ушедших богачах
     fair: bool = False             # доход собран во время ярмарки
     skim: int = 0                  # доля, утекшая из-за городской ситуации
     city_label: str = ""           # активная городская ситуация (для показа)
@@ -153,7 +156,7 @@ def collect_income(
     passive = int(tavern.income_rate * hours * mult * perks.passive_mult(player)
                   * buff.gold_mult(player) * worldevent.income_mult(player))
 
-    order, premium_unsold = _retail_demand(
+    order, premium_unsold, premium_left = _retail_demand(
         tavern, hours, demand_mult, perks.food_mult(player))
 
     # Порча: излишек сверх вместимости киснет за период (независимо от продажи).
@@ -167,17 +170,32 @@ def collect_income(
 
     player.gold += passive  # пассив — сразу, без подтверждения
     tavern.last_income_at = now
+
+    # Рычаг 1: богачи пришли, дорогого пойла не нашлось — ушли, репутация просела.
+    # Не бьём новичков (щит) и не казним пустой кабак (наливал ли вообще напитки).
+    rep_loss = 0
+    had_drinks = any(k in production.DRINKS and v > 0
+                     for k, v in (tavern.products or {}).items())
+    if premium_left > 0 and had_drinks and not story_state.is_shielded(player, now):
+        rep_loss = min(balance.PREMIUM_LEAVE_MAX_LOSS,
+                       premium_left // balance.PREMIUM_LEAVE_DIV)
+        if rep_loss:
+            tavern.reputation = max(0, tavern.reputation - rep_loss)
+            player.reputation = max(0, player.reputation - rep_loss)
+
     return IncomeResult(
         ok=True, gold=passive, passive=passive, order=order or None,
         spoiled=spoiled or None, premium_unsold=premium_unsold,
+        premium_left=premium_left, rep_loss=rep_loss,
     )
 
 
 def _retail_demand(
     tavern: Tavern, hours: float, demand_mult: float, food_mult: float
-) -> tuple[dict, bool]:
-    """Что гости ХОТЯТ выкупить (без исполнения): (want{ключ:кол}, premium_unsold).
-    Состоятельные — дороже-первым, пьянь — дешёвое (≤порога), еда — пул голода."""
+) -> tuple[dict, bool, int]:
+    """Что гости ХОТЯТ выкупить (без исполнения): (want{ключ:кол}, premium_unsold,
+    premium_left). Состоятельные пьют ТОЛЬКО дорогое пойло (≥ PREMIUM_MIN_PRICE);
+    кому не хватило — уходят (premium_left). Пьянь — дешёвое (≤порога)."""
     products = tavern.products or {}
     avail = {k: int(v) for k, v in products.items() if v > 0}
     want: dict[str, int] = {}
@@ -196,10 +214,15 @@ def _retail_demand(
 
     keys = [k for k in products if k in production.DRINKS and products[k] > 0]
     by_price = sorted(keys, key=lambda k: production.DRINKS[k].price)
-    for key in reversed(by_price):
+    # Состоятельные пьют только «дорогое пойло» (≥ порога), дороже первым. Остаток
+    # бюджета (не нашлось дорогого) = богачи, что уйдут недовольными.
+    prem_drinks = [k for k in by_price
+                   if production.DRINKS[k].price >= balance.PREMIUM_MIN_PRICE]
+    for key in reversed(prem_drinks):
         if premium <= 0:
             break
         premium -= take(key, premium)
+    premium_left = max(0, premium)
     for key in by_price:
         if commoner <= 0:
             break
@@ -228,17 +251,31 @@ def _retail_demand(
     premium_unsold = any(
         avail.get(k, 0) > 0 and production.DRINKS[k].price >= 10 for k in keys
     ) and share < 0.4
-    return want, premium_unsold
+    return want, premium_unsold, premium_left
 
 
-def retail_total(want: dict | None, player: Player | None = None) -> int:
+def assortment_mult(tavern) -> float:
+    """Рычаг 2: бонус за широкое меню — +ASSORTMENT_STEP за каждый ВИД товара
+    в погребе сверх первого, до потолка ASSORTMENT_MAX. Стимул докупать
+    разнообразие (в т.ч. чужих регионов), а не лить одну позицию."""
+    if tavern is None:
+        return 1.0
+    distinct = sum(1 for k, v in (tavern.products or {}).items()
+                   if k in production.GOODS and v > 0)
+    return min(balance.ASSORTMENT_MAX,
+               1.0 + balance.ASSORTMENT_STEP * max(0, distinct - 1))
+
+
+def retail_total(want: dict | None, player: Player | None = None, tavern=None) -> int:
     """Выручка от сбыта по фиксированным ценам (для показа на подтверждении).
-    С игроком — учитывает активный баф «Бойкая касса», чтобы показанная сумма
-    совпала с фактически начисленной в apply_retail."""
+    С игроком — учитывает баф «Бойкая касса», мировое событие и бонус ассортимента,
+    чтобы показанная сумма совпала с фактически начисленной в apply_retail."""
     base = sum(int(q) * production.GOODS[k].price
                for k, q in (want or {}).items() if k in production.GOODS)
-    return (int(base * buff.gold_mult(player) * worldevent.income_mult(player))
-            if player is not None else base)
+    if player is None:
+        return base
+    return int(base * buff.gold_mult(player) * worldevent.income_mult(player)
+               * assortment_mult(tavern))
 
 
 def add_goods_rep_progress(player: Player, tavern: Tavern, points: int) -> int:
@@ -278,7 +315,9 @@ def apply_retail(player: Player, tavern: Tavern, want: dict | None):
             gold += n * production.GOODS[key].price
     if not sold:
         return {}, 0, 0
-    gold = int(gold * buff.gold_mult(player) * worldevent.income_mult(player))
+    # assortment_mult читаем ДО переприсваивания tavern.products (меню «как было»).
+    gold = int(gold * buff.gold_mult(player) * worldevent.income_mult(player)
+               * assortment_mult(tavern))
     tavern.products = products
     player.gold += gold
     total = sum(sold.values())
