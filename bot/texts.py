@@ -2368,32 +2368,34 @@ def sellers_screen(rows: list, me: int | None = None) -> str:
 
 # ── Зазывала (рефералка) ──────────────────────────────────────────────────────
 def referral_welcome(gold: int) -> str:
-    return (f"🍻 <b>Тебя позвал друг — добро в Недоливск!</b>\n"
-            f"Держи <b>+{gold} 🪙</b> подъёмных сверху. Освоишься — зови своих: "
-            f"за каждого, кто заведёт кабак, тебе тоже капнет.")
+    return (f"🍻 <b>Тебя позвал друг — рады в Недоливске!</b>\n\n"
+            f"Лови <b>{gold} золота</b> на обзаведение. Освоишься — зови своих: "
+            f"за каждого, кто заведёт кабак, перепадёт и тебе.")
 
 
 def referral_screen(link: str, invited: int, ref_tier: int) -> str:
     from bot.game import balance
     lines = [
-        "🍻 <b>ЗАЗЫВАЛА</b>",
+        "🍻 <b>Зазывала</b>",
         "",
-        "Зови народ в Недоливск — за каждого друга, кто заведёт кабак:",
-        f"🎁 тебе <b>+{balance.REFERRAL_INVITER_GOLD} 🪙</b> и "
-        f"<b>+{balance.REFERRAL_INVITER_REP} ⭐</b>",
-        f"🍺 другу <b>+{balance.REFERRAL_INVITEE_GOLD} 🪙</b> подъёмных",
+        "Зови друзей в Недоливск — в выгоде оба.",
         "",
-        f"Уже привёл: <b>{invited}</b>",
+        ("<blockquote>За каждого, кто заведёт кабак:\n"
+         f"• тебе — <b>{balance.REFERRAL_INVITER_GOLD} золота</b> и "
+         f"<b>{balance.REFERRAL_INVITER_REP} репутации</b>\n"
+         f"• другу — <b>{balance.REFERRAL_INVITEE_GOLD} золота</b> на старт</blockquote>"),
+        "",
+        f"Приведено друзей: <b>{invited}</b>",
     ]
     if ref_tier < len(balance.REFERRAL_TIERS):
         need, bonus = balance.REFERRAL_TIERS[ref_tier]
-        lines.append(f"🏅 До бонуса <b>+{bonus} 🪙</b> — ещё "
-                     f"<b>{max(0, need - invited)}</b> друзей")
+        lines.append(f"До бонуса в <b>{bonus} золота</b>: ещё "
+                     f"<b>{max(0, need - invited)}</b>")
     else:
-        lines.append("🏅 Все вехи зазывалы взяты — ты легенда найма!")
+        lines.append("Все вехи зазывалы взяты — ты легенда найма.")
     lines += [
         "",
-        "Твоя ссылка (тапни — скопируется):",
+        "Твоя ссылка (нажми, чтобы скопировать):",
         f"<code>{link}</code>",
     ]
     return "\n".join(lines)
@@ -2402,18 +2404,17 @@ def referral_screen(link: str, invited: int, ref_tier: int) -> str:
 def referrers_screen(rows: list, me: int | None = None) -> str:
     """rows: [(Player, count)] — топ по числу приведённых друзей."""
     lines = [
-        "🏆 <b>ЛУЧШИЕ ЗАЗЫВАЛЫ НЕДОЛИВСКА</b>",
-        "<i>Кто привёл больше всех народу</i>",
+        "🏆 <b>Лучшие зазывалы</b>",
+        "<i>Кто привёл больше всего народу</i>",
         "",
     ]
     if not rows:
-        lines.append("Пока тихо — стань первым, кто зазовёт друзей в город!")
+        lines.append("Пока тихо — стань первым, кто зазовёт друзей в город.")
         return "\n".join(lines)
     for i, (p, n) in enumerate(rows, 1):
         medal = MEDALS.get(i, f"{i}.")
-        you = " 👈 <b>ты</b>" if me is not None and p.id == me else ""
-        lines.append(f"{medal} <b>{escape(p.first_name or '—')}</b> — привёл "
-                     f"<b>{n}</b>{you}")
+        you = " (это ты)" if me is not None and p.id == me else ""
+        lines.append(f"{medal} <b>{escape(p.first_name or '—')}</b> — {n}{you}")
     return "\n".join(lines)
 
 
