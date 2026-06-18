@@ -552,15 +552,19 @@ def _build_line(player: Player) -> str:
 
 
 def _cost_line(cost: dict, player: Player) -> str:
-    """🪙/🪵/… N ✅/❌ — по содержимому словаря стоимости."""
+    """Стоимость по словарю: хватает — «🪵 160 ✅»; не хватает — «🌾 40/60 ❌»
+    (видно, сколько ЕСТЬ из нужного, т.е. сколько ещё донести)."""
     emoji = {"gold": "🪙", **RESOURCE_EMOJI, **balance.GOODS_EMOJI}
     parts = []
     for key, need in cost.items():
         if not need:
             continue
         have = player.gold if key == "gold" else inventory.get(player, key)
-        mark = "✅" if have >= need else "❌"
-        parts.append(f"{emoji.get(key, key)} {need} {mark}")
+        ico = emoji.get(key, key)
+        if have >= need:
+            parts.append(f"{ico} {need} ✅")
+        else:
+            parts.append(f"{ico} {have}/{need} ❌")
     return " · ".join(parts)
 
 
@@ -2306,15 +2310,12 @@ def bonus_none() -> str:
     return "🎁 Бонус сгорел или ещё не подвезли. Загляни завтра."
 
 
-def upgrade_offer(tavern: Tavern, cost: dict) -> str:
+def upgrade_offer(player: Player, tavern: Tavern, cost: dict) -> str:
     new_stats = balance.stats_for_level(tavern.level + 1)
     return "\n".join([
         f"🔨 <b>ПЕРЕСТРОЙКА · ур. {tavern.level + 1}</b>",
         "",
-        *_branch("ВЫЛОЖИШЬ", [
-            f"🪙 {cost['gold']} · 🪵 {cost['wood']} · "
-            f"🌾 {cost['grain']} · 🌿 {cost['hops']}",
-        ]),
+        *_branch("ВЫЛОЖИШЬ", [_cost_line(cost, player)]),  # вся стоимость (с ур.5 — и камень)
         "",
         *_branch("ПОЛУЧИШЬ", [
             f"👥 Вместимость — {tavern.capacity} → {new_stats['capacity']}",
@@ -2337,10 +2338,7 @@ def upgrade_success(new_level: int) -> str:
 def upgrade_not_enough(cost: dict, player: Player) -> str:
     return (
         "😕 С такими запасами только сортир во дворе пристроить.\n\n"
-        f"Надо: 🪙 {cost['gold']} · 🪵 {cost['wood']} · "
-        f"🌾 {cost['grain']} · 🌿 {cost['hops']}\n"
-        f"У тебя: 🪙 {player.gold} · 🪵 {inventory.get(player, 'wood')} · "
-        f"🌾 {inventory.get(player, 'grain')} · 🌿 {inventory.get(player, 'hops')}\n\n"
+        f"Надо: {_cost_line(cost, player)}\n\n"
         "Иди работай."
     )
 

@@ -323,7 +323,7 @@ async def cb_upgrade(callback: CallbackQuery, session: AsyncSession) -> None:
 
     cost = balance.upgrade_cost(tavern.level)
     await _safe_edit(
-        callback, texts.upgrade_offer(tavern, cost), kb.upgrade_confirm_kb()
+        callback, texts.upgrade_offer(player, tavern, cost), kb.upgrade_confirm_kb()
     )
     await callback.answer()
 
