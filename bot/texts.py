@@ -552,8 +552,8 @@ def _build_line(player: Player) -> str:
 
 
 def _cost_line(cost: dict, player: Player) -> str:
-    """Стоимость по словарю: хватает — «🪵 160 ✅»; не хватает — «🌾 40/60 ❌»
-    (видно, сколько ЕСТЬ из нужного, т.е. сколько ещё донести)."""
+    """Стоимость по словарю, без крестов: хватает — «🪵 160»; не хватает —
+    «🌾 40/60» (дробь = есть/надо, сразу видно, сколько ещё донести)."""
     emoji = {"gold": "🪙", **RESOURCE_EMOJI, **balance.GOODS_EMOJI}
     parts = []
     for key, need in cost.items():
@@ -561,10 +561,7 @@ def _cost_line(cost: dict, player: Player) -> str:
             continue
         have = player.gold if key == "gold" else inventory.get(player, key)
         ico = emoji.get(key, key)
-        if have >= need:
-            parts.append(f"{ico} {need} ✅")
-        else:
-            parts.append(f"{ico} {have}/{need} ❌")
+        parts.append(f"{ico} {need}" if have >= need else f"{ico} {have}/{need}")
     return " · ".join(parts)
 
 
