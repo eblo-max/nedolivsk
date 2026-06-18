@@ -50,16 +50,21 @@ def _mk_fighter(pid: int, rng: random.Random):
                            leave_at=leave_at, last_hit=None)
 
 
+def _synth_power(f) -> float:
+    """«Сила» синтетического бойца = средний сырой урон/удар (база×(1+крит))."""
+    return f.base * (1 + f.crit / 100)
+
+
 def simulate(boss_key: str, fighters: int, rng: random.Random) -> dict:
     n = max(1, fighters)
+    roster = [_mk_fighter(i, rng) for i in range(n)]
+    hp0 = raid.hp_for_power(boss_key, sum(_synth_power(f) for f in roster))
     boss = SimpleNamespace(
-        id=1, boss_key=boss_key, status="active",
-        max_hp=raid.hp_for(boss_key, n), hp=raid.hp_for(boss_key, n),
+        id=1, boss_key=boss_key, status="active", max_hp=hp0, hp=hp0,
         contributions={}, messages={}, state={},
     )
     start = datetime(2026, 1, 1, tzinfo=UTC)
     boss.ends_at = start + timedelta(minutes=WINDOW_MIN)
-    roster = [_mk_fighter(i, rng) for i in range(n)]
 
     # Патчим источник сырого урона — остальное (проклятье/щит/броня/миньоны) реально.
     cur = {"f": None}
@@ -110,9 +115,9 @@ def run(trials: int = 150):
     for key in raid.BOSSES:
         spec = raid.BOSSES[key]
         spells = "/".join(dict.fromkeys(k for _, k in spec.script))
-        print(f"{spec.emoji} {spec.name}  (HP/боец {spec.hp_per_fighter}, пол {spec.min_hp}, "
+        print(f"{spec.emoji} {spec.name}  (HP/сила ×{spec.hp_per_power}, пол {spec.min_hp}, "
               f"КД {spec.cooldown_min} мин, броня {spec.armor}, скрипт: {spells})")
-        print(f"  {'явка':>5} {'HP':>7} {'kill%':>6} {'медиана,мин':>12} "
+        print(f"  {'явка':>5} {'~HP':>7} {'kill%':>6} {'медиана,мин':>12} "
               f"{'уход%':>6} {'2-е дых%':>8} {'ост.HP%(уход)':>13}")
         for nft in turnouts:
             res = [simulate(key, nft, rng) for _ in range(trials)]
@@ -122,7 +127,9 @@ def run(trials: int = 150):
             med = statistics.median([r["minutes"] for r in killed]) if killed else float("nan")
             sw = 100 * sum(r["second_wind"] for r in res) / trials
             esc_hp = statistics.mean([r["hp_left_pct"] for r in escaped]) if escaped else 0
-            print(f"  {nft:>5} {raid.hp_for(key, nft):>7} {kill_pct:>5.0f}% "
+            sample = [_mk_fighter(i, rng) for i in range(nft)]
+            hp_show = raid.hp_for_power(key, sum(_synth_power(f) for f in sample))
+            print(f"  {nft:>5} {hp_show:>7} {kill_pct:>5.0f}% "
                   f"{med:>12.1f} {100 - kill_pct:>5.0f}% {sw:>7.0f}% {esc_hp:>12.0f}%")
         print()
 

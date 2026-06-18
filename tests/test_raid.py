@@ -83,9 +83,26 @@ def test_mitigate_percentage_and_scaling():
     assert raid.mitigate("dragon", 100) == max(1, round(100 * k / (k + a)))
 
 
-def test_hp_scales_with_turnout_and_floor():
-    assert raid.hp_for("dragon", 1) == raid.BOSSES["dragon"].min_hp     # пол HP
-    assert raid.hp_for("dragon", 100) == 100 * raid.BOSSES["dragon"].hp_per_fighter
+def test_hp_scales_with_power_and_floor():
+    spec = raid.BOSSES["dragon"]
+    assert raid.hp_for_power("dragon", 1) == spec.min_hp               # пол HP (слабая пачка)
+    big = int(spec.min_hp / spec.hp_per_power) + 500                   # сила выше пола
+    assert raid.hp_for_power("dragon", big) == round(big * spec.hp_per_power)
+    # сильнее пачка → больше HP (масштаб по силе, не по числу)
+    assert raid.hp_for_power("dragon", big * 2) > raid.hp_for_power("dragon", big)
+
+
+def test_register_stores_power():
+    boss = make_boss(status="gathering", contributions={})
+    p = make_player(level=10)
+    raid.register(boss, p)
+    assert boss.contributions[str(p.id)]["pow"] == raid.player_power(p) > 0
+
+
+def test_roster_power_sums_with_fallback():
+    boss = make_boss(contributions={
+        "1": {"dmg": 0, "pow": 40}, "2": {"dmg": 0}})   # второй без pow → DEFAULT
+    assert raid.roster_power(boss) == 40 + raid.DEFAULT_POWER
 
 
 # ── регистрация ────────────────────────────────────────────────────────────

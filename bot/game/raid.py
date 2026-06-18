@@ -2,7 +2,7 @@
 
 ФАЗА 1 «Сбор» (GATHER_MINUTES): анонс во все чаты, игроки жмут «Присоединиться»,
 текст с обратным отсчётом обновляется. ФАЗА 2 «Битва» (FIGHT_HOURS): босс «дошёл»,
-HP подбирается под число записавшихся, бьют ТОЛЬКО записавшиеся. Повержен —
+HP подбирается под суммарную СИЛУ записавшихся, бьют ТОЛЬКО записавшиеся. Повержен —
 золото из пула делится ПОРОВНУ на всех, кто реально бил; одному случайному из
 них с РАВНЫМ шансом падает редкий дроп, редчайшее — снаряга.
 
@@ -52,8 +52,8 @@ class Boss:
     key: str
     emoji: str
     name: str
-    hp_per_fighter: int     # HP за каждого записавшегося (масштаб под явку)
-    min_hp: int             # пол HP (чтобы малой толпой не было тривиально)
+    hp_per_power: float     # HP на 1 ед. суммарной силы записавшихся (масштаб по силе)
+    min_hp: int             # пол HP (анти-тривиал для слабой/малой пачки)
     gold_pool: int          # делится поровну между всеми, кто бил (краник)
     blurb: str
     # Лут: один бонус-дроп победителю. Веса в промилле (сумма 1000) —
@@ -87,7 +87,7 @@ def _rarity_of(kind: str) -> str:
 # Снаряга — редчайшее: 1.5% / 3.5% / 7% за убийство. Топ-вещи ★★★ — только с Дракона.
 BOSSES: dict[str, Boss] = {
     "rat_king": Boss(
-        "rat_king", "🐀", "Крысиный Король", 4200, 13000, 800,
+        "rat_king", "🐀", "Крысиный Король", 80, 3000, 800,
         "Размером с борова, наглый как сборщик податей. Вылез из-под пола и жрёт "
         "всё, до чего дотянется. Прихлопнуть можно — но всем миром, по одному только "
         "лапу отгрызёт.",
@@ -98,7 +98,7 @@ BOSSES: dict[str, Boss] = {
         script=((80, "curse"), (62, "summon"), (45, "roar"),
                 (30, "curse"), (16, "summon"))),    # крысиный рой + чумная зараза
     "bog_troll": Boss(
-        "bog_troll", "👹", "Болотный Тролль", 3500, 14000, 2400,
+        "bog_troll", "👹", "Болотный Тролль", 80, 3000, 2400,
         "Гора смрадного мяса по пояс в тине. Каждый шаг — как телега с навозом, "
         "каждый замах — как падающий дуб. Сунешься один — раскатает в блин.",
         (("res:ore", 465, ("ore", 25, 50)), ("ingot", 300, (10, 20)),
@@ -108,7 +108,7 @@ BOSSES: dict[str, Boss] = {
         script=((85, "ward"), (66, "summon"), (50, "roar"),
                 (38, "ward"), (25, "summon"), (12, "roar"))),  # шкура-щит + выводок
     "dragon": Boss(
-        "dragon", "🐲", "Древний Змей", 3200, 13500, 6000,
+        "dragon", "🐲", "Древний Змей", 80, 3000, 6000,
         "Древний, злой и голодный до золота. Накроет тенью пол-Недоливска, дохнёт "
         "огнём — и от кабака одни головешки. Идёт весь мир разом, иначе всем крышка.",
         (("ingot", 520, (25, 45)), ("res:honey", 300, ("honey", 30, 60)),
@@ -158,10 +158,27 @@ def fight_until(now: datetime | None = None) -> datetime:
     return (now or _now()) + timedelta(hours=FIGHT_HOURS)
 
 
-def hp_for(boss_key: str, fighters: int) -> int:
-    """HP босса под число записавшихся (с полом)."""
+DEFAULT_POWER = 30   # «сила» по умолчанию (старые записи без pow / фолбэк)
+
+
+def hp_for_power(boss_key: str, power: int) -> int:
+    """HP босса от суммарной СИЛЫ записавшихся (ожидаемый урон/удар), а не от их
+    числа: ур.3 и кит больше не равны. Так время убийства ~постоянно при любой
+    прокачке базы. Пол (min_hp) — анти-тривиал для слабой/малой пачки."""
     spec = BOSSES[boss_key]
-    return max(spec.min_hp, fighters * spec.hp_per_fighter)
+    return max(spec.min_hp, round(power * spec.hp_per_power))
+
+
+def roster_power(boss) -> int:
+    """Сумма сил записавшихся (из contributions[pid]['pow']; фолбэк DEFAULT_POWER)."""
+    recs = (boss.contributions or {}).values()
+    total = sum(int(r.get("pow", DEFAULT_POWER) or DEFAULT_POWER) for r in recs)
+    return total or DEFAULT_POWER
+
+
+def boss_start_hp(boss) -> int:
+    """HP босса на старте битвы — от суммарной силы записавшихся."""
+    return hp_for_power(boss.boss_key, roster_power(boss))
 
 
 def registered_count(boss) -> int:
@@ -178,7 +195,8 @@ def register(boss, player) -> bool:
     pid = str(player.id)
     if pid in c:
         return False
-    c[pid] = {"dmg": 0, "hits": 0, "name": player.first_name or pid}
+    c[pid] = {"dmg": 0, "hits": 0, "name": player.first_name or pid,
+              "pow": player_power(player)}     # сила → масштаб HP босса
     boss.contributions = c
     return True
 
@@ -187,6 +205,15 @@ def hp_bar(hp: int, max_hp: int, width: int = 12) -> str:
     hp = max(0, hp)
     filled = round(width * hp / max_hp) if max_hp else 0
     return "🟥" * filled + "⬛" * (width - filled)
+
+
+def player_power(player) -> int:
+    """Ожидаемый сырой урон игрока по боссу за удар (база×(1+крит)) — мера «силы»
+    для масштаба HP босса. Тот же расчёт, что и средний player_damage без разброса."""
+    stats = combat.player_stats(player)
+    base = balance.BASE_DAMAGE + stats.get("damage", 0) + (getattr(player, "level", 1) or 1) * 2
+    crit = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0) + stats.get("luck", 0) // 2) / 100
+    return max(1, round(base * (1 + crit)))
 
 
 def player_damage(player, rng: random.Random | None = None) -> tuple[int, bool]:

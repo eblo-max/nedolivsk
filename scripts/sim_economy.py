@@ -711,10 +711,10 @@ def raid_economics():
             raw = hit_dmg(eq, lvl)
             per_hit = raid.mitigate(key, raw)
             dmg_per_fighter = per_hit * HITS_PER_FIGHTER
-            # минимальная явка, чтобы добить HP (HP сам растёт с явкой)
+            # минимальная явка, чтобы добить HP (HP растёт от СИЛЫ явки ≈ raw/удар)
             need = None
             for N in range(1, 60):
-                hp = raid.hp_for(key, N)
+                hp = raid.hp_for_power(key, N * raw)
                 if N * dmg_per_fighter >= hp:
                     need = N
                     break

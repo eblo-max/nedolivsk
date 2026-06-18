@@ -381,7 +381,7 @@ async def _notify_returned(bot: Bot) -> None:
                         raid_edits.append((dict(boss.messages or {}),
                                            texts.raid_no_show(boss), None, is_vid))
                     else:                                    # старт битвы
-                        boss.max_hp = boss.hp = raidmod.hp_for(boss.boss_key, fighters)
+                        boss.max_hp = boss.hp = raidmod.boss_start_hp(boss)
                         boss.status = "active"
                         boss.ends_at = raidmod.fight_until(now)
                         raid_edits.append((dict(boss.messages or {}),

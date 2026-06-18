@@ -984,10 +984,10 @@ async def cb_raid_menu(cb: CallbackQuery, session: AsyncSession) -> None:
                 "после его смерти/ухода.")
     else:
         for key, b in raid.BOSSES.items():
-            kb.button(text=f"{b.emoji} {b.name} (~{b.hp_per_fighter} HP/боец)",
+            kb.button(text=f"{b.emoji} {b.name} (×{b.hp_per_power} HP/силу, пол {b.min_hp})",
                       callback_data=f"adm:raidspawn:{key}")
         head = ("⚔️ <b>РЕЙД-БОСС</b>\n\nПризвать босса — сперва 20-мин сбор во всех "
-                "чатах, затем битва. HP растёт от явки. Бьют записавшиеся, награда — "
+                "чатах, затем битва. HP растёт от СИЛЫ записавшихся. Бьют записавшиеся, награда — "
                 "золото поровну на всех, кто бил, плюс шанс на эксклюзивный трофей.")
     kb.button(text="🏠 В меню", callback_data="adm:home")
     kb.adjust(1)
