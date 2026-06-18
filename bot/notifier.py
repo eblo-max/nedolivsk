@@ -398,13 +398,16 @@ async def _notify_returned(bot: Bot) -> None:
                     boss.status = "expired"                  # не добили — ушёл
                     raid_edits.append((dict(boss.messages or {}),
                                        texts.raid_expired(boss), None, is_vid))
-                else:                                        # идёт бой: self-баффы
-                    healed = raidmod.regen_if_stalled(boss, now)   # E2 реген простоя
-                    roared = raidmod.roar_if_due(boss, now)        # D2 рык-оглушение
-                    if healed or roared:   # есть новость — перерисуем экран боя
+                else:                                        # идёт бой: ход босса
+                    events = raidmod.cast_tick(boss, now)      # фазы/щит/проклятье/призыв/рык/реген
+                    if events:   # есть новость — перерисуем экран боя
                         raid_edits.append((dict(boss.messages or {}),
                                            texts.raid_screen(boss), raid_kb(boss.id),
                                            is_vid))
+                        push = texts.raid_cast_push(boss, events)   # «громкие» касты — в личку бойцам
+                        if push:
+                            for pid in list((boss.contributions or {}).keys()):
+                                repo.queue_notify(session, int(pid), push)
         # Кэш для кнопки «Рейд-босс» в меню: какой босс ещё жив (или None).
         raidmod.set_active(next(
             (b.id for b in live_raids if b.status in ("gathering", "active")), None))

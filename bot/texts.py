@@ -2781,11 +2781,24 @@ def raid_screen(boss) -> str:
         return "⚔️ Рейд-босс"
     fighters = len(boss.contributions or {})
     pct = round(100 * max(0, boss.hp) / boss.max_hp) if boss.max_hp else 0
+    ph = raid.phase(boss)
+    phase_lab = {1: "", 2: " · 🔥 разъярён", 3: " · 🔥 БЕШЕНСТВО"}.get(ph, "")
+
+    # Активные эффекты — что мешает прямо сейчас.
+    fx = []
     stun = raid.stun_left(boss)
-    status = (f"😵 <b>РЁВ!</b> Босс оглушил — удар на паузе ~{stun // 60 + 1} мин"
-              if stun > 0 else None)
+    if stun > 0:
+        fx.append(f"😵 <b>РЁВ!</b> Оглушил — удар на паузе ~{stun // 60 + 1} мин.")
+    adds = raid.adds_hp(boss)
+    if adds > 0:
+        fx.append(f"👹 <b>Миньоны</b> ({adds} HP) — бей их, иначе вольются и подлечат босса!")
+    if raid.ward_left(boss) > 0:
+        fx.append("🛡 <b>Щит</b> — урон почти не проходит, переждите.")
+    if raid.curse_left(boss) > 0:
+        fx.append("💀 <b>Проклятье</b> — удары ослаблены, пока не спадёт.")
+
     return "\n".join([
-        f"{spec.emoji} <b>{spec.name}</b>",
+        f"{spec.emoji} <b>{spec.name}</b>{phase_lab}",
         "<i>Рубилово — добиваем.</i>",
         "",
         f"<blockquote expandable>{escape(spec.blurb)}</blockquote>",
@@ -2793,7 +2806,7 @@ def raid_screen(boss) -> str:
         f"{raid.hp_bar(boss.hp, boss.max_hp)}  {pct}%",
         f"HP: <b>{max(0, boss.hp)} / {boss.max_hp}</b> · броня <b>{spec.armor}</b>",
         f"в деле: <b>{fighters}</b> · уйдёт через <b>{_fmt_left_h(boss.ends_at)}</b>",
-        *([status] if status else []),
+        *(["", *fx] if fx else []),
         "",
         _raid_loot_box(boss.boss_key),
         "",
@@ -2802,10 +2815,23 @@ def raid_screen(boss) -> str:
     ])
 
 
-def raid_hit_toast(dmg: int, crit: bool, hp: int, max_hp: int, soaked: int = 0) -> str:
-    head = f"💥 КРИТ! −{dmg} HP" if crit else f"🗡 −{dmg} HP"
-    soak = f" (🛡 −{soaked} в броню)" if soaked > 0 else ""
-    return f"{head}{soak} · у босса осталось {max(0, hp)}/{max_hp}"
+def raid_hit_toast(res: dict, hp: int, max_hp: int) -> str:
+    """Тост на удар: если есть миньоны — бьём их; иначе урон по боссу + пометки
+    щита/проклятья/брони. res — результат raid.resolve_hit."""
+    if res.get("adds_dmg"):
+        tail = " — последний пал, бей босса!" if res.get("adds_cleared") else \
+               f" (осталось {res['adds_left']})"
+        return f"👹 −{res['adds_dmg']} по миньону{tail}"
+    head = f"💥 КРИТ! −{res['dmg']} HP" if res.get("crit") else f"🗡 −{res['dmg']} HP"
+    marks = []
+    if res.get("ward"):
+        marks.append("🛡 щит")
+    if res.get("curse"):
+        marks.append("💀 проклят")
+    if res.get("soaked", 0) > 0:
+        marks.append(f"−{res['soaked']} в броню")
+    extra = f" ({', '.join(marks)})" if marks else ""
+    return f"{head}{extra} · у босса {max(0, hp)}/{max_hp}"
 
 
 def raid_dead(boss, top: list, winner_name: str | None, drop_line: str) -> str:
@@ -2823,6 +2849,25 @@ def raid_dead(boss, top: list, winner_name: str | None, drop_line: str) -> str:
     if winner_name and drop_line:
         lines.append(f"🎁 Легендарный трофей урвал <b>{escape(winner_name)}</b>: {drop_line}")
     return "\n".join(lines)
+
+
+def raid_cast_push(boss, events: list) -> str:
+    """Пуш бойцам в личку о «громком» касте босса. Частую мелочь (рык/щит/реген)
+    не шлём — она и так видна на экране боя; шумим только о крупном."""
+    from bot.game import raid
+    spec = raid.BOSSES.get(boss.boss_key)
+    name = spec.name if spec else "Босс"
+    emoji = spec.emoji if spec else "⚔️"
+    # Приоритет одного сообщения за тик (самое важное).
+    if "enrage3" in events:
+        return f"🔥 <b>{name} впал в БЕШЕНСТВО!</b> Лютует и быстро затягивает раны — добивайте, пока не оклемался!"
+    if "enrage2" in events:
+        return f"🔥 <b>{name} разъярился</b> — бьёт чаще и затягивает раны. Жмите сильнее!"
+    if "summon" in events:
+        return f"👹 <b>{name} призвал миньонов!</b> Сперва бей их — иначе вольются и подлечат тварь."
+    if "adds_merge" in events:
+        return f"😈 Миньоны {name} влились обратно — босс подлечился. В следующий раз чистите их живее!"
+    return ""
 
 
 def raid_expired(boss) -> str:
