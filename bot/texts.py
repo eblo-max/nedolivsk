@@ -649,38 +649,36 @@ def build_ready_notification(building) -> str:
 
 # ===== Производство =====
 
+def _recipe_line(player: Player, emoji: str, name: str, out_qty: int,
+                 time_str: str, inputs: dict) -> str:
+    """Рецепт одной строкой: «🍖 Жаркое ×12 · 6 ч» + «из: 🥩 3/6 · 🌾 6» — наличие
+    сразу в рецепте (дробь = есть/надо), без отдельной строки сверки."""
+    return (f"{emoji} <b>{name}</b> ×{out_qty} · {time_str}\n"
+            f"   из: {_cost_line(inputs, player)}")
+
+
 def production_screen(building, player: Player, tavern: Tavern) -> str:
     from bot.game import production as prod
 
-    head = f"{building.emoji} <b>{building.name}</b>\n<i>{building.description}</i>\n"
+    head = f"{building.emoji} <b>{building.name}</b>\n<i>{building.description}</i>"
     ico = {**RESOURCE_EMOJI, **balance.GOODS_EMOJI}
+    L = tavern.level
+
     if building.id in prod.GRIND:  # мельница/горн: сырьё → полуфабрикат
-        level = tavern.level
         state, minutes = prod.state(tavern, building.id)
-        if state == "active":
-            status = f"⏳ Работает — ещё {_fmt_minutes(minutes)}."
-        elif state == "ready":
-            status = "📦 Готово — забирай на склад!"
-        else:
-            status = "😴 Простаивает."
-        lines = [head, "", status, "", f"Передел (ур. {level}):"]
-        src_keys: set[str] = set()
-        for recipe, (_inp, mins, _o) in prod.GRIND[building.id].items():
-            cin = prod.grind_inputs(building.id, recipe, level)
-            out = prod.grind_output(building.id, recipe, level)
-            src = " ".join(f"{ico.get(r, r)}{q}" for r, q in cin.items())
-            lines.append(
-                f"{src} → {ico.get(recipe, recipe)}{out} "
-                f"{balance.GOODS_NAMES.get(recipe, recipe).lower()}, {mins} мин")
-            src_keys |= set(cin)
-        made = " · ".join(
-            f"{ico.get(rc, rc)} {inventory.get(player, rc)}" for rc in prod.GRIND[building.id])
-        have = " · ".join(
-            f"{ico.get(r, r)} {inventory.get(player, r)}" for r in sorted(src_keys))
-        lines += ["", f"На складе: {made}", f"Сырьё: {have}"]
-        return "\n".join(lines)
+        status = (f"⏳ Работает — ещё {_fmt_minutes(minutes)}." if state == "active"
+                  else "📦 Готово — забирай на склад!" if state == "ready"
+                  else "😴 Простаивает — выбери, что молоть.")
+        recipes = [
+            _recipe_line(player, ico.get(rc, rc), balance.GOODS_NAMES.get(rc, rc),
+                         prod.grind_output(building.id, rc, L), f"{mins} мин",
+                         prod.grind_inputs(building.id, rc, L))
+            for rc, (_i, mins, _o) in prod.GRIND[building.id].items()]
+        made = " · ".join(f"{ico.get(rc, rc)} {inventory.get(player, rc)}"
+                          for rc in prod.GRIND[building.id])
+        return "\n".join([head, "", status, ""] + recipes + ["", f"📦 Сделано: {made}"])
+
     if building.id in prod.RECIPES:  # пекарня/коптильня/сыроварня: вход → товар
-        level = tavern.level
         prods = tavern.products or {}
         state, minutes = prod.state(tavern, building.id)
         if state == "active":
@@ -690,29 +688,20 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
         elif state == "ready":
             status = "🍽 Готово — забирай в погреб!"
         else:
-            status = "😴 Простаивает. Выбери, что делать."
-        stock = " · ".join(
-            f"{prod.GOODS[rc].emoji} {prods.get(rc, 0)}" for rc in prod.RECIPES[building.id])
-        lines = [head, "", f"🛢 В погребе: {stock}", status, "", f"Рецепты (ур. {level}):"]
-        src_keys = set()
-        for recipe in prod.RECIPES[building.id]:
-            cin = prod.recipe_inputs(building.id, recipe, level)
-            out = prod.recipe_output(building.id, recipe, level)
-            g = prod.GOODS[recipe]
-            src = " ".join(f"{ico.get(r, r)}{q}" for r, q in cin.items())
-            lines.append(
-                f"{g.emoji} {g.name}: {src} → {out}, {prod.recipe_hours(building.id, recipe)} ч")
-            src_keys |= set(cin)
-        have = " · ".join(
-            f"{ico.get(r, r)} {inventory.get(player, r)}" for r in sorted(src_keys))
-        lines += [f"Есть: {have}"]
-        return "\n".join(lines)
+            status = "😴 Простаивает — выбери, что готовить."
+        stock = " · ".join(f"{prod.GOODS[rc].emoji} {prods.get(rc, 0)}"
+                           for rc in prod.RECIPES[building.id])
+        recipes = [
+            _recipe_line(player, prod.GOODS[rc].emoji, prod.GOODS[rc].name,
+                         prod.recipe_output(building.id, rc, L),
+                         f"{prod.recipe_hours(building.id, rc)} ч",
+                         prod.recipe_inputs(building.id, rc, L))
+            for rc in prod.RECIPES[building.id]]
+        return "\n".join([head, "", f"🛢 В погребе: {stock}", status, ""] + recipes)
+
     if building.id == "brewery":
-        level = tavern.level
         prods = tavern.products or {}
-        stock = " · ".join(
-            f"{prod.ALE_STARS[t]} {prods.get(f'ale{t}', 0)}" for t in (1, 2, 3)
-        )
+        stock = " · ".join(f"{prod.ALE_STARS[t]} {prods.get(f'ale{t}', 0)}" for t in (1, 2, 3))
         phase, minutes = prod.brew_phase(tavern)
         bt = int(tavern.production["brewery"]["tier"]) if phase != "empty" else 0
         if phase == "fermenting":
@@ -721,31 +710,22 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
             extra = " или выдержи (риск +ярус)" if bt < 3 else ""
             status = f"🍺 {prod.ALE_STARS[bt]} готов — разливай{extra}!"
         elif phase == "aging":
-            status = (
-                f"🛢 Выдержка {prod.ALE_STARS[bt]} → {prod.ALE_STARS[min(3, bt+1)]}? "
-                f"— ещё {_fmt_minutes(minutes)}."
-            )
+            status = (f"🛢 Выдержка {prod.ALE_STARS[bt]} → {prod.ALE_STARS[min(3, bt+1)]} — "
+                      f"ещё {_fmt_minutes(minutes)}.")
         elif phase == "ripe":
-            status = (
-                f"⏰ Выдержка дошла! Разливай в течение {_fmt_minutes(minutes)} — "
-                "иначе перекиснет."
-            )
+            status = (f"⏰ Выдержка дошла! Разливай за {_fmt_minutes(minutes)} — "
+                      "иначе перекиснет.")
         elif phase == "overripe":
             status = "⚠️ Перекисает! Разливай немедля — ярус упадёт."
         else:
-            status = "😴 Чаны пусты. Выбери, что варить."
-        inv = lambda r: inventory.get(player, r)  # noqa: E731
-        return (
-            head +
-            f"\n🛢 Погреб: {stock}\n{status}\n\n"
-            f"Рецепты (ур. {level}, выход {12 * level} кружек):\n"
-            f"★ {8*level}🌱 {5*level}🌿 {6*level}💧 — 4 ч\n"
-            f"★★ то же + {6*level}🍯 — 8 ч\n"
-            f"★★★ то же + {12*level}🍯 — 12 ч\n"
-            f"Есть: 🌱{inv('malt')} 🌿{inv('hops')} 💧{inv('water')} 🍯{inv('honey')}"
-        )
+            status = "😴 Чаны пусты — выбери, что варить."
+        recipes = [
+            _recipe_line(player, "🍺", f"Эль {prod.ALE_STARS[t]}", prod.brew_output(t, L),
+                         f"{prod.brew_hours(t)} ч", prod.brew_inputs(t, L))
+            for t in (1, 2, 3)]
+        return "\n".join([head, "", f"🛢 Погреб: {stock}", status, ""] + recipes)
+
     if building.id == "meadery":
-        level = tavern.level
         prods = tavern.products or {}
         stock = f"🍶 {prods.get('mead', 0)} · 🌿 {prods.get('sbiten', 0)}"
         state, minutes = prod.state(tavern, "meadery")
@@ -755,62 +735,37 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
         elif state == "ready":
             status = "🍶 Готово — разливай в погреб!"
         else:
-            status = "😴 Котлы остыли. Выбери, что варить."
-        m = prod.meadery_inputs("mead", level)
-        s = prod.meadery_inputs("sbiten", level)
-        return (
-            head +
-            f"\n🛢 Погреб: {stock}\n{status}\n\n"
-            f"Рецепты (ур. {level}):\n"
-            f"🍶 Медовуха: 🍯 {m['honey']} 💧 {m['water']} — {prod.meadery_hours('mead')} ч\n"
-            f"🌿 Сбитень: 🍯 {s['honey']} 🌶 {s['herbs']} 💧 {s['water']} — "
-            f"{prod.meadery_hours('sbiten')} ч\n"
-            f"Есть: 🍯 {inventory.get(player, 'honey')} · 🌶 {inventory.get(player, 'herbs')} "
-            f"· 💧 {inventory.get(player, 'water')}\n"
-            "<i>Берут состоятельные — репутация решает.</i>"
-        )
+            status = "😴 Котлы остыли — выбери, что варить."
+        recipes = [
+            _recipe_line(player, prod.DRINKS[rc].emoji, prod.DRINKS[rc].name,
+                         prod.meadery_output(rc, L), f"{prod.meadery_hours(rc)} ч",
+                         prod.meadery_inputs(rc, L))
+            for rc in ("mead", "sbiten")]
+        return "\n".join([head, "", f"🛢 Погреб: {stock}", status, ""] + recipes
+                         + ["", "<i>Берут состоятельные — репутация решает.</i>"])
+
     if building.id == "kitchen":
-        level = tavern.level
         food = (tavern.products or {}).get("roast", 0)
-        cin = prod.kitchen_inputs("roast", level)
-        out = prod.kitchen_output("roast", level)
         state, minutes = prod.state(tavern, "kitchen")
-        if state == "active":
-            status = f"⏳ На вертеле — ещё {_fmt_minutes(minutes)}."
-        elif state == "ready":
-            status = "🍖 Жаркое готово — в кладовую!"
-        else:
-            status = "😴 Очаг остыл. Поставь готовить."
-        return (
-            head +
-            f"\n🍖 Жаркое в кладовой: {food}\n{status}\n\n"
-            f"Рецепт (ур. {level}): 🥩 {cin['game']} 🌾 {cin['grain']} 🌶 {cin['herbs']} → "
-            f"🍖 {out}, {prod.kitchen_hours('roast')} ч\n"
-            f"Есть: 🥩 {inventory.get(player, 'game')} · 🌾 {inventory.get(player, 'grain')} "
-            f"· 🌶 {inventory.get(player, 'herbs')}\n"
-            "<i>Сытые гости платят за еду сверх выпивки (свой спрос).</i>"
-        )
+        status = (f"⏳ На вертеле — ещё {_fmt_minutes(minutes)}." if state == "active"
+                  else "🍖 Жаркое готово — в кладовую!" if state == "ready"
+                  else "😴 Очаг остыл — поставь готовить.")
+        recipe = _recipe_line(player, "🍖", "Жаркое", prod.kitchen_output("roast", L),
+                              f"{prod.kitchen_hours('roast')} ч", prod.kitchen_inputs("roast", L))
+        return "\n".join([head, "", f"🍖 В кладовой: {food}", status, "", recipe,
+                          "", "<i>Сытые гости платят за еду сверх выпивки.</i>"])
+
     if building.id == "winery":
-        level = tavern.level
         wine = (tavern.products or {}).get("wine", 0)
-        cin = prod.winery_inputs("wine", level)
-        out = prod.winery_output("wine", level)
         state, minutes = prod.state(tavern, "winery")
-        if state == "active":
-            status = f"⏳ Бродит — ещё {_fmt_minutes(minutes)}."
-        elif state == "ready":
-            status = "🍷 Вино готово — разливай в погреб!"
-        else:
-            status = "😴 Бочки пусты. Поставь вино."
-        return (
-            head +
-            f"\n🍷 Вино в погребе: {wine}\n{status}\n\n"
-            f"Рецепт (ур. {level}): 🍒 {cin['berries']} 🍯 {cin['honey']} 💧 {cin['water']} → "
-            f"🍷 {out}, {prod.winery_hours('wine')} ч\n"
-            f"Есть: 🍒 {inventory.get(player, 'berries')} · 🍯 {inventory.get(player, 'honey')} "
-            f"· 💧 {inventory.get(player, 'water')}\n"
-            "<i>Самый дорогой напиток — берут только богачи (высокая репутация).</i>"
-        )
+        status = (f"⏳ Бродит — ещё {_fmt_minutes(minutes)}." if state == "active"
+                  else "🍷 Вино готово — разливай в погреб!" if state == "ready"
+                  else "😴 Бочки пусты — поставь вино.")
+        recipe = _recipe_line(player, "🍷", "Вино", prod.winery_output("wine", L),
+                              f"{prod.winery_hours('wine')} ч", prod.winery_inputs("wine", L))
+        return "\n".join([head, "", f"🍷 В погребе: {wine}", status, "", recipe,
+                          "", "<i>Самый дорогой напиток — берут только богачи.</i>"])
+
     return head + "\nПроизводство этого здания — скоро."
 
 
