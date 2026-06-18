@@ -91,15 +91,15 @@ ENEMIES = [
     # паритетная (см. шлюз в симуляторе). Видео нет → фолбэк на картинку охоты.
     Enemy("lynx", "🐆", "Рысь", 58, 12, 1, (40, 80),
           (Drop("game", 4, 7), Drop("fang", 1, 2, 30), Drop("pelt", 1, 2, 40)),
-          rep=1, region="north_wilds", traits=("evasive",),
+          rep=1, region="north_wilds", traits=("evasive",), video="lynx",
           blurb="Тайга. Стремительна — уводит удары; нужен высокий урон/крит."),
     Enemy("tusker", "🐗", "Вепрь-секач", 88, 9, 8, (45, 90),
           (Drop("game", 8, 12), Drop("hide", 1, 2, 35), Drop("tusk", 1, 2, 40)),
-          rep=1, region="green_valleys",
+          rep=1, region="green_valleys", video="tusker",
           blurb="Долины. Бронированный кабанище — сырой урон вязнет, крит пробивает."),
     Enemy("scorpion", "🦂", "Степной Скорпион", 66, 8, 7, (40, 85),
           (Drop("herbs", 3, 6), Drop("fang", 1, 1, 25), Drop("chitin", 1, 2, 45)),
-          rep=1, region="red_wastes", traits=("venom",),
+          rep=1, region="red_wastes", traits=("venom",), video="scorpion",
           blurb="Пустоши. Жало ядовито (броня не спасёт — нужна удача), "
                 "а панцирь пробивает крит."),
 ]
