@@ -565,6 +565,21 @@ def _cost_line(cost: dict, player: Player) -> str:
     return " · ".join(parts)
 
 
+def _cost_block(cost: dict, player: Player) -> str:
+    """Стоимость столбиком, по-человечески: «   🪵 Древесина 40/160». Дробь —
+    если не хватает. Для экранов-деталей (стройка), где нужно читаемо и с воздухом."""
+    ico = {"gold": "🪙", **RESOURCE_EMOJI, **balance.GOODS_EMOJI}
+    nm = {"gold": "Золото", **RESOURCE_NAMES, **balance.GOODS_NAMES}
+    lines = []
+    for key, need in cost.items():
+        if not need:
+            continue
+        have = player.gold if key == "gold" else inventory.get(player, key)
+        amt = f"{need}" if have >= need else f"{have}/{need}"
+        lines.append(f"   {ico.get(key, key)} {nm.get(key, key)} {amt}")
+    return "\n".join(lines)
+
+
 def buildings_screen(player: Player, tavern: Tavern) -> str:
     from bot.game import buildings as bld
 
@@ -594,34 +609,34 @@ def buildings_screen(player: Player, tavern: Tavern) -> str:
 def building_detail(building, player: Player, tavern: Tavern) -> str:
     from bot.game import buildings as bld
 
-    head = f"{building.emoji} <b>{building.name}</b>\n<i>{building.description}</i>\n"
-    gives = f"Откроет: {building.unlocks}\n" if building.unlocks else ""
+    head = f"{building.emoji} <b>{building.name}</b>\n<i>{building.description}</i>"
+    gives = f"\n\n🔓 Откроет: {building.unlocks}" if building.unlocks else ""
 
     if bld.is_built(tavern, building.id):
-        return head + gives + "\n✓ Уже построено. Работает."
+        return head + gives + "\n\n✓ Уже построено. Работает."
 
     miss = bld.missing_requirements(tavern, building)
     if miss:
         req = ", ".join(r.name for r in miss)
-        return head + gives + f"\n🔒 Сначала построй: {req}."
+        return head + gives + f"\n\n🔒 Сначала построй: {req}."
 
     if bld.rep_locked(tavern, building):
         return head + gives + (
-            f"\n🔒 Нужна репутация {building.req_reputation} "
+            f"\n\n🔒 Нужна репутация {building.req_reputation} "
             f"(у тебя {tavern.reputation}). Поднимай заведение."
         )
 
     state, m = bld.build_state(player)
     if state != "none":
         return head + gives + (
-            "\n🏗 Сейчас уже идёт другая стройка — одна за раз. "
-            f"Освободятся работники через {_fmt_minutes(m)}."
+            "\n\n🏗 Сейчас идёт другая стройка — одна за раз. "
+            f"Работники освободятся через {_fmt_minutes(m)}."
         )
 
     return (
         head + gives +
-        f"\nСтройка: {building.build_hours} ч\n"
-        f"Цена: {_cost_line(building.cost, player)}"
+        f"\n\n⏱ Стройка: {building.build_hours} ч\n\n"
+        f"💰 <b>Стоимость</b>\n{_cost_block(building.cost, player)}"
     )
 
 
