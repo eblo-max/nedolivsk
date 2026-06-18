@@ -46,6 +46,11 @@ SUMMON_HP_PCT = 0.10         # 👹 призыв: щит миньонов = до
 SUMMON_TTL_SEC = 120         # не счистили за столько → вливаются (хил боссу)
 SUMMON_MERGE_FRAC = 0.5      # вольются — лечат лишь на половину остатка щита
 
+# Порог участия для доли золота и трофея: отсекает фри-райдеров (тапнул раз —
+# мимо). «Боец» = внёс ≥ MIN_SHARE_HP_PCT от max_hp ЛИБО сделал ≥ MIN_SHARE_HITS.
+MIN_SHARE_HP_PCT = 0.01
+MIN_SHARE_HITS = 5
+
 
 @dataclass(frozen=True)
 class Boss:
@@ -499,8 +504,13 @@ def settle(boss, rng: random.Random | None = None) -> dict:
     Золото — пул ПОРОВНУ на всех, кто реально бил; редкий дроп — одному
     случайному из них с РАВНЫМ шансом (не по вкладу — чистый кооп)."""
     rng = rng or random
-    contrib = {int(p): r for p, r in (boss.contributions or {}).items()
-               if r.get("dmg", 0) > 0}                     # только реально бившие
+    hitters = {int(p): r for p, r in (boss.contributions or {}).items()
+               if r.get("dmg", 0) > 0}                     # вообще нанёс урон
+    gate = max(1, round((getattr(boss, "max_hp", 0) or 0) * MIN_SHARE_HP_PCT))
+    # «Бойцы» — кто внёс ≥1% HP ИЛИ ≥5 ударов; фолбэк к hitters, если никто не дотянул
+    # (чтобы убийство всегда кому-то платило). Доля и трофей — только среди них.
+    contrib = {p: r for p, r in hitters.items()
+               if r.get("dmg", 0) >= gate or r.get("hits", 0) >= MIN_SHARE_HITS} or hitters
     spec = BOSSES[boss.boss_key]
     n = len(contrib)
     # Строго ≤ пула: доля = пол(пул/бойцов). При толпе больше пула доля=0

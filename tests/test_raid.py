@@ -29,6 +29,32 @@ def test_settle_gold_equal_and_conserved():
     assert plan["gold"][1] == pool // 4
 
 
+def test_settle_gate_excludes_freerider():
+    # луркер (1 тап) не в доле и не может урвать трофей; весь пул — карри.
+    boss = make_boss("dragon", status="dead", max_hp=10000)
+    boss.contributions = {"1": {"dmg": 5000, "hits": 200, "name": "carry"},
+                          "2": {"dmg": 8, "hits": 1, "name": "lurker"}}
+    plan = raid.settle(boss, random.Random(1))
+    assert 2 not in plan["gold"] and plan["winner"] == 1
+    assert plan["gold"][1] == raid.BOSSES["dragon"].gold_pool
+
+
+def test_settle_gate_qualifies_by_hits():
+    # упорный слабый тапер (≥5 ударов) — «боец», даже если урона мало.
+    boss = make_boss("rat_king", status="dead", max_hp=10000)
+    boss.contributions = {"1": {"dmg": 5000, "hits": 50, "name": "c"},
+                          "3": {"dmg": 40, "hits": 6, "name": "grinder"}}
+    assert 3 in raid.settle(boss, random.Random(2))["gold"]
+
+
+def test_settle_gate_fallback_when_nobody_qualifies():
+    # все слабо тапнули (никто не дотянул) → платим всем бившим, не зажимаем.
+    boss = make_boss("rat_king", status="dead", max_hp=10000)
+    boss.contributions = {"1": {"dmg": 9, "hits": 1}, "2": {"dmg": 7, "hits": 2}}
+    plan = raid.settle(boss, random.Random(4))
+    assert plan["winner"] in (1, 2)
+
+
 def test_settle_excludes_non_hitters():
     boss = make_boss("rat_king", status="dead")
     _hit(boss, 1, 50)
@@ -182,5 +208,5 @@ def test_gather_announce_states_loot_rules():
     assert "Добыча" in s                                   # блок добычи есть
     assert "~3%" in s                                      # честный шанс снаряги (дракон редок)
     assert "поровну" in s                                  # золото делится
-    assert "реально бил" in s                              # доля — только бившим
+    assert "реально дрался" in s                           # доля — только реально дравшимся
     assert "<blockquote expandable>" in s                  # лор спрятан под разворот

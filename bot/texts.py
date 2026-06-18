@@ -2712,8 +2712,9 @@ def _raid_loot_box(boss_key: str) -> str:
     from bot.game import raid
     pct = raid.gear_drop_pct(boss_key)
     return ("<blockquote>Добыча с туши:\n"
-            "• золото — поровну всем, кто бил\n"
+            "• золото — поровну всем, кто реально дрался\n"
             "• трофей — одному случайному из них\n"
+            "• один тап «для галочки» — мимо доли\n"
             f"• снаряга — шанс ~{pct:g}% (иначе ресурсы)</blockquote>")
 
 
@@ -2736,7 +2737,7 @@ def raid_gather_screen(boss) -> str:
         "",
         _raid_loot_box(boss.boss_key),
         "",
-        "Награду получает только тот, кто реально бил.",
+        "Награду получает тот, кто реально дрался (один тап — мимо).",
         "",
         f"<i>{cta}</i>",
     ])
