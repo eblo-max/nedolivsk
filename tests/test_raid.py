@@ -83,13 +83,15 @@ def test_mitigate_percentage_and_scaling():
     assert raid.mitigate("dragon", 100) == max(1, round(100 * k / (k + a)))
 
 
-def test_hp_scales_with_power_and_floor():
-    spec = raid.BOSSES["dragon"]
-    assert raid.hp_for_power("dragon", 1) == spec.min_hp               # пол HP (слабая пачка)
-    big = int(spec.min_hp / spec.hp_per_power) + 500                   # сила выше пола
-    assert raid.hp_for_power("dragon", big) == round(big * spec.hp_per_power)
-    # сильнее пачка → больше HP (масштаб по силе, не по числу)
-    assert raid.hp_for_power("dragon", big * 2) > raid.hp_for_power("dragon", big)
+def test_hp_scales_sublinearly_with_power_and_floor():
+    assert raid.hp_for_power("dragon", 1) == raid.BOSSES["dragon"].min_hp  # пол HP
+    big = 400                                                          # явно выше пола
+    hp1, hp2 = raid.hp_for_power("dragon", big), raid.hp_for_power("dragon", big * 2)
+    assert hp2 > hp1                                                   # сильнее → больше HP
+    # ЗАТУХАНИЕ: вдвое больше силы → HP МЕНЬШЕ чем вдвое → время убийства падает
+    assert hp2 < 2 * hp1
+    # время ~ HP/сила: у вдвое сильнее пачки оно строго меньше (прокачка ускоряет)
+    assert hp2 / (big * 2) < hp1 / big
 
 
 def test_register_stores_power():

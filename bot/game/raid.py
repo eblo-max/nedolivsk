@@ -160,13 +160,22 @@ def fight_until(now: datetime | None = None) -> datetime:
 
 DEFAULT_POWER = 30   # «сила» по умолчанию (старые записи без pow / фолбэк)
 
+# HP растёт от суммарной силы СУБЛИНЕЙНО (затухание): сильнее/больше пачка валит
+# ЗАМЕТНО быстрее — прокачка и снаряга реально дают результат, — но не мгновенно.
+# Якорь HP_REF_POWER: на этой силе HP = hp_per_power×ref (как было бы линейно),
+# вокруг неё кривая гнётся показателем HP_POWER_EXP (<1 → время падает с силой).
+HP_REF_POWER = 80
+HP_POWER_EXP = 0.75
+
 
 def hp_for_power(boss_key: str, power: int) -> int:
-    """HP босса от суммарной СИЛЫ записавшихся (ожидаемый урон/удар), а не от их
-    числа: ур.3 и кит больше не равны. Так время убийства ~постоянно при любой
-    прокачке базы. Пол (min_hp) — анти-тривиал для слабой/малой пачки."""
+    """HP босса от суммарной СИЛЫ записавшихся (урон/удар), сублинейно (затухание):
+    HP = hp_per_power × ref^(1−exp) × сила^exp. Сильнее пачка → выше HP, но время
+    убийства (HP/урон) падает ~как сила^(exp−1). Пол (min_hp) — анти-тривиал."""
     spec = BOSSES[boss_key]
-    return max(spec.min_hp, round(power * spec.hp_per_power))
+    scaled = (spec.hp_per_power * HP_REF_POWER ** (1 - HP_POWER_EXP)
+              * max(1, power) ** HP_POWER_EXP)
+    return max(spec.min_hp, round(scaled))
 
 
 def roster_power(boss) -> int:
