@@ -666,10 +666,10 @@ def build_ready_notification(building) -> str:
 
 def _recipe_line(player: Player, emoji: str, name: str, out_qty: int,
                  time_str: str, inputs: dict) -> str:
-    """Рецепт одной строкой: «🍖 Жаркое ×12 · 6 ч» + «из: 🥩 3/6 · 🌾 6» — наличие
-    сразу в рецепте (дробь = есть/надо), без отдельной строки сверки."""
+    """Рецепт: «🍖 Жаркое ×12 · 6 ч» + входы СТОЛБИКОМ с названиями и дробью
+    есть/надо («🥩 Дичь 3/6»). Сразу видно, чего и сколько не хватает."""
     return (f"{emoji} <b>{name}</b> ×{out_qty} · {time_str}\n"
-            f"   из: {_cost_line(inputs, player)}")
+            f"{_cost_block(inputs, player)}")
 
 
 def production_screen(building, player: Player, tavern: Tavern) -> str:
@@ -691,7 +691,8 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
             for rc, (_i, mins, _o) in prod.GRIND[building.id].items()]
         made = " · ".join(f"{ico.get(rc, rc)} {inventory.get(player, rc)}"
                           for rc in prod.GRIND[building.id])
-        return "\n".join([head, "", status, ""] + recipes + ["", f"📦 Сделано: {made}"])
+        return "\n".join([head, "", status, "", "\n\n".join(recipes),
+                          "", f"📦 Сделано: {made}"])
 
     if building.id in prod.RECIPES:  # пекарня/коптильня/сыроварня: вход → товар
         prods = tavern.products or {}
@@ -712,7 +713,8 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
                          f"{prod.recipe_hours(building.id, rc)} ч",
                          prod.recipe_inputs(building.id, rc, L))
             for rc in prod.RECIPES[building.id]]
-        return "\n".join([head, "", f"🛢 В погребе: {stock}", status, ""] + recipes)
+        return "\n".join([head, "", f"🛢 В погребе: {stock}", status, "",
+                          "\n\n".join(recipes)])
 
     if building.id == "brewery":
         prods = tavern.products or {}
@@ -738,7 +740,8 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
             _recipe_line(player, "🍺", f"Эль {prod.ALE_STARS[t]}", prod.brew_output(t, L),
                          f"{prod.brew_hours(t)} ч", prod.brew_inputs(t, L))
             for t in (1, 2, 3)]
-        return "\n".join([head, "", f"🛢 Погреб: {stock}", status, ""] + recipes)
+        return "\n".join([head, "", f"🛢 Погреб: {stock}", status, "",
+                          "\n\n".join(recipes)])
 
     if building.id == "meadery":
         prods = tavern.products or {}
@@ -756,8 +759,9 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
                          prod.meadery_output(rc, L), f"{prod.meadery_hours(rc)} ч",
                          prod.meadery_inputs(rc, L))
             for rc in ("mead", "sbiten")]
-        return "\n".join([head, "", f"🛢 Погреб: {stock}", status, ""] + recipes
-                         + ["", "<i>Берут состоятельные — репутация решает.</i>"])
+        return "\n".join([head, "", f"🛢 Погреб: {stock}", status, "",
+                          "\n\n".join(recipes),
+                          "", "<i>Берут состоятельные — репутация решает.</i>"])
 
     if building.id == "kitchen":
         food = (tavern.products or {}).get("roast", 0)
