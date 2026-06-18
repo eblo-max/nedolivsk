@@ -566,8 +566,9 @@ def _cost_line(cost: dict, player: Player) -> str:
 
 
 def _cost_block(cost: dict, player: Player) -> str:
-    """Стоимость столбиком, по-человечески: «   🪵 Древесина 40/160». Дробь —
-    если не хватает. Для экранов-деталей (стройка), где нужно читаемо и с воздухом."""
+    """Стоимость столбиком, по-человечески: «   🪵 Древесина 40/160».
+    Всегда дробь есть/надо — сразу видно и свой запас, и хватает ли (если
+    есть ≥ надо — хватает). Единый вид для стройки, рецептов и кузницы."""
     ico = {"gold": "🪙", **RESOURCE_EMOJI, **balance.GOODS_EMOJI}
     nm = {"gold": "Золото", **RESOURCE_NAMES, **balance.GOODS_NAMES}
     lines = []
@@ -575,8 +576,7 @@ def _cost_block(cost: dict, player: Player) -> str:
         if not need:
             continue
         have = player.gold if key == "gold" else inventory.get(player, key)
-        amt = f"{need}" if have >= need else f"{have}/{need}"
-        lines.append(f"   {ico.get(key, key)} {nm.get(key, key)} {amt}")
+        lines.append(f"   {ico.get(key, key)} {nm.get(key, key)} {have}/{need}")
     return "\n".join(lines)
 
 
@@ -2594,7 +2594,7 @@ def forge_item_screen(item, player, cur_tier: int, next_tier: int) -> str:
         f"<i>{item.description}</i>\n\n"
         f"Будет давать: {_tier_bonus_line(item, next_tier)}\n"
         f"Ковать: {hours} ч\n\n"
-        f"Цена: {_cost_line(c, player)}"
+        f"💰 <b>Цена</b>\n{_cost_block(c, player)}"
     )
 
 
