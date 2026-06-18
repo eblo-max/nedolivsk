@@ -34,8 +34,10 @@ TIERS = {
 # Доля ступеней в населении чата (грубая оценка активного ростера).
 POP = (("newbie", 0.35), ("mid", 0.35), ("strong", 0.22), ("whale", 0.08))
 
-ENGAGE = 0.75           # вероятность, что боец реально жмёт «Бить», когда КД сошёл
-STEP_SEC = 15           # шаг симуляции
+# Без кулдауна: бьют как раньше — спамят «Бить». Модель тапа: шаг 2 сек, на шаге
+# боец жмёт с вероятностью TAP_PROB (≈ 0.7/2с ≈ 21 удар/мин, пока в деле и не оглушён).
+TAP_PROB = 0.70
+STEP_SEC = 2
 WINDOW_MIN = raid.FIGHT_HOURS * 60
 
 
@@ -58,7 +60,6 @@ def simulate(boss_key: str, fighters: int, rng: random.Random) -> dict:
     start = datetime(2026, 1, 1, tzinfo=UTC)
     boss.ends_at = start + timedelta(minutes=WINDOW_MIN)
     roster = [_mk_fighter(i, rng) for i in range(n)]
-    cd = raid.BOSSES[boss_key].cooldown_min * 60
 
     # Патчим источник сырого урона — остальное (проклятье/щит/броня/миньоны) реально.
     cur = {"f": None}
@@ -79,19 +80,11 @@ def simulate(boss_key: str, fighters: int, rng: random.Random) -> dict:
         if cur_min != last_cast_min:        # ход босса — раз в минуту (как нотифаер)
             raid.cast_tick(boss, now)
             last_cast_min = cur_min
+        stunned = raid.stun_left(boss, now) > 0   # рык оглушает всех бьющих разом
         for f in roster:
             if now > start + timedelta(minutes=f.leave_at):
                 continue
-            if raid.cooldown_left(boss, f.id, now) > 0:
-                continue
-            if rng.random() > ENGAGE:
-                # «не сейчас» — но фиксируем как попытку, чтобы не лупил каждый шаг
-                f.last_hit = now - timedelta(seconds=cd - STEP_SEC)
-                # запишем «last» в contributions, чтобы cooldown_left увидел паузу
-                rec = dict((boss.contributions or {}).get(str(f.id))
-                           or {"dmg": 0, "hits": 0, "name": f.first_name})
-                rec["last"] = (now - timedelta(seconds=cd - STEP_SEC)).isoformat()
-                c = dict(boss.contributions); c[str(f.id)] = rec; boss.contributions = c
+            if stunned or rng.random() > TAP_PROB:    # оглушён либо «не в этот тик»
                 continue
             cur["f"] = f
             raid.resolve_hit(boss, f, now)
@@ -109,11 +102,11 @@ def simulate(boss_key: str, fighters: int, rng: random.Random) -> dict:
             "second_wind": bool((boss.state or {}).get("second_wind"))}
 
 
-def run(trials: int = 400):
+def run(trials: int = 150):
     rng = random.Random(20260618)
     turnouts = (2, 4, 6, 8, 12)
-    print(f"\n=== РЕЙД-СИМУЛЯТОР · {trials} боёв/ячейка · окно {WINDOW_MIN} мин · "
-          f"engage {ENGAGE:.0%} ===\n")
+    print(f"\n=== РЕЙД-СИМУЛЯТОР (без кулдауна) · {trials} боёв/ячейка · окно "
+          f"{WINDOW_MIN} мин · тап {TAP_PROB:.0%}/{STEP_SEC}с ===\n")
     for key in raid.BOSSES:
         spec = raid.BOSSES[key]
         print(f"{spec.emoji} {spec.name}  (HP/боец {spec.hp_per_fighter}, пол {spec.min_hp}, "
