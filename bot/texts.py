@@ -1317,15 +1317,16 @@ def expedition_menu(player: Player) -> str:
         "",
         f"«Свободно {c.free}/{c.total} · в пути {c.out} · вернулись {c.ready}»",
     ]
-    # 💡 Подсказка: на что не хватает добываемого сырья → куда слать бригад
-    goals, total = logic.expedition_goals(player, tavern)
+    # 💡 Подсказка: на что не хватает добываемого сырья → куда слать бригад.
+    # Вариант 1: каждая цель — отдельный блок, ресурсы названы словами.
+    goals, _total = logic.expedition_goals(player, tavern)
     if goals:
-        lines = [f"{label} — " + " · ".join(f"{ico.get(r, r)} {q}" for r, q in short.items())
-                 for label, short in goals]
-        top = sorted(total.items(), key=lambda kv: -kv[1])[:3]
-        lines.append("▶ В первую очередь: "
-                     + " · ".join(f"{ico.get(r, r)} {q}" for r, q in top))
-        parts += ["", *_branch("💡 НА ЧТО КОПИТЬ (не хватает сырья)", lines)]
+        nm = {**RESOURCE_NAMES, **balance.GOODS_NAMES}
+        parts += ["", "💡 <b>На что копить</b>"]
+        for label, short in goals:
+            res = " · ".join(f"{ico.get(r, r)} {nm.get(r, r)} {q}"
+                             for r, q in short.items())
+            parts += ["", f"<b>{label}</b>", f"   {res}"]
     parts += [
         "",
         *_branch("УСЛОВИЯ", [
