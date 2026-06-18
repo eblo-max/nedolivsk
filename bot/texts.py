@@ -1311,10 +1311,22 @@ def expedition_menu(player: Player) -> str:
     level = tavern.level if tavern else 1
     pay = balance.worker_pay(level)
     c = logic.expedition_counts(player, tavern)
-    return "\n".join([
+    ico = {**RESOURCE_EMOJI, **balance.GOODS_EMOJI}
+    parts = [
         "⛏ <b>БРИГАДЫ РАБОТНИКОВ</b>",
         "",
         f"«Свободно {c.free}/{c.total} · в пути {c.out} · вернулись {c.ready}»",
+    ]
+    # 💡 Подсказка: на что не хватает добываемого сырья → куда слать бригад
+    goals, total = logic.expedition_goals(player, tavern)
+    if goals:
+        lines = [f"{label} — " + " · ".join(f"{ico.get(r, r)} {q}" for r, q in short.items())
+                 for label, short in goals]
+        top = sorted(total.items(), key=lambda kv: -kv[1])[:3]
+        lines.append("▶ В первую очередь: "
+                     + " · ".join(f"{ico.get(r, r)} {q}" for r, q in top))
+        parts += ["", *_branch("💡 НА ЧТО КОПИТЬ (не хватает сырья)", lines)]
+    parts += [
         "",
         *_branch("УСЛОВИЯ", [
             f"Ходка — {balance.EXPEDITION_HOURS} ч",
@@ -1322,7 +1334,8 @@ def expedition_menu(player: Player) -> str:
         ]),
         "",
         "<i>Гони сразу несколько — кто за чем.</i>",
-    ])
+    ]
+    return "\n".join(parts)
 
 
 def expedition_no_slot() -> str:

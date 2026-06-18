@@ -54,6 +54,44 @@ def expedition_counts(player: Player, tavern: Tavern) -> ExpeditionCounts:
     )
 
 
+def expedition_goals(player: Player, tavern: Tavern, max_goals: int = 3):
+    """Цели, на которые НЕ ХВАТАЕТ ДОБЫВАЕМОГО сырья — подсказка, куда слать бригад.
+    Только апгрейд + доступные к стройке пристройки (бригады носят сырьё, не
+    компоненты охоты). Возвращает (goals: [(label, {res:дефицит})], total{res:сумма})."""
+    from collections import defaultdict
+    from bot.game import buildings as bld
+
+    def gatherable_short(cost: dict) -> dict:
+        out = {}
+        for res, need in cost.items():
+            if res in balance.EXPEDITION_YIELD:
+                short = need - inventory.get(player, res)
+                if short > 0:
+                    out[res] = short
+        return out
+
+    goals: list = []
+    if tavern and tavern.level < balance.MAX_LEVEL:
+        short = gatherable_short(balance.upgrade_cost(tavern.level))
+        if short:
+            goals.append((f"🔨 Апгрейд ур.{tavern.level + 1}", short))
+    for bid in bld.ORDER:
+        b = bld.CATALOG[bid]
+        if (bld.is_built(tavern, bid) or bld.missing_requirements(tavern, b)
+                or bld.rep_locked(tavern, b)):
+            continue
+        short = gatherable_short(b.cost)
+        if short:
+            goals.append((f"{b.emoji} {b.name}", short))
+
+    shown = goals[:max_goals]
+    total: dict = defaultdict(int)
+    for _label, short in shown:          # сумма по ПОКАЗАННЫМ целям — чтобы сходилось
+        for res, qty in short.items():
+            total[res] += qty
+    return shown, dict(total)
+
+
 @dataclass
 class ExpeditionStart:
     ok: bool
