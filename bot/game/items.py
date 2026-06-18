@@ -174,13 +174,13 @@ CATALOG: dict[str, Item] = {
             id="fur_coat", slot="chest", name="Меховая доха",
             description="Шкуры зверья мехом внутрь. Тепло, и удар держит — не фартук.",
             cost={"gold": 1500, "ingot": 4, "hide": 6},
-            craft_hours=5, armor=14, income_pct=2, sprite="bronya",
+            craft_hours=5, armor=14, income_pct=2,   # свой спрайт assets/items/fur_coat.png
         ),
         Item(
             id="fang_cleaver", slot="weapon", name="Клычный тесак",
             description="Звериные клыки в рукоять. Рвёт мясо и спор не хуже ковша.",
             cost={"gold": 1800, "ingot": 4, "fang": 5},
-            craft_hours=6, damage=22, crit=5, sprite="oruzhie",
+            craft_hours=6, damage=22, crit=5,   # свой спрайт assets/items/fang_cleaver.png
         ),
         Item(
             id="swift_boots", slot="boots", name="Сапоги-скороходы",
