@@ -79,41 +79,55 @@ def variant(base_player, equipment: dict, name: str):
                            buff_kind=None, buff_until=None, hp=35, hp_at=None)
 
 
-def simulate(boss_key: str, fighters: list, rng: random.Random) -> dict:
-    n = len(fighters)
+def simulate(boss_key: str, fighters: list, rng: random.Random,
+             session: tuple | None = None) -> dict:
+    """session=None — нонстоп (идеал). session=(lo,hi) — реализм: каждый боец
+    активен лишь lo..hi минут (потом «закрыл бота»), плюс случайный старт-офсет."""
     hp0 = boss_hp(boss_key, fighters)
     boss = SimpleNamespace(id=1, boss_key=boss_key, status="active", max_hp=hp0, hp=hp0,
                            contributions={}, messages={}, state={})
     start = datetime(2026, 1, 1, tzinfo=UTC)
     boss.ends_at = start + timedelta(minutes=WINDOW_MIN)
-    last_min, t = -1, 0
+    # окно активности каждого бойца (сек): [offset, offset+session]
+    win = {}
+    for i, f in enumerate(fighters):
+        if session is None:
+            win[i] = (0, WINDOW_MIN * 60)
+        else:
+            off = rng.uniform(0, 4) * 60
+            win[i] = (off, off + rng.uniform(*session) * 60)
+    last_min, t, hitters = -1, 0, set()
     while t <= WINDOW_MIN * 60:
         now = start + timedelta(seconds=t)
         if t // 60 != last_min:
             raid.cast_tick(boss, now); last_min = t // 60
         if raid.stun_left(boss, now) <= 0:
-            for f in fighters:
-                if rng.random() > TAP_PROB:
+            for i, f in enumerate(fighters):
+                lo, hi = win[i]
+                if t < lo or t > hi or rng.random() > TAP_PROB:
                     continue
                 raid.resolve_hit(boss, f, now, rng)
                 raid.maybe_second_wind(boss, now)
+                hitters.add(i)
                 if boss.hp <= 0:
-                    return {"killed": True, "minutes": t / 60}
+                    return {"killed": True, "minutes": t / 60, "hitters": len(hitters)}
         t += STEP_SEC
-    return {"killed": False, "minutes": WINDOW_MIN, "hp_left_pct": 100 * boss.hp / boss.max_hp}
+    return {"killed": False, "minutes": WINDOW_MIN, "hitters": len(hitters),
+            "hp_left_pct": 100 * boss.hp / boss.max_hp}
 
 
-def run_cell(boss_key: str, fighters: list) -> str:
+def run_cell(boss_key: str, fighters: list, session: tuple | None = None) -> str:
     rng = random.Random(20260618)
-    res = [simulate(boss_key, fighters, rng) for _ in range(TRIALS)]
+    res = [simulate(boss_key, fighters, rng, session) for _ in range(TRIALS)]
     killed = [r for r in res if r["killed"]]
     kp = 100 * len(killed) / TRIALS
     med = statistics.median([r["minutes"] for r in killed]) if killed else float("nan")
-    hp_left = statistics.mean([r["hp_left_pct"] for r in res if not r["killed"]]) \
-        if kp < 100 else 0
-    tail = f", уход с {hp_left:.0f}% HP" if kp < 100 else ""
-    return (f"{kp:>3.0f}% убийств, медиана {med:>4.1f} мин"
-            + (tail if kp < 100 else "")) if killed or kp == 0 else f"уход (с {hp_left:.0f}% HP)"
+    esc = [r for r in res if not r["killed"]]
+    hp_left = statistics.mean([r["hp_left_pct"] for r in esc]) if esc else 0
+    if not killed:
+        return f"УХОД 100% (в среднем добили лишь до {100 - hp_left:.0f}% урона)"
+    tail = f" · уход {100 - kp:.0f}% (ост. ~{hp_left:.0f}% HP)" if kp < 100 else ""
+    return f"убийств {kp:>3.0f}%, медиана {med:>4.1f} мин{tail}"
 
 
 async def main():
@@ -159,12 +173,51 @@ async def main():
     for p in team:
         print(f"    {pdesc(p)}")
 
+    # ── Профиль реальной базы ────────────────────────────────────────────────
+    from collections import Counter
+    lv = Counter(p.level for p in rows)
+    pw = sorted(raid.player_power(p) for p in rows)
+    withw = sum(1 for p in rows if (p.equipment or {}).get("weapon"))
+    nogear = sum(1 for p in rows if not (p.equipment or {}))
+    strong = sum(1 for x in pw if x >= 50)
+    print("\n" + "-" * 72)
+    print("ПРОФИЛЬ БАЗЫ:")
+    print(f"  уровни: {dict(sorted(lv.items()))}")
+    print(f"  сила/удар: мин {pw[0]} · медиана {statistics.median(pw):.0f} · "
+          f"среднее {statistics.mean(pw):.0f} · макс {pw[-1]}")
+    print(f"  с оружием: {withw}/{len(rows)} ({100*withw/len(rows):.0f}%) · "
+          f"совсем без снаряги: {nogear} · сила ≥50 (реально полезны в рейде): {strong}")
+
+    # ── 1. Идеал (нонстоп тап) — верхняя граница ─────────────────────────────
+    print("\n" + "=" * 72)
+    print("РЕЗУЛЬТАТ A · ИДЕАЛ (бьют без остановки весь бой — верхняя граница)")
+    print("=" * 72)
     for title, fighters in scenarios:
         print(f"\n{title}  (бойцов: {len(fighters)})")
         for key in raid.BOSSES:
             spec = raid.BOSSES[key]
-            hp = boss_hp(key, fighters)
-            print(f"    {spec.emoji} {spec.name:<16} HP {hp:>6} · {run_cell(key, fighters)}")
+            print(f"    {spec.emoji} {spec.name:<16} HP {boss_hp(key, fighters):>6} · "
+                  f"{run_cell(key, fighters)}")
+
+    # ── 2. Реализм (сессии активности с отвалом) — настоящий риск ухода ───────
+    print("\n" + "=" * 72)
+    print("РЕЗУЛЬТАТ B · РЕАЛИЗМ (каждый активен ~3–15 мин, потом уходит)")
+    print("=" * 72)
+    for title, fighters in scenarios:
+        print(f"\n{title}  (бойцов: {len(fighters)})")
+        for key in raid.BOSSES:
+            spec = raid.BOSSES[key]
+            print(f"    {spec.emoji} {spec.name:<16} · {run_cell(key, fighters, session=(3, 15))}")
+
+    # ── 3. Экономика золота на реальной тиме ─────────────────────────────────
+    print("\n" + "=" * 72)
+    print("РЕЗУЛЬТАТ C · ЗОЛОТО (пул делится поровну на бивших)")
+    print("=" * 72)
+    for key in raid.BOSSES:
+        spec = raid.BOSSES[key]
+        per = spec.gold_pool // max(1, len(team))
+        print(f"    {spec.emoji} {spec.name:<16} пул {spec.gold_pool:>5}🪙 · "
+              f"тима {len(team)} → ~{per}🪙/чел")
     print()
 
 
