@@ -220,6 +220,13 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
     second_wind = raid.maybe_second_wind(boss, now)   # S8: хил + оглушение на 30% HP
 
     if not raid.is_dead(boss):
+        # Босс пробил HP-порог и кастанул что-то «громкое» (бешенство/призыв) —
+        # пуш всем бойцам, КРОМЕ ударившего (он и так видит по тосту/экрану).
+        push = texts.raid_cast_push(boss, res.get("casts", []))
+        if push:
+            for pid in (boss.contributions or {}):
+                if int(pid) != player.id:
+                    repo.queue_notify(session, int(pid), push)
         # ФИКСИРУЕМ урон в БД ДО косметической отрисовки — иначе сбой правки
         # сообщения/ответа (429, «query too old») откатил бы записанный удар.
         await session.commit()

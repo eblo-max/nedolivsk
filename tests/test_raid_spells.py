@@ -73,8 +73,11 @@ def test_summon_clear_lets_overflow_hit_boss():
 
 
 def test_summon_merges_back_partial_heal_on_ttl():
+    # cast_done со всеми порогами — чтобы страховочный script_cast не призвал
+    # выводок заново (в реальной игре призыв уже пометил бы свой порог взятым).
+    done = list(range(len(raid.BOSSES["dragon"].script)))
     boss = make_boss("dragon", hp=1000, max_hp=2000,
-                     state={"adds_hp": 400,
+                     state={"adds_hp": 400, "cast_done": done,
                             "adds_until": (NOW - timedelta(seconds=1)).isoformat()})
     events = raid.cast_tick(boss, NOW)
     assert "adds_merge" in events
@@ -82,29 +85,40 @@ def test_summon_merges_back_partial_heal_on_ttl():
     assert boss.hp == 1000 + int(400 * raid.SUMMON_MERGE_FRAC)   # лечит лишь половину
 
 
-# ── cast_tick: касты только из спеллбука ─────────────────────────────────────
-def test_cast_tick_fires_full_spellbook_for_dragon():
-    boss = _started("dragon")
-    events = raid.cast_tick(boss, NOW)
-    assert raid.ward_left(boss, NOW) > 0      # 🛡 есть в спеллбуке
-    assert raid.curse_left(boss, NOW) > 0     # 💀 есть
-    assert raid.adds_hp(boss) > 0             # 👹 есть
-    assert {"ward", "curse", "summon"} <= set(events)
+# ── script_cast: касты по ПОРОГАМ HP ─────────────────────────────────────────
+def test_script_fires_each_threshold_once_in_order():
+    # Дракон на 1% HP проходит ВСЕ пороги скрипта за один проход → весь арсенал.
+    boss = make_boss("dragon", hp=10, max_hp=1000)
+    events = raid.script_cast(boss, NOW)
+    assert raid.ward_left(boss, NOW) > 0
+    assert raid.curse_left(boss, NOW) > 0
+    assert raid.adds_hp(boss) > 0
+    assert {"ward", "curse", "summon", "roar"} <= set(events)
+    # повторный заход на тех же HP не кастует заново — пороги взяты
+    assert raid.script_cast(boss, NOW) == []
 
 
-def test_cast_tick_respects_spellbook_rat_has_no_ward():
-    boss = _started("rat_king")               # spellbook = summon, curse (без ward)
-    raid.cast_tick(boss, NOW)
-    assert raid.ward_left(boss, NOW) == 0     # щит крыса не ставит
+def test_script_triggers_progressively_not_all_at_full_hp():
+    # На 95% HP ещё ничего (первый порог дракона — 90%).
+    boss = make_boss("dragon", hp=950, max_hp=1000)
+    assert raid.script_cast(boss, NOW) == []
+    assert raid.ward_left(boss, NOW) == 0
+    # упало до 88% → первый каст (щит на 90%)
+    boss.hp = 880
+    assert "ward" in raid.script_cast(boss, NOW)
+
+
+def test_script_respects_per_boss_book_rat_has_no_ward():
+    boss = make_boss("rat_king", hp=10, max_hp=1000)   # script крысы — без ward
+    raid.script_cast(boss, NOW)
+    assert raid.ward_left(boss, NOW) == 0              # щит крыса не ставит
     assert raid.adds_hp(boss) > 0 or raid.curse_left(boss, NOW) > 0
 
 
-def test_cast_tick_enrage_event_once_per_phase():
-    boss = _started("dragon", hp=400, max_hp=1000)   # фаза 2
-    ev1 = raid.cast_tick(boss, NOW)
-    assert "enrage2" in ev1
-    ev2 = raid.cast_tick(boss, NOW + timedelta(seconds=30))
-    assert "enrage2" not in ev2               # повторно фазу не объявляем
+def test_script_enrage_event_once_per_phase():
+    boss = make_boss("dragon", hp=400, max_hp=1000)    # фаза 2 (40%)
+    assert "enrage2" in raid.script_cast(boss, NOW)
+    assert "enrage2" not in raid.script_cast(boss, NOW)  # повторно фазу не объявляем
 
 
 # ── resolve_hit: запись вклада и снятие HP ───────────────────────────────────

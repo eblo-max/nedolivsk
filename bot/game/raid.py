@@ -18,37 +18,32 @@ from bot.game import balance, combat
 GATHER_MINUTES = 20      # сбор перед битвой
 FIGHT_HOURS = 1          # окно на добивание
 
-# Self-баффы/дебаффы босса в бою.
-STALL_REGEN_MINUTES = 5      # E2: нет ударов столько минут → босс лечится (анти-АФК,
-                             # а не наказание за норм. ритм; 5 мин = реально забросили)
-STALL_REGEN_PCT = 0.02       # E2: сколько max_hp реген за тик простоя
-ROAR_EVERY_MINUTES = 5       # D2: как часто босс ревёт (оглушает всех бьющих)
-ROAR_STUN_SECONDS = 45       # D2/S8: на сколько оглушает (короткая пауза в спам-бою)
-SECOND_WIND_AT = 0.30        # S8: порог HP, на котором срабатывает «второе дыхание»
-SECOND_WIND_HEAL_PCT = 0.20  # S8: на сколько max_hp лечится (один раз)
+# ── Модель боя (best practice, как у WoW/FFXIV/idle-боссов) ──────────────────
+# ТРИГГЕРЫ заклинаний — по ПОРОГАМ HP (BOSSES.script): пропорционально прогрессу,
+# читаемо, видно по HP-бару. ДЛИТЕЛЬНОСТЬ эффектов — реальное время (секунды).
+# Единственный легитимный ТАЙМЕР — реген при простое (анти-АФК), и дедлайн боя
+# (окно FIGHT_HOURS = энрейдж: не успели — ушёл).
 
-# ── Фазы боя по доле HP: чем ниже здоровье — тем злее тварь ──────────────────
-PHASE2_AT = 0.66             # ниже этой доли HP — фаза 2 (разъярён)
-PHASE3_AT = 0.33            # ниже этой доли HP — фаза 3 (бешенство)
-# Ярость (🔥): с фазой растёт реген и учащаются все касты (множитель интервала <1).
+# Реген простоя (анти-АФК: никто не бьёт STALL_REGEN_MINUTES → лечится; это про
+# реальное бездействие, а не про HP, поэтому намеренно по времени).
+STALL_REGEN_MINUTES = 5
+STALL_REGEN_PCT = 0.02
+SECOND_WIND_AT = 0.30        # S8: порог HP «второго дыхания» (хил + рык, один раз)
+SECOND_WIND_HEAL_PCT = 0.20
+
+# Фазы боя по доле HP (тон + сила регена в ярости).
+PHASE2_AT = 0.66             # ниже — фаза 2 (разъярён)
+PHASE3_AT = 0.33            # ниже — фаза 3 (бешенство)
 ENRAGE_REGEN_MULT = {1: 1.0, 2: 1.4, 3: 1.8}
-ENRAGE_CADENCE_MULT = {1: 1.0, 2: 0.7, 3: 0.5}
 
-# Спеллбук — заклинания, что босс кастует по тику нотифаера (раз в минуту).
-# Без кулдауна бой быстрый и спамный → касты частые, чтобы спеллы реально били,
-# а не «не успевали» (фаза ярости учащает их ещё сильнее, см. ENRAGE_CADENCE).
-# 🛡 Щит/Ward: на время режет входящий урон.
-WARD_EVERY_MIN = 3
-WARD_DURATION_SEC = 45
-WARD_MITIGATE = 0.30         # урон под щитом × 0.30
-# 💀 Проклятье/дебафф: на время слабит удары ВСЕХ бьющих.
-CURSE_EVERY_MIN = 4
-CURSE_DURATION_SEC = 45
-CURSE_FACTOR = 0.55          # удар проклятых × 0.55
-# 👹 Призыв миньонов: вешает «щит» из HP миньонов — бить сперва их, иначе вольются.
-SUMMON_EVERY_MIN = 5
-SUMMON_HP_PCT = 0.10         # щит миньонов = 10% max_hp
-SUMMON_TTL_SEC = 120         # не счистили за 2 мин → миньоны вливаются (хил боссу)
+# Эффекты заклинаний (длительность реальная; триггер — по HP, см. BOSSES.script).
+ROAR_STUN_SECONDS = 45       # 🗣 рык: оглушает всех бьющих на столько
+WARD_DURATION_SEC = 45       # 🛡 щит: урон под ним × WARD_MITIGATE
+WARD_MITIGATE = 0.30
+CURSE_DURATION_SEC = 45      # 💀 проклятье: удары всех × CURSE_FACTOR
+CURSE_FACTOR = 0.55
+SUMMON_HP_PCT = 0.10         # 👹 призыв: щит миньонов = доля max_hp
+SUMMON_TTL_SEC = 120         # не счистили за столько → вливаются (хил боссу)
 SUMMON_MERGE_FRAC = 0.5      # вольются — лечат лишь на половину остатка щита
 
 
@@ -69,7 +64,10 @@ class Boss:
     cooldown_min: int = 6   # пауза между ударами одного игрока
     armor: int = 0          # «толща» босса: гасит часть урона за удар (max(1, dmg-armor))
     video: str = ""         # имя ролика в assets/<video>.mp4 (анонс-видео); "" = текст
-    spellbook: tuple = ()   # заклинания босса: "ward"/"curse"/"summon" (ярость — всегда)
+    # Скрипт заклинаний по ПОРОГАМ HP: ((hp%, "ward"/"curse"/"summon"/"roar"), ...),
+    # по убыванию %. Каждый каст срабатывает один раз, когда HP падает до порога —
+    # как сигнатурные способности рейд-боссов. Низкие пороги гуще = «ярость» к концу.
+    script: tuple = ()
 
 
 # Ярусы редкости бонус-дропа (для подписи в сообщениях).
@@ -97,7 +95,8 @@ BOSSES: dict[str, Boss] = {
          ("gold", 145, (60, 120)), ("gear", 80, None)),   # 8% — лёгкий босс, щедр на (слабую) снарягу
         gear_pool=("rat_crown", "rat_pelt", "rat_tail"),
         gear_tier_weights=(82, 16, 2), cooldown_min=0, armor=3, video="rat_king",
-        spellbook=("summon", "curse")),    # крысиный рой + чумная зараза
+        script=((80, "curse"), (62, "summon"), (45, "roar"),
+                (30, "curse"), (16, "summon"))),    # крысиный рой + чумная зараза
     "bog_troll": Boss(
         "bog_troll", "👹", "Болотный Тролль", 3500, 14000, 2400,
         "Гора смрадного мяса по пояс в тине. Каждый шаг — как телега с навозом, "
@@ -106,7 +105,8 @@ BOSSES: dict[str, Boss] = {
          ("gold", 185, (150, 300)), ("gear", 50, None)),   # 5% — середняк
         gear_pool=("troll_club", "troll_hide", "troll_eye"),
         gear_tier_weights=(50, 42, 8), cooldown_min=0, armor=8, video="bog_troll",
-        spellbook=("ward", "summon")),     # дублёная шкура + болотный выводок
+        script=((85, "ward"), (66, "summon"), (50, "roar"),
+                (38, "ward"), (25, "summon"), (12, "roar"))),  # шкура-щит + выводок
     "dragon": Boss(
         "dragon", "🐲", "Древний Змей", 3200, 13500, 6000,
         "Древний, злой и голодный до золота. Накроет тенью пол-Недоливска, дохнёт "
@@ -115,7 +115,9 @@ BOSSES: dict[str, Boss] = {
          ("gold", 150, (300, 600)), ("gear", 30, None)),   # 3% — сильный босс, снаряга редкая (престиж, она же 2× мощнее)
         gear_pool=("dragon_fang", "dragon_scale", "dragon_heart"),
         gear_tier_weights=(14, 50, 36), cooldown_min=0, armor=15, video="dragon",
-        spellbook=("ward", "curse", "summon")),   # всё: чешуя-щит, ужас, выводок
+        script=((90, "ward"), (78, "curse"), (66, "summon"), (55, "roar"),
+                (45, "ward"), (38, "curse"), (30, "summon"), (22, "roar"),
+                (14, "ward"), (8, "curse"))),   # всё, и гуще к концу (бешенство)
 }
 
 
@@ -274,22 +276,6 @@ def regen_if_stalled(boss, now: datetime | None = None) -> int:
     return heal
 
 
-def roar_if_due(boss, now: datetime | None = None) -> bool:
-    """D2: раз в ROAR_EVERY_MINUTES (в ярости — чаще) босс ревёт, оглушая всех
-    бьющих. True — взревел."""
-    now = now or _now()
-    last = (boss.state or {}).get("last_roar")
-    base = datetime.fromisoformat(last) if isinstance(last, str) else _fight_start(boss)
-    every = ROAR_EVERY_MINUTES * ENRAGE_CADENCE_MULT.get(phase(boss), 1.0)
-    if (now - base).total_seconds() < every * 60:
-        return False
-    st = dict(boss.state or {})
-    st["stun_until"] = (now + timedelta(seconds=ROAR_STUN_SECONDS)).isoformat()
-    st["last_roar"] = now.isoformat()
-    boss.state = st
-    return True
-
-
 def maybe_second_wind(boss, now: datetime | None = None) -> bool:
     """S8: один раз на ≤30% HP — хил + рык (оглушение всех). True — сработало."""
     now = now or _now()
@@ -323,75 +309,75 @@ def adds_hp(boss) -> int:
     return int((boss.state or {}).get("adds_hp", 0) or 0)
 
 
-def _due(st: dict, key: str, every_min: float, boss, now: datetime) -> bool:
-    """Пора ли каст «key»: прошло ≥ every_min (с учётом ярости) c прошлого раза.
-    Базовая точка — старт боя (чтобы не пальнуть всем сразу на 0-й минуте)."""
-    last = st.get(key)
-    base = datetime.fromisoformat(last) if isinstance(last, str) else _fight_start(boss)
-    every = every_min * ENRAGE_CADENCE_MULT.get(phase(boss), 1.0)
-    return (now - base).total_seconds() >= every * 60
+def _apply_spell(st: dict, key: str, now: datetime, boss) -> bool:
+    """Наложить эффект каста на копию state. False — каст «пустой» (например призыв
+    при живом выводке): порог всё равно считаем взятым, но события не выдаём."""
+    if key == "ward":
+        st["ward_until"] = (now + timedelta(seconds=WARD_DURATION_SEC)).isoformat()
+        return True
+    if key == "curse":
+        st["curse_until"] = (now + timedelta(seconds=CURSE_DURATION_SEC)).isoformat()
+        return True
+    if key == "roar":
+        st["stun_until"] = (now + timedelta(seconds=ROAR_STUN_SECONDS)).isoformat()
+        return True
+    if key == "summon":
+        if int(st.get("adds_hp", 0) or 0) > 0:      # выводок ещё жив — не плодим
+            return False
+        st["adds_hp"] = max(1, int(boss.max_hp * SUMMON_HP_PCT))
+        st["adds_until"] = (now + timedelta(seconds=SUMMON_TTL_SEC)).isoformat()
+        return True
+    return False
+
+
+def script_cast(boss, now: datetime | None = None) -> list[str]:
+    """Сигнатурные заклинания по ПОРОГАМ HP (BOSSES.script): каждый порог — один
+    раз, как только HP до него падает (как способности рейд-боссов). Зовётся на
+    каждом ударе — спелл бьёт мгновенно на пробитии порога. Возвращает ключи
+    сработавших каст (+ «enrage2/3» при входе в фазу ярости)."""
+    now = now or _now()
+    spec = BOSSES.get(boss.boss_key)
+    if spec is None or getattr(boss, "status", "active") != "active" or boss.max_hp <= 0:
+        return []
+    pct = 100 * max(0, boss.hp) / boss.max_hp
+    st = dict(boss.state or {})
+    fired = list(st.get("cast_done", []))
+    events: list[str] = []
+    for i, (thr, key) in enumerate(spec.script):
+        if i in fired or pct > thr:
+            continue
+        if _apply_spell(st, key, now, boss):
+            events.append(key)
+        fired.append(i)                 # порог взят (даже если каст «пустой»)
+    st["cast_done"] = fired
+    ph = phase(boss)                    # объявление ярости — один раз на фазу
+    if ph >= 2 and int(st.get("phase", 1)) < ph:
+        st["phase"] = ph
+        events.append("enrage2" if ph == 2 else "enrage3")
+    boss.state = st
+    return events
 
 
 def cast_tick(boss, now: datetime | None = None) -> list[str]:
-    """Ход босса (зовётся нотифаером раз в минуту): фазы ярости, реген простоя,
-    рык и заклинания из spellbook. Мутирует boss (hp/state); коммит — снаружи.
-    Возвращает список «громких» событий (ключи) для пуша бойцам и лога."""
+    """Ход босса по ТАЙМЕРУ (нотифаер, раз в минуту): только временны́е штуки —
+    реген при простое (анти-АФК) и «вливание» не счищенных вовремя миньонов. Плюс
+    добор HP-каст, если порог проскочили между тиками. Мутирует boss; коммит снаружи."""
     now = now or _now()
     spec = BOSSES.get(boss.boss_key)
     if spec is None or boss.status != "active":
         return []
     events: list[str] = []
     st = dict(boss.state or {})
-    ph = phase(boss)
-
-    # Объявление новой фазы ярости (один раз на фазу).
-    if ph >= 2 and int(st.get("phase", 1)) < ph:
-        st["phase"] = ph
-        events.append("enrage2" if ph == 2 else "enrage3")
-
-    # Миньоны истекли и не счищены → вливаются в босса (хил на половину остатка).
     adds_until = st.get("adds_until")
     if st.get("adds_hp") and adds_until and _iso_left(adds_until, now) == 0:
         boss.hp = min(boss.max_hp, boss.hp + int(st.get("adds_hp", 0) * SUMMON_MERGE_FRAC))
         st["adds_hp"] = 0
         st.pop("adds_until", None)
+        boss.state = st
         events.append("adds_merge")
-
-    boss.state = st  # зафиксировать до спелл-кастов (они снова возьмут свежую копию)
-
-    # 🛡 Щит
-    if "ward" in spec.spellbook and not ward_left(boss, now) and \
-            _due(boss.state or {}, "last_ward", WARD_EVERY_MIN, boss, now):
-        st = dict(boss.state or {})
-        st["ward_until"] = (now + timedelta(seconds=WARD_DURATION_SEC)).isoformat()
-        st["last_ward"] = now.isoformat()
-        boss.state = st
-        events.append("ward")
-
-    # 💀 Проклятье
-    if "curse" in spec.spellbook and not curse_left(boss, now) and \
-            _due(boss.state or {}, "last_curse", CURSE_EVERY_MIN, boss, now):
-        st = dict(boss.state or {})
-        st["curse_until"] = (now + timedelta(seconds=CURSE_DURATION_SEC)).isoformat()
-        st["last_curse"] = now.isoformat()
-        boss.state = st
-        events.append("curse")
-
-    # 👹 Призыв миньонов (только если прошлый выводок уже счищен)
-    if "summon" in spec.spellbook and adds_hp(boss) <= 0 and \
-            _due(boss.state or {}, "last_summon", SUMMON_EVERY_MIN, boss, now):
-        st = dict(boss.state or {})
-        st["adds_hp"] = max(1, int(boss.max_hp * SUMMON_HP_PCT))
-        st["adds_until"] = (now + timedelta(seconds=SUMMON_TTL_SEC)).isoformat()
-        st["last_summon"] = now.isoformat()
-        boss.state = st
-        events.append("summon")
-
-    # Рык (оглушение) и реген простоя — общие для всех боссов.
-    if roar_if_due(boss, now):
-        events.append("roar")
     if regen_if_stalled(boss, now) > 0:
         events.append("regen")
+    events += script_cast(boss, now)    # страховка: добрать пороги, если проскочили
     return events
 
 
@@ -432,7 +418,8 @@ def resolve_hit(boss, player, now: datetime | None = None,
     Порядок: урон игрока → 💀 проклятье (×CURSE) → 🛡 щит (×WARD) → толща-броня
     → 👹 миньоны (сперва их щит, остаток — боссу). Мутирует boss; коммит снаружи.
     Возвращает флаги для тоста: dmg (по боссу), crit, soaked (съедено бронёй),
-    curse/ward (активны ли), adds_dmg, adds_left, adds_cleared."""
+    curse/ward (активны ли), adds_dmg, adds_left, adds_cleared, casts (сработавшие
+    на этом ударе HP-пороговые заклинания — для пуша бойцам)."""
     now = now or _now()
     raw, crit = player_damage(player, rng)
 
@@ -460,9 +447,11 @@ def resolve_hit(boss, player, now: datetime | None = None,
         boss.state = st
 
     apply_hit(boss, player, boss_dmg, now, credit=dmg)
+    casts = script_cast(boss, now)   # HP-пороговые заклинания срабатывают на ударе
     return {"dmg": boss_dmg, "crit": crit, "soaked": soaked,
             "curse": curse, "ward": ward, "adds_dmg": adds_dmg,
-            "adds_left": adds_hp(boss), "adds_cleared": adds_cleared}
+            "adds_left": adds_hp(boss), "adds_cleared": adds_cleared,
+            "casts": casts}
 
 
 def is_dead(boss) -> bool:

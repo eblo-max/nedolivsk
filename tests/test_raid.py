@@ -110,14 +110,16 @@ def test_regen_only_when_stalled():
     assert healed > 0 and stalled.hp == 1000 + healed
 
 
-def test_roar_stuns_then_cooldowns():
+def test_roar_stuns_on_hp_threshold_once():
+    # Рык теперь — каст по порогу HP (script), а не по таймеру: пробили порог →
+    # оглушение; повторный заход на том же пороге не ревёт снова.
     now = datetime.now(UTC)
-    boss = make_boss("dragon", ends_at=now + timedelta(minutes=40),
-                     started_at=now - timedelta(minutes=20),
-                     contributions={"1": {"dmg": 5, "last": now.isoformat()}})
-    assert raid.roar_if_due(boss, now) is True
+    # дракон ревёт на 55% HP; ставим HP чуть ниже порога
+    boss = make_boss("dragon", hp=540, max_hp=1000, ends_at=now + timedelta(minutes=40))
+    events = raid.script_cast(boss, now)
+    assert "roar" in events
     assert raid.stun_left(boss, now) > 0
-    assert raid.roar_if_due(boss, now) is False            # кулдаун рыка
+    assert "roar" not in raid.script_cast(boss, now)        # порог уже взят
 
 
 def test_second_wind_once_and_heals():

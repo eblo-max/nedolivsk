@@ -237,7 +237,8 @@ class RaidBoss(Base):
     hp: Mapped[int] = mapped_column(default=0)
     contributions: Mapped[dict] = mapped_column(JSONB, default=dict)
     messages: Mapped[dict] = mapped_column(JSONB, default=dict)
-    # Боевое состояние: {stun_until, last_roar, second_wind} — рык/реген/второе дыхание.
+    # Боевое состояние: {stun_until, ward_until, curse_until, adds_hp, adds_until,
+    # cast_done (взятые HP-пороги), phase, second_wind} — заклинания/фазы боя.
     state: Mapped[dict] = mapped_column(JSONB, default=dict)
     status: Mapped[str] = mapped_column(String(10), default="gathering")
     started_at: Mapped[datetime] = mapped_column(

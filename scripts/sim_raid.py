@@ -109,8 +109,9 @@ def run(trials: int = 150):
           f"{WINDOW_MIN} мин · тап {TAP_PROB:.0%}/{STEP_SEC}с ===\n")
     for key in raid.BOSSES:
         spec = raid.BOSSES[key]
+        spells = "/".join(dict.fromkeys(k for _, k in spec.script))
         print(f"{spec.emoji} {spec.name}  (HP/боец {spec.hp_per_fighter}, пол {spec.min_hp}, "
-              f"КД {spec.cooldown_min} мин, броня {spec.armor}, спеллы {spec.spellbook})")
+              f"КД {spec.cooldown_min} мин, броня {spec.armor}, скрипт: {spells})")
         print(f"  {'явка':>5} {'HP':>7} {'kill%':>6} {'медиана,мин':>12} "
               f"{'уход%':>6} {'2-е дых%':>8} {'ост.HP%(уход)':>13}")
         for nft in turnouts:
