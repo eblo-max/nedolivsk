@@ -70,11 +70,23 @@ def expedition_goals(player: Player, tavern: Tavern, max_goals: int = 3):
                     out[res] = short
         return out
 
-    goals: list = []
-    if tavern and tavern.level < balance.MAX_LEVEL:
-        short = gatherable_short(balance.upgrade_cost(tavern.level))
+    level = tavern.level if tavern else 1
+    region = getattr(player, "region", None)
+
+    def trips(short: dict) -> float:
+        """≈ходок бригад до закрытия дефицита (дефицит ÷ добыча за ходку) — мера
+        близости к готовности: меньше ходок → ближе достроить → выше приоритет."""
+        return sum(q / max(1, balance.expedition_yield(r, level, region))
+                   for r, q in short.items())
+
+    # Апгрейд закреплён первым (главная прогрессия), постройки — по близости.
+    upgrade_goal = None
+    if tavern and level < balance.MAX_LEVEL:
+        short = gatherable_short(balance.upgrade_cost(level))
         if short:
-            goals.append((f"🔨 Апгрейд ур.{tavern.level + 1}", short))
+            upgrade_goal = (f"🔨 Апгрейд ур.{level + 1}", short)
+
+    building_goals: list = []
     for bid in bld.ORDER:
         b = bld.CATALOG[bid]
         if (bld.is_built(tavern, bid) or bld.missing_requirements(tavern, b)
@@ -82,9 +94,11 @@ def expedition_goals(player: Player, tavern: Tavern, max_goals: int = 3):
             continue
         short = gatherable_short(b.cost)
         if short:
-            goals.append((f"{b.emoji} {b.name}", short))
+            building_goals.append((f"{b.emoji} {b.name}", short))
+    building_goals.sort(key=lambda g: trips(g[1]))   # ближайшие к готовности — выше
 
-    shown = goals[:max_goals]
+    ordered = ([upgrade_goal] if upgrade_goal else []) + building_goals
+    shown = ordered[:max_goals]
     total: dict = defaultdict(int)
     for _label, short in shown:          # сумма по ПОКАЗАННЫМ целям — чтобы сходилось
         for res, qty in short.items():
