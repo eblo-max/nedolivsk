@@ -2901,6 +2901,8 @@ _NR_FLAVOR = {
     "fight":  ("⚔️ Засада", "блеск железа в кустах — никак Головорез Перо или зверьё"),
     "gamble": ("🎲 Лихо", "у костра Картёжник Картавый тасует колоду — «рискнём, хозяин?»"),
     "sneak":  ("🌒 Тишком", "обойти стороной, по-тихому, авось пронесёт"),
+    "meet":   ("🗣 Встреча", "у дороги маячит чей-то силуэт — потолковать?"),
+    "quiz":   ("❓ Загадка", "старуха в лохмотьях заступила путь с загадкой"),
     "rest":   ("🔥 Привал", "тлеющий костёр — можно перевести дух"),
     "find":   ("💰 Схрон", "заброшенный хутор — глянуть, что осталось"),
 }
@@ -2956,9 +2958,10 @@ def nightrun_meet(player, run: dict) -> str:
 
 
 def _nr_odds(player, run: dict, kind: str) -> int:
-    """Шанс пройти испытание в %, для информированного решения (provably fair)."""
+    """Шанс пройти испытание в %, для информированного решения (provably fair).
+    Не рискованные ноды (привал/схрон/встреча/загадка) не бюстятся → 100%."""
     from bot.game import nightrun
-    if kind in ("rest", "find"):
+    if not nightrun.KINDS[kind][2]:
         return 100
     return round(100 * nightrun.success_p(run, player, kind))
 
@@ -2991,10 +2994,11 @@ def nightrun_fork(player, run: dict) -> str:
                  "Ветер несёт дым и чей-то дальний хохот. Тракт пуст… вроде бы."]
     lines.append(f"<i>{rng_scene[run['leg'] % len(rng_scene)]}</i>")
     lines.append("\nРазвилка:")
+    from bot.game import nightrun
     for side, k in (("⬅️", a), ("➡️", b)):
         title, hint = _NR_FLAVOR[k]
-        odds = _nr_odds(player, run, k)
-        tag = "безопасно" if k in ("rest", "find") else f"шанс ~{odds}%"
+        tag = (f"шанс ~{_nr_odds(player, run, k)}%" if nightrun.KINDS[k][2]
+               else "безопасно")
         lines.append(f"{side} <b>{title}</b> ({tag}) — {hint}")
     return "\n".join(lines)
 

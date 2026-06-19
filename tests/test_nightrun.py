@@ -136,6 +136,21 @@ def test_bank_deposits_and_clears():
     assert banked["gold"] == 120 and r["satchel"] == {} and r["state"] == "done"
 
 
+def test_fork_renders_every_node_type(monkeypatch):
+    """Развилка должна РИСОВАТЬСЯ при любом типе ноды (meet/quiz/rest/find/...).
+    Регресс: _NR_FLAVOR без meet/quiz → KeyError → «ходка сбилась»."""
+    from bot import texts
+    _stub(monkeypatch)
+    p = _player()
+    for seed in range(1, 60):
+        for leg in range(1, balance.NIGHTRUN_LEGS + 1):
+            run = nightrun.start(p, "green_valleys", seed=seed)
+            run["leg"] = leg
+            texts.nightrun_fork(p, run)        # не должно падать ни на одном типе
+            kb_mod = __import__("bot.keyboards.inline", fromlist=["nightrun_fork_kb"])
+            kb_mod.nightrun_fork_kb(run)
+
+
 def test_fork_deterministic_by_seed():
     r = nightrun.start(_player(), "green_valleys", seed=42)
     assert nightrun.fork(r) == nightrun.fork(dict(r))                  # та же развилка
