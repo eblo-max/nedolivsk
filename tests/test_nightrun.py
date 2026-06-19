@@ -199,3 +199,28 @@ def test_situation_loot_bonus():
     plain = nightrun._bundle(100, "green_valleys", None, random.Random(1))
     boom = nightrun._bundle(100, "green_valleys", "merchant_boom", random.Random(1))
     assert nightrun.satchel_value(boom) > nightrun.satchel_value(plain)
+
+
+# ── ❓ Загадка (квиз) ─────────────────────────────────────────────────────────
+def test_quiz_enters_state(monkeypatch):
+    _stub(monkeypatch)
+    r = nightrun.start(_player(), "green_valleys", seed=9)
+    r["leg"] = 4
+    nightrun.attempt(r, _player(), "quiz", FakeRNG())
+    assert r["state"] == "quiz" and "riddle" in r and nightrun.is_active(r)
+    assert nightrun.current_riddle(r) in nightrun.RIDDLES
+
+
+def test_quiz_correct_loots_wrong_empty(monkeypatch):
+    _stub(monkeypatch)
+    p = _player()
+    r = nightrun.start(p, "green_valleys", seed=9)
+    r["leg"] = 4
+    nightrun.attempt(r, p, "quiz", FakeRNG())
+    ok = nightrun.quiz_resolve(r, p, True, FakeRNG())
+    assert ok["correct"] and ok["loot"] and r["state"] == "crossroad" and "riddle" not in r
+    r2 = nightrun.start(p, "green_valleys", seed=9)
+    r2["leg"] = 4
+    nightrun.attempt(r2, p, "quiz", FakeRNG())
+    bad = nightrun.quiz_resolve(r2, p, False, FakeRNG())
+    assert not bad["correct"] and not bad["loot"] and r2["state"] == "crossroad"

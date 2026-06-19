@@ -2937,6 +2937,13 @@ def _nr_faction_flavor(factions) -> str:
     return " · ".join(parts)
 
 
+def nightrun_quiz_wait(player, run: dict) -> str:
+    """Панель, пока висит нативная викторина (ждём ответа игрока)."""
+    return (_nr_head(run) + "\n\n🔮 <b>Ведьма Гнилозубка</b> заступила дорогу и "
+            "загадала загадку.\n<i>Ответь на викторину ниже — угадаешь, отсыплет "
+            "за смекалку; нет — каркнет и сгинет.</i>")
+
+
 def nightrun_meet(player, run: dict) -> str:
     from bot.game import nightrun
     enc = nightrun.MEET_ENCOUNTERS[run["meet"]]
@@ -3006,6 +3013,11 @@ def nightrun_result(player, run: dict, out: dict) -> str:
         ff = _nr_faction_flavor(out.get("factions"))
         if ff:
             body.append(f"<i>({ff} — городу это аукнется)</i>")
+    elif k == "quiz":
+        if out.get("correct"):
+            body.append(f"❓ Загадка: в точку! Ведьма сплюнула с досады: +{_nr_loot(out['loot'])}.")
+        else:
+            body.append("❓ Загадка: мимо. Ведьма каркнула и растаяла — без добычи.")
     elif k == "find":                                    # схрон — добыча под спойлером
         body.append(f"💰 Схрон: <tg-spoiler>+{_nr_loot(out['loot'])}</tg-spoiler> — глянь, что там.")
     elif out.get("hp_cost"):

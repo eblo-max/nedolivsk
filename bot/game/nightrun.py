@@ -27,11 +27,26 @@ KINDS = {
     "gamble": ("🎲", "Лихо", True),      # бросок кубика; высокая дисперсия
     "sneak":  ("🌒", "Тишком", True),    # удача; проскользнуть мимо беды
     "meet":   ("🗣", "Встреча", False),  # НПС-выбор: добыча + сдвиг фракций, без бюста
+    "quiz":   ("❓", "Загадка", False),  # викторина Ведьмы (нативный poll): угадал — куш
     "rest":   ("🔥", "Привал", False),   # безопасно: лечит, добычи нет
     "find":   ("💰", "Схрон", False),    # безопасно: малая добыча, без бюста
 }
 
 RISKY = [k for k, v in KINDS.items() if v[2]]
+
+# Загадки Ведьмы (нода «quiz» → нативная викторина Telegram). correct — индекс.
+RIDDLES = [
+    {"q": "🔮 Ведьма щерится: «Что в кабаке льётся рекой, а наутро аукается башкой?»",
+     "options": ["Вода", "Эль", "Дождь", "Слёзы должника"], "correct": 1},
+    {"q": "🔮 «Сидит дед, во сто шуб одет; кто его раздевает — слёзы проливает».",
+     "options": ["Лук", "Капуста", "Поп", "Скупой барон"], "correct": 0},
+    {"q": "🔮 «Не лает, не кусает, а в дом не пускает».",
+     "options": ["Замок", "Стража", "Тёща", "Долговая яма"], "correct": 0},
+    {"q": "🔮 «Чем больше из неё черпаешь, тем больше она становится».",
+     "options": ["Бочка", "Яма", "Казна купца", "Кружка"], "correct": 1},
+    {"q": "🔮 «Зимой и летом одним цветом — да не ёлка».",
+     "options": ["Пропойца Сивуха", "Монета", "Снег", "Ряса монаха"], "correct": 3},
+]
 
 # Встречи на тракте (нода «meet»): живой НПС + выбор, двигающий силу фракций
 # города (хук в общий мир). Опция: (id, кнопка, множитель добычи, [(фракция, знак)]).
@@ -133,6 +148,8 @@ def fork(run: dict) -> tuple[str, str]:
         pool.append("find")
     if 2 <= run["leg"] <= 4:
         pool.append("meet")           # встречи на тракте — в середине пути
+    if 3 <= run["leg"] <= 5:
+        pool.append("quiz")           # загадки Ведьмы — поглубже
     if run["leg"] >= 4:
         pool.append("rest")
     a = rng.choice(pool)
@@ -160,6 +177,12 @@ def attempt(run: dict, player, kind: str, rng: random.Random | None = None,
         run["meet"] = _pick_meet(run)
         run["state"] = "meet"
         out["encounter"] = run["meet"]
+        return out
+
+    if kind == "quiz":                                   # викторина — резолв по poll_answer
+        run["riddle"] = random.Random(run["seed"] * 1000 + run["leg"] + 333).randrange(len(RIDDLES))
+        run["state"] = "quiz"
+        out["riddle"] = run["riddle"]
         return out
 
     if kind == "rest":                                   # безопасно: лечит
@@ -266,9 +289,28 @@ def meet_resolve(run: dict, player, opt_id: str, rng: random.Random | None = Non
             "opt": opt_id, "npc": enc["npc"]}
 
 
+def current_riddle(run: dict) -> dict:
+    """Текущая загадка ноды «quiz» (для отправки нативной викторины)."""
+    return RIDDLES[run["riddle"]]
+
+
+def quiz_resolve(run: dict, player, correct: bool, rng: random.Random | None = None) -> dict:
+    """Применить ответ на загадку: угадал — куш (×1.5), мимо — Ведьма хохочет,
+    добычи нет (но без бюста). Переводит забег на перекрёсток."""
+    rng = rng or random.Random()
+    loot = {}
+    if correct:
+        loot = _bundle(leg_value(run["leg"]) * 1.5, run["region"], run["situation"], rng)
+        _merge(run["satchel"], loot)
+    run.pop("riddle", None)
+    run.pop("quiz", None)
+    run["state"] = "crossroad"
+    return {"kind": "quiz", "busted": False, "correct": correct, "loot": loot}
+
+
 def is_active(run: dict | None) -> bool:
     """Есть ли незавершённый забег (ждёт решения игрока)."""
-    return bool(run) and run.get("state") in ("fork", "crossroad", "meet")
+    return bool(run) and run.get("state") in ("fork", "crossroad", "meet", "quiz")
 
 
 def cooldown_left(player, now: datetime | None = None) -> int:

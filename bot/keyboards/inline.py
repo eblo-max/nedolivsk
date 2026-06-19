@@ -150,6 +150,14 @@ def nightrun_fork_kb(run: dict) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def nightrun_wait_kb() -> InlineKeyboardMarkup:
+    """Пока висит викторина — даём возможность свернуть (бросить загадку)."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏠 Свернуть с добычей", callback_data="nr:bank", style="success")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def nightrun_meet_kb(run: dict) -> InlineKeyboardMarkup:
     from bot.game import nightrun
     kb = InlineKeyboardBuilder()

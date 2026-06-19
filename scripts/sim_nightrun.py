@@ -39,6 +39,9 @@ def run_once(stop_leg: int, rng: random.Random):
         if run.get("state") == "meet":                   # встреча — берём первую опцию
             nightrun.meet_resolve(run, player, nightrun.meet_options(run)[0][0], rng)
             out = {"busted": False}
+        if run.get("state") == "quiz":                   # загадка — угадываем с p≈0.6
+            nightrun.quiz_resolve(run, player, rng.random() < 0.6, rng)
+            out = {"busted": False}
         if out["busted"]:
             return 0.0, leg, True
         if leg >= stop_leg or not nightrun.can_push(run):

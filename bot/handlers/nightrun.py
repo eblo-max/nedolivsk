@@ -10,12 +10,13 @@ import asyncio
 import random
 from datetime import datetime, timezone
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, InputPollOption, PollAnswer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import effects, texts
+from bot.config import settings
 from bot.db import repo
 from bot.game import balance, city as citymod, nightrun
 from bot.keyboards import inline as kb
@@ -25,11 +26,25 @@ UTC = timezone.utc
 
 
 async def _blocked(cb: CallbackQuery) -> bool:
-    """Режим выключен для всех (в разработке) — мягко отбиваем любой клик."""
-    if balance.NIGHTRUN_ENABLED:
+    """Доступ: открыт всем при NIGHTRUN_ENABLED, иначе — ТОЛЬКО админу (тест).
+    Остальным — мягкий алерт «в разработке»."""
+    if balance.NIGHTRUN_ENABLED or cb.from_user.id == settings.admin_id:
         return False
     await cb.answer("🌙 Ночная ходка ещё в разработке — скоро открою!", show_alert=True)
     return True
+
+
+async def _edit_panel(bot: Bot, chat_id: int, msg_id: int, text: str, markup) -> None:
+    """Правка панели из не-callback контекста (poll_answer): подпись, потом текст."""
+    try:
+        await bot.edit_message_caption(chat_id=chat_id, message_id=msg_id,
+                                       caption=text, reply_markup=markup)
+    except TelegramBadRequest:
+        try:
+            await bot.edit_message_text(text, chat_id=chat_id, message_id=msg_id,
+                                        reply_markup=markup)
+        except TelegramBadRequest:
+            pass
 
 
 async def _player(cb: CallbackQuery, session: AsyncSession, *, lock: bool = False):
@@ -58,6 +73,8 @@ async def _render_state(cb: CallbackQuery, p, run: dict) -> None:
         await _edit(cb, texts.nightrun_fork(p, run), kb.nightrun_fork_kb(run))
     elif run.get("state") == "meet":
         await _edit(cb, texts.nightrun_meet(p, run), kb.nightrun_meet_kb(run))
+    elif run.get("state") == "quiz":
+        await _edit(cb, texts.nightrun_quiz_wait(p, run), kb.nightrun_wait_kb())
     elif run.get("state") == "crossroad":
         await _edit(cb, texts.nightrun_crossroad(p, run), kb.nightrun_cross_kb(run))
     else:
@@ -161,7 +178,47 @@ async def cb_pick(cb: CallbackQuery, session: AsyncSession) -> None:
         await _edit(cb, texts.nightrun_meet(p, run), kb.nightrun_meet_kb(run))
         await cb.answer()
         return
+    if kind == "quiz":                                  # загадка — нативная викторина
+        rd = nightrun.current_riddle(run)
+        try:
+            sent = await cb.message.answer_poll(
+                question=rd["q"],
+                options=[InputPollOption(text=o) for o in rd["options"]],
+                type="quiz", correct_option_id=rd["correct"], is_anonymous=False)
+            run["quiz"] = {"poll_id": sent.poll.id,
+                           "panel": [cb.message.chat.id, cb.message.message_id]}
+        except TelegramBadRequest:                      # не вышло — считаем мимо, не блокируем забег
+            await _apply(cb, session, p, run, nightrun.quiz_resolve(run, p, False))
+            return
+        p.night_run = run
+        await session.commit()
+        await _edit(cb, texts.nightrun_quiz_wait(p, run), kb.nightrun_wait_kb())
+        await cb.answer("🔮 Ведьма загадала загадку…")
+        return
     await _apply(cb, session, p, run, out)
+
+
+@router.poll_answer()
+async def cb_poll(poll_answer: PollAnswer, session: AsyncSession, bot: Bot) -> None:
+    """Ответ на викторину Ведьмы: резолвим загадку и правим панель забега."""
+    if not poll_answer.option_ids or poll_answer.user is None:   # отозвал голос / нет юзера
+        return
+    p = await repo.get_player(session, poll_answer.user.id, for_update=True)
+    if p is None:
+        return
+    run = dict(p.night_run or {})
+    q = run.get("quiz") or {}
+    if run.get("state") != "quiz" or q.get("poll_id") != poll_answer.poll_id:
+        return                                          # стейл/чужой опрос — игнор
+    correct = poll_answer.option_ids[0] == nightrun.current_riddle(run)["correct"]
+    out = nightrun.quiz_resolve(run, p, correct)
+    p.night_run = run
+    repo.add_log(session, "player", p.id, f"❓ загадка: {'верно' if correct else 'мимо'}")
+    await session.commit()
+    chat_id, msg_id = (q.get("panel") or [None, None])
+    if chat_id:
+        await _edit_panel(bot, chat_id, msg_id,
+                          texts.nightrun_result(p, run, out), kb.nightrun_cross_kb(run))
 
 
 @router.callback_query(F.data.startswith("nr:meet:"))
