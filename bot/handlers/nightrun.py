@@ -7,6 +7,7 @@
 """
 
 import asyncio
+import logging
 import random
 from datetime import datetime, timezone
 
@@ -22,6 +23,7 @@ from bot.game import balance, city as citymod, nightrun
 from bot.keyboards import inline as kb
 
 router = Router()
+logger = logging.getLogger(__name__)
 UTC = timezone.utc
 
 
@@ -64,20 +66,25 @@ def _cooldown(cb: CallbackQuery, p) -> int:
 
 async def _edit(cb: CallbackQuery, text: str, markup) -> None:
     """Правка текущей панели (подпись, если медиа; иначе текст). Косметика —
-    глушим ЛЮБУЮ ошибку правки, чтобы кнопка не «висла» (данные уже в БД)."""
+    не должна ронять хендлер (данные уже в БД). TelegramBadRequest (не изменено /
+    старое сообщение) — ожидаемо, тихо; прочее — логируем, чтобы было видно."""
     msg = cb.message
     try:
         if msg.photo or msg.video:
             await msg.edit_caption(caption=text, reply_markup=markup)
         else:
             await msg.edit_text(text, reply_markup=markup)
-    except Exception:  # noqa: BLE001 — правка панели не должна ронять хендлер
+    except TelegramBadRequest:
         pass
+    except Exception:  # noqa: BLE001
+        logger.exception("nightrun: сбой правки панели (uid=%s)", cb.from_user.id)
 
 
-async def _render_state(cb: CallbackQuery, p, run: dict) -> None:
+async def _render_state(cb: CallbackQuery, p, run: dict,
+                        session: AsyncSession | None = None) -> None:
     """Перерисовать экран под текущее состояние забега. Любой сбой сборки текста/
-    клавиатуры глушим в безопасный экран — кнопка не должна «висеть»."""
+    клавиатуры — НЕ молча: логируем (stdout + БД), затем безопасный экран, чтобы
+    кнопка не «висела». Видимость поломки — чтобы такие баги не прятались."""
     try:
         if run.get("state") == "fork":
             await _edit(cb, texts.nightrun_fork(p, run), kb.nightrun_fork_kb(run))
@@ -90,7 +97,12 @@ async def _render_state(cb: CallbackQuery, p, run: dict) -> None:
         else:
             cd = _cooldown(cb, p)
             await _edit(cb, texts.nightrun_intro(p, cd), kb.nightrun_intro_kb(p, cd))
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
+        logger.exception("nightrun: сбой отрисовки (state=%s, uid=%s)",
+                         run.get("state"), cb.from_user.id)
+        if session is not None:
+            repo.add_log(session, "error", cb.from_user.id,
+                         f"ночная ходка: сбой отрисовки [{run.get('state')}] {type(e).__name__}: {e}")
         await _edit(cb, "🌙 Ходка сбилась. Открой «Ночная ходка» заново.",
                     kb.nightrun_after_kb())
 
@@ -134,7 +146,7 @@ async def cb_open(cb: CallbackQuery, session: AsyncSession) -> None:
         return
     run = p.night_run or {}
     if nightrun.is_active(run):
-        await _render_state(cb, p, run)
+        await _render_state(cb, p, run, session)
     else:
         cd = _cooldown(cb, p)
         await _edit(cb, texts.nightrun_intro(p, cd), kb.nightrun_intro_kb(p, cd))
@@ -149,7 +161,7 @@ async def cb_go(cb: CallbackQuery, session: AsyncSession) -> None:
     if p is None:
         return
     if nightrun.is_active(p.night_run or {}):                # уже в пути
-        await _render_state(cb, p, p.night_run)
+        await _render_state(cb, p, p.night_run, session)
         await cb.answer()
         return
     if _cooldown(cb, p) > 0:
@@ -164,7 +176,7 @@ async def cb_go(cb: CallbackQuery, session: AsyncSession) -> None:
     p.night_run = nightrun.start(p, p.region or "", situation=situation)
     repo.add_log(session, "player", p.id, "🌙 ушёл в ночную ходку")
     await session.commit()
-    await _render_state(cb, p, p.night_run)
+    await _render_state(cb, p, p.night_run, session)
     await cb.answer("🌙 В добрый путь…")
 
 
@@ -203,6 +215,7 @@ async def cb_pick(cb: CallbackQuery, session: AsyncSession) -> None:
             run["quiz"] = {"poll_id": sent.poll.id,
                            "panel": [cb.message.chat.id, cb.message.message_id]}
         except Exception:  # noqa: BLE001 — опрос не ушёл: считаем «мимо», забег не виснет
+            logger.exception("nightrun: не отправилась викторина (uid=%s)", cb.from_user.id)
             await _apply(cb, session, p, run, nightrun.quiz_resolve(run, p, False))
             return
         p.night_run = run
@@ -265,7 +278,7 @@ async def _gamble(cb: CallbackQuery, session: AsyncSession, p, run: dict) -> Non
         dice = await cb.message.answer_dice(emoji="🎲")
         val = dice.dice.value
     except Exception:  # noqa: BLE001 — кубик не ушёл: режемся по случайному значению
-        pass
+        logger.exception("nightrun: не отправился кубик (uid=%s)", cb.from_user.id)
     await asyncio.sleep(3.6)                                 # дать анимации доиграть
     out = nightrun.attempt(run, p, "gamble", roll=val)
     await _apply(cb, session, p, run, out, answered=True)
@@ -301,7 +314,7 @@ async def cb_push(cb: CallbackQuery, session: AsyncSession) -> None:
     nightrun.push(run)
     p.night_run = run
     await session.commit()
-    await _render_state(cb, p, run)
+    await _render_state(cb, p, run, session)
     await cb.answer()
 
 

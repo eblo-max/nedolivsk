@@ -136,6 +136,51 @@ def test_bank_deposits_and_clears():
     assert banked["gold"] == 120 and r["satchel"] == {} and r["state"] == "done"
 
 
+def test_nr_flavor_covers_all_kinds():
+    """Каждый тип ноды из движка ОБЯЗАН иметь флавор развилки (иначе KeyError)."""
+    from bot import texts
+    missing = set(nightrun.KINDS) - set(texts._NR_FLAVOR)
+    assert not missing, f"нет флавора развилки для нод: {missing}"
+
+
+def test_meet_encounters_well_formed():
+    from bot.game import factions
+    for enc in nightrun.MEET_ENCOUNTERS.values():
+        assert enc["npc"] and enc["scene"] and len(enc["options"]) == 2
+        for _id, label, mult, facs in enc["options"]:
+            assert label and mult > 0
+            for fac, sign in facs:
+                assert fac in factions.NAMES and sign in (-1, 1)
+
+
+def test_riddles_well_formed():
+    for rd in nightrun.RIDDLES:
+        assert rd["q"] and 2 <= len(rd["options"]) <= 4
+        assert 0 <= rd["correct"] < len(rd["options"])
+        assert all(o for o in rd["options"])
+
+
+def test_result_renders_every_kind(monkeypatch):
+    """nightrun_result не должен падать ни на одном исходе ноды."""
+    from bot import texts
+    _stub(monkeypatch)
+    p = _player()
+    base = nightrun.start(p, "green_valleys", seed=3)
+    samples = [
+        {"kind": "find", "busted": False, "loot": {"gold": 5}},
+        {"kind": "rest", "busted": False, "loot": {}, "healed": 8},
+        {"kind": "fight", "busted": False, "loot": {"gold": 9}, "hp_cost": 6},
+        {"kind": "sneak", "busted": False, "loot": {"gold": 7}},
+        {"kind": "gamble", "busted": False, "loot": {"gold": 12}, "roll": 5},
+        {"kind": "meet", "busted": False, "loot": {"gold": 8}, "npc": "🥷 Тест",
+         "factions": [("thieves", 4)]},
+        {"kind": "quiz", "busted": False, "loot": {"gold": 10}, "correct": True},
+        {"kind": "quiz", "busted": False, "loot": {}, "correct": False},
+    ]
+    for out in samples:
+        texts.nightrun_result(p, dict(base, leg=3), out)
+
+
 def test_fork_renders_every_node_type(monkeypatch):
     """Развилка должна РИСОВАТЬСЯ при любом типе ноды (meet/quiz/rest/find/...).
     Регресс: _NR_FLAVOR без meet/quiz → KeyError → «ходка сбилась»."""
