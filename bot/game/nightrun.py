@@ -199,3 +199,19 @@ def bank(run: dict, player) -> dict:
     run["satchel"] = {}
     run["state"] = "done"
     return sat
+
+
+def is_active(run: dict | None) -> bool:
+    """Есть ли незавершённый забег (ждёт решения игрока)."""
+    return bool(run) and run.get("state") in ("fork", "crossroad")
+
+
+def cooldown_left(player, now: datetime | None = None) -> int:
+    """Секунд до следующей ходки (0 — можно идти). От player.night_run_at."""
+    at = getattr(player, "night_run_at", None)
+    if at is None:
+        return 0
+    if at.tzinfo is None:
+        at = at.replace(tzinfo=UTC)
+    left = balance.NIGHTRUN_COOLDOWN_H * 3600 - ((now or datetime.now(UTC)) - at).total_seconds()
+    return max(0, int(left))

@@ -84,6 +84,14 @@ async def create_tables() -> None:
             "ALTER TABLE market_orders ADD COLUMN IF NOT EXISTS "
             "side VARCHAR(8) NOT NULL DEFAULT 'sell'"
         ))
+        # Ночная ходка: активный забег (JSONB) + кулдаун.
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "night_run JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS night_run_at TIMESTAMPTZ"
+        ))
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "expedition_resource VARCHAR(16)"

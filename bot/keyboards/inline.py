@@ -121,9 +121,48 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     kb.button(text="🧍 Персонаж", callback_data="character")
     kb.button(text="🏗 Пристройки", callback_data="buildings")
     kb.button(text="🔨 Улучшить таверну", callback_data="upgrade")
+    kb.button(text="🌙 Ночная ходка", callback_data="nr:open")
     kb.button(text="📘 Об игре и правила", callback_data="info", style="primary")
     kb.button(text="🍻 Позвать друга", callback_data="referral")
-    kb.adjust(*sizes, 1, 2, 2, 2, 1, 1, 1)
+    kb.adjust(*sizes, 1, 2, 2, 2, 1, 1, 1, 1)
+    return kb.as_markup()
+
+
+def nightrun_intro_kb(player: Player) -> InlineKeyboardMarkup:
+    from bot.game import nightrun
+    kb = InlineKeyboardBuilder()
+    if nightrun.cooldown_left(player) <= 0:
+        kb.button(text="🌙 Уйти на тракт", callback_data="nr:go", style="primary")
+    kb.button(text="🏠 В таверну", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def nightrun_fork_kb(run: dict) -> InlineKeyboardMarkup:
+    from bot.game import nightrun
+    a, b = nightrun.fork(run)
+    L = nightrun.KINDS
+    kb = InlineKeyboardBuilder()
+    kb.button(text=f"⬅️ {L[a][0]} {L[a][1]}", callback_data=f"nr:pick:{a}")
+    kb.button(text=f"➡️ {L[b][0]} {L[b][1]}", callback_data=f"nr:pick:{b}")
+    kb.button(text="🏠 Свернуть с добычей", callback_data="nr:bank", style="success")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def nightrun_cross_kb(run: dict) -> InlineKeyboardMarkup:
+    from bot.game import nightrun
+    kb = InlineKeyboardBuilder()
+    if nightrun.can_push(run):
+        kb.button(text="⬇️ Глубже в ночь", callback_data="nr:push", style="danger")
+    kb.button(text="🏠 Свернуть с добычей", callback_data="nr:bank", style="success")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def nightrun_after_kb() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏠 В таверну", callback_data="tavern", style="success")
     return kb.as_markup()
 
 

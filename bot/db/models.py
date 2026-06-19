@@ -58,6 +58,11 @@ class Player(Base):
     hp: Mapped[int | None] = mapped_column()
     hp_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Ночная ходка (соло push-your-luck): активный забег (JSONB машины состояний
+    # из bot.game.nightrun) и метка кулдауна (когда можно уйти на тракт снова).
+    night_run: Mapped[dict] = mapped_column(JSONB, default=dict)
+    night_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     # Стройка пристройки (один слот за раз)
     build_item: Mapped[str | None] = mapped_column(String(32))
     build_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

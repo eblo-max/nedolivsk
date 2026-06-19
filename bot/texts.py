@@ -2879,3 +2879,150 @@ def raid_expired(boss) -> str:
     return (f"{emoji} <b>{name} ушёл.</b>\n"
             "Провозились — тварь огрызнулась и уползла зализывать раны, унеся всю "
             "добычу. В другой раз шевелитесь живее, мямли.")
+
+
+# ===== Ночная ходка =====
+
+_NR_ROAD = {
+    "north_wilds": "глухой тракт через тайгу",
+    "green_valleys": "просёлок меж полей",
+    "red_wastes": "пыльный шлях по степи",
+}
+# Тип испытания → (заголовок развилки, живой лор-намёк).
+_NR_FLAVOR = {
+    "fight":  ("⚔️ Засада", "блеск железа в кустах — никак Головорез Перо или зверьё"),
+    "gamble": ("🎲 Лихо", "у костра Картёжник Картавый тасует колоду — «рискнём, хозяин?»"),
+    "sneak":  ("🌒 Тишком", "обойти стороной, по-тихому, авось пронесёт"),
+    "rest":   ("🔥 Привал", "тлеющий костёр — можно перевести дух"),
+    "find":   ("💰 Схрон", "заброшенный хутор — глянуть, что осталось"),
+}
+
+
+def _nr_loot(d: dict) -> str:
+    if not d:
+        return "пусто"
+    ico = {"gold": "🪙", **RESOURCE_EMOJI, **balance.GOODS_EMOJI}
+    return " · ".join(f"{ico.get(k, k)} {v}" for k, v in d.items())
+
+
+def _nr_head(run: dict) -> str:
+    from bot.game import nightrun
+    road = _NR_ROAD.get(run.get("region"), "ночной тракт")
+    return (f"🌙 <b>Ночная ходка</b> · {road}\n"
+            f"Этап {run['leg']}/{balance.NIGHTRUN_LEGS} · 🎒 {_nr_loot(run.get('satchel') or {})} "
+            f"· ❤ {run['hp']}/{nightrun.BASE_HP}")
+
+
+def _nr_odds(player, run: dict, kind: str) -> int:
+    """Шанс пройти испытание в %, для информированного решения (provably fair)."""
+    from bot.game import nightrun
+    if kind in ("rest", "find"):
+        return 100
+    return round(100 * nightrun.success_p(run, player, kind))
+
+
+def nightrun_intro(player) -> str:
+    from bot.game import nightrun
+    cd = nightrun.cooldown_left(player)
+    if cd > 0:
+        return ("🌙 <b>Ночная ходка</b>\n\n"
+                "Ноги ещё гудят с прошлой вылазки. Отдышись — "
+                f"на тракт можно через <b>{_fmt_minutes(cd // 60)}</b>.")
+    return (
+        "🌙 <b>Ночная ходка</b>\n\n"
+        "Берёшь котомку и уходишь из кабака в ночь — один, со своей снарягой и "
+        "удачей. Тракт ведёт этапами: на каждом — развилка. Прошёл — добыча в "
+        "котомку; <b>сорвался — теряешь всё незабанканное</b>.\n\n"
+        "На любом этапе можно <b>свернуть в таверну</b> и забрать добычу — или "
+        "жадничать глубже, где жирнее и опаснее.\n\n"
+        "<i>Снаряга решает: броня держит в драке, удача — выскользнуть. "
+        "Прокачался — заходи дальше.</i>"
+    )
+
+
+def nightrun_fork(player, run: dict) -> str:
+    a, b = _nr_fork(run)
+    lines = [_nr_head(run), ""]
+    rng_scene = ["Туман стелется по земле. Где-то брешет собака — а может, и не собака.",
+                 "Луна прячется за тучу. Тишина такая, что слышно своё сердце.",
+                 "Ветер несёт дым и чей-то дальний хохот. Тракт пуст… вроде бы."]
+    lines.append(f"<i>{rng_scene[run['leg'] % len(rng_scene)]}</i>")
+    lines.append("\nРазвилка:")
+    for side, k in (("⬅️", a), ("➡️", b)):
+        title, hint = _NR_FLAVOR[k]
+        odds = _nr_odds(player, run, k)
+        tag = "безопасно" if k in ("rest", "find") else f"шанс ~{odds}%"
+        lines.append(f"{side} <b>{title}</b> ({tag}) — {hint}")
+    return "\n".join(lines)
+
+
+def nightrun_result(player, run: dict, out: dict) -> str:
+    """Исход испытания + перекрёсток (или подводка к бюсту — там свой экран)."""
+    from bot.game import nightrun
+    k = out["kind"]
+    title = _NR_FLAVOR[k][0]
+    body = []
+    if out.get("healed"):
+        body.append(f"{title}: перевёл дух, +{out['healed']} ❤.")
+    elif k == "gamble":
+        body.append(f"{title}: 🎲 выпало <b>{out['roll']}</b> — куш! +{_nr_loot(out['loot'])}.")
+    elif out.get("hp_cost"):
+        body.append(f"{title}: одолел, но потрёпан (−{out['hp_cost']} ❤). "
+                    f"Добыча: +{_nr_loot(out['loot'])}.")
+    else:
+        body.append(f"{title}: чисто. Добыча: +{_nr_loot(out['loot'])}.")
+    head = _nr_head(run)
+    if not nightrun.can_push(run):
+        body.append("\n🌅 Впереди светает — тракт выводит к городу. Дальше нельзя, "
+                    "пора сворачивать с добычей.")
+    else:
+        nxt = _nr_next_odds(player, run)
+        body.append(f"\n⬇️ Дальше опаснее (~{nxt}% пройти) и жирнее, "
+                    f"или 🏠 свернуть с котомкой ({_nr_loot(run.get('satchel') or {})}).")
+    return head + "\n\n" + "\n".join(body)
+
+
+def nightrun_bust(run: dict, out: dict) -> str:
+    k = out["kind"]
+    lost = _nr_loot(out.get("lost") or {})
+    if out.get("collapsed"):
+        lead = "Ты одолел врага, но рухнул без сил у обочины."
+    elif k == "gamble":
+        lead = f"🎲 Выпало <b>{out['roll']}</b> — не повезло. Картавый сгрёб ставку и растаял в темноте."
+    elif k == "fight":
+        lead = "Их было больше. Очнулся в канаве — без котомки и достоинства."
+    else:
+        lead = "Оступился в темноте, попался — и налегке драпал до самого кабака."
+    tail = f"\n\n😶 Потеряно: {lost}." if lost and lost != "пусто" else ""
+    return f"🌑 <b>Ходка сорвалась.</b>\n\n{lead}{tail}\n\n<i>В другой раз сверни вовремя, жадюга.</i>"
+
+
+def nightrun_bank(banked: dict) -> str:
+    loot = _nr_loot(banked or {})
+    if not banked:
+        return ("🏠 <b>Вернулся в таверну.</b>\nПустой, зато живой. Бывает и хуже.")
+    return (f"🏠 <b>Вернулся с добычей!</b>\n\nВ котомке донёс: {loot}.\n"
+            "<i>Сгрузил в погреб. Знатная ночка.</i>")
+
+
+def _nr_fork(run: dict):
+    from bot.game import nightrun
+    return nightrun.fork(run)
+
+
+def _nr_next_odds(player, run: dict) -> int:
+    from bot.game import nightrun
+    nxt = dict(run, leg=run["leg"] + 1)
+    a, b = nightrun.fork(nxt)
+    return max(_nr_odds(player, nxt, a), _nr_odds(player, nxt, b))
+
+
+def nightrun_crossroad(player, run: dict) -> str:
+    """Экран распутья (резюме при возврате к незавершённой ходке)."""
+    from bot.game import nightrun
+    head = _nr_head(run)
+    if not nightrun.can_push(run):
+        return head + "\n\n🌅 Светает — тракт выводит к городу. Пора сворачивать с добычей."
+    nxt = _nr_next_odds(player, run)
+    return (head + f"\n\nТы на распутье: ⬇️ глубже в ночь (~{nxt}% пройти, добыча жирнее) "
+            f"или 🏠 свернуть с котомкой ({_nr_loot(run.get('satchel') or {})}).")

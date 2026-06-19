@@ -141,3 +141,22 @@ def test_fork_deterministic_by_seed():
     assert nightrun.fork(r) == nightrun.fork(dict(r))                  # та же развилка
     a, b = nightrun.fork(r)
     assert a in nightrun.KINDS and b in nightrun.KINDS and a != b
+
+
+# ── кулдаун / активность (для хендлеров) ─────────────────────────────────────
+def test_is_active():
+    assert not nightrun.is_active({})
+    assert not nightrun.is_active({"state": "done"})
+    assert nightrun.is_active({"state": "fork"})
+    assert nightrun.is_active({"state": "crossroad"})
+
+
+def test_cooldown_left():
+    from datetime import datetime, timedelta, timezone
+    p = _player()
+    p.night_run_at = None
+    assert nightrun.cooldown_left(p) == 0
+    p.night_run_at = datetime.now(timezone.utc)
+    assert nightrun.cooldown_left(p) > 0
+    p.night_run_at = datetime.now(timezone.utc) - timedelta(hours=balance.NIGHTRUN_COOLDOWN_H + 1)
+    assert nightrun.cooldown_left(p) == 0
