@@ -36,6 +36,9 @@ def run_once(stop_leg: int, rng: random.Random):
         if "rest" in (a, b) and run["hp"] < 15:          # отдышаться, если плохо
             kind = "rest"
         out = nightrun.attempt(run, player, kind, rng)
+        if run.get("state") == "meet":                   # встреча — берём первую опцию
+            nightrun.meet_resolve(run, player, nightrun.meet_options(run)[0][0], rng)
+            out = {"busted": False}
         if out["busted"]:
             return 0.0, leg, True
         if leg >= stop_leg or not nightrun.can_push(run):

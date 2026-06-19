@@ -26,11 +26,41 @@ KINDS = {
     "fight":  ("⚔️", "Засада", True),    # сила/броня; даже победа стоит здоровья
     "gamble": ("🎲", "Лихо", True),      # бросок кубика; высокая дисперсия
     "sneak":  ("🌒", "Тишком", True),    # удача; проскользнуть мимо беды
+    "meet":   ("🗣", "Встреча", False),  # НПС-выбор: добыча + сдвиг фракций, без бюста
     "rest":   ("🔥", "Привал", False),   # безопасно: лечит, добычи нет
     "find":   ("💰", "Схрон", False),    # безопасно: малая добыча, без бюста
 }
 
 RISKY = [k for k, v in KINDS.items() if v[2]]
+
+# Встречи на тракте (нода «meet»): живой НПС + выбор, двигающий силу фракций
+# города (хук в общий мир). Опция: (id, кнопка, множитель добычи, [(фракция, знак)]).
+MEET_ENCOUNTERS = {
+    "smuggler": {
+        "npc": "🥷 Контрабандист Тихушкин",
+        "scene": "из темноты шипят: «Эй, хозяин… товар не нужен? Дёшево, мимо застав».",
+        "options": [
+            ("buy",  "🤝 Взять товар", 1.6, [("thieves", +1)]),
+            ("turn", "🛡 Сдать страже", 1.0, [("watch", +1), ("thieves", -1)]),
+        ],
+    },
+    "taxman": {
+        "npc": "👑 Сборщик податей",
+        "scene": "верхом, при бумагах: «Ночной промысел? С него — пошлина короне».",
+        "options": [
+            ("pay",  "💰 Заплатить пошлину", 0.6, [("crown", +1)]),
+            ("slip", "🌒 Ускользнуть в темень", 1.2, [("crown", -1)]),
+        ],
+    },
+    "monk": {
+        "npc": "⛪ Брат Постник",
+        "scene": "тощий монах с факелом грозит геенной за ночные шатания.",
+        "options": [
+            ("alms",   "🙏 Подать на храм", 0.7, [("church", +1)]),
+            ("ignore", "🍺 Отмахнуться", 1.1, [("church", -1)]),
+        ],
+    },
+}
 
 
 def leg_value(leg: int) -> float:
@@ -101,6 +131,8 @@ def fork(run: dict) -> tuple[str, str]:
     pool = list(RISKY)
     if run["leg"] <= 2:
         pool.append("find")
+    if 2 <= run["leg"] <= 4:
+        pool.append("meet")           # встречи на тракте — в середине пути
     if run["leg"] >= 4:
         pool.append("rest")
     a = rng.choice(pool)
@@ -123,6 +155,12 @@ def attempt(run: dict, player, kind: str, rng: random.Random | None = None,
     val = leg_value(leg)
     out = {"kind": kind, "busted": False, "loot": {}, "hp_cost": 0,
            "healed": 0, "roll": roll}
+
+    if kind == "meet":                                   # НПС-выбор на под-экране
+        run["meet"] = _pick_meet(run)
+        run["state"] = "meet"
+        out["encounter"] = run["meet"]
+        return out
 
     if kind == "rest":                                   # безопасно: лечит
         heal = max(0, min(balance.NIGHTRUN_REST_HEAL, BASE_HP - run["hp"]))
@@ -201,9 +239,36 @@ def bank(run: dict, player) -> dict:
     return sat
 
 
+def _pick_meet(run: dict) -> str:
+    """Детерминированный выбор встречи на этапе (по seed)."""
+    rng = random.Random(run["seed"] * 1000 + run["leg"] + 777)
+    return rng.choice(list(MEET_ENCOUNTERS))
+
+
+def meet_options(run: dict) -> list:
+    """Опции текущей встречи: [(id, кнопка, множитель, [(фракция, знак)]), ...]."""
+    return MEET_ENCOUNTERS[run["meet"]]["options"]
+
+
+def meet_resolve(run: dict, player, opt_id: str, rng: random.Random | None = None) -> dict:
+    """Применить выбор во встрече: добыча + ИНТЕНТ сдвига фракций (его применяет
+    хендлер к городу — движок чист). Переводит забег на перекрёсток."""
+    rng = rng or random.Random()
+    enc = MEET_ENCOUNTERS[run["meet"]]
+    opt = next((o for o in enc["options"] if o[0] == opt_id), enc["options"][0])
+    _id, _label, mult, facs = opt
+    loot = _bundle(leg_value(run["leg"]) * mult, run["region"], run["situation"], rng)
+    _merge(run["satchel"], loot)
+    run.pop("meet", None)
+    run["state"] = "crossroad"
+    factions = [(f, sign * balance.NIGHTRUN_FACTION_NUDGE) for f, sign in facs]
+    return {"kind": "meet", "busted": False, "loot": loot, "factions": factions,
+            "opt": opt_id, "npc": enc["npc"]}
+
+
 def is_active(run: dict | None) -> bool:
     """Есть ли незавершённый забег (ждёт решения игрока)."""
-    return bool(run) and run.get("state") in ("fork", "crossroad")
+    return bool(run) and run.get("state") in ("fork", "crossroad", "meet")
 
 
 def cooldown_left(player, now: datetime | None = None) -> int:

@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import effects, texts
 from bot.db import repo
-from bot.game import balance, nightrun
+from bot.game import balance, city as citymod, nightrun
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -56,10 +56,24 @@ async def _render_state(cb: CallbackQuery, p, run: dict) -> None:
     """Перерисовать экран под текущее состояние забега."""
     if run.get("state") == "fork":
         await _edit(cb, texts.nightrun_fork(p, run), kb.nightrun_fork_kb(run))
+    elif run.get("state") == "meet":
+        await _edit(cb, texts.nightrun_meet(p, run), kb.nightrun_meet_kb(run))
     elif run.get("state") == "crossroad":
         await _edit(cb, texts.nightrun_crossroad(p, run), kb.nightrun_cross_kb(run))
     else:
         await _edit(cb, texts.nightrun_intro(p), kb.nightrun_intro_kb(p))
+
+
+async def _apply_factions(session: AsyncSession, p, factions) -> None:
+    """Применить сдвиг силы фракций к ОБЩЕМУ городу игрока (если есть домашний
+    чат). Город лочим FOR UPDATE — как в событиях, безопасно при параллели."""
+    if not factions or p.chat_id is None:
+        return
+    city = await repo.get_or_create_city(session, p.chat_id, lock=True)
+    fp = dict(city.faction_power or {})
+    for fac, delta in factions:
+        fp[fac] = max(balance.FACTION_MIN, min(balance.FACTION_MAX, fp.get(fac, 0) + delta))
+    city.faction_power = fp
 
 
 async def _finish(cb: CallbackQuery, text: str, *, win: bool) -> None:
@@ -109,8 +123,13 @@ async def cb_go(cb: CallbackQuery, session: AsyncSession) -> None:
     if nightrun.cooldown_left(p) > 0:
         await cb.answer("Ноги ещё гудят — отдышись.", show_alert=True)
         return
+    situation = None                                    # активная ситуация города красит ночь
+    if p.chat_id is not None:
+        city = await repo.get_or_create_city(session, p.chat_id)
+        sit = citymod.current(city)
+        situation = sit.id if sit else None
     p.night_run_at = datetime.now(UTC)
-    p.night_run = nightrun.start(p, p.region or "")
+    p.night_run = nightrun.start(p, p.region or "", situation=situation)
     repo.add_log(session, "player", p.id, "🌙 ушёл в ночную ходку")
     await session.commit()
     await _render_state(cb, p, p.night_run)
@@ -136,7 +155,34 @@ async def cb_pick(cb: CallbackQuery, session: AsyncSession) -> None:
         await _gamble(cb, session, p, run)
         return
     out = nightrun.attempt(run, p, kind)
+    if kind == "meet":                                  # встреча — под-экран выбора
+        p.night_run = run
+        await session.commit()
+        await _edit(cb, texts.nightrun_meet(p, run), kb.nightrun_meet_kb(run))
+        await cb.answer()
+        return
     await _apply(cb, session, p, run, out)
+
+
+@router.callback_query(F.data.startswith("nr:meet:"))
+async def cb_meet(cb: CallbackQuery, session: AsyncSession) -> None:
+    if await _blocked(cb):
+        return
+    p = await _player(cb, session, lock=True)
+    if p is None:
+        return
+    run = dict(p.night_run or {})
+    if run.get("state") != "meet":
+        await cb.answer("Встреча уже позади.", show_alert=True)
+        return
+    opt = cb.data.split(":", 2)[2]
+    out = nightrun.meet_resolve(run, p, opt)
+    await _apply_factions(session, p, out.get("factions"))   # сдвиг фракций в общий город
+    p.night_run = run
+    repo.add_log(session, "player", p.id, f"🗣 встреча на тракте ({out.get('opt')})")
+    await session.commit()
+    await _edit(cb, texts.nightrun_result(p, run, out), kb.nightrun_cross_kb(run))
+    await cb.answer()
 
 
 async def _gamble(cb: CallbackQuery, session: AsyncSession, p, run: dict) -> None:

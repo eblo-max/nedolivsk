@@ -2888,6 +2888,14 @@ _NR_ROAD = {
     "green_valleys": "просёлок меж полей",
     "red_wastes": "пыльный шлях по степи",
 }
+# Активная городская ситуация красит ночь (текст; механика — в движке).
+_NR_SIT = {
+    "curfew": "👮 комендантский час — патрули злы, тракт опаснее",
+    "thieves_rampant": "🥷 ворьё лютует — на дорогах лихо",
+    "merchant_boom": "💰 купеческий бум — караваны жирны",
+    "crown_taxes": "👑 поборы короны",
+    "temperance": "⛪ воздержание — на дорогах тихо",
+}
 # Тип испытания → (заголовок развилки, живой лор-намёк).
 _NR_FLAVOR = {
     "fight":  ("⚔️ Засада", "блеск железа в кустах — никак Головорез Перо или зверьё"),
@@ -2908,9 +2916,36 @@ def _nr_loot(d: dict) -> str:
 def _nr_head(run: dict) -> str:
     from bot.game import nightrun
     road = _NR_ROAD.get(run.get("region"), "ночной тракт")
-    return (f"🌙 <b>Ночная ходка</b> · {road}\n"
+    head = (f"🌙 <b>Ночная ходка</b> · {road}\n"
             f"Этап {run['leg']}/{balance.NIGHTRUN_LEGS} · 🎒 {_nr_loot(run.get('satchel') or {})} "
             f"· ❤ {run['hp']}/{nightrun.BASE_HP}")
+    sit = _NR_SIT.get(run.get("situation"))
+    if sit:
+        head += f"\n<i>В городе: {sit}</i>"
+    return head
+
+
+def _nr_faction_flavor(factions) -> str:
+    from bot.game import factions as fac
+    ups = [fac.name(f) for f, d in (factions or []) if d > 0]
+    downs = [fac.name(f) for f, d in (factions or []) if d < 0]
+    parts = []
+    if ups:
+        parts.append("укрепил " + ", ".join(ups))
+    if downs:
+        parts.append("насолил " + ", ".join(downs))
+    return " · ".join(parts)
+
+
+def nightrun_meet(player, run: dict) -> str:
+    from bot.game import nightrun
+    enc = nightrun.MEET_ENCOUNTERS[run["meet"]]
+    lines = [_nr_head(run), "", f"<b>{enc['npc']}</b>", f"<i>{enc['scene']}</i>", "",
+             "Как поступишь?"]
+    for _id, label, _mult, facs in enc["options"]:
+        ff = _nr_faction_flavor([(f, s) for f, s in facs])
+        lines.append(f"• <b>{label}</b>{(' — ' + ff) if ff else ''}")
+    return "\n".join(lines)
 
 
 def _nr_odds(player, run: dict, kind: str) -> int:
@@ -2960,12 +2995,19 @@ def nightrun_result(player, run: dict, out: dict) -> str:
     """Исход испытания + перекрёсток (или подводка к бюсту — там свой экран)."""
     from bot.game import nightrun
     k = out["kind"]
-    title = _NR_FLAVOR[k][0]
+    title = _NR_FLAVOR[k][0] if k in _NR_FLAVOR else "🗣 Встреча"
     body = []
     if out.get("healed"):
         body.append(f"{title}: перевёл дух, +{out['healed']} ❤.")
     elif k == "gamble":
         body.append(f"{title}: 🎲 выпало <b>{out['roll']}</b> — куш! +{_nr_loot(out['loot'])}.")
+    elif k == "meet":
+        body.append(f"🗣 {out.get('npc', 'Встреча')}: +{_nr_loot(out['loot'])}.")
+        ff = _nr_faction_flavor(out.get("factions"))
+        if ff:
+            body.append(f"<i>({ff} — городу это аукнется)</i>")
+    elif k == "find":                                    # схрон — добыча под спойлером
+        body.append(f"💰 Схрон: <tg-spoiler>+{_nr_loot(out['loot'])}</tg-spoiler> — глянь, что там.")
     elif out.get("hp_cost"):
         body.append(f"{title}: одолел, но потрёпан (−{out['hp_cost']} ❤). "
                     f"Добыча: +{_nr_loot(out['loot'])}.")

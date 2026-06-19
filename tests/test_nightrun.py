@@ -160,3 +160,42 @@ def test_cooldown_left():
     assert nightrun.cooldown_left(p) > 0
     p.night_run_at = datetime.now(timezone.utc) - timedelta(hours=balance.NIGHTRUN_COOLDOWN_H + 1)
     assert nightrun.cooldown_left(p) == 0
+
+
+# ── 🗣 Встреча (фаза 3): фракц-хук ───────────────────────────────────────────
+def test_meet_enters_subchoice(monkeypatch):
+    _stub(monkeypatch)
+    r = nightrun.start(_player(), "green_valleys", seed=5)
+    r["leg"] = 3
+    out = nightrun.attempt(r, _player(), "meet", FakeRNG())
+    assert r["state"] == "meet" and r.get("meet") in nightrun.MEET_ENCOUNTERS
+    assert not out["busted"] and nightrun.is_active(r)
+
+
+def test_meet_resolve_loot_and_faction(monkeypatch):
+    _stub(monkeypatch)
+    p = _player()
+    r = nightrun.start(p, "green_valleys", seed=5)
+    r["leg"] = 3
+    nightrun.attempt(r, p, "meet", FakeRNG())
+    opt_id = nightrun.MEET_ENCOUNTERS[r["meet"]]["options"][0][0]
+    out = nightrun.meet_resolve(r, p, opt_id, FakeRNG())
+    assert r["state"] == "crossroad" and "meet" not in r
+    assert out["loot"] and out["factions"]
+    _fac, delta = out["factions"][0]
+    assert abs(delta) == balance.NIGHTRUN_FACTION_NUDGE      # сдвиг ровно на NUDGE
+
+
+# ── реактивность городской ситуации ──────────────────────────────────────────
+def test_situation_lowers_success(monkeypatch):
+    _stub(monkeypatch)
+    p = _player()
+    base = nightrun.start(p, "green_valleys")
+    curfew = dict(base, situation="curfew")
+    assert nightrun.success_p(curfew, p, "sneak") < nightrun.success_p(base, p, "sneak")
+
+
+def test_situation_loot_bonus():
+    plain = nightrun._bundle(100, "green_valleys", None, random.Random(1))
+    boom = nightrun._bundle(100, "green_valleys", "merchant_boom", random.Random(1))
+    assert nightrun.satchel_value(boom) > nightrun.satchel_value(plain)

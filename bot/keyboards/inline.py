@@ -150,6 +150,15 @@ def nightrun_fork_kb(run: dict) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def nightrun_meet_kb(run: dict) -> InlineKeyboardMarkup:
+    from bot.game import nightrun
+    kb = InlineKeyboardBuilder()
+    for opt_id, label, _mult, _facs in nightrun.meet_options(run):
+        kb.button(text=label, callback_data=f"nr:meet:{opt_id}")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def nightrun_cross_kb(run: dict) -> InlineKeyboardMarkup:
     from bot.game import nightrun
     kb = InlineKeyboardBuilder()
