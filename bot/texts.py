@@ -2963,9 +2963,10 @@ def _nr_odds(player, run: dict, kind: str) -> int:
     return round(100 * nightrun.success_p(run, player, kind))
 
 
-def nightrun_intro(player) -> str:
+def nightrun_intro(player, cd: int | None = None) -> str:
     from bot.game import nightrun
-    cd = nightrun.cooldown_left(player)
+    if cd is None:
+        cd = nightrun.cooldown_left(player)
     if cd > 0:
         return ("🌙 <b>Ночная ходка</b>\n\n"
                 "Ноги ещё гудят с прошлой вылазки. Отдышись — "

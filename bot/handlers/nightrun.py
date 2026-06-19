@@ -55,30 +55,44 @@ async def _player(cb: CallbackQuery, session: AsyncSession, *, lock: bool = Fals
     return p
 
 
+def _cooldown(cb: CallbackQuery, p) -> int:
+    """Кулдаун до следующей ходки. Админу — 0 (свободная обкатка режима)."""
+    if cb.from_user.id == settings.admin_id:
+        return 0
+    return nightrun.cooldown_left(p)
+
+
 async def _edit(cb: CallbackQuery, text: str, markup) -> None:
-    """Правка текущей панели (подпись, если медиа; иначе текст)."""
+    """Правка текущей панели (подпись, если медиа; иначе текст). Косметика —
+    глушим ЛЮБУЮ ошибку правки, чтобы кнопка не «висла» (данные уже в БД)."""
     msg = cb.message
     try:
         if msg.photo or msg.video:
             await msg.edit_caption(caption=text, reply_markup=markup)
         else:
             await msg.edit_text(text, reply_markup=markup)
-    except TelegramBadRequest:
+    except Exception:  # noqa: BLE001 — правка панели не должна ронять хендлер
         pass
 
 
 async def _render_state(cb: CallbackQuery, p, run: dict) -> None:
-    """Перерисовать экран под текущее состояние забега."""
-    if run.get("state") == "fork":
-        await _edit(cb, texts.nightrun_fork(p, run), kb.nightrun_fork_kb(run))
-    elif run.get("state") == "meet":
-        await _edit(cb, texts.nightrun_meet(p, run), kb.nightrun_meet_kb(run))
-    elif run.get("state") == "quiz":
-        await _edit(cb, texts.nightrun_quiz_wait(p, run), kb.nightrun_wait_kb())
-    elif run.get("state") == "crossroad":
-        await _edit(cb, texts.nightrun_crossroad(p, run), kb.nightrun_cross_kb(run))
-    else:
-        await _edit(cb, texts.nightrun_intro(p), kb.nightrun_intro_kb(p))
+    """Перерисовать экран под текущее состояние забега. Любой сбой сборки текста/
+    клавиатуры глушим в безопасный экран — кнопка не должна «висеть»."""
+    try:
+        if run.get("state") == "fork":
+            await _edit(cb, texts.nightrun_fork(p, run), kb.nightrun_fork_kb(run))
+        elif run.get("state") == "meet":
+            await _edit(cb, texts.nightrun_meet(p, run), kb.nightrun_meet_kb(run))
+        elif run.get("state") == "quiz":
+            await _edit(cb, texts.nightrun_quiz_wait(p, run), kb.nightrun_wait_kb())
+        elif run.get("state") == "crossroad":
+            await _edit(cb, texts.nightrun_crossroad(p, run), kb.nightrun_cross_kb(run))
+        else:
+            cd = _cooldown(cb, p)
+            await _edit(cb, texts.nightrun_intro(p, cd), kb.nightrun_intro_kb(p, cd))
+    except Exception:  # noqa: BLE001
+        await _edit(cb, "🌙 Ходка сбилась. Открой «Ночная ходка» заново.",
+                    kb.nightrun_after_kb())
 
 
 async def _apply_factions(session: AsyncSession, p, factions) -> None:
@@ -122,7 +136,8 @@ async def cb_open(cb: CallbackQuery, session: AsyncSession) -> None:
     if nightrun.is_active(run):
         await _render_state(cb, p, run)
     else:
-        await _edit(cb, texts.nightrun_intro(p), kb.nightrun_intro_kb(p))
+        cd = _cooldown(cb, p)
+        await _edit(cb, texts.nightrun_intro(p, cd), kb.nightrun_intro_kb(p, cd))
     await cb.answer()
 
 
@@ -137,7 +152,7 @@ async def cb_go(cb: CallbackQuery, session: AsyncSession) -> None:
         await _render_state(cb, p, p.night_run)
         await cb.answer()
         return
-    if nightrun.cooldown_left(p) > 0:
+    if _cooldown(cb, p) > 0:
         await cb.answer("Ноги ещё гудят — отдышись.", show_alert=True)
         return
     situation = None                                    # активная ситуация города красит ночь
@@ -187,7 +202,7 @@ async def cb_pick(cb: CallbackQuery, session: AsyncSession) -> None:
                 type="quiz", correct_option_id=rd["correct"], is_anonymous=False)
             run["quiz"] = {"poll_id": sent.poll.id,
                            "panel": [cb.message.chat.id, cb.message.message_id]}
-        except TelegramBadRequest:                      # не вышло — считаем мимо, не блокируем забег
+        except Exception:  # noqa: BLE001 — опрос не ушёл: считаем «мимо», забег не виснет
             await _apply(cb, session, p, run, nightrun.quiz_resolve(run, p, False))
             return
         p.night_run = run
@@ -249,7 +264,7 @@ async def _gamble(cb: CallbackQuery, session: AsyncSession, p, run: dict) -> Non
     try:
         dice = await cb.message.answer_dice(emoji="🎲")
         val = dice.dice.value
-    except TelegramBadRequest:
+    except Exception:  # noqa: BLE001 — кубик не ушёл: режемся по случайному значению
         pass
     await asyncio.sleep(3.6)                                 # дать анимации доиграть
     out = nightrun.attempt(run, p, "gamble", roll=val)

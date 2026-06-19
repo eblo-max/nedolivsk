@@ -128,10 +128,12 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def nightrun_intro_kb(player: Player) -> InlineKeyboardMarkup:
+def nightrun_intro_kb(player: Player, cd: int | None = None) -> InlineKeyboardMarkup:
     from bot.game import nightrun
+    if cd is None:
+        cd = nightrun.cooldown_left(player)
     kb = InlineKeyboardBuilder()
-    if nightrun.cooldown_left(player) <= 0:
+    if cd <= 0:
         kb.button(text="🌙 Уйти на тракт", callback_data="nr:go", style="primary")
     kb.button(text="🏠 В таверну", callback_data="tavern")
     kb.adjust(1)
