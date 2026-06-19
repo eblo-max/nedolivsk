@@ -17,11 +17,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import effects, texts
 from bot.db import repo
-from bot.game import nightrun
+from bot.game import balance, nightrun
 from bot.keyboards import inline as kb
 
 router = Router()
 UTC = timezone.utc
+
+
+async def _blocked(cb: CallbackQuery) -> bool:
+    """Режим выключен для всех (в разработке) — мягко отбиваем любой клик."""
+    if balance.NIGHTRUN_ENABLED:
+        return False
+    await cb.answer("🌙 Ночная ходка ещё в разработке — скоро открою!", show_alert=True)
+    return True
 
 
 async def _player(cb: CallbackQuery, session: AsyncSession, *, lock: bool = False):
@@ -74,6 +82,8 @@ async def _finish(cb: CallbackQuery, text: str, *, win: bool) -> None:
 
 @router.callback_query(F.data == "nr:open")
 async def cb_open(cb: CallbackQuery, session: AsyncSession) -> None:
+    if await _blocked(cb):
+        return
     p = await _player(cb, session)
     if p is None:
         return
@@ -87,6 +97,8 @@ async def cb_open(cb: CallbackQuery, session: AsyncSession) -> None:
 
 @router.callback_query(F.data == "nr:go")
 async def cb_go(cb: CallbackQuery, session: AsyncSession) -> None:
+    if await _blocked(cb):
+        return
     p = await _player(cb, session, lock=True)
     if p is None:
         return
@@ -107,6 +119,8 @@ async def cb_go(cb: CallbackQuery, session: AsyncSession) -> None:
 
 @router.callback_query(F.data.startswith("nr:pick:"))
 async def cb_pick(cb: CallbackQuery, session: AsyncSession) -> None:
+    if await _blocked(cb):
+        return
     p = await _player(cb, session, lock=True)
     if p is None:
         return
@@ -157,6 +171,8 @@ async def _apply(cb: CallbackQuery, session: AsyncSession, p, run: dict,
 
 @router.callback_query(F.data == "nr:push")
 async def cb_push(cb: CallbackQuery, session: AsyncSession) -> None:
+    if await _blocked(cb):
+        return
     p = await _player(cb, session, lock=True)
     if p is None:
         return
@@ -173,6 +189,8 @@ async def cb_push(cb: CallbackQuery, session: AsyncSession) -> None:
 
 @router.callback_query(F.data == "nr:bank")
 async def cb_bank(cb: CallbackQuery, session: AsyncSession) -> None:
+    if await _blocked(cb):
+        return
     p = await _player(cb, session, lock=True)
     if p is None:
         return
