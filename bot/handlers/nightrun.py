@@ -57,10 +57,9 @@ async def _player(cb: CallbackQuery, session: AsyncSession, *, lock: bool = Fals
     return p
 
 
-def _cooldown(cb: CallbackQuery, p) -> int:
-    """Кулдаун до следующей ходки. Админу — 0 (свободная обкатка режима)."""
-    if cb.from_user.id == settings.admin_id:
-        return 0
+def _cooldown(p) -> int:
+    """Секунд до следующей ходки — одна ходка в NIGHTRUN_COOLDOWN_H часов (для
+    всех, включая админа: иначе «прошёл и сразу снова» — абуз)."""
     return nightrun.cooldown_left(p)
 
 
@@ -95,7 +94,7 @@ async def _render_state(cb: CallbackQuery, p, run: dict,
         elif run.get("state") == "crossroad":
             await _edit(cb, texts.nightrun_crossroad(p, run), kb.nightrun_cross_kb(run))
         else:
-            cd = _cooldown(cb, p)
+            cd = _cooldown(p)
             await _edit(cb, texts.nightrun_intro(p, cd), kb.nightrun_intro_kb(p, cd))
     except Exception as e:  # noqa: BLE001
         logger.exception("nightrun: сбой отрисовки (state=%s, uid=%s)",
@@ -148,7 +147,7 @@ async def cb_open(cb: CallbackQuery, session: AsyncSession) -> None:
     if nightrun.is_active(run):
         await _render_state(cb, p, run, session)
     else:
-        cd = _cooldown(cb, p)
+        cd = _cooldown(p)
         await _edit(cb, texts.nightrun_intro(p, cd), kb.nightrun_intro_kb(p, cd))
     await cb.answer()
 
@@ -164,7 +163,7 @@ async def cb_go(cb: CallbackQuery, session: AsyncSession) -> None:
         await _render_state(cb, p, p.night_run, session)
         await cb.answer()
         return
-    if _cooldown(cb, p) > 0:
+    if _cooldown(p) > 0:
         await cb.answer("Ноги ещё гудят — отдышись.", show_alert=True)
         return
     situation = None                                    # активная ситуация города красит ночь
