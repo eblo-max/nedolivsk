@@ -20,29 +20,17 @@ from aiohttp import web
 from bot.db import repo
 from bot.db.base import session_factory
 from bot.game import balance, worldmap
-from bot.game import raid as raidmod
 
 ASSETS_DIR = worldmap.ASSETS_DIR
 
-# Какой спрайт-орк рисуем для какого босса (арт CraftPix: 3 орка). Фолбэк — 1.
-BOSS_SPRITE = {"rat_king": 1, "bog_troll": 2, "dragon": 3}
-BOSS_POS = (0.5, 0.40)   # «логово» босса-ивента на карте (норм. координаты)
-
-
-def _boss_payload(raid) -> dict | None:
-    """Данные босса-ивента для карты из живого рейда (или None)."""
-    if raid is None:
-        return None
-    spec = raidmod.BOSSES.get(raid.boss_key)
-    if spec is None:
-        return None
-    return {
-        "name": spec.name, "emoji": spec.emoji,
-        "sprite": BOSS_SPRITE.get(raid.boss_key, 1),
-        "x": BOSS_POS[0], "y": BOSS_POS[1],
-        "hp": int(raid.hp or 0), "max_hp": int(raid.max_hp or 0),
-        "status": raid.status,
-    }
+# Самостоятельные анимированные ивент-объекты на карте (НЕ связаны с рейдами).
+# Каждый: sprite (орк 1..3), норм. позиция x/y (на суше!), имя и описание.
+# Список — чтобы легко добавлять новые ивенты. Полная механика — отдельно, позже.
+MAP_EVENTS = [
+    {"sprite": 1, "x": 0.40, "y": 0.74,
+     "name": "Орда орков",
+     "blurb": "Дикая орда встала лагерем в Красных пустошах. Зреет буря."},
+]
 
 
 def base_url() -> str:
@@ -66,14 +54,6 @@ async def _api_taverns(request: web.Request) -> web.Response:
         uid = 0
     async with session_factory() as s:
         rows = await repo.get_map_taverns(s)
-        raid = await repo.get_active_raid(s)
-    # босс-ивент: живой рейд, либо демо для предпросмотра (?boss=demo)
-    if request.query.get("boss") == "demo":
-        boss = {"name": "Болотный Тролль", "emoji": "👹", "sprite": 2,
-                "x": BOSS_POS[0], "y": BOSS_POS[1], "hp": 1400, "max_hp": 2000,
-                "status": "active"}
-    else:
-        boss = _boss_payload(raid)
     out = []
     for tav, pl in rows:
         # Со слотом — фикс. позиция; без слота (зона полна) — детерминированная
@@ -90,7 +70,7 @@ async def _api_taverns(request: web.Request) -> web.Response:
             "mine": bool(uid) and pl.id == uid,
         })
     return web.json_response(
-        {"taverns": out, "regions": balance.REGIONS, "boss": boss},
+        {"taverns": out, "regions": balance.REGIONS, "events": MAP_EVENTS},
         headers={"Cache-Control": "no-store"})
 
 
@@ -137,8 +117,8 @@ async def _tavern_sprite(request: web.Request) -> web.Response:
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
-async def _boss_sprite(request: web.Request) -> web.Response:
-    # IDLE-стрип орка-босса (1..3): 10 кадров в ряд для AnimatedSprite на карте.
+async def _event_sprite(request: web.Request) -> web.Response:
+    # IDLE-стрип орка-ивента (1..3): 10 кадров в ряд для AnimatedSprite на карте.
     try:
         n = int(request.match_info["n"])
     except (KeyError, ValueError):
@@ -156,7 +136,7 @@ def build_app() -> web.Application:
     app.router.add_get("/api/taverns", _api_taverns)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
-    app.router.add_get("/assets/boss/ork{n}_idle.png", _boss_sprite)  # босс-ивент
+    app.router.add_get("/assets/boss/ork{n}_idle.png", _event_sprite)  # ивент-объекты
     return app
 
 
@@ -239,8 +219,8 @@ const MAXS = 9;               // максимальный зум; минимал
   app.stage.addChild(world);
   const markers = new PIXI.Container(); markers.sortableChildren = true;
   app.stage.addChild(markers);
-  const bossLayer = new PIXI.Container(); app.stage.addChild(bossLayer);  // босс-ивент поверх
-  let bossNode = null;
+  const eventLayer = new PIXI.Container(); app.stage.addChild(eventLayer);  // ивенты поверх
+  const eventNodes = [];   // самостоятельные анимированные ивент-объекты
 
   // минимальный зум = «вся карта в экране» с небольшим запасом → вокруг материка
   // видна кайма моря/тумана (плюс виньетка). Снапится по центру, меньше не сжать.
@@ -249,10 +229,8 @@ const MAXS = 9;               // максимальный зум; минимал
   world.scale.set(minScale); clampCam();
 
   // --- таверны ---
-  const demoBoss = new URLSearchParams(location.search).get('boss');  // ?boss=demo — предпросмотр
   let data;
-  try { data = await (await fetch('/api/taverns?uid='+encodeURIComponent(myId)
-        + (demoBoss ? '&boss='+encodeURIComponent(demoBoss) : ''))).json(); }
+  try { data = await (await fetch('/api/taverns?uid='+encodeURIComponent(myId))).json(); }
   catch(e){ bar.textContent='⚠ не загрузить таверны'; return; }
   const regions = data.regions || {};
   const taverns = data.taverns.map(t => ({...t, wx: t.x*W, wy: t.y*H}));  // мировые px
@@ -390,8 +368,8 @@ const MAXS = 9;               // максимальный зум; минимал
       const s = screenOf(node.wx, node.wy); node.x = s.x; node.y = s.y; node.scale.set(k);
       if (node._label) node._label.visible = showLabels && node._labelAllowed;
     }
-    if (bossNode){ const s = screenOf(bossNode.wx, bossNode.wy);
-      bossNode.x = s.x; bossNode.y = s.y; bossNode.scale.set(k * 0.62); }  // босс крупнее таверн
+    for (const ev of eventNodes){ const s = screenOf(ev.wx, ev.wy);
+      ev.x = s.x; ev.y = s.y; ev.scale.set(k * 0.62); }   // ивенты крупнее таверн
   }
 
   // перерисовку коалесцируем по кадрам: пан — только перепозиционируем (дёшево),
@@ -465,21 +443,22 @@ const MAXS = 9;               // максимальный зум; минимал
     clampCam(); refresh();
   });
 
-  // ---------- босс-ивент (анимированный) ----------
-  if (data.boss){
+  // ---------- ивент-объекты (анимированные, самостоятельные) ----------
+  for (const ev of (data.events || [])){
     try {
-      const b = data.boss;
-      const tex = await PIXI.Assets.load('/assets/boss/ork'+b.sprite+'_idle.png');
+      const tex = await PIXI.Assets.load('/assets/boss/ork'+ev.sprite+'_idle.png');
       const fw = tex.width/10, fh = tex.height;   // стрип = 10 равных кадров в ряд
       const frames = [];
       for (let i=0;i<10;i++)
         frames.push(new PIXI.Texture({source:tex.source, frame:new PIXI.Rectangle(i*fw,0,fw,fh)}));
-      bossNode = buildBoss(b, frames, fw, fh);
-      bossLayer.addChild(bossNode);
-      app.ticker.add(() => { if (bossNode) bossNode._aura.alpha =
-        0.10 + 0.12*(0.5 + 0.5*Math.sin(performance.now()/650)); });   // пульс ауры
-      refresh();
-    } catch(e){ console.log('boss load fail', e); }
+      const node = buildEvent(ev, frames, fw, fh);
+      eventLayer.addChild(node); eventNodes.push(node);
+    } catch(e){ console.log('event load fail', e); }
+  }
+  if (eventNodes.length){
+    app.ticker.add(() => { const a = 0.10 + 0.12*(0.5 + 0.5*Math.sin(performance.now()/700));
+      for (const ev of eventNodes) ev._glow.alpha = a; });   // мягкий пульс свечения
+    refresh();
   }
 
   // ---------- карточка ----------
@@ -491,32 +470,30 @@ const MAXS = 9;               // максимальный зум; минимал
     document.getElementById('cme').style.display = t.mine ? 'block' : 'none';
     card.classList.add('show');
   }
-  function buildBoss(b, frames, fw, fh){
-    const node = new PIXI.Container(); node.wx = b.x*W; node.wy = b.y*H;
-    const aura = new PIXI.Graphics().ellipse(0, -fh*0.42, fw*0.62, fh*0.5).fill({color:0xff3b30, alpha:0.16});
-    node.addChild(aura); node._aura = aura;
+  function buildEvent(ev, frames, fw, fh){
+    const node = new PIXI.Container(); node.wx = ev.x*W; node.wy = ev.y*H;
+    // мягкое тёплое свечение под ивентом (пульсирует) + тень
+    const glow = new PIXI.Graphics().ellipse(0, -fh*0.06, fw*0.5, fw*0.2).fill({color:0xffb347, alpha:0.2});
+    node.addChild(glow); node._glow = glow;
     node.addChild(new PIXI.Graphics().ellipse(0,0, fw*0.4, fw*0.13).fill({color:0x000000, alpha:0.42}));
     const anim = new PIXI.AnimatedSprite(frames); anim.animationSpeed = 0.12; anim.anchor.set(0.5,1); anim.play();
-    anim.eventMode='static'; anim.cursor='pointer'; anim.on('pointertap', e=> showBossCard(b, e));
+    anim.eventMode='static'; anim.cursor='pointer'; anim.on('pointertap', e=> showEventCard(ev, e));
     node.addChild(anim);
-    const barW = fw*0.82, barH = 12, by = -fh - 18;   // HP-бар над боссом
-    node.addChild(new PIXI.Graphics().roundRect(-barW/2, by, barW, barH, 4)
-      .fill({color:0x140d06, alpha:0.85}).stroke({color:0x6b522e, width:1}));
-    const frac = b.max_hp>0 ? Math.max(0, Math.min(1, b.hp/b.max_hp)) : 1;
-    if (frac > 0) node.addChild(new PIXI.Graphics()
-      .roundRect(-barW/2+1.5, by+1.5, (barW-3)*frac, barH-3, 3).fill({color:0xc0392b}));
-    const lab = new PIXI.Text({text:'⚔ '+(b.emoji||'')+' '+b.name, style:{fontFamily:'Georgia,serif',
-      fontSize:15, fontWeight:'700', fill:0xffd9a8, stroke:{color:0x140d06, width:4}}});
-    lab.anchor.set(0.5,1); lab.y = by - 5; node.addChild(lab);
+    // банер-подпись названия ивента (рамка с акцентом)
+    const txt = new PIXI.Text({text:'⚔ '+ev.name, style:{fontFamily:'Georgia,serif',
+      fontSize:14, fontWeight:'700', fill:0xffe2a8}});
+    txt.anchor.set(0.5, 1); txt.y = -fh - 8;
+    const bw = txt.width + 18, by = -fh - 8 - txt.height - 4;
+    node.addChild(new PIXI.Graphics().roundRect(-bw/2, by, bw, txt.height + 6, 7)
+      .fill({color:0x2a160a, alpha:0.9}).stroke({color:0xc9803a, width:1.4, alpha:0.9}));
+    node.addChild(txt);
     return node;
   }
-  function showBossCard(b, e){
+  function showEventCard(ev, e){
     if (e) e.stopPropagation();
-    const pct = b.max_hp>0 ? Math.round(100*b.hp/b.max_hp) : 100;
-    document.getElementById('cnm').textContent = '⚔ ' + b.name;
-    document.getElementById('clv').textContent = 'HP ' + pct + '%';
-    document.getElementById('crg').textContent = b.status==='gathering'
-      ? 'Сбор бойцов — вступай в таверне' : 'РЕЙД-БОСС — бей в таверне!';
+    document.getElementById('cnm').textContent = '⚔ ' + ev.name;
+    document.getElementById('clv').textContent = ev.blurb || '';
+    document.getElementById('crg').textContent = 'Событие';
     document.getElementById('cme').style.display = 'none';
     card.classList.add('show');
   }
