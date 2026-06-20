@@ -95,6 +95,21 @@ def _invasion_event(inv, uid: int = 0) -> dict:
     синхронизирован серверным временем (elapsed — секунды с начала сбора) и с
     реальными войсками (записавшиеся таверны). Фронт крутит анимацию по elapsed."""
     now = datetime.now(timezone.utc)
+
+    def _secs(a, b):
+        if not a or not b:
+            return 0.0
+        if a.tzinfo is None:
+            a = a.replace(tzinfo=timezone.utc)
+        if b.tzinfo is None:
+            b = b.replace(tzinfo=timezone.utc)
+        return max(0.0, (b - a).total_seconds())
+
+    # тайминги — из РЕАЛЬНЫХ меток ивента (обычный/быстрый режим совпадут с картой)
+    gather_secs = _secs(inv.started_at, inv.gather_until) or invmod.GATHER_MINUTES * 60
+    window = _secs(inv.gather_until, inv.resolve_at)
+    march_secs = min(invmod.MARCH_SECONDS, window * 0.3) if window else invmod.MARCH_SECONDS
+    battle_secs = max(1.0, window - march_secs) if window else invmod.BATTLE_SECONDS
     troops = [{"x": (r or {}).get("tx", 0.5), "y": (r or {}).get("ty", 0.5),
                "role": (r or {}).get("role", "ratnik")}
               for r in (inv.registered or {}).values()]
@@ -107,8 +122,8 @@ def _invasion_event(inv, uid: int = 0) -> dict:
     return {
         "id": inv.id, "sprite": inv.sprite, "x": invmod.POS[0], "y": invmod.POS[1],
         "name": invmod.NAME, "blurb": "Орда орков идёт на Недоливск — поднимай войско!",
-        "gather_secs": invmod.GATHER_MINUTES * 60,
-        "march_secs": invmod.MARCH_SECONDS, "battle_secs": invmod.BATTLE_SECONDS,
+        "gather_secs": round(gather_secs), "march_secs": round(march_secs),
+        "battle_secs": round(battle_secs),
         "elapsed": round(invmod.elapsed_secs(inv, now), 1),
         "result": result, "troops": troops, "status": inv.status,
         "n": invmod.registered_count(inv),

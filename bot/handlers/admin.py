@@ -25,19 +25,20 @@ def _is_admin(message: Message) -> bool:
 
 
 @router.message(Command("orc"))
-async def cmd_orc(message: Message, session: AsyncSession) -> None:
-    """Запустить ивент «Орда орков» вручную (порог = снимок мощи города)."""
+async def cmd_orc(message: Message, command: CommandObject, session: AsyncSession) -> None:
+    """Запустить ивент «Орда орков». /orc — обычный; /orc fast — быстрый тест-режим."""
     if not _is_admin(message):
         return
     if await repo.get_active_invasion(session) is not None:
         await message.answer("Орда уже идёт — дождись итога текущего ивента.")
         return
+    fast = bool(command.args and command.args.strip().lower() == "fast")
     now = datetime.now(timezone.utc)
     total = await repo.world_might_sum(session)
     threshold = invasion.horde_threshold(total)
-    g_until = invasion.gather_until(now)
+    g_until, r_at = invasion.schedule(now, fast=fast)
     inv = repo.create_invasion(session, sprite=invasion.SPRITE, threshold=threshold,
-                               gather_until=g_until, resolve_at=invasion.resolve_at(g_until))
+                               gather_until=g_until, resolve_at=r_at)
     world = await repo.get_or_create_world(session)
     world.invasion_next_at = None          # активна — авто не спавнит поверх
     await session.flush()                  # нужен inv.id для кнопок
@@ -49,10 +50,13 @@ async def cmd_orc(message: Message, session: AsyncSession) -> None:
         from bot.keyboards.inline import invasion_map_dm_kb
         b = base_url()
         kb = invasion_map_dm_kb(b + "/map") if b else None
+        timing = (f"⚡ быстрый режим: сбор {invasion.FAST_GATHER_SECONDS}с, "
+                  f"бой ~{invasion.FAST_MARCH_SECONDS + invasion.FAST_BATTLE_SECONDS}с" if fast
+                  else f"сбор {invasion.GATHER_MINUTES} мин, бой ~{invasion.BATTLE_SECONDS // 60} мин")
         await message.answer(
             f"🪓 <b>Орда запущена в ТЕСТ-режиме</b> (без анонсов в чаты/лички).\n"
-            f"Порог {threshold} (мощь города {total}). Сбор {invasion.GATHER_MINUTES} мин, "
-            f"бой ~{invasion.BATTLE_SECONDS // 60} мин. Открой карту — записывайся и тестируй:",
+            f"Порог {threshold} (мощь города {total}). {timing}. "
+            "Открой карту — записывайся и тестируй:",
             reply_markup=kb)
         return
 
