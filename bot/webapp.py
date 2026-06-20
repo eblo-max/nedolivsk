@@ -150,8 +150,11 @@ _MAP_HTML = """<!doctype html>
   .card .me{margin-top:7px;color:#ffd24a;font-weight:700}
   .card .x{position:absolute;right:9px;top:6px;font-size:20px;color:#a98c5c;cursor:pointer;line-height:1}
   .hint{position:fixed;right:8px;top:8px;z-index:10;font-size:11px;color:#9a8052;opacity:.85}
+  .vig{position:fixed;inset:0;pointer-events:none;z-index:5;
+    background:radial-gradient(ellipse 78% 78% at 50% 50%, transparent 58%, #060a12 100%)}
 </style></head>
 <body>
+<div class="vig"></div>
 <div class="bar" id="bar">🗺 Недоливск · загрузка…</div>
 <div class="hint">тащи · щипок/колесо — зум · тап по кружку — раскрыть</div>
 <div class="card" id="card">
@@ -195,6 +198,9 @@ const MAXS = 9;               // максимальный зум; минимал
   const markers = new PIXI.Container(); markers.sortableChildren = true;
   app.stage.addChild(markers);
 
+  // поле «моря/тумана» вокруг материка: на столько мировых px можно отвести
+  // карту за край в каждую сторону (в открывшейся зоне — туман + виньетка).
+  const MARGIN = Math.max(W, H) * 0.4;
   // минимальный зум = «вся карта помещается в экран»; первичная посадка по центру
   let minScale = Math.min(app.screen.width/W, app.screen.height/H);
   world.scale.set(minScale); clampCam();
@@ -350,14 +356,14 @@ const MAXS = 9;               // максимальный зум; минимал
   app.stage.hitArea = {contains:()=>true};
   const ptrs = new Map(); let lastDist = null;
 
-  // привязка камеры к границам: карта всегда покрывает экран (или центрируется,
-  // если по оси она меньше экрана) — нельзя утащить в пустоту и отдалить «в точку».
+  // привязка камеры: материк + поле тумана MARGIN вокруг. Можно отвести карту на
+  // MARGIN за каждый край (там — море/туман), но не дальше и не «в точку».
   function clampCam(){
-    const s = world.scale.x, mw = W*s, mh = H*s;
-    if (mw <= app.screen.width) world.x = (app.screen.width - mw)/2;
-    else world.x = Math.min(0, Math.max(app.screen.width - mw, world.x));
-    if (mh <= app.screen.height) world.y = (app.screen.height - mh)/2;
-    else world.y = Math.min(0, Math.max(app.screen.height - mh, world.y));
+    const s = world.scale.x, M = MARGIN, iw = W*s, ih = H*s;
+    const xMin = app.screen.width  - (W+M)*s, xMax = M*s;
+    const yMin = app.screen.height - (H+M)*s, yMax = M*s;
+    world.x = (xMin <= xMax) ? Math.min(xMax, Math.max(xMin, world.x)) : (app.screen.width  - iw)/2;
+    world.y = (yMin <= yMax) ? Math.min(yMax, Math.max(yMin, world.y)) : (app.screen.height - ih)/2;
   }
   function zoomAt(sx, sy, factor){
     const ns = Math.min(MAXS, Math.max(minScale, world.scale.x*factor));
