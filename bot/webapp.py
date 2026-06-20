@@ -35,8 +35,10 @@ def _invasion_event(inv) -> dict:
               for r in (inv.registered or {}).values()]
     if inv.status in ("won", "lost"):
         result = inv.status
-    else:   # ещё не решено — предсказываем для совпадения анимации итога
-        result = "won" if invmod.registered_might(inv) >= int(inv.threshold or 0) else "lost"
+    else:   # ещё не решено — гоняем ту же симуляцию (сид=id), чтобы анимация
+        # итога на карте совпала с реальным исходом, который объявят в чате
+        parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
+        result = "won" if invmod.simulate(parts, seed=inv.id)["won"] else "lost"
     return {
         "sprite": inv.sprite, "x": invmod.POS[0], "y": invmod.POS[1],
         "name": invmod.NAME, "blurb": "Орда орков идёт на Недоливск — поднимай войско!",
