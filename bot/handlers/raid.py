@@ -178,7 +178,9 @@ async def cb_raid_join(cb: CallbackQuery, session: AsyncSession) -> None:
     repo.add_log(session, "player", player.id, "⚔️ записался в рейд")
     await session.commit()  # фиксируем запись ДО косметики (сбой UI не откатит)
     await _render(cb, boss)
-    await _safe_answer(cb, "Ты в рейде! Как босс дойдёт — врежем все вместе.", alert=True)
+    await _safe_answer(cb, "Ты в рейде! Как босс дойдёт — открой кабак и жми "
+                           "«⚔️ РЕЙД-БОСС» в меню: бить можно из лички, даже если "
+                           "это сообщение тут удалят.", alert=True)
 
 
 @router.callback_query(F.data.startswith("raidhit:"))

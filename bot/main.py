@@ -87,6 +87,12 @@ async def _load_media_cache() -> None:
         common.load_file_ids(world.media_ids)
         from bot.game import worldevent  # активное мир-событие — в кэш сразу на старте
         worldevent.set_active(world.event_kind, world.event_until, world.event_good)
+        # Кэш живого рейда — сразу на старте, иначе после рестарта кнопка «РЕЙД-БОСС»
+        # в меню таверны пропадает до первого тика нотифаера (≤60с) — игроки не
+        # могут зайти в бой из лички (особенно если сообщение в чате удалили).
+        from bot.game import raid as raidmod
+        active_raid = await repo.get_active_raid(session)
+        raidmod.set_active(active_raid.id if active_raid else None)
 
 
 async def main() -> None:
