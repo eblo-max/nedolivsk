@@ -174,7 +174,7 @@ const RING = {north_wilds:0x6ea8ff, green_valleys:0x6fd07a, red_wastes:0xe07a55}
 const SCREEN_W = 58;          // ширина здания НА ЭКРАНЕ (постоянная, не зависит от зума)
 const CLUSTER_T = 50;         // ближе этого (px на экране) — таверны сливаются в кластер
 const LABEL_MIN = 0.22;       // ниже этого масштаба подписи названий скрыты
-const MINS = 0.14, MAXS = 9;  // пределы зума
+const MAXS = 9;               // максимальный зум; минимальный = «вся карта в экране»
 
 (async () => {
   const app = new PIXI.Application();
@@ -195,11 +195,9 @@ const MINS = 0.14, MAXS = 9;  // пределы зума
   const markers = new PIXI.Container(); markers.sortableChildren = true;
   app.stage.addChild(markers);
 
-  // первичная посадка карты по центру экрана
-  const fit = Math.min(app.screen.width/W, app.screen.height/H) * 0.96;
-  world.scale.set(fit);
-  world.x = (app.screen.width  - W*fit)/2;
-  world.y = (app.screen.height - H*fit)/2;
+  // минимальный зум = «вся карта помещается в экран»; первичная посадка по центру
+  let minScale = Math.min(app.screen.width/W, app.screen.height/H);
+  world.scale.set(minScale); clampCam();
 
   // --- таверны ---
   let data;
@@ -352,17 +350,26 @@ const MINS = 0.14, MAXS = 9;  // пределы зума
   app.stage.hitArea = {contains:()=>true};
   const ptrs = new Map(); let lastDist = null;
 
+  // привязка камеры к границам: карта всегда покрывает экран (или центрируется,
+  // если по оси она меньше экрана) — нельзя утащить в пустоту и отдалить «в точку».
+  function clampCam(){
+    const s = world.scale.x, mw = W*s, mh = H*s;
+    if (mw <= app.screen.width) world.x = (app.screen.width - mw)/2;
+    else world.x = Math.min(0, Math.max(app.screen.width - mw, world.x));
+    if (mh <= app.screen.height) world.y = (app.screen.height - mh)/2;
+    else world.y = Math.min(0, Math.max(app.screen.height - mh, world.y));
+  }
   function zoomAt(sx, sy, factor){
-    const ns = Math.min(MAXS, Math.max(MINS, world.scale.x*factor));
+    const ns = Math.min(MAXS, Math.max(minScale, world.scale.x*factor));
     const f = ns/world.scale.x;
     world.x = sx - (sx-world.x)*f;
     world.y = sy - (sy-world.y)*f;
-    world.scale.set(ns); refresh();
+    world.scale.set(ns); clampCam(); refresh();
   }
   function centerOn(wx, wy, s){
-    world.scale.set(Math.min(MAXS, Math.max(MINS, s)));
+    world.scale.set(Math.min(MAXS, Math.max(minScale, s)));
     world.x = app.screen.width/2  - wx*world.scale.x;
-    world.y = app.screen.height/2 - wy*world.scale.y; refresh();
+    world.y = app.screen.height/2 - wy*world.scale.y; clampCam(); refresh();
   }
 
   app.stage.on('pointerdown', e => ptrs.set(e.pointerId, {x:e.global.x, y:e.global.y}));
@@ -374,7 +381,7 @@ const MINS = 0.14, MAXS = 9;  // пределы зума
     const prev = ptrs.get(e.pointerId);
     const cur = {x:e.global.x, y:e.global.y};
     ptrs.set(e.pointerId, cur);
-    if (ptrs.size === 1){ world.x += cur.x-prev.x; world.y += cur.y-prev.y; refresh(); }
+    if (ptrs.size === 1){ world.x += cur.x-prev.x; world.y += cur.y-prev.y; clampCam(); refresh(); }
     else if (ptrs.size === 2){
       const p = [...ptrs.values()];
       const d = Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y);
@@ -391,8 +398,12 @@ const MINS = 0.14, MAXS = 9;  // пределы зума
   // ---------- старт ----------
   bar.textContent = '🗺 Недоливск · таверн на карте: ' + taverns.length;
   const mine = taverns.find(t=>t.mine);
-  if (mine) centerOn(mine.wx, mine.wy, Math.max(fit, 1.0)); else refresh();
-  window.addEventListener('resize', refresh);
+  if (mine) centerOn(mine.wx, mine.wy, Math.max(minScale, 0.85)); else refresh();
+  window.addEventListener('resize', () => {
+    minScale = Math.min(app.screen.width/W, app.screen.height/H);
+    if (world.scale.x < minScale) world.scale.set(minScale);
+    clampCam(); refresh();
+  });
 
   // ---------- карточка ----------
   function showCard(t, e){
