@@ -139,6 +139,8 @@ class WorldState(Base):
     event_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     event_next_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     event_good: Mapped[str | None] = mapped_column(String(16))  # товар «в моде» (спрос-событие)
+    # Расписание ивента «Орда орков»: когда можно спавнить следующий (None — можно/пауза не задана).
+    invasion_next_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class KnownChat(Base):
@@ -251,6 +253,33 @@ class RaidBoss(Base):
     )
     gather_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Invasion(Base):
+    """Ивент «Орда орков» — кооп town-defense (один живой на весь мир).
+      gathering — окно сбора: таверны записывают войско, идёт обратный отсчёт;
+      battle    — войска идут и бьются авто (визуал на карте);
+    далее won / lost — исход посчитан раз и атомарно (резолв в нотифаере).
+
+    registered: {str(player_id): {"name": str, "tx": float, "ty": float,
+    "might": int}} — кто поднял войско, позиция таверны на карте и мощь дружины.
+    messages: {str(chat_id): message_id} — анонсы в чатах (правим отсчёт→итог).
+    result: снимок исхода для показа {won, total, threshold, n}."""
+
+    __tablename__ = "invasion"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    sprite: Mapped[int] = mapped_column(default=1)         # орк-модель (ork{sprite})
+    registered: Mapped[dict] = mapped_column(JSONB, default=dict)
+    threshold: Mapped[int] = mapped_column(default=0)      # порог орды (снимок при спавне)
+    status: Mapped[str] = mapped_column(String(10), default="gathering")
+    messages: Mapped[dict] = mapped_column(JSONB, default=dict)
+    result: Mapped[dict] = mapped_column(JSONB, default=dict)
+    started_at: Mapped[datetime] = mapped_column(           # начало сбора
+        DateTime(timezone=True), server_default=func.now()
+    )
+    gather_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolve_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class LogEntry(Base):

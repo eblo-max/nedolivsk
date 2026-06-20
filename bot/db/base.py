@@ -74,6 +74,10 @@ async def create_tables() -> None:
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS "
             "media_ids JSONB NOT NULL DEFAULT '{}'::jsonb"
         ))
+        # Расписание ивента «Орда орков»: когда можно спавнить следующий.
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS invasion_next_at TIMESTAMPTZ"
+        ))
         # Лимит покупки на бирже (анти-абуз): окно 4ч по товарам.
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
