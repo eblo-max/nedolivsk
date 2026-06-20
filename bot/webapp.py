@@ -73,20 +73,28 @@ REPORT_WINDOW_SEC = 45 * 60   # сколько показывать боевую
 
 def _invasion_report_event(inv, uid: int = 0) -> dict:
     """Событие-СВОДКА для карты после боя: орда (idle) + полная статистика боя по
-    каждому (урон/крит/блок/пал) и НАГРАДА. pid наружу не отдаём — только флаг mine."""
+    каждому (урон/крит/блок/пал) и НАГРАДА. pid наружу не отдаём — только флаг mine.
+    Если сервер ещё не зарезолвил (status=battle, но время вышло) — считаем сводку
+    ПРЕДСКАЗАНИЕМ (та же детерминированная симуляция) → результат виден мгновенно."""
     res = inv.result or {}
-    rows = []
-    for r in (res.get("report") or []):
-        rows.append({k: v for k, v in r.items() if k != "pid"}
-                    | {"mine": bool(uid) and int(r.get("pid", 0)) == uid})
+    report = res.get("report")
+    won, rounds = res.get("won"), res.get("rounds")
+    n, ohl, ohm = res.get("n"), res.get("orc_hp_left"), res.get("orc_hp_max")
+    if not report:                       # ещё не зарезолвлено сервером — предсказываем
+        parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
+        sim = invmod.simulate(parts, seed=inv.id)
+        plan = invmod.settle(inv, sim)
+        report = invmod.build_report(inv, sim, plan)
+        won, rounds, n = sim["won"], sim["rounds"], sim["n"]
+        ohl, ohm = sim["orc_hp_left"], sim["orc_hp_max"]
+    rows = [{k: v for k, v in r.items() if k != "pid"}
+            | {"mine": bool(uid) and int(r.get("pid", 0)) == uid} for r in report]
     return {
         "id": inv.id, "sprite": inv.sprite, "x": invmod.POS[0], "y": invmod.POS[1],
         "name": invmod.NAME, "blurb": "Итог битвы с ордой орков",
-        "report": True, "won": bool(res.get("won")), "status": inv.status,
-        "rounds": int(res.get("rounds", 0)), "n": int(res.get("n", 0)),
-        "orc_hp_left": int(res.get("orc_hp_left", 0)),
-        "orc_hp_max": int(res.get("orc_hp_max", 1)),
-        "rows": rows,
+        "report": True, "won": bool(won), "status": inv.status,
+        "rounds": int(rounds or 0), "n": int(n or 0),
+        "orc_hp_left": int(ohl or 0), "orc_hp_max": int(ohm or 1), "rows": rows,
     }
 
 
@@ -163,14 +171,21 @@ async def _api_taverns(request: web.Request) -> web.Response:
     async with session_factory() as s:
         rows = await repo.get_map_taverns(s)
         latest = await repo.latest_invasion(s)
+    now = datetime.now(timezone.utc)
     live = latest if (latest and latest.status in ("gathering", "battle")) else None
     report_inv = None
-    if live is None and latest and latest.status in ("won", "lost") and latest.resolve_at:
+    # бой ещё «battle», но время боя вышло → показываем сводку СРАЗУ (предсказанием)
+    if live is not None and live.status == "battle" and live.resolve_at:
+        ra = live.resolve_at if live.resolve_at.tzinfo else live.resolve_at.replace(tzinfo=timezone.utc)
+        if now >= ra:
+            report_inv, live = live, None
+    # уже зарезолвлен и недавно — показываем сводку из снимка
+    if live is None and report_inv is None and latest and latest.status in ("won", "lost") and latest.resolve_at:
         ra = latest.resolve_at
         if ra.tzinfo is None:
             ra = ra.replace(tzinfo=timezone.utc)
-        if (datetime.now(timezone.utc) - ra).total_seconds() < REPORT_WINDOW_SEC:
-            report_inv = latest          # недавний бой — показываем сводку на карте
+        if (now - ra).total_seconds() < REPORT_WINDOW_SEC:
+            report_inv = latest
     out = []
     for tav, pl in rows:
         # Со слотом — фикс. позиция; без слота (зона полна) — детерминированная
@@ -699,6 +714,7 @@ const MAXS = 9;               // максимальный зум; минимал
   const RL = {tank:['🛡','Авангард'], archer:['⚔️','Рубаки'],
               scout:['🔭','Разведка'], ratnik:['🗡','Ратники']};
   let liveInv = null, reportEv = null;      // живой ивент / сводка боя
+  let invAddTroop = null;                    // добавить свою дружину на карту live
   for (const ev of (data.events || [])){
     try {
       const tex = await PIXI.Assets.load('/assets/boss/ork'+ev.sprite+'_idle.png');
@@ -715,21 +731,7 @@ const MAXS = 9;               // максимальный зум; минимал
     if (liveInv.status === 'gathering') setupRegPanel(liveInv);    // плашка регистрации
   } else if (reportEv){
     centerOn(reportEv.x*W, reportEv.y*H, Math.max(minScale, 1.1));
-    setupReportPanel(reportEv);                                    // боевая сводка
-  }
-  // real-time: пока идёт/завершается ивент — опрашиваем сервер и обновляем карту
-  // при смене фазы (сбор→бой) или появлении сводки боя (без переоткрытия).
-  if (liveInv || reportEv){
-    const e0 = (data.events && data.events[0]) || {};
-    let sig = (e0.status || '') + '|' + (e0.report ? 'R' : '');
-    setInterval(async () => {
-      try {
-        const d = await (await fetch('/api/taverns?uid=' + encodeURIComponent(myId))).json();
-        const e = (d.events && d.events[0]) || {};
-        const ns = (e.status || '') + '|' + (e.report ? 'R' : '');
-        if (ns !== sig) location.reload();   // фаза сменилась/сводка готова → обновить
-      } catch(err){}
-    }, 9000);
+    setupReportPanel(reportEv);                                    // боевая сводка (уже завершён)
   }
   if (eventNodes.length){
     app.ticker.add(() => { const a = 0.10 + 0.12*(0.5 + 0.5*Math.sin(performance.now()/700));
@@ -802,14 +804,16 @@ const MAXS = 9;               // максимальный зум; минимал
     function uAnim(u, name){ if (u.anim===name) return; const fr=HERO[u.hero][name]; if (!fr) return;
       u.sp.textures = fr; u.sp.loop = (name!=='die'); u.sp.gotoAndPlay(0); u.anim = name; }
     // войска — герои, выходят из таверн
-    const units = (ev.troops||[]).map((t,i) => {
+    function makeUnit(t, i){
       const h = 1 + (hashCoord(t.x, t.y) % HERO_COUNT);
       const sp = new PIXI.AnimatedSprite(HERO[h].walk || [PIXI.Texture.EMPTY]);
       sp.anchor.set(0.5, 1); sp.animationSpeed = 0.22; sp.play(); sp.visible = false;
       eventLayer.addChild(sp);
       return {sp, hero:h, anim:'walk', dir:1, ox:t.x*W, oy:t.y*H, wx:t.x*W, wy:t.y*H,
               ang:Math.random()*6.28, rad:fw*(0.30+0.25*Math.random()), delay:(i%6)*0.06};
-    });
+    }
+    const units = (ev.troops||[]).map((t,i)=>makeUnit(t,i));
+    invAddTroop = (t) => { units.push(makeUnit(t, units.length)); };   // своя дружина live
     const HSCALE = 0.44;   // размер героя относительно карты
     // пунктир маршрута таверна→орда (экранные коорд., экранно-постоянный шаг)
     function drawDotted(x1,y1,x2,y2,prog){
@@ -837,7 +841,19 @@ const MAXS = 9;               // максимальный зум; минимал
     // демо крутит локально; живой ивент синхронизируем серверным elapsed (сек с
     // начала сбора) — сдвигаем старт так, чтобы t совпало с фазой на сервере.
     let start = performance.now()/1000 - (ev.demo ? 0 : (ev.elapsed||0));
-    let cur='', dieStarted=false, lastHurt=0;
+    let cur='', dieStarted=false, lastHurt=0, reportFetched=false;
+    // конец боя — подтянуть сводку с сервера (предсказание готово сразу) и показать
+    // ПРЯМО НА КАРТЕ, без перезагрузки. Несколько попыток на случай сетевой заминки.
+    async function pollReport(){
+      for (let i=0;i<25;i++){
+        try {
+          const d = await (await fetch('/api/taverns?uid='+encodeURIComponent(myId))).json();
+          const e = (d.events||[]).find(x=>x.report);
+          if (e){ setupReportPanel(e); return; }
+        } catch(_){}
+        await new Promise(r=>setTimeout(r, 1800));
+      }
+    }
     function setAnim(name){
       if (cur===name) return;
       const fr = name==='idle' ? idle : A[name]; if (!fr) return;
@@ -899,6 +915,7 @@ const MAXS = 9;               // максимальный зум; минимал
           hp.visible=true; drawHp(0.35); setAnim('idle'); anim.tint=0xffffff;
           for (const u of units){ uAnim(u,'die'); }
         }
+        if (!ev.demo && !reportFetched){ reportFetched=true; pollReport(); }   // сводка live, без reload
       }
       pathLayer.stroke({color:0xffe2a8, width:Math.max(1.4, 2*k), alpha:0.5});
       for (const u of units){ const s=screenOf(u.wx,u.wy); u.sp.x=s.x; u.sp.y=s.y;
@@ -974,7 +991,7 @@ const MAXS = 9;               // максимальный зум; минимал
         if (d.ok){
           paintJoined(d.role);
           try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch(e){}
-          setTimeout(() => location.reload(), 1500);   // подтянуть свою дружину на карту
+          if (invAddTroop) invAddTroop({x: d.x, y: d.y});   // твоя дружина появляется на карте live
         } else {
           btn.disabled = false; btn.textContent = was;
           sub.textContent = ({no_tavern: 'Сначала заведи кабак в боте (/start)',
