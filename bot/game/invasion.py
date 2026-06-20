@@ -16,7 +16,10 @@
 (repo, notifier, handlers), как у рейдов. Тестируется без БД.
 """
 
+import random
 from datetime import datetime, timedelta, timezone
+
+from bot.game import balance
 
 # ── Тайминги ─────────────────────────────────────────────────────────────────
 GATHER_MINUTES = 20          # окно регистрации (сбор войска)
@@ -85,8 +88,170 @@ def tavern_might(tavern) -> int:
 
 
 def horde_threshold(total_world_might: int) -> int:
-    """Порог орды из суммарной мощи всех таверн мира (снимок при спавне)."""
+    """Порог орды из суммарной мощи всех таверн мира (снимок при спавне).
+    Используется как анти-тривиал/эталон сложности; реальный исход — в simulate()."""
     return max(MIN_THRESHOLD, round(COVERAGE * max(0, total_world_might)))
+
+
+# ═══ ТАКТИЧЕСКАЯ БОЕВАЯ МОДЕЛЬ ═══════════════════════════════════════════════
+# Орда — настоящий босс (HP/атака/броня + 4 способности по порогам HP). Армия —
+# записавшиеся таверны; у каждой боевой профиль из СНАРЯГИ владельца (урон/крит/
+# броня/уворот) + размер дружины из МОЩИ таверны (HP/база урона). Роль выводится
+# из билда (броня→танк, урон→стрелок, удача→разведка). Бой — детерминированная
+# пораундовая симуляция (сид = id ивента): и честно, и воспроизводимо, и даёт
+# «боевую сводку» для чата. Исход решает КОМПОЗИЦИЯ, а не сумма.
+
+ROLES: dict[str, tuple[str, str]] = {
+    "tank":   ("🛡", "Авангард"),    # держит строй; контрит ярость; защищает тыл
+    "archer": ("🏹", "Стрелки"),     # бёрст-урон; контрит зов стаи и стену щитов (крит)
+    "scout":  ("🔭", "Разведка"),    # уворот/чистка; контрит проклятье шамана
+    "ratnik": ("🗡", "Ратники"),     # надёжная линия без спец-контры
+}
+
+# Дружина таверны: HP и база урона растут от МОЩИ (развития таверны).
+WB_HP_BASE, WB_HP_PER_MIGHT = 80, 4.0
+WB_DMG_BASE, WB_DMG_PER_MIGHT = 6.0, 0.45
+
+# Орда (масштаб по числу записавшихся — сложность константна при любом размере мира).
+ORC_HP_BASE = 950
+ORC_ATK_BASE = 4.1
+ORC_ARMOR = 4
+ORC_SCALE_EXP = 0.85
+ROUNDS_BUDGET = 40            # окно боя в «раундах» (≈ 5 мин на карте)
+NO_FRONT_MULT = 3.2          # нет танков — орда прорывается и фокусит дамагеров
+
+# Способности по порогам HP орды (срабатывают раз, когда HP падает до порога).
+WARD_AT, WARD_ARMOR, WARD_ROUNDS = 0.90, 16, 6     # 🛡 стена щитов: броня ↑ (бьёт крит)
+SUMMON_AT, SUMMON_HP_FRAC = 0.70, 0.16             # 🐺 зов стаи: HP-щит волков (бёрст/стрелки)
+CURSE_AT, CURSE_FACTOR, CURSE_ROUNDS = 0.45, 0.62, 6   # 💀 проклятье: DPS армии ↓ (чистит разведка)
+ENRAGE_AT, ENRAGE_MULT = 0.25, 1.6                 # 🗣 ярость: атака орды ↑ до конца (держат танки)
+ARCHER_ADDS_BONUS = 1.7      # стрелки бьют волков-миньонов сильнее
+SCOUT_CLEANSE = 0.6          # разведка ослабляет проклятье (по доле разведчиков)
+
+
+def role_of(stats: dict) -> str:
+    """Роль из доминирующего стата билда (нормировано). Слабый билд → ратник."""
+    dps = (stats.get("damage", 0) + stats.get("crit", 0) * 0.4) / 12.0
+    tank = stats.get("armor", 0) / 8.0
+    scout = stats.get("luck", 0) / 8.0
+    best = max(dps, tank, scout)
+    if best < 0.6:            # снаряга слабая — обычная линия
+        return "ratnik"
+    if best == tank:
+        return "tank"
+    if best == scout:
+        return "scout"
+    return "archer"
+
+
+def battle_profile(stats: dict, might: int) -> dict:
+    """Боевой профиль войска: роль (билд) + урон/крит/броня/уворот (снаряга) +
+    HP/база урона (мощь таверны = размер дружины)."""
+    crit = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0)) / 100
+    dodge = min(balance.HUNT_LUCK_DODGE_CAP,
+                stats.get("luck", 0) * balance.HUNT_LUCK_DODGE_PER) / 100
+    return {
+        "role": role_of(stats),
+        "dmg": round(WB_DMG_BASE + might * WB_DMG_PER_MIGHT + stats.get("damage", 0), 1),
+        "crit": round(crit, 3),
+        "armor": int(stats.get("armor", 0)),
+        "dodge": round(dodge, 3),
+        "hp": round(WB_HP_BASE + might * WB_HP_PER_MIGHT),
+    }
+
+
+def _unit_output(p: dict, orc_armor: int) -> float:
+    """Урон дружины за раунд против текущей брони орды (крит ×2 и пробивает броню)."""
+    return (1 - p["crit"]) * max(1.0, p["dmg"] - orc_armor) + p["crit"] * 2 * p["dmg"]
+
+
+def simulate(participants: list[dict], seed: int = 0) -> dict:
+    """Детерминированный бой армии против орды. participants — боевые профили с
+    полем pid. Возвращает {won, rounds, orc_hp_max, orc_hp_left, dealt:{pid:int},
+    fell:[pid], events:[(round, kind, payload)], n}. Чистая — без БД/IO."""
+    n = len(participants)
+    if n == 0:
+        return {"won": False, "rounds": 0, "orc_hp_max": 0, "orc_hp_left": 0,
+                "dealt": {}, "fell": [], "events": [], "n": 0}
+    rng = random.Random(seed)
+    scale = n ** ORC_SCALE_EXP
+    orc_hp_max = round(ORC_HP_BASE * scale)
+    orc_hp = float(orc_hp_max)
+    orc_atk = ORC_ATK_BASE * scale
+    units = [dict(p, hp_left=float(p["hp"]), alive=True, dealt=0.0) for p in participants]
+    scout_frac = sum(1 for p in units if p["role"] == "scout") / n
+    adds_hp = 0.0
+    ward_until = curse_until = -1
+    enraged = False
+    done: set[str] = set()
+    events: list = []
+    armor_k = balance.HUNT_ARMOR_K
+    rounds = 0
+    while rounds < ROUNDS_BUDGET:
+        rounds += 1
+        pct = orc_hp / orc_hp_max
+        for at, name in ((WARD_AT, "ward"), (SUMMON_AT, "summon"),
+                         (CURSE_AT, "curse"), (ENRAGE_AT, "enrage")):
+            if name not in done and pct <= at:
+                done.add(name)
+                if name == "ward":
+                    ward_until = rounds + WARD_ROUNDS
+                elif name == "summon":
+                    adds_hp = orc_hp_max * SUMMON_HP_FRAC
+                elif name == "curse":
+                    curse_until = rounds + CURSE_ROUNDS
+                else:
+                    enraged = True
+                events.append((rounds, name, None))
+        alive = [p for p in units if p["alive"]]
+        if not alive:
+            break
+        orc_armor = ORC_ARMOR + (WARD_ARMOR if rounds <= ward_until else 0)
+        curse_mult = 1.0
+        if rounds <= curse_until:        # проклятье режет DPS; разведка ослабляет
+            relief = min(1.0, scout_frac * 2) * SCOUT_CLEANSE
+            curse_mult = CURSE_FACTOR + (1 - CURSE_FACTOR) * relief
+        # удар армии: если жив щит волков — бьём его (стрелки ×бонус), иначе орду
+        hitting_adds = adds_hp > 0
+        adds_dmg = orc_dmg = 0.0
+        for p in alive:
+            out = _unit_output(p, orc_armor) * curse_mult
+            p["dealt"] += out
+            if hitting_adds:
+                adds_dmg += out * (ARCHER_ADDS_BONUS if p["role"] == "archer" else 1.0)
+            else:
+                orc_dmg += out
+        if hitting_adds:
+            adds_hp -= adds_dmg
+            if adds_hp <= 0:
+                orc_hp += adds_hp            # перелив добивает орду
+                adds_hp = 0.0
+                events.append((rounds, "adds_down", None))
+        else:
+            orc_hp -= orc_dmg
+        if orc_hp <= 0:
+            break
+        # удар орды: танки держат строй (бьют их); нет танков — фокус по сильнейшему DPS
+        atk = orc_atk * (ENRAGE_MULT if enraged else 1.0)
+        tanks = [p for p in alive if p["role"] == "tank"]
+        if tanks:
+            share = atk / len(tanks)
+            targets = [(p, share) for p in tanks]
+        else:
+            focus = max(alive, key=lambda p: _unit_output(p, orc_armor))
+            targets = [(focus, atk * NO_FRONT_MULT)]    # некому держать — выбивают дамагеров
+        for p, dmg in targets:
+            taken = dmg * (armor_k / (armor_k + p["armor"])) * (1 - p["dodge"])
+            p["hp_left"] -= taken
+            if p["hp_left"] <= 0:
+                p["alive"] = False
+                events.append((rounds, "fall", p["pid"]))
+    won = orc_hp <= 0
+    return {"won": won, "rounds": rounds, "orc_hp_max": orc_hp_max,
+            "orc_hp_left": max(0, round(orc_hp)),
+            "dealt": {p["pid"]: round(p["dealt"]) for p in units},
+            "fell": [p["pid"] for p in units if not p["alive"]],
+            "events": events, "n": n}
 
 
 # ── Тайминги/фазы ────────────────────────────────────────────────────────────
@@ -137,11 +302,14 @@ def registered_might(inv) -> int:
     return sum(int((r or {}).get("might", 0)) for r in (inv.registered or {}).values())
 
 
-def make_record(player, tavern, pos) -> dict:
-    """Запись бойца в реестр: имя, позиция таверны на карте, мощь дружины."""
+def make_record(player, tavern, pos, stats: dict) -> dict:
+    """Запись бойца в реестр: имя, позиция таверны, мощь дружины + боевой профиль
+    (роль/урон/крит/броня/уворот/HP) — снимок на момент записи (фиксирован на бой).
+    stats — combat.player_stats(player) (снаряга + бафы)."""
+    might = tavern_might(tavern)
     return {"name": player.first_name or str(player.id),
             "tx": round(pos[0], 4), "ty": round(pos[1], 4),
-            "might": tavern_might(tavern)}
+            "might": might, **battle_profile(stats, might)}
 
 
 # ── Исход и раздача ──────────────────────────────────────────────────────────

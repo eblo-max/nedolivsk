@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import texts
 from bot.db import repo
-from bot.game import invasion, worldmap
+from bot.game import combat, invasion, worldmap
 from bot.keyboards.inline import invasion_gather_kb
 
 router = Router()
@@ -68,7 +68,8 @@ async def cb_inv_join(cb: CallbackQuery, session: AsyncSession) -> None:
     if invasion.is_registered(inv, player.id):
         await cb.answer("Войско уже выслано — жди битвы!", show_alert=True)
         return
-    record = invasion.make_record(player, player.tavern, _tavern_pos(player))
+    record = invasion.make_record(player, player.tavern, _tavern_pos(player),
+                                  combat.player_stats(player))
     ok = await repo.invasion_register(session, inv.id, player.id, record)
     if not ok:
         await cb.answer("Войско уже выслано — жди битвы!", show_alert=True)

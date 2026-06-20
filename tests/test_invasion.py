@@ -104,3 +104,56 @@ def test_elapsed_and_gather_left():
     i = _inv(status="gathering")
     assert inv.gather_left(i, T0) == inv.GATHER_MINUTES * 60
     assert inv.elapsed_secs(i, T0 + timedelta(seconds=90)) == 90
+
+
+# ── тактическая симуляция: роли, профиль, исход по композиции ────────────────
+def _gear(d=0, c=0, a=0, l=0):
+    return {"damage": d, "crit": c, "armor": a, "luck": l}
+
+
+def test_role_from_build():
+    assert inv.role_of(_gear(a=14)) == "tank"          # броня → авангард
+    assert inv.role_of(_gear(d=18, c=25)) == "archer"  # урон/крит → стрелок
+    assert inv.role_of(_gear(l=16)) == "scout"         # удача → разведка
+    assert inv.role_of(_gear(d=1, c=1, a=1, l=1)) == "ratnik"  # слабый билд → линия
+
+
+def test_battle_profile_from_gear_and_might():
+    p = inv.battle_profile(_gear(d=10, c=20, a=8, l=10), might=40)
+    assert p["dmg"] > 10                       # мощь + снаряга в урон
+    assert 0 < p["crit"] <= 0.75 and p["armor"] == 8 and 0 < p["dodge"] <= 0.30
+    assert p["hp"] > inv.WB_HP_BASE            # мощь даёт живучесть
+
+
+_GEAR = {"tank": _gear(4, 5, 13, 4), "archer": _gear(17, 28, 2, 4),
+         "scout": _gear(6, 8, 3, 15)}
+
+
+def _army(comp, might=30):
+    out, pid = [], 1
+    for kind, cnt in comp.items():
+        for _ in range(cnt):
+            p = inv.battle_profile(_GEAR[kind], might); p["pid"] = pid
+            out.append(p); pid += 1
+    return out
+
+
+def test_simulate_deterministic():
+    a = _army({"tank": 2, "archer": 4, "scout": 2})
+    r1, r2 = inv.simulate(a, seed=7), inv.simulate(a, seed=7)
+    assert r1["won"] == r2["won"] and r1["dealt"] == r2["dealt"]
+
+
+def test_composition_decides_outcome():
+    assert inv.simulate(_army({"tank": 2, "archer": 4, "scout": 2}), 1)["won"] is True   # баланс
+    assert inv.simulate(_army({"archer": 8}), 1)["won"] is False    # нет танков — выкосят
+    assert inv.simulate(_army({"tank": 8}), 1)["won"] is False      # нет урона — уйдёт
+
+
+def test_simulate_empty_and_tracks_contribution():
+    r0 = inv.simulate([], seed=1)
+    assert r0["won"] is False and r0["n"] == 0 and r0["dealt"] == {}
+    a = _army({"archer": 8})
+    r = inv.simulate(a, seed=3)
+    assert set(r["dealt"]) == {p["pid"] for p in a}     # вклад посчитан всем
+    assert len(r["fell"]) > 0                            # были павшие
