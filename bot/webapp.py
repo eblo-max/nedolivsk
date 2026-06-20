@@ -652,9 +652,9 @@ const MAXS = 9;               // максимальный зум; минимал
           u.sp.visible=true; u.dir = (bx>=u.wx)?1:-1; uAnim(u,'attack'); }
         const s = performance.now()/1000;
         if (s-lastHurt > 0.55){ lastHurt=s; anim.tint=0xff7a6a; setAnim('hurt');
-          const n = 2 + (Math.random()*2|0);   // 2–3 вспышки за удар
+          const n = 2 + (Math.random()*2|0);   // 2–3 вспышки за удар — кучно по орку
           for (let q=0;q<n;q++)
-            spawnHit(bx + (Math.random()-0.5)*fw*0.7, by - Math.random()*fh*0.3, 110 + Math.random()*70); }
+            spawnHit(bx + (Math.random()-0.5)*fw*0.22, by - Math.random()*fh*0.1, 120 + Math.random()*60); }
         else if (s-lastHurt > 0.22){ anim.tint=0xffffff; setAnim('idle'); }
       } else {                                        // ИТОГ
         const won = ev.result!=='lost';
