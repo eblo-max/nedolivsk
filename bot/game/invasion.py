@@ -358,21 +358,36 @@ def registered_might(inv) -> int:
     return sum(int((r or {}).get("might", 0)) for r in (inv.registered or {}).values())
 
 
-def dummy_roster(n: int = 8) -> dict:
-    """Болванка-армия для отладки (/orc fast army): сбалансированный микс ролей с
-    отрицательными pid (не настоящие игроки → в наградах пропускаются). Чтобы видеть
-    полноценный бой и победу, не собирая реальную толпу."""
+# Человекоподобные ники для болванок (под стиль реальных игроков города).
+_DUMMY_NICKS = (
+    "Михалыч", "Гром", "Алёна", "Тихон", "Бугай", "Лиса", "Кузьма", "Марья",
+    "Хорёк", "Демьян", "Сивый", "Прохор", "Глаша", "Бирюк", "Фёкла", "Жмых",
+    "Варвара", "Лютый", "Зосима", "Кривой", "Степаныч", "Дарёна", "Волк",
+    "Рыжий Пёс", "Косой", "Гаврила", "Устинья", "Молот", "Пантелей", "Снежа",
+)
+
+
+def dummy_roster(n: int = 16) -> dict:
+    """Болванка-армия (/orc army): сбалансированный микс ролей с ЧЕЛОВЕЧЕСКИМИ никами
+    и отрицательными pid (не настоящие игроки → в наградах пропускаются). Чтобы дать
+    городу полноценный бой/победу, не собирая реальную толпу."""
     import random as _r
     rng = _r.Random(99)
     gears = {"tank": {"damage": 4, "crit": 5, "armor": 13, "luck": 4},
              "archer": {"damage": 17, "crit": 28, "armor": 2, "luck": 4},
-             "scout": {"damage": 6, "crit": 8, "armor": 3, "luck": 15}}
-    pattern = ["tank", "archer", "scout", "archer", "tank", "archer", "scout", "archer"]
+             "scout": {"damage": 6, "crit": 8, "armor": 3, "luck": 15},
+             "ratnik": {"damage": 5, "crit": 4, "armor": 4, "luck": 4}}
+    # реалистичный микс: побольше фронта (танки/ратники), стрелки, немного разведки
+    pattern = ["tank", "ratnik", "archer", "ratnik", "tank", "archer", "scout",
+               "ratnik", "tank", "archer", "ratnik", "scout"]
+    names = rng.sample(_DUMMY_NICKS, min(n, len(_DUMMY_NICKS)))
     out = {}
     for i in range(n):
         kind = pattern[i % len(pattern)]
-        prof = battle_profile(gears[kind], 30)
-        out[str(-(i + 1))] = {"name": f"Дружина-{i + 1}", "might": 30,
+        might = rng.randint(22, 42)              # разброс «развитости» как у живых
+        prof = battle_profile(gears[kind], might)
+        out[str(-(i + 1))] = {"name": names[i] if i < len(names) else f"Боец-{i + 1}",
+                              "might": might,
                               "tx": round(0.2 + 0.6 * rng.random(), 4),
                               "ty": round(0.25 + 0.5 * rng.random(), 4), **prof}
     return out

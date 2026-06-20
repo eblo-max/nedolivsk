@@ -42,7 +42,7 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
     inv = repo.create_invasion(session, sprite=invasion.SPRITE, threshold=threshold,
                                gather_until=g_until, resolve_at=r_at)
     if seed_army:
-        inv.registered = invasion.dummy_roster(8)
+        inv.registered = invasion.dummy_roster()   # 16 бойцов с человеч. никами
     world = await repo.get_or_create_world(session)
     world.invasion_next_at = None          # активна — авто не спавнит поверх
     await session.flush()                  # нужен inv.id для кнопок
@@ -60,7 +60,7 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
         timing = (f"⚡ быстрый режим: сбор {invasion.FAST_GATHER_SECONDS}с, "
                   f"бой ~{invasion.FAST_MARCH_SECONDS + invasion.FAST_BATTLE_SECONDS}с" if fast
                   else f"сбор {invasion.GATHER_MINUTES} мин, бой ~{invasion.BATTLE_SECONDS // 60} мин")
-        army = "\n🤖 Болванка-армия: 🛡2 ⚔️4 🔭2 — подключайся, и будет реальный бой." if seed_army else ""
+        army = "\n🤖 Болванка-армия: 16 бойцов (🛡4 🗡6 ⚔️4 🔭2) — город уже силён." if seed_army else ""
         await message.answer(
             f"🪓 <b>Орда запущена в ТЕСТ-режиме</b> (без анонсов в чаты/лички).\n"
             f"Порог {threshold} (мощь города {total}). {timing}.{army}\n"
@@ -83,10 +83,12 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
         select(Player.id).where(Player.last_seen_at >= cut))).all()]
     for uid in pids:
         repo.queue_notify(session, uid, texts.invasion_push_dm(inv))
+    army = ("\n🤖 Подсажена болванка-армия: 16 бойцов с никами — город уже силён, "
+            "живые добьют." if seed_army else "")
     await message.answer(
         f"🪓 Орда орков запущена! Порог орды: <b>{threshold}</b> "
         f"(мощь города {total}). Сбор {invasion.GATHER_MINUTES} мин. "
-        f"В чаты: {len(msgs)}/{len(chat_ids)}. Пуш в личку: {len(pids)}.")
+        f"В чаты: {len(msgs)}/{len(chat_ids)}. Пуш в личку: {len(pids)}.{army}")
 
 
 @router.message(Command("reset"))
