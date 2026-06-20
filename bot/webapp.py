@@ -68,7 +68,7 @@ def _tavern_norm_pos(player) -> tuple[float, float]:
     return worldmap.region_point(player.region or "", player.id) or (0.5, 0.5)
 
 
-REPORT_WINDOW_SEC = 45 * 60   # сколько показывать боевую сводку на карте после боя
+REPORT_WINDOW_SEC = 20 * 60   # сколько сводка доступна на карте после боя
 
 
 def _invasion_report_event(inv, uid: int = 0) -> dict:
@@ -731,7 +731,9 @@ const MAXS = 9;               // максимальный зум; минимал
     if (liveInv.status === 'gathering') setupRegPanel(liveInv);    // плашка регистрации
   } else if (reportEv){
     centerOn(reportEv.x*W, reportEv.y*H, Math.max(minScale, 1.1));
-    setupReportPanel(reportEv);                                    // боевая сводка (уже завершён)
+    let seen = ''; try { seen = localStorage.getItem('inv_seen') || ''; } catch(e){}
+    if (String(reportEv.id) !== seen) setupReportPanel(reportEv);  // авто-показ только ОДИН раз
+    // иначе сводка доступна тапом по орде (showEventCard), сама не лезет
   }
   if (eventNodes.length){
     app.ticker.add(() => { const a = 0.10 + 0.12*(0.5 + 0.5*Math.sin(performance.now()/700));
@@ -949,6 +951,7 @@ const MAXS = 9;               // максимальный зум; минимал
     body.innerHTML = html + '</table>';
     rep.style.display = 'block';
     bar.style.display = 'none';            // на время сводки счётчик прячем
+    try { localStorage.setItem('inv_seen', String(ev.id || '')); } catch(e){}  // больше не авто-показывать этот бой
   }
   document.getElementById('repx').onclick = () => {
     document.getElementById('rep').style.display = 'none';
