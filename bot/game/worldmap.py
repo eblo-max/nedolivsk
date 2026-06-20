@@ -129,6 +129,18 @@ def slot_norm_pos(slot_id: int) -> tuple[float, float] | None:
     return pts[local] if 0 <= local < len(pts) else None
 
 
+def region_point(region: str, key: int) -> tuple[float, float] | None:
+    """Детерминированная [0,1] точка ВНУТРИ прямоугольника региона по ключу
+    (telegram-id владельца). Для таверн без слота: на интерактивной карте лимита
+    в 44 слота нет — кластеры разрулят плотность, а позиция стабильна."""
+    rect = ZONE_RECTS.get(region)
+    if rect is None:
+        return None
+    x1, y1, x2, y2 = rect
+    rng = random.Random(key)
+    return (x1 + rng.random() * (x2 - x1), y1 + rng.random() * (y2 - y1))
+
+
 def _slot_pos(slot_id: int, w: int, h: int) -> tuple[int, int] | None:
     """Пиксельный центр таверны по слоту (из blue-noise точки зоны)."""
     zone = slot_zone(slot_id)

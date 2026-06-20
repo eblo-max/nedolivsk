@@ -46,9 +46,10 @@ async def _api_taverns(request: web.Request) -> web.Response:
         rows = await repo.get_map_taverns(s)
     out = []
     for tav, pl in rows:
-        if tav.map_slot is None:
-            continue
-        pos = worldmap.slot_norm_pos(tav.map_slot)
+        # Со слотом — фикс. позиция; без слота (зона полна) — детерминированная
+        # по региону: на интерактивной карте лимита нет, видны ВСЕ таверны.
+        pos = (worldmap.slot_norm_pos(tav.map_slot) if tav.map_slot is not None
+               else worldmap.region_point(pl.region or "", pl.id))
         if pos is None:
             continue
         out.append({
