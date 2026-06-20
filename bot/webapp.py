@@ -400,7 +400,8 @@ _MAP_HTML = """<!doctype html>
   .hint{position:fixed;right:8px;top:8px;z-index:10;font-size:11px;color:#9a8052;opacity:.85}
   .vig{position:fixed;inset:0;pointer-events:none;z-index:5;
     background:radial-gradient(ellipse 78% 78% at 50% 50%, transparent 58%, #060a12 100%)}
-  .ev{position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:10;display:none;
+  .ev{position:fixed;left:50%;top:calc(58px + env(safe-area-inset-top,0px));
+    transform:translateX(-50%);z-index:10;display:none;
     background:#2a160ae8;border:1px solid #c9803a;border-radius:11px;padding:7px 16px;
     font-size:13px;color:#ffe2a8;font-weight:700;box-shadow:0 4px 16px #000a;white-space:nowrap}
   .reg{position:fixed;left:50%;bottom:16vh;transform:translateX(-50%);z-index:11;display:none;
@@ -844,16 +845,18 @@ const MAXS = 9;               // максимальный зум; минимал
     // начала сбора) — сдвигаем старт так, чтобы t совпало с фазой на сервере.
     let start = performance.now()/1000 - (ev.demo ? 0 : (ev.elapsed||0));
     let cur='', dieStarted=false, lastHurt=0, reportFetched=false;
+    let retStarted=false, retStart=0;
+    const RETURN_SECS = 7;        // дружины уходят домой так же неспешно, как шли к орде
     // конец боя — подтянуть сводку с сервера (предсказание готово сразу) и показать
     // ПРЯМО НА КАРТЕ, без перезагрузки. Несколько попыток на случай сетевой заминки.
     async function pollReport(){
-      for (let i=0;i<25;i++){
+      for (let i=0;i<60;i++){
         try {
           const d = await (await fetch('/api/taverns?uid='+encodeURIComponent(myId))).json();
           const e = (d.events||[]).find(x=>x.report);
           if (e){ setupReportPanel(e); return; }
         } catch(_){}
-        await new Promise(r=>setTimeout(r, 1800));
+        await new Promise(r=>setTimeout(r, 700));
       }
     }
     function setAnim(name){
@@ -894,6 +897,7 @@ const MAXS = 9;               // максимальный зум; минимал
         const bp=(t-(G+M))/B;
         evEl.textContent = '⚔ Битва · '+fmt(B*(1-bp));
         hp.visible=true; drawHp(1-bp);
+        if (bp > 0.88 && !ev.demo && !reportFetched){ reportFetched=true; pollReport(); }  // итог пораньше
         for (const u of units){ u.ang+=0.03;
           u.wx = bx + Math.cos(u.ang)*u.rad*0.55; u.wy = by + Math.sin(u.ang)*u.rad*0.30 - fh*0.06;
           u.sp.visible=true; u.dir = (bx>=u.wx)?1:-1; uAnim(u,'attack'); }
@@ -912,10 +916,12 @@ const MAXS = 9;               // максимальный зум; минимал
             spawnHit(bx, by - fh*0.2, 280);                              // большой взрыв
             spawnHit(bx-fw*0.3, by, 150); spawnHit(bx+fw*0.3, by, 150); }  // + по бокам
           node.alpha = Math.max(0, node.alpha - 0.012);
-          for (const u of units){                       // победа — дружины идут домой
-            const dx=u.ox-u.wx, dy=u.oy-u.wy, dist=Math.hypot(dx,dy);
-            if (dist>5){ u.wx+=dx*0.05; u.wy+=dy*0.05; u.dir=(dx>=0)?1:-1; uAnim(u,'walk'); }
-            else uAnim(u,'idle');                        // дошёл до таверны — встал
+          if (!retStarted){ retStarted=true; retStart=performance.now()/1000;
+            for (const u of units){ u.rx0=u.wx; u.ry0=u.wy; } }   // откуда уходят
+          const rp = Math.min(1, (performance.now()/1000 - retStart)/RETURN_SECS);
+          for (const u of units){                       // победа — дружины НЕСПЕШНО идут домой
+            u.wx = u.rx0 + (u.ox-u.rx0)*rp; u.wy = u.ry0 + (u.oy-u.ry0)*rp;
+            u.dir = (u.ox>=u.wx)?1:-1; uAnim(u, rp<1 ? 'walk' : 'idle');
           }
         } else {
           hp.visible=true; drawHp(0.35); setAnim('idle'); anim.tint=0xffffff;
