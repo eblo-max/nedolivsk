@@ -175,8 +175,10 @@ async def _api_taverns(request: web.Request) -> web.Response:
     now = datetime.now(timezone.utc)
     live = latest if (latest and latest.status in ("gathering", "battle")) else None
     report_inv = None
-    # бой ещё «battle», но время боя вышло → показываем сводку СРАЗУ (предсказанием)
-    if live is not None and live.status == "battle" and live.resolve_at:
+    # время боя ВЫШЛО (now ≥ resolve_at) → показываем сводку СРАЗУ (предсказанием),
+    # не дожидаясь, пока нотифаер переключит статус/зарезолвит (лаг до тика ~60с).
+    # Важно: НЕ только при status=='battle' — нотифаер мог ещё не флипнуть gathering→battle.
+    if live is not None and live.resolve_at:
         ra = live.resolve_at if live.resolve_at.tzinfo else live.resolve_at.replace(tzinfo=timezone.utc)
         if now >= ra:
             report_inv, live = live, None
