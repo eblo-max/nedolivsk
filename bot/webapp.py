@@ -965,7 +965,7 @@ const MAXS = 9;               // максимальный зум; минимал
 
   function showEventCard(ev, e){
     if (e) e.stopPropagation();
-    if (ev.report){ document.getElementById('rep').style.display = 'block'; return; }  // тап по орде — снова сводка
+    if (ev.report){ setupReportPanel(ev); return; }   // тап по орде — пересобрать и показать сводку
     document.getElementById('cnm').textContent = '⚔ ' + ev.name;
     document.getElementById('clv').textContent = ev.blurb || '';
     document.getElementById('crg').textContent = 'Событие';
