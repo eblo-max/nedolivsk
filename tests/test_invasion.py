@@ -160,3 +160,29 @@ def test_simulate_empty_and_tracks_contribution():
     r = inv.simulate(a, seed=3)
     assert set(r["dealt"]) == {p["pid"] for p in a}     # вклад посчитан всем
     assert len(r["fell"]) > 0                            # были павшие
+
+
+def test_simulate_full_stats_and_roles():
+    a = _army({"tank": 2, "archer": 4, "scout": 2})
+    r = inv.simulate(a, seed=1)
+    assert set(r["stats"]) == {p["pid"] for p in a}
+    for st in r["stats"].values():
+        assert set(st) == {"dmg", "crit", "blocked", "fell"}
+    tanks = [p["pid"] for p in a if p["role"] == "tank"]
+    archers = [p["pid"] for p in a if p["role"] == "archer"]
+    # танк блокирует больше; стрелок наносит больше крита
+    assert max(r["stats"][t]["blocked"] for t in tanks) > max(r["stats"][x]["blocked"] for x in archers)
+    assert max(r["stats"][x]["crit"] for x in archers) > max(r["stats"][t]["crit"] for t in tanks)
+
+
+def test_build_report_rows_sorted_with_rewards():
+    i = _inv(_reg(10, 40))
+    sim = {"won": True, "dealt": {1: 100, 2: 400}, "n": 2,
+           "stats": {1: {"dmg": 100, "crit": 10, "blocked": 50, "fell": False},
+                     2: {"dmg": 400, "crit": 200, "blocked": 5, "fell": True}}}
+    plan = inv.settle(i, sim, random.Random(1))
+    rep = inv.build_report(i, sim, plan)
+    assert rep[0]["dmg"] >= rep[1]["dmg"]                 # сорт по урону
+    assert any(r["trophy"] for r in rep)                 # у MVP — трофей
+    need = {"name", "role", "dmg", "crit", "blocked", "fell", "gold", "rep", "trophy", "pid"}
+    assert all(need <= set(r) for r in rep)

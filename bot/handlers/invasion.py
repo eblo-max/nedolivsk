@@ -12,11 +12,17 @@ from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import texts
+from bot.config import settings
 from bot.db import repo
 from bot.game import combat, invasion, worldmap
 from bot.keyboards.inline import invasion_gather_kb
 
 router = Router()
+
+
+def _blocked(user_id: int) -> bool:
+    """Тест-режим: ивент закрыт для всех, кроме админа."""
+    return invasion.TEST_MODE and user_id != settings.admin_id
 
 
 async def send_invasion_announce(bot: Bot, chat_id: int, caption: str, markup):
@@ -57,6 +63,9 @@ async def cb_inv_refresh(cb: CallbackQuery, session: AsyncSession) -> None:
 
 @router.callback_query(F.data.startswith("invjoin:"))
 async def cb_inv_join(cb: CallbackQuery, session: AsyncSession) -> None:
+    if _blocked(cb.from_user.id):
+        await cb.answer("Ивент «Орда орков» на тестировании — скоро откроем!", show_alert=True)
+        return
     player = await repo.get_player(session, cb.from_user.id)
     if player is None or not player.tavern:
         await cb.answer("Сначала заведи кабак: /start", show_alert=True)

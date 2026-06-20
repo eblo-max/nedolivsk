@@ -869,6 +869,14 @@ def set_bot_username(username: str) -> None:
     _BOT_USERNAME = (username or "").lstrip("@")
 
 
+def invasion_map_dm_kb(map_url: str) -> InlineKeyboardMarkup:
+    """Личка-кнопка: web_app открывает карту прямо в Telegram (тест/админ/пуш)."""
+    from aiogram.types import WebAppInfo
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⚔️ К ОРДЕ — открыть карту", web_app=WebAppInfo(url=map_url), style="danger")
+    return kb.as_markup()
+
+
 def invasion_announce_kb(inv_id: int) -> InlineKeyboardMarkup:
     """Кнопка анонса орды. Если настроен Direct-Link Mini App (webapp_short_name +
     имя бота) — красная url-кнопка ОТКРЫВАЕТ КАРТУ на боссе (вся регистрация там).

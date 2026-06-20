@@ -487,7 +487,8 @@ async def _notify_returned(bot: Bot) -> None:
                                   "orc_hp_left": sim["orc_hp_left"],
                                   "orc_hp_max": sim["orc_hp_max"],
                                   "top": [[nm, role, dmg] for _p, nm, role, dmg
-                                          in invmod.top_contributors(inv, sim)]}
+                                          in invmod.top_contributors(inv, sim)],
+                                  "report": invmod.build_report(inv, sim, plan)}
                     inv.status = "won" if sim["won"] else "lost"
                     world.invasion_next_at = invmod.cooldown_until(now)
                     inv_edits.append((dict(inv.messages or {}),

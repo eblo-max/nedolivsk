@@ -137,6 +137,12 @@ async def live_invasions(session: AsyncSession) -> list[Invasion]:
         .with_for_update(skip_locked=True))).scalars().all())
 
 
+async def latest_invasion(session: AsyncSession) -> Invasion | None:
+    """Самый свежий ивент (любой статус) — для показа сводки боя на карте."""
+    return (await session.execute(
+        select(Invasion).order_by(Invasion.id.desc()).limit(1))).scalar_one_or_none()
+
+
 def create_invasion(session: AsyncSession, *, sprite: int, threshold: int,
                     gather_until, resolve_at) -> Invasion:
     """Создать ивент в фазе СБОРА (порог орды — снимок при спавне)."""

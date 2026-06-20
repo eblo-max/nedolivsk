@@ -68,6 +68,28 @@ def _tavern_norm_pos(player) -> tuple[float, float]:
     return worldmap.region_point(player.region or "", player.id) or (0.5, 0.5)
 
 
+REPORT_WINDOW_SEC = 45 * 60   # сколько показывать боевую сводку на карте после боя
+
+
+def _invasion_report_event(inv, uid: int = 0) -> dict:
+    """Событие-СВОДКА для карты после боя: орда (idle) + полная статистика боя по
+    каждому (урон/крит/блок/пал) и НАГРАДА. pid наружу не отдаём — только флаг mine."""
+    res = inv.result or {}
+    rows = []
+    for r in (res.get("report") or []):
+        rows.append({k: v for k, v in r.items() if k != "pid"}
+                    | {"mine": bool(uid) and int(r.get("pid", 0)) == uid})
+    return {
+        "id": inv.id, "sprite": inv.sprite, "x": invmod.POS[0], "y": invmod.POS[1],
+        "name": invmod.NAME, "blurb": "Итог битвы с ордой орков",
+        "report": True, "won": bool(res.get("won")), "status": inv.status,
+        "rounds": int(res.get("rounds", 0)), "n": int(res.get("n", 0)),
+        "orc_hp_left": int(res.get("orc_hp_left", 0)),
+        "orc_hp_max": int(res.get("orc_hp_max", 1)),
+        "rows": rows,
+    }
+
+
 def _invasion_event(inv, uid: int = 0) -> dict:
     """Живой ивент «Орда орков» для карты: тот же таймлайн-формат, что демо, но
     синхронизирован серверным временем (elapsed — секунды с начала сбора) и с
@@ -125,7 +147,15 @@ async def _api_taverns(request: web.Request) -> web.Response:
         uid = 0
     async with session_factory() as s:
         rows = await repo.get_map_taverns(s)
-        live = await repo.get_active_invasion(s)
+        latest = await repo.latest_invasion(s)
+    live = latest if (latest and latest.status in ("gathering", "battle")) else None
+    report_inv = None
+    if live is None and latest and latest.status in ("won", "lost") and latest.resolve_at:
+        ra = latest.resolve_at
+        if ra.tzinfo is None:
+            ra = ra.replace(tzinfo=timezone.utc)
+        if (datetime.now(timezone.utc) - ra).total_seconds() < REPORT_WINDOW_SEC:
+            report_inv = latest          # недавний бой — показываем сводку на карте
     out = []
     for tav, pl in rows:
         # Со слотом — фикс. позиция; без слота (зона полна) — детерминированная
@@ -145,6 +175,8 @@ async def _api_taverns(request: web.Request) -> web.Response:
     # (?inv=demo, предпросмотр) > статичный маркер орды (idle).
     if live is not None:
         events = [_invasion_event(live, uid)]
+    elif report_inv is not None:
+        events = [_invasion_report_event(report_inv, uid)]
     elif request.query.get("inv") == "demo" and MAP_EVENTS:
         troops = [{"x": t["x"], "y": t["y"]} for t in out[:8]]
         ev = dict(MAP_EVENTS[0])
@@ -172,6 +204,9 @@ async def _api_invasion_join(request: web.Request) -> web.Response:
     uid = _verify_init_data(body.get("initData") or "")
     if not uid:
         return web.json_response({"ok": False, "error": "auth"}, status=401)
+    from bot.config import settings
+    if invmod.TEST_MODE and uid != settings.admin_id:     # тест-режим: только админ
+        return web.json_response({"ok": False, "error": "testing"})
     from bot.game import combat
     async with session_factory() as s:
         player = await repo.get_player(s, uid)
@@ -345,6 +380,19 @@ _MAP_HTML = """<!doctype html>
     color:#fff;font:700 15px Georgia,serif;cursor:pointer}
   .reg .rb:active{transform:scale(.98)} .reg .rb:disabled{opacity:.55}
   .reg .rj{font-size:14px;color:#ffd24a;font-weight:700}
+  .rep{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:12;display:none;
+    width:min(96vw,470px);max-height:72vh;overflow:auto;background:#1c1206f8;
+    border:1px solid #c9803a;border-radius:14px 14px 0 0;padding:12px 12px 18px;
+    box-shadow:0 -6px 28px #000c}
+  .rep h3{margin:0 0 9px;font-size:15px;color:#ffd9a8;text-align:center;padding-right:18px}
+  .rep .x{position:absolute;right:11px;top:8px;font-size:20px;color:#a98c5c;cursor:pointer;line-height:1}
+  .rep table{width:100%;border-collapse:collapse;font-size:12px}
+  .rep th{color:#a98c5c;font-weight:600;text-align:right;padding:3px 4px}
+  .rep th:first-child{text-align:left}
+  .rep td{padding:5px 4px;text-align:right;border-top:1px solid #3a2a16;color:#e6d3a8}
+  .rep td:first-child{text-align:left;white-space:nowrap}
+  .rep tr.me td{background:#43301266;color:#ffe2a8;font-weight:700}
+  .rep .gold{color:#ffd24a;white-space:nowrap}
 </style></head>
 <body>
 <div class="vig"></div>
@@ -354,6 +402,11 @@ _MAP_HTML = """<!doctype html>
   <div class="rs" id="regSub"></div>
   <button class="rb" id="regBtn">⚔ Поднять войско</button>
   <div class="rj" id="regJoined" style="display:none"></div>
+</div>
+<div class="rep" id="rep">
+  <span class="x" id="repx">×</span>
+  <h3 id="repTitle"></h3>
+  <div id="repBody"></div>
 </div>
 <div class="bar" id="bar">🗺 Недоливск · загрузка…</div>
 <div class="hint">тащи · щипок/колесо — зум · тап по кружку — раскрыть</div>
@@ -374,6 +427,7 @@ const myId = tg?.initDataUnsafe?.user?.id || 0;
 const bar = document.getElementById('bar');
 const card = document.getElementById('card');
 const RING = {north_wilds:0x6ea8ff, green_valleys:0x6fd07a, red_wastes:0xe07a55};
+const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const SCREEN_W = 58;          // ширина здания НА ЭКРАНЕ (постоянная, не зависит от зума)
 const CLUSTER_T = 50;         // ближе этого (px на экране) — таверны сливаются в кластер
 const LABEL_MIN = 0.22;       // ниже этого масштаба подписи названий скрыты
@@ -627,7 +681,7 @@ const MAXS = 9;               // максимальный зум; минимал
   // ---------- ивент-объекты (анимированные, самостоятельные) ----------
   const RL = {tank:['🛡','Авангард'], archer:['🏹','Стрелки'],
               scout:['🔭','Разведка'], ratnik:['🗡','Ратники']};
-  let liveInv = null;                       // живой ивент (для центровки + панели)
+  let liveInv = null, reportEv = null;      // живой ивент / сводка боя
   for (const ev of (data.events || [])){
     try {
       const tex = await PIXI.Assets.load('/assets/boss/ork'+ev.sprite+'_idle.png');
@@ -636,11 +690,15 @@ const MAXS = 9;               // максимальный зум; минимал
       eventLayer.addChild(node); eventNodes.push(node);
       if (ev.gather_secs != null) await setupInvasion(ev, node, fw, fh);   // полноценный ивент с боем
       if (ev.gather_secs != null && !ev.demo) liveInv = ev;                // настоящий ивент
+      if (ev.report) reportEv = ev;                                        // сводка после боя
     } catch(e){ console.log('event load fail', e); }
   }
   if (liveInv){
     centerOn(liveInv.x*W, liveInv.y*H, Math.max(minScale, 1.1));   // открываемся на орде
     if (liveInv.status === 'gathering') setupRegPanel(liveInv);    // плашка регистрации
+  } else if (reportEv){
+    centerOn(reportEv.x*W, reportEv.y*H, Math.max(minScale, 1.1));
+    setupReportPanel(reportEv);                                    // боевая сводка
   }
   if (eventNodes.length){
     app.ticker.add(() => { const a = 0.10 + 0.12*(0.5 + 0.5*Math.sin(performance.now()/700));
@@ -817,8 +875,34 @@ const MAXS = 9;               // максимальный зум; минимал
         sp.x=s.x; sp.y=s.y - fh*0.34*k; sp.scale.set(k*sp._size/sp._fs); }
     });
   }
+  // ---------- боевая сводка после боя (таблица по каждому) ----------
+  function setupReportPanel(ev){
+    const rep = document.getElementById('rep'), title = document.getElementById('repTitle'),
+          body = document.getElementById('repBody');
+    title.innerHTML = (ev.won ? '🏆 Орда разбита' : '💀 Орки устояли')
+      + ' · ' + (ev.n || 0) + ' дружин · ' + (ev.rounds || 0) + ' раундов';
+    let html = '<table><tr><th>Боец</th><th>⚔ урон</th><th>🛡 блок</th>'
+      + '<th>💥 крит</th><th>🪙 итог</th></tr>';
+    for (const r of (ev.rows || [])){
+      const rl = RL[r.role] || RL.ratnik;
+      const nm = (r.fell ? '💀 ' : '') + rl[0] + ' ' + esc(r.name);
+      const rew = ev.won
+        ? ('+' + r.gold + (r.trophy ? ' 🎁' + esc(r.trophy) : ''))
+        : ('' + r.gold);
+      html += '<tr class="' + (r.mine ? 'me' : '') + '"><td>' + nm + '</td><td>'
+        + r.dmg + '</td><td>' + r.blocked + '</td><td>' + r.crit
+        + '</td><td class="gold">' + rew + '</td></tr>';
+    }
+    body.innerHTML = html + '</table>';
+    rep.style.display = 'block';
+  }
+  document.getElementById('repx').onclick = () => {
+    document.getElementById('rep').style.display = 'none';
+  };
+
   function showEventCard(ev, e){
     if (e) e.stopPropagation();
+    if (ev.report){ document.getElementById('rep').style.display = 'block'; return; }  // тап по орде — снова сводка
     document.getElementById('cnm').textContent = '⚔ ' + ev.name;
     document.getElementById('clv').textContent = ev.blurb || '';
     document.getElementById('crg').textContent = 'Событие';
@@ -859,7 +943,7 @@ const MAXS = 9;               // максимальный зум; минимал
         } else {
           btn.disabled = false; btn.textContent = was;
           sub.textContent = ({no_tavern: 'Сначала заведи кабак в боте (/start)',
-            closed: 'Сбор уже закончился',
+            closed: 'Сбор уже закончился', testing: 'Ивент на тестировании — скоро откроем',
             auth: 'Не удалось войти — открой карту через бота'}[d.error]) || 'Не вышло, попробуй ещё';
         }
       } catch(e){ btn.disabled = false; btn.textContent = was; sub.textContent = 'Сеть подвела — ещё раз'; }

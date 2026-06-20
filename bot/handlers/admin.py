@@ -43,6 +43,19 @@ async def cmd_orc(message: Message, session: AsyncSession) -> None:
     await session.flush()                  # нужен inv.id для кнопок
     repo.add_log(session, "admin", message.from_user.id,
                  f"🪓 запущена Орда орков (порог {threshold}, сбор {invasion.GATHER_MINUTES} мин)")
+
+    if invasion.TEST_MODE:                  # тест: без анонсов в чаты/лички — только админу
+        from bot.webapp import base_url
+        from bot.keyboards.inline import invasion_map_dm_kb
+        b = base_url()
+        kb = invasion_map_dm_kb(b + "/map") if b else None
+        await message.answer(
+            f"🪓 <b>Орда запущена в ТЕСТ-режиме</b> (без анонсов в чаты/лички).\n"
+            f"Порог {threshold} (мощь города {total}). Сбор {invasion.GATHER_MINUTES} мин, "
+            f"бой ~{invasion.BATTLE_SECONDS // 60} мин. Открой карту — записывайся и тестируй:",
+            reply_markup=kb)
+        return
+
     from bot.handlers.invasion import send_invasion_announce
     caption = texts.invasion_gather_screen(inv)
     chat_ids = await repo.all_chat_ids(session)
