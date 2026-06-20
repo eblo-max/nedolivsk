@@ -147,10 +147,13 @@ def test_simulate_deterministic():
     assert r1["won"] == r2["won"] and r1["dealt"] == r2["dealt"]
 
 
-def test_composition_decides_outcome():
-    assert inv.simulate(_army({"tank": 2, "archer": 4, "scout": 2}), 1)["won"] is True   # баланс
-    assert inv.simulate(_army({"archer": 8}), 1)["won"] is False    # нет танков — выкосят
-    assert inv.simulate(_army({"tank": 8}), 1)["won"] is False      # нет урона — уйдёт
+def test_front_line_and_turnout_decide():
+    # достаточная армия с линией фронта (танки/ратники держат) — победа
+    assert inv.simulate(_army({"tank": 8, "archer": 8, "scout": 3}), 1)["won"] is True
+    # совсем нет линии фронта (одни рубаки) — орда прорывается и фокусит → провал
+    assert inv.simulate(_army({"archer": 8}), 1)["won"] is False
+    # крошечная явка — фронта мало, выкосят → провал
+    assert inv.simulate(_army({"tank": 1, "archer": 2}), 1)["won"] is False
 
 
 def test_simulate_empty_and_tracks_contribution():

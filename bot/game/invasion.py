@@ -121,16 +121,20 @@ ROLES: dict[str, tuple[str, str]] = {
 WB_HP_BASE, WB_HP_PER_MIGHT = 80, 4.0
 WB_DMG_BASE, WB_DMG_PER_MIGHT = 6.0, 0.45
 
-# Орда (масштаб по числу записавшихся — сложность константна при любом размере мира).
-ORC_HP_BASE = 950
-ORC_ATK_BASE = 4.1
+# Орда. HP масштабируется СУБЛИНЕЙНО от боевой МОЩИ армии (сумма DPS-потенциала),
+# а не от числа людей: слабый город валит слабую орду, сильный/многочисленный —
+# толще, но БЫСТРЕЕ. Явка и прокачка решают. Атака орды фиксирована и делится на
+# «линию фронта» (танки + ратники = массовая пехота); тыл (рубаки/разведка) прикрыт.
 ORC_ARMOR = 4
-ORC_SCALE_EXP = 0.85
-ROUNDS_BUDGET = 40            # окно боя в «раундах» (≈ 5 мин на карте)
-NO_FRONT_MULT = 3.2          # нет танков — орда прорывается и фокусит дамагеров
+ROUNDS_BUDGET = 45           # окно боя в «раундах» (≈ 5 мин на карте)
+HP_PER_POWER = 42.0          # HP орды на единицу мощи (при опорной мощи)
+HP_POWER_EXP = 0.82          # сублинейность: <1 → сильнее армия валит быстрее
+MIN_ORC_HP = 300             # пол HP (анти-тривиал для крошечной явки)
+ORC_ATK = 75                 # фикс. урон орды за раунд (делится на линию фронта)
+NO_FRONT_MULT = 3.0          # нет линии фронта (одни рубаки/разведка) — орда прорывается
 
 # Способности по порогам HP орды (срабатывают раз, когда HP падает до порога).
-WARD_AT, WARD_ARMOR, WARD_ROUNDS = 0.90, 16, 6     # 🛡 стена щитов: броня ↑ (бьёт крит)
+WARD_AT, WARD_ARMOR, WARD_ROUNDS = 0.90, 8, 4      # 🛡 стена щитов: броня ↑ (бьёт крит)
 SUMMON_AT, SUMMON_HP_FRAC = 0.70, 0.16             # 🐺 зов стаи: HP-щит волков (бёрст/стрелки)
 CURSE_AT, CURSE_FACTOR, CURSE_ROUNDS = 0.45, 0.62, 6   # 💀 проклятье: DPS армии ↓ (чистит разведка)
 ENRAGE_AT, ENRAGE_MULT = 0.25, 1.6                 # 🗣 ярость: атака орды ↑ до конца (держат танки)
@@ -183,10 +187,10 @@ def simulate(participants: list[dict], seed: int = 0) -> dict:
         return {"won": False, "rounds": 0, "orc_hp_max": 0, "orc_hp_left": 0,
                 "dealt": {}, "fell": [], "events": [], "n": 0}
     rng = random.Random(seed)
-    scale = n ** ORC_SCALE_EXP
-    orc_hp_max = round(ORC_HP_BASE * scale)
+    power = sum(_unit_output(p, ORC_ARMOR) for p in participants) or 1.0
+    orc_hp_max = max(MIN_ORC_HP, round(HP_PER_POWER * power ** HP_POWER_EXP))
     orc_hp = float(orc_hp_max)
-    orc_atk = ORC_ATK_BASE * scale
+    orc_atk = ORC_ATK
     units = [dict(p, hp_left=float(p["hp"]), alive=True, dealt=0.0, critdmg=0.0,
                   blocked=0.0) for p in participants]
     scout_frac = sum(1 for p in units if p["role"] == "scout") / n
@@ -242,15 +246,16 @@ def simulate(participants: list[dict], seed: int = 0) -> dict:
             orc_hp -= orc_dmg
         if orc_hp <= 0:
             break
-        # удар орды: танки держат строй (бьют их); нет танков — фокус по сильнейшему DPS
+        # удар орды: линию фронта держат танки + ратники (массовая пехота), бьют их;
+        # совсем нет фронта (одни рубаки/разведка) — орда прорывается и фокусит DPS.
         atk = orc_atk * (ENRAGE_MULT if enraged else 1.0)
-        tanks = [p for p in alive if p["role"] == "tank"]
-        if tanks:
-            share = atk / len(tanks)
-            targets = [(p, share) for p in tanks]
+        front = [p for p in alive if p["role"] in ("tank", "ratnik")]
+        if front:
+            share = atk / len(front)
+            targets = [(p, share) for p in front]
         else:
             focus = max(alive, key=lambda p: _unit_output(p, orc_armor))
-            targets = [(focus, atk * NO_FRONT_MULT)]    # некому держать — выбивают дамагеров
+            targets = [(focus, atk * NO_FRONT_MULT)]
         for p, dmg in targets:
             taken = dmg * (armor_k / (armor_k + p["armor"])) * (1 - p["dodge"])
             p["hp_left"] -= taken
