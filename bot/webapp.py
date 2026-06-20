@@ -147,6 +147,21 @@ async def _event_sprite(request: web.Request) -> web.Response:
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
+async def _hero_sprite(request: web.Request) -> web.Response:
+    # Стрип-анимация героя-воина (1..3): hero{n}_{anim}.png — войска из таверн.
+    try:
+        n = int(request.match_info["n"])
+    except (KeyError, ValueError):
+        raise web.HTTPNotFound()
+    anim = request.match_info.get("anim", "walk")
+    if not (1 <= n <= 3) or anim not in _EVENT_ANIMS:
+        raise web.HTTPNotFound()
+    p = ASSETS_DIR / "heroes" / f"hero{n}_{anim}.png"
+    if not p.is_file():
+        raise web.HTTPNotFound()
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
+
+
 def build_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/", lambda r: web.Response(text="ok"))
@@ -155,6 +170,7 @@ def build_app() -> web.Application:
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
     app.router.add_get("/assets/boss/ork{n}_{anim}.png", _event_sprite)  # ивент-анимации
+    app.router.add_get("/assets/heroes/hero{n}_{anim}.png", _hero_sprite)  # войска-герои
     return app
 
 
@@ -239,6 +255,7 @@ const MAXS = 9;               // максимальный зум; минимал
   const world = new PIXI.Container();
   const bg = new PIXI.Sprite(bgTex); world.addChild(bg);
   app.stage.addChild(world);
+  const pathLayer = new PIXI.Graphics(); app.stage.addChild(pathLayer);  // пунктир маршрутов
   const markers = new PIXI.Container(); markers.sortableChildren = true;
   app.stage.addChild(markers);
   const eventLayer = new PIXI.Container(); app.stage.addChild(eventLayer);  // ивенты поверх
@@ -536,17 +553,32 @@ const MAXS = 9;               // максимальный зум; минимал
       hp.roundRect(-barW/2, barY, barW, 11, 4).fill({color:0x140d06, alpha:0.85}).stroke({color:0x6b522e, width:1});
       if (frac>0) hp.roundRect(-barW/2+1.5, barY+1.5, (barW-3)*frac, 8, 3).fill({color:0xc0392b});
     }
-    // войска — маленькие флаг-токены, выходят из таверн
+    // спрайты героев (3 модели) — раздаём таверне стабильно по координатам
+    const HERO = {};
+    for (const h of [1,2,3]){ HERO[h] = {};
+      for (const a of ['walk','attack','die','idle']){
+        try { HERO[h][a] = sliceFrames(await PIXI.Assets.load('/assets/heroes/hero'+h+'_'+a+'.png'), 10); } catch(e){}
+      }
+    }
+    const hashCoord = (x,y) => Math.abs(Math.floor(x*1000)*31 + Math.floor(y*1000)*17);
+    function uAnim(u, name){ if (u.anim===name) return; const fr=HERO[u.hero][name]; if (!fr) return;
+      u.sp.textures = fr; u.sp.loop = (name!=='die'); u.sp.gotoAndPlay(0); u.anim = name; }
+    // войска — герои, выходят из таверн
     const units = (ev.troops||[]).map((t,i) => {
-      const g = new PIXI.Container();
-      g.addChild(new PIXI.Graphics().ellipse(0,2, 7, 2.5).fill({color:0x000000, alpha:0.3}));
-      g.addChild(new PIXI.Graphics().moveTo(0,1).lineTo(0,-13).stroke({color:0x2a1d10, width:2}));
-      g.addChild(new PIXI.Graphics().poly([0,-13, 11,-10, 0,-6]).fill({color:0x4a7bd0}));
-      g.addChild(new PIXI.Graphics().circle(0,-2, 3.6).fill({color:0xe0cda0}));
-      g.visible = false; eventLayer.addChild(g);
-      return {g, ox:t.x*W, oy:t.y*H, wx:t.x*W, wy:t.y*H,
+      const h = 1 + (hashCoord(t.x, t.y) % 3);
+      const sp = new PIXI.AnimatedSprite(HERO[h].walk || [PIXI.Texture.EMPTY]);
+      sp.anchor.set(0.5, 1); sp.animationSpeed = 0.22; sp.play(); sp.visible = false;
+      eventLayer.addChild(sp);
+      return {sp, hero:h, anim:'walk', dir:1, ox:t.x*W, oy:t.y*H, wx:t.x*W, wy:t.y*H,
               ang:Math.random()*6.28, rad:fw*(0.30+0.25*Math.random()), delay:(i%6)*0.06};
     });
+    const HSCALE = 0.32;   // размер героя относительно карты
+    // пунктир маршрута таверна→орда (экранные коорд., экранно-постоянный шаг)
+    function drawDotted(x1,y1,x2,y2,prog){
+      const dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy)||1, ux=dx/len, uy=dy/len, end=len*prog;
+      for (let d=0; d<end; d+=15){ const a=d, b=Math.min(end, d+8);
+        pathLayer.moveTo(x1+ux*a, y1+uy*a).lineTo(x1+ux*b, y1+uy*b); }
+    }
     const G=ev.gather_secs, M=ev.march_secs, B=ev.battle_secs, END=4, TOTAL=G+M+B+END;
     const evEl = document.getElementById('ev');
     let start = performance.now()/1000, cur='', dieStarted=false, lastHurt=0;
@@ -557,30 +589,38 @@ const MAXS = 9;               // максимальный зум; минимал
     }
     function fmt(s){ s=Math.max(0,Math.ceil(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
     function reset(){ start=performance.now()/1000; cur=''; dieStarted=false; node.alpha=1; anim.tint=0xffffff;
-      setAnim('idle'); for (const u of units){ u.wx=u.ox; u.wy=u.oy; u.g.alpha=1; u.g.visible=false; } }
+      setAnim('idle');
+      for (const u of units){ u.wx=u.ox; u.wy=u.oy; u.sp.alpha=1; u.sp.visible=false; uAnim(u,'walk'); } }
     setAnim('idle');
 
     app.ticker.add(() => {
       let t = (performance.now()/1000) - start;
       if (t > TOTAL){ if (ev.demo) { reset(); t = 0; } else t = TOTAL; }
       const k = markerK();
-      if (t < G){                                   // СБОР
+      pathLayer.clear();
+      const bs = screenOf(bx, by);
+      if (t < G){                                   // СБОР: пунктир «тянется» к орде
         evEl.style.display='block';
         evEl.textContent = '⚔ Сбор войск · выход через '+Math.ceil(G-t)+'с · таверн: '+units.length;
-        setAnim('idle'); hp.visible=false; for (const u of units) u.g.visible=false;
-      } else if (t < G+M){                            // МАРШ
+        setAnim('idle'); hp.visible=false;
+        for (const u of units){ u.sp.visible=false;
+          const us=screenOf(u.ox,u.oy); drawDotted(us.x,us.y, bs.x,bs.y, t/G); }
+      } else if (t < G+M){                            // МАРШ: герои идут по пунктиру
         const p=(t-G)/M;
         evEl.textContent = '⚔ Войска идут к орде!'; setAnim('idle'); hp.visible=false;
         for (const u of units){
           const lp = Math.max(0, Math.min(1, (p-u.delay)/(1-u.delay)));
-          u.wx = u.ox + (bx-u.ox)*lp; u.wy = u.oy + (by-u.oy)*lp; u.g.visible = lp>0;
+          u.wx = u.ox + (bx-u.ox)*lp; u.wy = u.oy + (by-u.oy)*lp;
+          u.sp.visible = lp>0; u.dir = (bx>=u.ox)?1:-1; uAnim(u,'walk');
+          const us=screenOf(u.ox,u.oy); drawDotted(us.x,us.y, bs.x,bs.y, 1);
         }
       } else if (t < G+M+B){                          // БОЙ
         const bp=(t-(G+M))/B;
         evEl.textContent = '⚔ Битва · '+fmt(B*(1-bp));
         hp.visible=true; drawHp(1-bp);
         for (const u of units){ u.ang+=0.03;
-          u.wx = bx + Math.cos(u.ang)*u.rad*0.5; u.wy = by + Math.sin(u.ang)*u.rad*0.28 - fh*0.08; }
+          u.wx = bx + Math.cos(u.ang)*u.rad*0.55; u.wy = by + Math.sin(u.ang)*u.rad*0.30 - fh*0.06;
+          u.sp.visible=true; u.dir = (bx>=u.wx)?1:-1; uAnim(u,'attack'); }
         const s = performance.now()/1000;
         if (s-lastHurt > 0.9){ lastHurt=s; anim.tint=0xff7a6a; setAnim('hurt'); }
         else if (s-lastHurt > 0.32){ anim.tint=0xffffff; setAnim('idle'); }
@@ -591,12 +631,15 @@ const MAXS = 9;               // максимальный зум; минимал
           hp.visible=false;
           if (!dieStarted && A.die){ dieStarted=true; anim.tint=0xffffff; setAnim('die'); }
           node.alpha = Math.max(0, node.alpha - 0.012);
+          for (const u of units){ u.dir=(bx>=u.wx)?1:-1; uAnim(u,'idle'); }
         } else {
           hp.visible=true; drawHp(0.35); setAnim('idle'); anim.tint=0xffffff;
-          for (const u of units){ u.wx += (u.ox-u.wx)*0.04; u.wy += (u.oy-u.wy)*0.04; }
+          for (const u of units){ uAnim(u,'die'); }
         }
       }
-      for (const u of units){ const s=screenOf(u.wx,u.wy); u.g.x=s.x; u.g.y=s.y; u.g.scale.set(k*0.55); }
+      pathLayer.stroke({color:0xffe2a8, width:Math.max(1.4, 2*k), alpha:0.5});
+      for (const u of units){ const s=screenOf(u.wx,u.wy); u.sp.x=s.x; u.sp.y=s.y;
+        u.sp.scale.set(k*HSCALE); u.sp.scale.x = k*HSCALE*u.dir; }
     });
   }
   function showEventCard(ev, e){
