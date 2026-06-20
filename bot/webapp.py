@@ -121,12 +121,11 @@ def _invasion_event(inv, uid: int = 0) -> dict:
     troops = [{"x": (r or {}).get("tx", 0.5), "y": (r or {}).get("ty", 0.5),
                "role": (r or {}).get("role", "ratnik")}
               for r in (inv.registered or {}).values()]
-    if inv.status in ("won", "lost"):
-        result = inv.status
-    else:   # ещё не решено — гоняем ту же симуляцию (сид=id), чтобы анимация
-        # итога на карте совпала с реальным исходом, который объявят в чате
-        parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
-        result = "won" if invmod.simulate(parts, seed=inv.id)["won"] else "lost"
+    # Та же детерминированная симуляция (сид=id) → реальный исход + ТАЙМЛАЙН
+    # (HP орды/броня/баффы по раундам) для честной анимации полоски и баффов.
+    parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
+    sim = invmod.simulate(parts, seed=inv.id)
+    result = inv.status if inv.status in ("won", "lost") else ("won" if sim["won"] else "lost")
     return {
         "id": inv.id, "sprite": inv.sprite, "x": invmod.POS[0], "y": invmod.POS[1],
         "name": invmod.NAME, "blurb": "Орда орков идёт на Недоливск — поднимай войско!",
@@ -137,6 +136,8 @@ def _invasion_event(inv, uid: int = 0) -> dict:
         "n": invmod.registered_count(inv),
         "me_registered": bool(uid) and str(uid) in (inv.registered or {}),
         "my_role": (inv.registered or {}).get(str(uid), {}).get("role") if uid else None,
+        # реальная боевая динамика для карты:
+        "orc_hp_max": sim["orc_hp_max"], "timeline": sim["timeline"],
     }
 
 # Самостоятельные анимированные ивент-объекты на карте (НЕ связаны с рейдами).
@@ -791,11 +792,17 @@ const MAXS = 9;               // максимальный зум; минимал
     // HP-бар орды (рисуем по ходу боя)
     const hp = new PIXI.Graphics(); hp.visible = false; node.addChild(hp);
     const barW = fw*0.8, barY = -fh - 16;
-    function drawHp(frac){
+    function drawHp(frac, warded){     // под щитом (бронёй) бар синеет и обводится
       frac = Math.max(0, Math.min(1, frac)); hp.clear();
-      hp.roundRect(-barW/2, barY, barW, 11, 4).fill({color:0x140d06, alpha:0.85}).stroke({color:0x6b522e, width:1});
-      if (frac>0) hp.roundRect(-barW/2+1.5, barY+1.5, (barW-3)*frac, 8, 3).fill({color:0xc0392b});
+      hp.roundRect(-barW/2, barY, barW, 11, 4).fill({color:0x140d06, alpha:0.85})
+        .stroke({color: warded?0x6ea8ff:0x6b522e, width: warded?2:1});
+      if (frac>0) hp.roundRect(-barW/2+1.5, barY+1.5, (barW-3)*frac, 8, 3)
+        .fill({color: warded?0x3d6fb0:0xc0392b});
     }
+    // иконки активных баффов орды над полоской (по реальному таймлайну)
+    const buffTxt = new PIXI.Text({text:'', style:{fontFamily:'Georgia,serif', fontSize:15,
+      fontWeight:'700', fill:0xffe2a8, stroke:{color:0x140d06, width:4}}});
+    buffTxt.anchor.set(0.5, 1); buffTxt.y = barY - 3; buffTxt.visible = false; node.addChild(buffTxt);
     // спрайты героев (3 модели) — раздаём таверне стабильно по координатам
     const HERO_COUNT = 6;
     const HERO = {};
@@ -879,6 +886,7 @@ const MAXS = 9;               // максимальный зум; минимал
       pathLayer.clear();
       const bs = screenOf(bx, by);
       evEl.style.display = 'block';                  // баннер фазы (внизу); на живом сборе скроем
+      buffTxt.visible = false;                       // баффы орды — только в бою
       if (t < G){                                   // СБОР: войска СТОЯТ у таверн + пунктир к орде
         evEl.style.display = ev.demo ? 'block' : 'none';   // на сборе отсчёт показывает плашка регистрации
         evEl.textContent = '⚔ Сбор войск · выход через '+Math.ceil(G-t)+'с · таверн: '+units.length;
@@ -898,7 +906,15 @@ const MAXS = 9;               // максимальный зум; минимал
       } else if (t < G+M+B){                          // БОЙ
         const bp=(t-(G+M))/B;
         evEl.textContent = '⚔ Битва · '+fmt(B*(1-bp));
-        hp.visible=true; drawHp(1-bp);
+        hp.visible=true;
+        let warded=false, bf='';
+        if (ev.timeline && ev.timeline.length && ev.orc_hp_max){    // РЕАЛЬНАЯ динамика
+          const tl=ev.timeline, idx=Math.min(tl.length-1, Math.max(0, Math.floor(bp*tl.length)));
+          const st=tl[idx]; warded=!!st.ward;
+          drawHp(st.hp/ev.orc_hp_max, warded);
+          if (st.ward) bf+='🛡'; if (st.curse) bf+='💀'; if (st.adds>0) bf+='🐺'; if (st.enraged) bf+='🗣';
+        } else { drawHp(1-bp); }                                    // демо — по таймеру
+        buffTxt.visible = !!bf; buffTxt.text = bf;
         if (bp > 0.88 && !ev.demo && !reportFetched){ reportFetched=true; pollReport(); }  // итог пораньше
         for (const u of units){ u.ang+=0.03;
           u.wx = bx + Math.cos(u.ang)*u.rad*0.55; u.wy = by + Math.sin(u.ang)*u.rad*0.30 - fh*0.06;
@@ -926,7 +942,10 @@ const MAXS = 9;               // максимальный зум; минимал
             u.dir = (u.ox>=u.wx)?1:-1; uAnim(u, rp<1 ? 'walk' : 'idle');
           }
         } else {
-          hp.visible=true; drawHp(0.35); setAnim('idle'); anim.tint=0xffffff;
+          let lf=0.35;
+          if (ev.timeline && ev.timeline.length && ev.orc_hp_max)
+            lf = ev.timeline[ev.timeline.length-1].hp / ev.orc_hp_max;   // реальный остаток HP орды
+          hp.visible=true; drawHp(lf); setAnim('idle'); anim.tint=0xffffff;
           for (const u of units){ uAnim(u,'die'); }
         }
         if (!ev.demo && !reportFetched){ reportFetched=true; pollReport(); }   // сводка live, без reload

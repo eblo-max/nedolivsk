@@ -203,6 +203,7 @@ def simulate(participants: list[dict], seed: int = 0) -> dict:
     enraged = False
     done: set[str] = set()
     events: list = []
+    timeline: list = []     # поминутно: HP орды, броня, активные баффы — для карты
     armor_k = balance.HUNT_ARMOR_K
     rounds = 0
     while rounds < ROUNDS_BUDGET:
@@ -248,6 +249,13 @@ def simulate(participants: list[dict], seed: int = 0) -> dict:
                 events.append((rounds, "adds_down", None))
         else:
             orc_hp -= orc_dmg
+        # снимок раунда для карты: HP/броня/баффы (после удара армии)
+        timeline.append({
+            "hp": max(0, round(orc_hp)), "armor": orc_armor,
+            "ward": rounds <= ward_until, "curse": rounds <= curse_until,
+            "adds": max(0, round(adds_hp)), "enraged": enraged,
+            "alive": len(alive),
+        })
         if orc_hp <= 0:
             break
         # удар орды: линию фронта держат танки + ратники (массовая пехота), бьют их;
@@ -276,7 +284,7 @@ def simulate(participants: list[dict], seed: int = 0) -> dict:
                                  "blocked": round(p["blocked"]), "fell": not p["alive"]}
                       for p in units},
             "fell": [p["pid"] for p in units if not p["alive"]],
-            "events": events, "n": n}
+            "events": events, "timeline": timeline, "n": n}
 
 
 # ── Тайминги/фазы ────────────────────────────────────────────────────────────

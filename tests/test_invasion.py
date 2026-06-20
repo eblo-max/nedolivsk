@@ -178,6 +178,19 @@ def test_simulate_full_stats_and_roles():
     assert max(r["stats"][x]["crit"] for x in archers) > max(r["stats"][t]["crit"] for t in tanks)
 
 
+def test_timeline_real_hp_armor_buffs():
+    r = inv.simulate(_army({"tank": 6, "archer": 10}), 1)
+    tl = r["timeline"]
+    assert tl and len(tl) == r["rounds"]
+    # в каждом раунде — полное состояние для карты
+    assert all(set(s) >= {"hp", "armor", "ward", "curse", "adds", "enraged"} for s in tl)
+    # под щитом (ward) броня выше базовой
+    if any(s["ward"] for s in tl):
+        assert max(s["armor"] for s in tl if s["ward"]) > inv.ORC_ARMOR
+    # на победе HP добит в ноль; иначе — остался
+    assert (tl[-1]["hp"] == 0) == r["won"]
+
+
 def test_build_report_rows_sorted_with_rewards():
     i = _inv(_reg(10, 40))
     sim = {"won": True, "dealt": {1: 100, 2: 400}, "n": 2,
