@@ -400,10 +400,11 @@ _MAP_HTML = """<!doctype html>
   .hint{position:fixed;right:8px;top:8px;z-index:10;font-size:11px;color:#9a8052;opacity:.85}
   .vig{position:fixed;inset:0;pointer-events:none;z-index:5;
     background:radial-gradient(ellipse 78% 78% at 50% 50%, transparent 58%, #060a12 100%)}
-  .ev{position:fixed;left:50%;top:calc(58px + env(safe-area-inset-top,0px));
+  .ev{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));
     transform:translateX(-50%);z-index:10;display:none;
-    background:#2a160ae8;border:1px solid #c9803a;border-radius:11px;padding:7px 16px;
-    font-size:13px;color:#ffe2a8;font-weight:700;box-shadow:0 4px 16px #000a;white-space:nowrap}
+    background:#2a160af2;border:1px solid #c9803a;border-radius:22px;padding:8px 18px;
+    font-size:13px;color:#ffe2a8;font-weight:700;letter-spacing:.2px;
+    box-shadow:0 4px 18px #000b;white-space:nowrap;backdrop-filter:blur(3px)}
   .reg{position:fixed;left:50%;bottom:16vh;transform:translateX(-50%);z-index:11;display:none;
     width:min(92vw,420px);background:#241809f5;border:1px solid #c9803a;border-radius:14px;
     padding:12px 14px;text-align:center;box-shadow:0 8px 28px #000b}
@@ -877,8 +878,9 @@ const MAXS = 9;               // максимальный зум; минимал
       const k = markerK();
       pathLayer.clear();
       const bs = screenOf(bx, by);
+      evEl.style.display = 'block';                  // баннер фазы (внизу); на живом сборе скроем
       if (t < G){                                   // СБОР: войска СТОЯТ у таверн + пунктир к орде
-        evEl.style.display='block';
+        evEl.style.display = ev.demo ? 'block' : 'none';   // на сборе отсчёт показывает плашка регистрации
         evEl.textContent = '⚔ Сбор войск · выход через '+Math.ceil(G-t)+'с · таверн: '+units.length;
         setAnim('idle'); hp.visible=false;
         for (const u of units){ u.wx=u.ox; u.wy=u.oy; u.sp.visible=true;
