@@ -112,7 +112,7 @@ def horde_threshold(total_world_might: int) -> int:
 
 ROLES: dict[str, tuple[str, str]] = {
     "tank":   ("🛡", "Авангард"),    # держит строй; контрит ярость; защищает тыл
-    "archer": ("🏹", "Стрелки"),     # бёрст-урон; контрит зов стаи и стену щитов (крит)
+    "archer": ("⚔️", "Рубаки"),      # бёрст-урон (ближний/дальний); контрит зов стаи/стену щитов
     "scout":  ("🔭", "Разведка"),    # уворот/чистка; контрит проклятье шамана
     "ratnik": ("🗡", "Ратники"),     # надёжная линия без спец-контры
 }
@@ -324,6 +324,26 @@ def registered_count(inv) -> int:
 
 def registered_might(inv) -> int:
     return sum(int((r or {}).get("might", 0)) for r in (inv.registered or {}).values())
+
+
+def dummy_roster(n: int = 8) -> dict:
+    """Болванка-армия для отладки (/orc fast army): сбалансированный микс ролей с
+    отрицательными pid (не настоящие игроки → в наградах пропускаются). Чтобы видеть
+    полноценный бой и победу, не собирая реальную толпу."""
+    import random as _r
+    rng = _r.Random(99)
+    gears = {"tank": {"damage": 4, "crit": 5, "armor": 13, "luck": 4},
+             "archer": {"damage": 17, "crit": 28, "armor": 2, "luck": 4},
+             "scout": {"damage": 6, "crit": 8, "armor": 3, "luck": 15}}
+    pattern = ["tank", "archer", "scout", "archer", "tank", "archer", "scout", "archer"]
+    out = {}
+    for i in range(n):
+        kind = pattern[i % len(pattern)]
+        prof = battle_profile(gears[kind], 30)
+        out[str(-(i + 1))] = {"name": f"Дружина-{i + 1}", "might": 30,
+                              "tx": round(0.2 + 0.6 * rng.random(), 4),
+                              "ty": round(0.25 + 0.5 * rng.random(), 4), **prof}
+    return out
 
 
 def make_record(player, tavern, pos, stats: dict) -> dict:

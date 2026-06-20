@@ -32,18 +32,24 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
     if await repo.get_active_invasion(session) is not None:
         await message.answer("Орда уже идёт — дождись итога текущего ивента.")
         return
-    fast = bool(command.args and command.args.strip().lower() == "fast")
+    args = (command.args or "").lower().split()
+    fast = "fast" in args
+    seed_army = "army" in args             # /orc fast army — болванка-армия для отладки
     now = datetime.now(timezone.utc)
     total = await repo.world_might_sum(session)
     threshold = invasion.horde_threshold(total)
     g_until, r_at = invasion.schedule(now, fast=fast)
     inv = repo.create_invasion(session, sprite=invasion.SPRITE, threshold=threshold,
                                gather_until=g_until, resolve_at=r_at)
+    if seed_army:
+        inv.registered = invasion.dummy_roster(8)
     world = await repo.get_or_create_world(session)
     world.invasion_next_at = None          # активна — авто не спавнит поверх
     await session.flush()                  # нужен inv.id для кнопок
+    gsec = round((g_until - now).total_seconds())
     repo.add_log(session, "admin", message.from_user.id,
-                 f"🪓 запущена Орда орков (порог {threshold}, сбор {invasion.GATHER_MINUTES} мин)")
+                 f"🪓 запущена Орда орков ({'fast ' if fast else ''}порог {threshold}, "
+                 f"сбор {gsec}с)")
 
     if invasion.TEST_MODE:                  # тест: без анонсов в чаты/лички — только админу
         from bot.webapp import base_url
@@ -53,9 +59,10 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
         timing = (f"⚡ быстрый режим: сбор {invasion.FAST_GATHER_SECONDS}с, "
                   f"бой ~{invasion.FAST_MARCH_SECONDS + invasion.FAST_BATTLE_SECONDS}с" if fast
                   else f"сбор {invasion.GATHER_MINUTES} мин, бой ~{invasion.BATTLE_SECONDS // 60} мин")
+        army = "\n🤖 Болванка-армия: 🛡2 ⚔️4 🔭2 — подключайся, и будет реальный бой." if seed_army else ""
         await message.answer(
             f"🪓 <b>Орда запущена в ТЕСТ-режиме</b> (без анонсов в чаты/лички).\n"
-            f"Порог {threshold} (мощь города {total}). {timing}. "
+            f"Порог {threshold} (мощь города {total}). {timing}.{army}\n"
             "Открой карту — записывайся и тестируй:",
             reply_markup=kb)
         return
