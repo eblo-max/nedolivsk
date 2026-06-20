@@ -58,10 +58,16 @@ async def _apply_invasion(session, inv, plan: dict) -> None:
         player = await session.get(Player, int(pid), with_for_update=True)
         if player is None:
             continue
+        # репутацию (молву) ведём И на игроке, И на таверне (видимая — с таверны, как в охоте)
+        tav = (await session.execute(
+            select(Tavern).where(Tavern.player_id == int(pid)).with_for_update())
+        ).scalar_one_or_none()
         drep = int(plan["rep"].get(pid, 0))
         if won:
             player.gold += int(dgold)
-            player.reputation += drep
+            player.reputation = (player.reputation or 0) + drep
+            if tav is not None:
+                tav.reputation = (tav.reputation or 0) + drep
             haul = plan["res"].get(pid) or {}
             for res, qty in haul.items():
                 inventory.add(player, res, int(qty))
@@ -72,7 +78,9 @@ async def _apply_invasion(session, inv, plan: dict) -> None:
                               texts.invasion_reward_dm(True, int(dgold), drep, haul, tline))
         else:
             player.gold = max(0, player.gold + int(dgold))     # не в минус
-            player.reputation = max(0, player.reputation + drep)
+            player.reputation = max(0, (player.reputation or 0) + drep)
+            if tav is not None:
+                tav.reputation = max(0, (tav.reputation or 0) + drep)
             repo.queue_notify(session, int(pid),
                               texts.invasion_reward_dm(False, int(dgold), drep))
 

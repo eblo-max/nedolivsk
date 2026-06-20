@@ -3202,12 +3202,12 @@ def invasion_reward_dm(won: bool, gold: int, rep: int,
     """Личная сводка участнику (победа — доля; провал — потери)."""
     if won:
         from bot.game import invasion as invmod
-        parts = [f"+{gold} 🪙", f"+{rep} молвы"]
+        parts = [f"+{gold} 🪙", f"+{rep} репутации"]
         for k, v in (res or {}).items():
             parts.append(f"{invmod.res_label(k)} ×{v}")
         out = "🏆 <b>Орда разбита!</b>\nТвоя доля: " + ", ".join(parts) + "."
         if trophy_line:
             out += f"\n🎁 <b>ТРОФЕЙ:</b> {trophy_line}"
         return out
-    return (f"💀 <b>Орки устояли…</b>\nПоход стоил: −{abs(gold)} 🪙, −{abs(rep)} молвы. "
+    return (f"💀 <b>Орки устояли…</b>\nПоход стоил: −{abs(gold)} 🪙, −{abs(rep)} репутации. "
             "Соберёмся в следующий раз — всем миром.")
