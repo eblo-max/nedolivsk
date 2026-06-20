@@ -169,7 +169,7 @@ async def _fx_sprite(request: web.Request) -> web.Response:
     except (KeyError, ValueError):
         raise web.HTTPNotFound()
     p = ASSETS_DIR / "fx" / f"fire{n}.png"
-    if not (1 <= n <= 9) or not p.is_file():
+    if not (1 <= n <= 10) or not p.is_file():
         raise web.HTTPNotFound()
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
@@ -585,7 +585,7 @@ const MAXS = 9;               // максимальный зум; минимал
       return {sp, hero:h, anim:'walk', dir:1, ox:t.x*W, oy:t.y*H, wx:t.x*W, wy:t.y*H,
               ang:Math.random()*6.28, rad:fw*(0.30+0.25*Math.random()), delay:(i%6)*0.06};
     });
-    const HSCALE = 0.32;   // размер героя относительно карты
+    const HSCALE = 0.44;   // размер героя относительно карты
     // пунктир маршрута таверна→орда (экранные коорд., экранно-постоянный шаг)
     function drawDotted(x1,y1,x2,y2,prog){
       const dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy)||1, ux=dx/len, uy=dy/len, end=len*prog;
@@ -594,7 +594,7 @@ const MAXS = 9;               // максимальный зум; минимал
     }
     // эффекты ударов (огонь/взрыв) — one-shot, спавним по орку в бою
     const FX = [];
-    for (const n of [1,2,3]){
+    for (let n=1; n<=10; n++){
       try { const tx = await PIXI.Assets.load('/assets/fx/fire'+n+'.png');
         FX.push(sliceFrames(tx, Math.max(1, Math.round(tx.width/tx.height)))); } catch(e){}
     }
@@ -651,17 +651,19 @@ const MAXS = 9;               // максимальный зум; минимал
           u.wx = bx + Math.cos(u.ang)*u.rad*0.55; u.wy = by + Math.sin(u.ang)*u.rad*0.30 - fh*0.06;
           u.sp.visible=true; u.dir = (bx>=u.wx)?1:-1; uAnim(u,'attack'); }
         const s = performance.now()/1000;
-        if (s-lastHurt > 0.9){ lastHurt=s; anim.tint=0xff7a6a; setAnim('hurt');
-          spawnHit(bx + (Math.random()-0.5)*fw*0.4, by, 72);
-          if (Math.random()<0.5) spawnHit(bx + (Math.random()-0.5)*fw*0.5, by, 52); }
-        else if (s-lastHurt > 0.32){ anim.tint=0xffffff; setAnim('idle'); }
+        if (s-lastHurt > 0.55){ lastHurt=s; anim.tint=0xff7a6a; setAnim('hurt');
+          const n = 2 + (Math.random()*2|0);   // 2–3 вспышки за удар
+          for (let q=0;q<n;q++)
+            spawnHit(bx + (Math.random()-0.5)*fw*0.7, by - Math.random()*fh*0.3, 110 + Math.random()*70); }
+        else if (s-lastHurt > 0.22){ anim.tint=0xffffff; setAnim('idle'); }
       } else {                                        // ИТОГ
         const won = ev.result!=='lost';
         evEl.textContent = won ? '🏆 Орда разбита! Победа за городом' : '💀 Орки устояли…';
         if (won){
           hp.visible=false;
           if (!dieStarted && A.die){ dieStarted=true; anim.tint=0xffffff; setAnim('die');
-            spawnHit(bx, by, 160); }   // большой взрыв при гибели орды
+            spawnHit(bx, by - fh*0.2, 280);                              // большой взрыв
+            spawnHit(bx-fw*0.3, by, 150); spawnHit(bx+fw*0.3, by, 150); }  // + по бокам
           node.alpha = Math.max(0, node.alpha - 0.012);
           for (const u of units){ u.dir=(bx>=u.wx)?1:-1; uAnim(u,'idle'); }
         } else {
