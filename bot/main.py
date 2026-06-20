@@ -96,6 +96,11 @@ async def _load_media_cache() -> None:
         from bot.game import raid as raidmod
         active_raid = await repo.get_active_raid(session)
         raidmod.set_active(active_raid.id if active_raid else None)
+        # Кэш «идёт сбор на Орду» — чтобы кнопка «в строй» в меню таверны пережила рестарт.
+        from bot.game import invasion as invmod
+        active_inv = await repo.get_active_invasion(session)
+        invmod.set_gathering(active_inv.id if (active_inv and active_inv.status == "gathering")
+                             else None)
 
 
 async def main() -> None:

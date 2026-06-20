@@ -466,7 +466,8 @@ async def _notify_returned(bot: Bot) -> None:
         # Ивент «Орда орков»: сбор → битва → резолв (раздача/штраф). Правки анонсов
         # копим (messages, text, markup|None) и шлём ПОСЛЕ коммита, как у рейда.
         inv_edits: list[tuple[dict, str, object]] = []
-        for inv in await repo.live_invasions(session):
+        invs = await repo.live_invasions(session)
+        for inv in invs:
             if inv.status == "gathering":
                 if now >= (inv.gather_until or now):
                     if invmod.registered_count(inv) == 0:        # никто не пришёл
@@ -499,6 +500,8 @@ async def _notify_returned(bot: Bot) -> None:
                     world.invasion_next_at = invmod.cooldown_until(now)
                     inv_edits.append((dict(inv.messages or {}),
                                       texts.invasion_result_chat(inv), None))
+        # Кэш «идёт сбор» для кнопки «в строй» в меню таверны (или None — сбор кончился).
+        invmod.set_gathering(next((iv.id for iv in invs if iv.status == "gathering"), None))
 
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
         world_news: list[str] = []  # глобальные вести для DM-дайджеста одиночкам

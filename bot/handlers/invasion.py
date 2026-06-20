@@ -15,7 +15,7 @@ from bot import texts
 from bot.config import settings
 from bot.db import repo
 from bot.game import combat, invasion, worldmap
-from bot.keyboards.inline import invasion_gather_kb
+from bot.keyboards.inline import invasion_gather_kb, invasion_open_kb
 
 router = Router()
 
@@ -45,6 +45,32 @@ def _tavern_pos(player) -> tuple[float, float]:
         if p:
             return p
     return worldmap.region_point(player.region or "", player.id) or (0.5, 0.5)
+
+
+@router.callback_query(F.data == "invopen")
+async def cb_inv_open(cb: CallbackQuery, session: AsyncSession) -> None:
+    """Экран «в строй» из меню таверны — работает у всех (личка и группа)."""
+    if _blocked(cb.from_user.id):
+        await cb.answer("Ивент «Орда орков» на тестировании — скоро откроем!", show_alert=True)
+        return
+    inv = await repo.get_active_invasion(session)
+    if inv is None or inv.status != "gathering":
+        await cb.answer("Сбор уже закончился — войска выступили.", show_alert=True)
+        return
+    private = cb.message.chat.type == "private"
+    already = invasion.is_registered(inv, cb.from_user.id)
+    text = texts.invasion_gather_screen(inv)
+    if already:
+        text += "\n\n✅ <b>Ты уже в строю</b> — жди битвы!"
+    mk = invasion_open_kb(inv.id, private, already)
+    try:
+        if cb.message.photo:
+            await cb.message.edit_caption(caption=text, reply_markup=mk)
+        else:
+            await cb.message.edit_text(text, reply_markup=mk)
+    except TelegramBadRequest:
+        pass
+    await cb.answer()
 
 
 @router.callback_query(F.data.startswith("invref:"))

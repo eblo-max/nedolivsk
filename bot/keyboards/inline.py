@@ -68,12 +68,16 @@ def regions_kb() -> InlineKeyboardMarkup:
 
 def tavern_kb(player: Player, private: bool = True) -> InlineKeyboardMarkup:
     from bot.game import buff, newbie, raid as raidmod, story_state
+    from bot.game import invasion as invmod
 
     kb = InlineKeyboardBuilder()
     sizes: list[int] = []
 
     if raidmod.active_id() is not None:  # идёт глобальный рейд-босс — в бой!
         kb.button(text="⚔️ РЕЙД-БОСС — В БОЙ!", callback_data="raidopen", style="danger")
+        sizes.append(1)
+    if invmod.gathering_id() is not None:  # идёт сбор на Орду орков — в строй!
+        kb.button(text="🪓 ОРДА ОРКОВ — В СТРОЙ!", callback_data="invopen", style="danger")
         sizes.append(1)
     # Web-App кнопки Telegram принимает ТОЛЬКО в личке — в группе панель с такой
     # кнопкой отклоняется целиком (ломала «гг таверна»). Потому карта — лишь в ЛС.
@@ -867,6 +871,26 @@ def invasion_gather_kb(inv_id: int) -> InlineKeyboardMarkup:
     kb.button(text="⚔️ Поднять войско", callback_data=f"invjoin:{inv_id}", style="danger")
     kb.button(text="🔄 Обновить", callback_data=f"invref:{inv_id}")
     kb.adjust(1, 1)
+    return kb.as_markup()
+
+
+def invasion_open_kb(inv_id: int, private: bool, already: bool) -> InlineKeyboardMarkup:
+    """Экран «в строй» из меню таверны: запись + карта (бой) + назад."""
+    from bot.config import settings
+    from bot.webapp import base_url
+    kb = InlineKeyboardBuilder()
+    if not already:
+        kb.button(text="⚔️ Поднять войско", callback_data=f"invjoin:{inv_id}", style="danger")
+    b = base_url()
+    if b and private:
+        kb.button(text="🗺 На карту — следить за боем", web_app=WebAppInfo(url=f"{b}/map"))
+    elif b:
+        short = (getattr(settings, "webapp_short_name", "") or "").strip()
+        if short and _BOT_USERNAME:
+            kb.button(text="🗺 На карту — следить за боем",
+                      url=f"https://t.me/{_BOT_USERNAME}/{short}?startapp=map")
+    kb.button(text="🏠 В таверну", callback_data="tavern")
+    kb.adjust(1)
     return kb.as_markup()
 
 

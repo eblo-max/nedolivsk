@@ -46,6 +46,7 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
     world = await repo.get_or_create_world(session)
     world.invasion_next_at = None          # активна — авто не спавнит поверх
     await session.flush()                  # нужен inv.id для кнопок
+    invasion.set_gathering(inv.id)         # меню таверны сразу покажет «в строй» у ВСЕХ
     gsec = round((g_until - now).total_seconds())
     repo.add_log(session, "admin", message.from_user.id,
                  f"🪓 запущена Орда орков ({'fast ' if fast else ''}порог {threshold}, "

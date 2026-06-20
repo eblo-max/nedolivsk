@@ -77,6 +77,20 @@ LOSS_GOLD = 40
 LOSS_REP = 4
 
 
+# Лёгкий кэш «идёт ли сбор на Орду» — чтобы меню таверны рисовало кнопку «в строй»
+# без запроса к БД (как active_id у рейда). Ставит спавн (сразу) и нотифаер (раз в тик).
+_gathering_id: int | None = None
+
+
+def set_gathering(inv_id: int | None) -> None:
+    global _gathering_id
+    _gathering_id = inv_id
+
+
+def gathering_id() -> int | None:
+    return _gathering_id
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
