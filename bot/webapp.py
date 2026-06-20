@@ -230,24 +230,29 @@ const MINS = 0.14, MAXS = 9;  // пределы зума
       const g = new PIXI.Graphics().circle(0,-w*0.4, w*0.32).fill({color: t.mine?0xffd24a:(RING[t.region]||0xcaa23f)});
       node.addChild(g); g.eventMode='static'; g.cursor='pointer'; g.on('pointertap', e=> showCard(t, e));
     }
-    const lvl = new PIXI.Text({text:String(t.level), style:{fontFamily:'Georgia,serif',
-      fontSize:13, fontWeight:'700', fill:0xfff3d6, stroke:{color:0x241809, width:4}}});
-    lvl.anchor.set(0.5,1); lvl.y = -hs - 1; node.addChild(lvl);
-
-    // подпись-лента с названием под зданием (тёмная плашка для читаемости)
-    const raw = t.name || '';
-    const nm = raw.length > 18 ? raw.slice(0,17)+'…' : raw;
-    if (nm){
-      const lab = new PIXI.Container(); lab.eventMode = 'none'; lab.y = 9;
-      const label = new PIXI.Text({text:nm, style:{fontFamily:'Georgia,serif',
-        fontSize:12, fontWeight:'600', fill:0xf3e6c8, stroke:{color:0x140d06, width:3}}});
-      label.anchor.set(0.5, 0);
-      const bw = label.width + 10, bh = label.height + 4;
-      const lbg = new PIXI.Graphics().roundRect(-bw/2, -2, bw, bh, 6)
-        .fill({color:0x140d06, alpha:0.64}).stroke({color:0x6b522e, width:1, alpha:0.55});
-      lab.addChild(lbg); lab.addChild(label);
-      node.addChild(lab); node._label = lab;
-    }
+    // подпись: ЕДИНАЯ рамка [чип уровня][название] под зданием.
+    // Текст всегда помещается в рамку (ширина считается по тексту). Видимость
+    // решает декластеризация подписей (declutterLabels) — чтобы не налезали.
+    const raw = (t.name || '').trim();
+    const nm = raw.length > 20 ? raw.slice(0,19)+'…' : (raw || 'Таверна');
+    const lab = new PIXI.Container(); lab.eventMode = 'none'; lab.y = 8;
+    const fh = 21, padX = 6, gap = 5, chipR = 8.5;
+    const txt = new PIXI.Text({text:nm, style:{fontFamily:'Georgia,serif',
+      fontSize:12, fontWeight:'600', fill:0xf3e6c8}});
+    const totalW = padX + chipR*2 + gap + Math.ceil(txt.width) + padX;
+    lab.addChild(new PIXI.Graphics().roundRect(-totalW/2, 0, totalW, fh, 7)
+      .fill({color:0x140d06, alpha:0.76}).stroke({color:0x6b522e, width:1.2, alpha:0.7}));
+    const chipX = -totalW/2 + padX + chipR;
+    const chipCol = t.mine ? 0xffd24a : (RING[t.region] || 0xcaa23f);
+    lab.addChild(new PIXI.Graphics().circle(chipX, fh/2, chipR)
+      .fill({color:chipCol}).stroke({color:0x140d06, width:1.5}));
+    const lt = new PIXI.Text({text:String(t.level), style:{fontFamily:'Georgia,serif',
+      fontSize:11, fontWeight:'700', fill:0x201202}});
+    lt.anchor.set(0.5); lt.position.set(chipX, fh/2); lab.addChild(lt);
+    txt.anchor.set(0, 0.5); txt.position.set(chipX + chipR + gap, fh/2); lab.addChild(txt);
+    node.addChild(lab);
+    node._label = lab; node._labelBox = {w: totalW, h: fh};
+    node._pri = (t.mine ? 1e6 : 0) + t.level;   // приоритет в борьбе за место
     return node;
   }
 
@@ -293,13 +298,35 @@ const MINS = 0.14, MAXS = 9;  // пределы зума
       }
       markers.addChild(node);
     }
+    declutterLabels();
     reposition();
+  }
+
+  // greedy label placement: рамка-подпись видна, только если её экранный бокс не
+  // налезает на другое здание и на уже размещённые подписи. Приоритет — своя
+  // таверна и более высокий уровень (сортировка по _pri убыванием).
+  function declutterLabels(){
+    const blds = markers.children.filter(n => n._label);
+    const foot = blds.map(n => { const s = screenOf(n.wx, n.wy);
+      return {n, l:s.x-SCREEN_W*0.5, r:s.x+SCREEN_W*0.5, t:s.y-SCREEN_W*1.05, b:s.y+3}; });
+    const hit = (a,b) => !(a.r < b.l || a.l > b.r || a.b < b.t || a.t > b.b);
+    blds.sort((a,b) => b._pri - a._pri);
+    const placed = [];
+    for (const n of blds){
+      const s = screenOf(n.wx, n.wy), bw = n._labelBox.w, bh = n._labelBox.h;
+      const box = {l:s.x-bw/2, r:s.x+bw/2, t:s.y+8, b:s.y+8+bh};
+      let ok = true;
+      for (const f of foot){ if (f.n !== n && hit(box, f)){ ok = false; break; } }
+      if (ok) for (const p of placed){ if (hit(box, p)){ ok = false; break; } }
+      n._labelAllowed = ok;
+      if (ok) placed.push(box);
+    }
   }
   function reposition(){
     const showLabels = world.scale.x > LABEL_MIN;   // на сильном отдалении подписи прячем
     for (const node of markers.children){
       const s = screenOf(node.wx, node.wy); node.x = s.x; node.y = s.y;
-      if (node._label) node._label.visible = showLabels;
+      if (node._label) node._label.visible = showLabels && node._labelAllowed;
     }
   }
 
