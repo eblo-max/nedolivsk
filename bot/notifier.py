@@ -480,10 +480,8 @@ async def _notify_returned(bot: Bot) -> None:
                         inv.status = "battle"
                         inv_edits.append((dict(inv.messages or {}),
                                           texts.invasion_battle_screen(inv), None))
-                else:                                            # идёт сбор — отсчёт
-                    inv_edits.append((dict(inv.messages or {}),
-                                      texts.invasion_gather_screen(inv),
-                                      invasion_announce_kb(inv.id)))
+                # пока идёт сбор — анонс НЕ правим (отсчёт/состав живут на карте);
+                # сообщение в чате остаётся статичным призывом до старта битвы.
             elif inv.status == "battle":
                 if now >= (inv.resolve_at or now):               # время исхода — СИМУЛЯЦИЯ
                     parts = [dict(r, pid=int(pid))
