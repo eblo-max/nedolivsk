@@ -7,9 +7,10 @@
   GET /api/taverns — JSON таверн (норм. координаты слота, имя, уровень, регион)
   /assets/...      — статика (world.png, спрайты)
 
-Карта — НЕ гео: это наш нарисованный world.png. Leaflet с CRS.Simple кладёт его
-как imageOverlay, маркеры группируются кластерами — лимита на число таверн нет.
-Платных картсервисов не нужно; Leaflet/markercluster тянутся с CDN.
+Карта — 2.5D-«диорама» на PixiJS (WebGL): нарисованный world.png — это «земля»,
+а каждая таверна — стоячее здание-спрайт (map_tavern_<уровень>.png) с тенью,
+глубиной (depth-sort по Y), плавным pan/zoom (тащить, щипок, колесо) и тапом по
+зданию → карточка. Лимита на число таверн нет. Pixi тянется с CDN.
 """
 
 import os
@@ -56,6 +57,7 @@ async def _api_taverns(request: web.Request) -> web.Response:
             "x": round(pos[0], 4), "y": round(pos[1], 4),
             "name": tav.name or pl.first_name or "Таверна",
             "level": tav.level, "region": pl.region or "",
+            "tier": worldmap.sprite_tier(tav.level),   # какой спрайт-здание рисовать
             "mine": bool(uid) and pl.id == uid,
         })
     return web.json_response(
@@ -71,12 +73,28 @@ async def _world_png(request: web.Request) -> web.Response:
     return web.FileResponse(worldmap.MAP_FILE)
 
 
+async def _tavern_sprite(request: web.Request) -> web.Response:
+    # Спрайты-здания таверн по уровню (1..9) для 2.5D-диорамы. Только эти файлы —
+    # не вся папка assets (там бывают служебные картинки).
+    try:
+        n = int(request.match_info["n"])
+    except (KeyError, ValueError):
+        raise web.HTTPNotFound()
+    if not 1 <= n <= 9:
+        raise web.HTTPNotFound()
+    p = ASSETS_DIR / f"map_tavern_{n}.png"
+    if not p.is_file():
+        raise web.HTTPNotFound()
+    return web.FileResponse(p)
+
+
 def build_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/", lambda r: web.Response(text="ok"))
     app.router.add_get("/map", _map_page)
     app.router.add_get("/api/taverns", _api_taverns)
-    app.router.add_get("/assets/world.png", _world_png)   # только карта, не вся папка
+    app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
+    app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
     return app
 
 
@@ -94,69 +112,171 @@ _MAP_HTML = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Карта Недоливска</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
 <style>
-  html,body{margin:0;height:100%;background:#140d06;font:14px/1.4 Georgia,serif;color:#f3e6c8}
-  #map{position:absolute;inset:0;background:#140d06}
-  .leaflet-container{background:#140d06}
-  .pin{display:flex;align-items:center;justify-content:center;width:26px;height:26px;
-    border-radius:50%;border:2px solid #2a1a0a;color:#fff;font:700 12px Georgia,serif;
-    box-shadow:0 2px 6px rgba(0,0,0,.6)}
-  .pin.me{border-color:#ffd24a;box-shadow:0 0 0 3px #ffd24a88,0 2px 8px #000}
-  .leaflet-popup-content-wrapper{background:#2a1d10;color:#f3e6c8;border:1px solid #5a4527}
-  .leaflet-popup-tip{background:#2a1d10}
-  .leaflet-popup-content b{color:#f6dca0}
-  .bar{position:absolute;left:8px;top:8px;z-index:1000;background:#241809cc;border:1px solid #5a4527;
-    border-radius:10px;padding:6px 10px;font-size:12px;color:#e9d6a8;backdrop-filter:blur(3px)}
-  .leaflet-bar a{background:#2a1d10;color:#f3e6c8;border-bottom:1px solid #5a4527}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0e1822;
+    font:14px/1.4 Georgia,serif;color:#f3e6c8;-webkit-tap-highlight-color:transparent}
+  canvas{display:block;touch-action:none}
+  .bar{position:fixed;left:8px;top:8px;z-index:10;background:#241809d8;border:1px solid #5a4527;
+    border-radius:10px;padding:6px 11px;font-size:12px;color:#e9d6a8;backdrop-filter:blur(3px)}
+  .card{position:fixed;left:50%;bottom:14px;transform:translateX(-50%) translateY(140%);
+    z-index:10;width:min(92vw,420px);background:#241809f2;border:1px solid #6b522e;
+    border-radius:14px;padding:12px 14px;box-shadow:0 8px 26px #000a;transition:transform .22s ease}
+  .card.show{transform:translateX(-50%) translateY(0)}
+  .card .nm{font-size:17px;color:#f6dca0;font-weight:700;margin:0 0 4px}
+  .card .rw{display:flex;gap:14px;font-size:13px;color:#d8c39a;flex-wrap:wrap}
+  .card .rg{color:#c2a878}
+  .card .me{margin-top:7px;color:#ffd24a;font-weight:700}
+  .card .x{position:absolute;right:9px;top:6px;font-size:20px;color:#a98c5c;cursor:pointer;line-height:1}
+  .hint{position:fixed;right:8px;top:8px;z-index:10;font-size:11px;color:#9a8052;opacity:.85}
 </style></head>
 <body>
-<div id="map"></div>
-<div class="bar" id="bar">🗺 Карта Недоливска · загрузка…</div>
+<div class="bar" id="bar">🗺 Недоливск · загрузка…</div>
+<div class="hint">тащи · щипок/колесо — зум · тапни таверну</div>
+<div class="card" id="card">
+  <span class="x" id="cardx">×</span>
+  <div class="nm" id="cnm"></div>
+  <div class="rw"><span id="clv"></span><span class="rg" id="crg"></span></div>
+  <div class="me" id="cme" style="display:none">🏠 Твоя таверна</div>
+</div>
 <script>
 const tg = window.Telegram?.WebApp; if (tg){ tg.ready(); tg.expand(); }
 const myId = tg?.initDataUnsafe?.user?.id || 0;
-const COLORS = {north_wilds:'#5b8def', green_valleys:'#5fb36a', red_wastes:'#c9603f'};
+const bar = document.getElementById('bar');
+const card = document.getElementById('card');
+const RING = {north_wilds:0x6ea8ff, green_valleys:0x6fd07a, red_wastes:0xe07a55};
+const SPRITE_W = 78;          // ширина здания в мировых px
+const MINS = 0.18, MAXS = 6;  // пределы зума
 
-const img = new Image();
-img.src = '/assets/world.png';
-img.onload = () => {
-  const W = img.naturalWidth, H = img.naturalHeight;
-  const map = L.map('map', {crs: L.CRS.Simple, minZoom: -5, maxZoom: 4,
-                           zoomControl: true, attributionControl: false});
-  const bounds = [[0,0],[H,W]];
-  L.imageOverlay(img.src, bounds).addTo(map);
-  map.fitBounds(bounds);
-  map.setMaxBounds(L.latLngBounds(bounds).pad(0.2));
+(async () => {
+  const app = new PIXI.Application();
+  await app.init({resizeTo: window, antialias: true, background: 0x0e1822,
+                  resolution: Math.min(window.devicePixelRatio||1, 2), autoDensity: true});
+  document.body.appendChild(app.canvas);
 
-  fetch('/api/taverns?uid=' + encodeURIComponent(myId)).then(r => r.json()).then(data => {
-    const regions = data.regions || {};
-    const cluster = L.markerClusterGroup({maxClusterRadius: 44, showCoverageOnHover:false});
-    let mine = null;
-    data.taverns.forEach(t => {
-      const lat = (1 - t.y) * H, lng = t.x * W;        // норм.(от верха) → CRS.Simple
-      const me = !!t.mine;
-      const col = COLORS[t.region] || '#caa23f';
-      const icon = L.divIcon({className:'', iconSize:[26,26],
-        html:`<div class="pin ${me?'me':''}" style="background:${col}">${t.level}</div>`});
-      const m = L.marker([lat,lng], {icon});
-      m.bindPopup(`<b>${esc(t.name)}</b><br>Уровень ${t.level}<br>`+
-                  `<span style="color:#c2a878">${esc(regions[t.region]||t.region)}</span>`+
-                  (me?'<br>🏠 <b>Твоя таверна</b>':''));
-      if (me) mine = [lat,lng];
-      cluster.addLayer(m);
-    });
-    map.addLayer(cluster);
-    document.getElementById('bar').textContent =
-      `🗺 Недоливск · таверн на карте: ${data.taverns.length}`;
-    if (mine) map.setView(mine, 1);
-  }).catch(e => { document.getElementById('bar').textContent = '⚠ не загрузить таверны'; });
-};
-img.onerror = () => { document.getElementById('bar').textContent = '⚠ карта не загрузилась'; };
-function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+  let bgTex;
+  try { bgTex = await PIXI.Assets.load('/assets/world.png'); }
+  catch(e){ bar.textContent='⚠ карта не загрузилась'; return; }
+  const W = bgTex.width, H = bgTex.height;
+
+  const world = new PIXI.Container();
+  app.stage.addChild(world);
+  const bg = new PIXI.Sprite(bgTex); world.addChild(bg);
+  const layer = new PIXI.Container(); layer.sortableChildren = true; world.addChild(layer);
+
+  // первичная посадка карты по центру экрана
+  const fit = Math.min(app.screen.width/W, app.screen.height/H) * 0.96;
+  world.scale.set(fit);
+  world.x = (app.screen.width  - W*fit)/2;
+  world.y = (app.screen.height - H*fit)/2;
+
+  // --- таверны ---
+  let data;
+  try { data = await (await fetch('/api/taverns?uid='+encodeURIComponent(myId))).json(); }
+  catch(e){ bar.textContent='⚠ не загрузить таверны'; return; }
+  const regions = data.regions || {};
+
+  // предзагрузим только нужные спрайты-здания
+  const tiers = [...new Set(data.taverns.map(t=>t.tier))];
+  const tex = {};
+  await Promise.all(tiers.map(async n => {
+    try { tex[n] = await PIXI.Assets.load('/assets/map_tavern_'+n+'.png'); } catch(e){}
+  }));
+
+  let mineXY = null;
+  for (const t of data.taverns){
+    const px = t.x*W, py = t.y*H;
+    const node = new PIXI.Container(); node.x = px; node.y = py; node.zIndex = py;
+
+    const st = tex[t.tier];
+    const w = SPRITE_W, h = st ? w*(st.height/st.width) : w;
+
+    // тень под зданием
+    const sh = new PIXI.Graphics().ellipse(0,0, w*0.42, w*0.15).fill({color:0x000000, alpha:0.34});
+    node.addChild(sh);
+    // подсветка своей таверны
+    if (t.mine){
+      node.addChild(new PIXI.Graphics().ellipse(0,0, w*0.5, w*0.19)
+        .stroke({color:0xffd24a, width:3, alpha:0.95}));
+    } else {
+      node.addChild(new PIXI.Graphics().ellipse(0,0, w*0.46, w*0.17)
+        .stroke({color:RING[t.region]||0xcaa23f, width:2, alpha:0.55}));
+    }
+
+    if (st){
+      const sp = new PIXI.Sprite(st); sp.anchor.set(0.5, 1); sp.scale.set(w/st.width);
+      node.addChild(sp);
+      sp.eventMode='static'; sp.cursor='pointer';
+      sp.on('pointertap', ()=> showCard(t));
+    } else {
+      // нет спрайта — кружок с уровнем
+      const g = new PIXI.Graphics().circle(0,-w*0.4, w*0.32)
+        .fill({color: t.mine?0xffd24a:(RING[t.region]||0xcaa23f)});
+      node.addChild(g); g.eventMode='static'; g.cursor='pointer';
+      g.on('pointertap', ()=> showCard(t));
+    }
+    // бейдж уровня
+    const lvl = new PIXI.Text({text:String(t.level), style:{fontFamily:'Georgia,serif',
+      fontSize:18, fontWeight:'700', fill:0xfff3d6, stroke:{color:0x241809, width:4}}});
+    lvl.anchor.set(0.5,1); lvl.scale.set(0.62); lvl.y = -h - 2; node.addChild(lvl);
+
+    layer.addChild(node);
+    if (t.mine) mineXY = {x:px, y:py};
+  }
+  bar.textContent = '🗺 Недоливск · таверн на карте: ' + data.taverns.length;
+  if (mineXY) centerOn(mineXY.x, mineXY.y, Math.max(world.scale.x, 0.7));
+
+  // ---------- pan / zoom ----------
+  app.stage.eventMode = 'static';
+  app.stage.hitArea = {contains:()=>true};
+  const ptrs = new Map(); let lastDist = null;
+
+  function zoomAt(sx, sy, factor){
+    const ns = Math.min(MAXS, Math.max(MINS, world.scale.x*factor));
+    const f = ns/world.scale.x;
+    world.x = sx - (sx-world.x)*f;
+    world.y = sy - (sy-world.y)*f;
+    world.scale.set(ns);
+  }
+  function centerOn(wx, wy, s){
+    world.scale.set(Math.min(MAXS, Math.max(MINS, s)));
+    world.x = app.screen.width/2  - wx*world.scale.x;
+    world.y = app.screen.height/2 - wy*world.scale.y;
+  }
+
+  app.stage.on('pointerdown', e => ptrs.set(e.pointerId, {x:e.global.x, y:e.global.y}));
+  const drop = e => { ptrs.delete(e.pointerId); if (ptrs.size<2) lastDist=null; };
+  app.stage.on('pointerup', drop);
+  app.stage.on('pointerupoutside', drop);
+  app.stage.on('pointermove', e => {
+    if (!ptrs.has(e.pointerId)) return;
+    const prev = ptrs.get(e.pointerId);
+    const cur = {x:e.global.x, y:e.global.y};
+    ptrs.set(e.pointerId, cur);
+    if (ptrs.size === 1){
+      world.x += cur.x-prev.x; world.y += cur.y-prev.y;
+    } else if (ptrs.size === 2){
+      const p = [...ptrs.values()];
+      const d = Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y);
+      const mx = (p[0].x+p[1].x)/2, my = (p[0].y+p[1].y)/2;
+      if (lastDist) zoomAt(mx, my, d/lastDist);
+      lastDist = d;
+    }
+  });
+  app.canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomAt(e.offsetX, e.offsetY, e.deltaY<0 ? 1.12 : 0.89);
+  }, {passive:false});
+
+  // ---------- карточка ----------
+  function showCard(t){
+    document.getElementById('cnm').textContent = t.name;
+    document.getElementById('clv').textContent = 'Уровень ' + t.level;
+    document.getElementById('crg').textContent = regions[t.region] || t.region || '';
+    document.getElementById('cme').style.display = t.mine ? 'block' : 'none';
+    card.classList.add('show');
+  }
+  document.getElementById('cardx').onclick = () => card.classList.remove('show');
+})();
 </script>
 </body></html>"""
