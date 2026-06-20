@@ -413,12 +413,12 @@ _MAP_HTML = """<!doctype html>
   .reg .rb:active{transform:scale(.98)} .reg .rb:disabled{opacity:.55}
   .reg .rj{font-size:14px;color:#ffd24a;font-weight:700}
   .rep{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:12;display:none;
-    width:min(96vw,470px);max-height:78vh;overflow:auto;background:#1c1206f8;
-    border:1px solid #c9803a;border-radius:14px;padding:12px 12px 16px;
+    width:min(88vw,410px);max-height:76vh;overflow:auto;background:#1c1206f8;
+    border:1px solid #c9803a;border-radius:14px;padding:12px 11px 15px;
     box-shadow:0 10px 34px #000d}
   .rep h3{margin:0 0 9px;font-size:15px;color:#ffd9a8;text-align:center;padding-right:18px}
   .rep .x{position:absolute;right:11px;top:8px;font-size:20px;color:#a98c5c;cursor:pointer;line-height:1}
-  .rep table{width:100%;border-collapse:collapse;font-size:12px}
+  .rep table{width:100%;border-collapse:collapse;font-size:11.5px}
   .rep th{color:#a98c5c;font-weight:600;text-align:right;padding:3px 4px}
   .rep th:first-child{text-align:left}
   .rep td{padding:5px 4px;text-align:right;border-top:1px solid #3a2a16;color:#e6d3a8}
@@ -636,7 +636,7 @@ const MAXS = 9;               // максимальный зум; минимал
       if (node._label) node._label.visible = showLabels && node._labelAllowed;
     }
     for (const ev of eventNodes){ const s = screenOf(ev.wx, ev.wy);
-      ev.x = s.x; ev.y = s.y; ev.scale.set(k * 0.62); }   // ивенты крупнее таверн
+      ev.x = s.x; ev.y = s.y; ev.scale.set(k * 0.52); }   // ивенты крупнее таверн
   }
 
   // перерисовку коалесцируем по кадрам: пан — только перепозиционируем (дёшево),
