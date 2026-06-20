@@ -134,7 +134,8 @@ _MAP_HTML = """<!doctype html>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#0e1822;
+  html,body{margin:0;padding:0;height:100%;width:100%;overflow:hidden;
+    position:fixed;inset:0;overscroll-behavior:none;background:#0e1822;
     font:14px/1.4 Georgia,serif;color:#f3e6c8;-webkit-tap-highlight-color:transparent}
   canvas{display:block;touch-action:none}
   .bar{position:fixed;left:8px;top:8px;z-index:10;background:#241809d8;border:1px solid #5a4527;
@@ -160,7 +161,12 @@ _MAP_HTML = """<!doctype html>
   <div class="me" id="cme" style="display:none">🏠 Твоя таверна</div>
 </div>
 <script>
-const tg = window.Telegram?.WebApp; if (tg){ tg.ready(); tg.expand(); }
+const tg = window.Telegram?.WebApp;
+if (tg){ tg.ready(); tg.expand();
+  // отключаем вертикальный свайп Telegram (тянет/закрывает мини-апп) — иначе
+  // нельзя протащить карту вниз, чтобы посмотреть север. 7.7+; на старых — no-op.
+  try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch(e){}
+}
 const myId = tg?.initDataUnsafe?.user?.id || 0;
 const bar = document.getElementById('bar');
 const card = document.getElementById('card');
