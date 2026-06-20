@@ -66,7 +66,7 @@ def regions_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
-def tavern_kb(player: Player) -> InlineKeyboardMarkup:
+def tavern_kb(player: Player, private: bool = True) -> InlineKeyboardMarkup:
     from bot.game import buff, newbie, raid as raidmod, story_state
 
     kb = InlineKeyboardBuilder()
@@ -75,11 +75,14 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
     if raidmod.active_id() is not None:  # идёт глобальный рейд-босс — в бой!
         kb.button(text="⚔️ РЕЙД-БОСС — В БОЙ!", callback_data="raidopen", style="danger")
         sizes.append(1)
-    from bot import webapp  # интерактивная карта мира (Mini App) — если хостинг задан
-    _murl = webapp.base_url()
-    if _murl:
-        kb.button(text="🗺 Карта мира", web_app=WebAppInfo(url=f"{_murl}/map"))
-        sizes.append(1)
+    # Web-App кнопки Telegram принимает ТОЛЬКО в личке — в группе панель с такой
+    # кнопкой отклоняется целиком (ломала «гг таверна»). Потому карта — лишь в ЛС.
+    if private:
+        from bot import webapp  # интерактивная карта мира (Mini App) — если хостинг задан
+        _murl = webapp.base_url()
+        if _murl:
+            kb.button(text="🗺 Карта мира", web_app=WebAppInfo(url=f"{_murl}/map"))
+            sizes.append(1)
     if player.chat_id is None:  # одиночка — переключатель вестей мира в ЛС
         on = getattr(player, "dm_news", False)
         kb.button(text=f"🌍 Вести мира в ЛС: {'✅' if on else '❌'}",

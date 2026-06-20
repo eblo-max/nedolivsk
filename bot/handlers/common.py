@@ -165,7 +165,7 @@ async def send_tavern_screen(
     """Экран таверны: фото уровня + подпись, либо просто текст, если фото нет."""
     buff.refresh(player)  # прокрутить ежедневный бонус (выдать/сжечь/снять баф)
     caption = texts.tavern_screen(player, player.tavern)
-    markup = kb.tavern_kb(player)
+    markup = kb.tavern_kb(player, private=message.chat.type == "private")
     img = images.tavern_image(player.tavern.level)
     if img is not None:
         msg = await message.answer_photo(
@@ -256,7 +256,7 @@ async def show_tavern_panel(
     """Экран таверны в текущем окне (переход с куклы обратно к таверне)."""
     buff.refresh(player)  # прокрутить ежедневный бонус (выдать/сжечь/снять баф)
     caption = texts.tavern_screen(player, player.tavern)
-    markup = kb.tavern_kb(player)
+    markup = kb.tavern_kb(player, private=message.chat.type == "private")
     img = images.tavern_image(player.tavern.level)
     if img is None:
         return await show_text_panel(message, caption, markup, owner_id)
