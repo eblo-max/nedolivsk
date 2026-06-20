@@ -869,6 +869,28 @@ def set_bot_username(username: str) -> None:
     _BOT_USERNAME = (username or "").lstrip("@")
 
 
+def world_map_kb(private: bool) -> InlineKeyboardMarkup | None:
+    """Кнопка «Открыть интерактивную карту»: в личке — web_app (работает сразу);
+    в группе — url на Direct-Link Mini App (если настроен webapp_short_name + имя
+    бота), иначе None (web_app в группах Telegram не работает)."""
+    from bot.config import settings
+    from bot.webapp import base_url
+    b = base_url()
+    if not b:
+        return None
+    kb = InlineKeyboardBuilder()
+    if private:
+        from aiogram.types import WebAppInfo
+        kb.button(text="🗺 Открыть карту мира", web_app=WebAppInfo(url=b + "/map"))
+        return kb.as_markup()
+    short = (getattr(settings, "webapp_short_name", "") or "").strip()
+    if short and _BOT_USERNAME:
+        kb.button(text="🗺 Открыть карту мира",
+                  url=f"https://t.me/{_BOT_USERNAME}/{short}?startapp=map")
+        return kb.as_markup()
+    return None
+
+
 def invasion_map_dm_kb(map_url: str) -> InlineKeyboardMarkup:
     """Личка-кнопка: web_app открывает карту прямо в Telegram (тест/админ/пуш)."""
     from aiogram.types import WebAppInfo

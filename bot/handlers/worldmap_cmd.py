@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db import repo
 from bot.game import worldmap
+from bot.keyboards.inline import world_map_kb
 
 router = Router()
 
@@ -38,6 +39,14 @@ async def cmd_map(message: Message, session: AsyncSession) -> None:
         caption += "\n⛺ Ждут места: " + ", ".join(
             escape(n) for n in homeless[:5]
         )
+    # кнопка на ЖИВУЮ интерактивную карту (личка — web_app; группа — Direct-Link)
+    private = message.chat.type == "private"
+    kb = world_map_kb(private)
+    if kb is None and not private:
+        caption += "\n\n🗺 <i>Живая интерактивная карта — открой бота в личке.</i>"
+    else:
+        caption += "\n\n👇 <b>Открой живую интерактивную карту</b> — зум, таверны, ивенты."
     return await message.answer_photo(
-        BufferedInputFile(img, filename="nedolivsk_map.jpg"), caption=caption
+        BufferedInputFile(img, filename="nedolivsk_map.jpg"),
+        caption=caption, reply_markup=kb,
     )
