@@ -187,9 +187,10 @@ def simulate(participants: list[dict], seed: int = 0) -> dict:
     полем pid. Возвращает {won, rounds, orc_hp_max, orc_hp_left, dealt:{pid:int},
     fell:[pid], events:[(round, kind, payload)], n}. Чистая — без БД/IO."""
     n = len(participants)
-    if n == 0:
+    if n == 0:                      # пустой ростер — ВСЕ ключи на месте (иначе KeyError снаружи)
         return {"won": False, "rounds": 0, "orc_hp_max": 0, "orc_hp_left": 0,
-                "dealt": {}, "fell": [], "events": [], "n": 0}
+                "dealt": {}, "stats": {}, "fell": [], "events": [],
+                "timeline": [], "n": 0}
     rng = random.Random(seed)
     power = sum(_unit_output(p, ORC_ARMOR) for p in participants) or 1.0
     orc_hp_max = max(MIN_ORC_HP, round(HP_PER_POWER * power ** HP_POWER_EXP))

@@ -159,6 +159,10 @@ def test_front_line_and_turnout_decide():
 def test_simulate_empty_and_tracks_contribution():
     r0 = inv.simulate([], seed=1)
     assert r0["won"] is False and r0["n"] == 0 and r0["dealt"] == {}
+    # ВСЕ ключи должны быть и у пустого ростера (иначе KeyError на /api/taverns)
+    need = {"timeline", "stats", "dealt", "fell", "events", "won", "rounds",
+            "orc_hp_max", "orc_hp_left", "n"}
+    assert need <= set(r0) and r0["timeline"] == [] and r0["stats"] == {}
     a = _army({"archer": 8})
     r = inv.simulate(a, seed=3)
     assert set(r["dealt"]) == {p["pid"] for p in a}     # вклад посчитан всем
