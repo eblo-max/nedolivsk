@@ -981,8 +981,8 @@ const MAXS = 9;               // максимальный зум; минимал
     const start = performance.now()/1000 - (ev.elapsed || 0);
     app.ticker.add(() => {
       const left = Math.max(0, (ev.gather_secs || 0) - (performance.now()/1000 - start));
-      if (left <= 0){ sub.textContent = 'Войска выступили — бой начался'; btn.disabled = true; }
-      else sub.textContent = '⏳ Выход через ' + Math.floor(left/60) + ':'
+      if (left <= 0){ reg.style.display = 'none'; return; }   // сбор окончен — плашка уходит
+      sub.textContent = '⏳ Выход через ' + Math.floor(left/60) + ':'
         + String(Math.floor(left % 60)).padStart(2, '0') + ' · таверн: ' + (ev.n || 0);
     });
     btn.onclick = async () => {
