@@ -69,8 +69,20 @@ async def _api_taverns(request: web.Request) -> web.Response:
             "tier": worldmap.sprite_tier(tav.level),   # какой спрайт-здание рисовать
             "mine": bool(uid) and pl.id == uid,
         })
+    # Демо-ивент для предпросмотра анимации (?inv=demo): таймлайн + войска из
+    # реальных таверн. Реальная регистрация/таймеры подключатся позже (бэкенд).
+    events = MAP_EVENTS
+    if request.query.get("inv") == "demo" and MAP_EVENTS:
+        troops = [{"x": t["x"], "y": t["y"]} for t in out[:8]]
+        ev = dict(MAP_EVENTS[0])
+        ev.update({
+            "demo": True, "result": "won",
+            "gather_secs": 10, "march_secs": 14, "battle_secs": 30,
+            "troops": troops,
+        })
+        events = [ev]
     return web.json_response(
-        {"taverns": out, "regions": balance.REGIONS, "events": MAP_EVENTS},
+        {"taverns": out, "regions": balance.REGIONS, "events": events},
         headers={"Cache-Control": "no-store"})
 
 
@@ -117,14 +129,20 @@ async def _tavern_sprite(request: web.Request) -> web.Response:
                         headers={"Cache-Control": "public, max-age=86400"})
 
 
+_EVENT_ANIMS = {"idle", "hurt", "die", "attack", "walk", "run"}
+
+
 async def _event_sprite(request: web.Request) -> web.Response:
-    # IDLE-стрип орка-ивента (1..3): 10 кадров в ряд для AnimatedSprite на карте.
+    # Стрип-анимация орка-ивента: ork{n}_{anim}.png — 10 кадров в ряд (AnimatedSprite).
     try:
         n = int(request.match_info["n"])
     except (KeyError, ValueError):
         raise web.HTTPNotFound()
-    p = ASSETS_DIR / "boss" / f"ork{n}_idle.png"
-    if not (1 <= n <= 3) or not p.is_file():
+    anim = request.match_info.get("anim", "idle")
+    if not (1 <= n <= 3) or anim not in _EVENT_ANIMS:
+        raise web.HTTPNotFound()
+    p = ASSETS_DIR / "boss" / f"ork{n}_{anim}.png"
+    if not p.is_file():
         raise web.HTTPNotFound()
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
@@ -136,7 +154,7 @@ def build_app() -> web.Application:
     app.router.add_get("/api/taverns", _api_taverns)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
-    app.router.add_get("/assets/boss/ork{n}_idle.png", _event_sprite)  # ивент-объекты
+    app.router.add_get("/assets/boss/ork{n}_{anim}.png", _event_sprite)  # ивент-анимации
     return app
 
 
@@ -174,9 +192,13 @@ _MAP_HTML = """<!doctype html>
   .hint{position:fixed;right:8px;top:8px;z-index:10;font-size:11px;color:#9a8052;opacity:.85}
   .vig{position:fixed;inset:0;pointer-events:none;z-index:5;
     background:radial-gradient(ellipse 78% 78% at 50% 50%, transparent 58%, #060a12 100%)}
+  .ev{position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:10;display:none;
+    background:#2a160ae8;border:1px solid #c9803a;border-radius:11px;padding:7px 16px;
+    font-size:13px;color:#ffe2a8;font-weight:700;box-shadow:0 4px 16px #000a;white-space:nowrap}
 </style></head>
 <body>
 <div class="vig"></div>
+<div class="ev" id="ev"></div>
 <div class="bar" id="bar">🗺 Недоливск · загрузка…</div>
 <div class="hint">тащи · щипок/колесо — зум · тап по кружку — раскрыть</div>
 <div class="card" id="card">
@@ -229,8 +251,10 @@ const MAXS = 9;               // максимальный зум; минимал
   world.scale.set(minScale); clampCam();
 
   // --- таверны ---
+  const inv = new URLSearchParams(location.search).get('inv');   // ?inv=demo — предпросмотр ивента
   let data;
-  try { data = await (await fetch('/api/taverns?uid='+encodeURIComponent(myId))).json(); }
+  try { data = await (await fetch('/api/taverns?uid='+encodeURIComponent(myId)
+        + (inv ? '&inv='+encodeURIComponent(inv) : ''))).json(); }
   catch(e){ bar.textContent='⚠ не загрузить таверны'; return; }
   const regions = data.regions || {};
   const taverns = data.taverns.map(t => ({...t, wx: t.x*W, wy: t.y*H}));  // мировые px
@@ -448,11 +472,9 @@ const MAXS = 9;               // максимальный зум; минимал
     try {
       const tex = await PIXI.Assets.load('/assets/boss/ork'+ev.sprite+'_idle.png');
       const fw = tex.width/10, fh = tex.height;   // стрип = 10 равных кадров в ряд
-      const frames = [];
-      for (let i=0;i<10;i++)
-        frames.push(new PIXI.Texture({source:tex.source, frame:new PIXI.Rectangle(i*fw,0,fw,fh)}));
-      const node = buildEvent(ev, frames, fw, fh);
+      const node = buildEvent(ev, sliceFrames(tex, 10), fw, fh);
       eventLayer.addChild(node); eventNodes.push(node);
+      if (ev.gather_secs != null) await setupInvasion(ev, node, fw, fh);   // полноценный ивент с боем
     } catch(e){ console.log('event load fail', e); }
   }
   if (eventNodes.length){
@@ -470,24 +492,112 @@ const MAXS = 9;               // максимальный зум; минимал
     document.getElementById('cme').style.display = t.mine ? 'block' : 'none';
     card.classList.add('show');
   }
+  function sliceFrames(tex, count){
+    const fw = tex.width/count, fh = tex.height, fr = [];
+    for (let i=0;i<count;i++)
+      fr.push(new PIXI.Texture({source:tex.source, frame:new PIXI.Rectangle(i*fw,0,fw,fh)}));
+    return fr;
+  }
   function buildEvent(ev, frames, fw, fh){
-    const node = new PIXI.Container(); node.wx = ev.x*W; node.wy = ev.y*H;
+    const node = new PIXI.Container(); node.wx = ev.x*W; node.wy = ev.y*H; node._fh = fh; node._fw = fw;
     // мягкое тёплое свечение под ивентом (пульсирует) + тень
     const glow = new PIXI.Graphics().ellipse(0, -fh*0.06, fw*0.5, fw*0.2).fill({color:0xffb347, alpha:0.2});
     node.addChild(glow); node._glow = glow;
     node.addChild(new PIXI.Graphics().ellipse(0,0, fw*0.4, fw*0.13).fill({color:0x000000, alpha:0.42}));
     const anim = new PIXI.AnimatedSprite(frames); anim.animationSpeed = 0.12; anim.anchor.set(0.5,1); anim.play();
     anim.eventMode='static'; anim.cursor='pointer'; anim.on('pointertap', e=> showEventCard(ev, e));
-    node.addChild(anim);
-    // банер-подпись названия ивента (рамка с акцентом)
-    const txt = new PIXI.Text({text:'⚔ '+ev.name, style:{fontFamily:'Georgia,serif',
-      fontSize:14, fontWeight:'700', fill:0xffe2a8}});
-    txt.anchor.set(0.5, 1); txt.y = -fh - 8;
-    const bw = txt.width + 18, by = -fh - 8 - txt.height - 4;
-    node.addChild(new PIXI.Graphics().roundRect(-bw/2, by, bw, txt.height + 6, 7)
-      .fill({color:0x2a160a, alpha:0.9}).stroke({color:0xc9803a, width:1.4, alpha:0.9}));
-    node.addChild(txt);
+    node.addChild(anim); node._anim = anim; node._idle = frames;
+    // статичная подпись-банер — только для idle-маркера (у ивента с боем банер сверху, в HTML)
+    if (ev.gather_secs == null){
+      const txt = new PIXI.Text({text:'⚔ '+ev.name, style:{fontFamily:'Georgia,serif',
+        fontSize:14, fontWeight:'700', fill:0xffe2a8}});
+      txt.anchor.set(0.5, 1); txt.y = -fh - 8;
+      const bw = txt.width + 18, by = -fh - 8 - txt.height - 4;
+      node.addChild(new PIXI.Graphics().roundRect(-bw/2, by, bw, txt.height + 6, 7)
+        .fill({color:0x2a160a, alpha:0.9}).stroke({color:0xc9803a, width:1.4, alpha:0.9}));
+      node.addChild(txt);
+    }
     return node;
+  }
+  // полноценный ивент: сбор → марш войск из таверн → авто-бой → итог.
+  // Драйвится таймлайном (демо — локальная петля; реальный — серверное время).
+  async function setupInvasion(ev, node, fw, fh){
+    const anim = node._anim, idle = node._idle;
+    const A = {};
+    for (const a of ['hurt','die','attack']){
+      try { A[a] = sliceFrames(await PIXI.Assets.load('/assets/boss/ork'+ev.sprite+'_'+a+'.png'), 10); } catch(e){}
+    }
+    const bx = ev.x*W, by = ev.y*H;
+    // HP-бар орды (рисуем по ходу боя)
+    const hp = new PIXI.Graphics(); hp.visible = false; node.addChild(hp);
+    const barW = fw*0.8, barY = -fh - 16;
+    function drawHp(frac){
+      frac = Math.max(0, Math.min(1, frac)); hp.clear();
+      hp.roundRect(-barW/2, barY, barW, 11, 4).fill({color:0x140d06, alpha:0.85}).stroke({color:0x6b522e, width:1});
+      if (frac>0) hp.roundRect(-barW/2+1.5, barY+1.5, (barW-3)*frac, 8, 3).fill({color:0xc0392b});
+    }
+    // войска — маленькие флаг-токены, выходят из таверн
+    const units = (ev.troops||[]).map((t,i) => {
+      const g = new PIXI.Container();
+      g.addChild(new PIXI.Graphics().ellipse(0,2, 7, 2.5).fill({color:0x000000, alpha:0.3}));
+      g.addChild(new PIXI.Graphics().moveTo(0,1).lineTo(0,-13).stroke({color:0x2a1d10, width:2}));
+      g.addChild(new PIXI.Graphics().poly([0,-13, 11,-10, 0,-6]).fill({color:0x4a7bd0}));
+      g.addChild(new PIXI.Graphics().circle(0,-2, 3.6).fill({color:0xe0cda0}));
+      g.visible = false; eventLayer.addChild(g);
+      return {g, ox:t.x*W, oy:t.y*H, wx:t.x*W, wy:t.y*H,
+              ang:Math.random()*6.28, rad:fw*(0.30+0.25*Math.random()), delay:(i%6)*0.06};
+    });
+    const G=ev.gather_secs, M=ev.march_secs, B=ev.battle_secs, END=4, TOTAL=G+M+B+END;
+    const evEl = document.getElementById('ev');
+    let start = performance.now()/1000, cur='', dieStarted=false, lastHurt=0;
+    function setAnim(name){
+      if (cur===name) return;
+      const fr = name==='idle' ? idle : A[name]; if (!fr) return;
+      anim.textures = fr; anim.loop = (name!=='die'); anim.gotoAndPlay(0); cur=name;
+    }
+    function fmt(s){ s=Math.max(0,Math.ceil(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+    function reset(){ start=performance.now()/1000; cur=''; dieStarted=false; node.alpha=1; anim.tint=0xffffff;
+      setAnim('idle'); for (const u of units){ u.wx=u.ox; u.wy=u.oy; u.g.alpha=1; u.g.visible=false; } }
+    setAnim('idle');
+
+    app.ticker.add(() => {
+      let t = (performance.now()/1000) - start;
+      if (t > TOTAL){ if (ev.demo) { reset(); t = 0; } else t = TOTAL; }
+      const k = markerK();
+      if (t < G){                                   // СБОР
+        evEl.style.display='block';
+        evEl.textContent = '⚔ Сбор войск · выход через '+Math.ceil(G-t)+'с · таверн: '+units.length;
+        setAnim('idle'); hp.visible=false; for (const u of units) u.g.visible=false;
+      } else if (t < G+M){                            // МАРШ
+        const p=(t-G)/M;
+        evEl.textContent = '⚔ Войска идут к орде!'; setAnim('idle'); hp.visible=false;
+        for (const u of units){
+          const lp = Math.max(0, Math.min(1, (p-u.delay)/(1-u.delay)));
+          u.wx = u.ox + (bx-u.ox)*lp; u.wy = u.oy + (by-u.oy)*lp; u.g.visible = lp>0;
+        }
+      } else if (t < G+M+B){                          // БОЙ
+        const bp=(t-(G+M))/B;
+        evEl.textContent = '⚔ Битва · '+fmt(B*(1-bp));
+        hp.visible=true; drawHp(1-bp);
+        for (const u of units){ u.ang+=0.03;
+          u.wx = bx + Math.cos(u.ang)*u.rad*0.5; u.wy = by + Math.sin(u.ang)*u.rad*0.28 - fh*0.08; }
+        const s = performance.now()/1000;
+        if (s-lastHurt > 0.9){ lastHurt=s; anim.tint=0xff7a6a; setAnim('hurt'); }
+        else if (s-lastHurt > 0.32){ anim.tint=0xffffff; setAnim('idle'); }
+      } else {                                        // ИТОГ
+        const won = ev.result!=='lost';
+        evEl.textContent = won ? '🏆 Орда разбита! Победа за городом' : '💀 Орки устояли…';
+        if (won){
+          hp.visible=false;
+          if (!dieStarted && A.die){ dieStarted=true; anim.tint=0xffffff; setAnim('die'); }
+          node.alpha = Math.max(0, node.alpha - 0.012);
+        } else {
+          hp.visible=true; drawHp(0.35); setAnim('idle'); anim.tint=0xffffff;
+          for (const u of units){ u.wx += (u.ox-u.wx)*0.04; u.wy += (u.oy-u.wy)*0.04; }
+        }
+      }
+      for (const u of units){ const s=screenOf(u.wx,u.wy); u.g.x=s.x; u.g.y=s.y; u.g.scale.set(k*0.55); }
+    });
   }
   function showEventCard(ev, e){
     if (e) e.stopPropagation();
