@@ -198,11 +198,10 @@ const MAXS = 9;               // максимальный зум; минимал
   const markers = new PIXI.Container(); markers.sortableChildren = true;
   app.stage.addChild(markers);
 
-  // поле «моря/тумана» вокруг материка: на столько мировых px можно отвести
-  // карту за край в каждую сторону (в открывшейся зоне — туман + виньетка).
-  const MARGIN = Math.max(W, H) * 0.4;
-  // минимальный зум = «вся карта помещается в экран»; первичная посадка по центру
-  let minScale = Math.min(app.screen.width/W, app.screen.height/H);
+  // минимальный зум = «вся карта в экране» с небольшим запасом → вокруг материка
+  // видна кайма моря/тумана (плюс виньетка). Снапится по центру, меньше не сжать.
+  const SEA_FRAME = 0.9;   // <1 → материк чуть меньше экрана, вокруг полоса моря
+  let minScale = Math.min(app.screen.width/W, app.screen.height/H) * SEA_FRAME;
   world.scale.set(minScale); clampCam();
 
   // --- таверны ---
@@ -356,14 +355,14 @@ const MAXS = 9;               // максимальный зум; минимал
   app.stage.hitArea = {contains:()=>true};
   const ptrs = new Map(); let lastDist = null;
 
-  // привязка камеры: материк + поле тумана MARGIN вокруг. Можно отвести карту на
-  // MARGIN за каждый край (там — море/туман), но не дальше и не «в точку».
+  // привязка камеры к границам: карта всегда покрывает экран, а если по оси меньше
+  // (на минимальном зуме) — снапится по центру; за край утащить нельзя, меньше не сжать.
   function clampCam(){
-    const s = world.scale.x, M = MARGIN, iw = W*s, ih = H*s;
-    const xMin = app.screen.width  - (W+M)*s, xMax = M*s;
-    const yMin = app.screen.height - (H+M)*s, yMax = M*s;
-    world.x = (xMin <= xMax) ? Math.min(xMax, Math.max(xMin, world.x)) : (app.screen.width  - iw)/2;
-    world.y = (yMin <= yMax) ? Math.min(yMax, Math.max(yMin, world.y)) : (app.screen.height - ih)/2;
+    const s = world.scale.x, mw = W*s, mh = H*s;
+    if (mw <= app.screen.width) world.x = (app.screen.width - mw)/2;
+    else world.x = Math.min(0, Math.max(app.screen.width - mw, world.x));
+    if (mh <= app.screen.height) world.y = (app.screen.height - mh)/2;
+    else world.y = Math.min(0, Math.max(app.screen.height - mh, world.y));
   }
   function zoomAt(sx, sy, factor){
     const ns = Math.min(MAXS, Math.max(minScale, world.scale.x*factor));
@@ -406,7 +405,7 @@ const MAXS = 9;               // максимальный зум; минимал
   const mine = taverns.find(t=>t.mine);
   if (mine) centerOn(mine.wx, mine.wy, Math.max(minScale, 0.85)); else refresh();
   window.addEventListener('resize', () => {
-    minScale = Math.min(app.screen.width/W, app.screen.height/H);
+    minScale = Math.min(app.screen.width/W, app.screen.height/H) * SEA_FRAME;
     if (world.scale.x < minScale) world.scale.set(minScale);
     clampCam(); refresh();
   });
