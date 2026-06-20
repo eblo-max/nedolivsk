@@ -204,21 +204,11 @@ async def _api_taverns(request: web.Request) -> web.Response:
             "tier": worldmap.sprite_tier(tav.level),   # какой спрайт-здание рисовать
             "mine": bool(uid) and pl.id == uid,
         })
-    # Приоритет: живой ивент (реальный таймлайн по серверному времени) > демо
-    # (?inv=demo, предпросмотр) > статичный маркер орды (idle).
+    # Живой ивент (реальный таймлайн) > свежая сводка боя > статичный маркер орды.
     if live is not None:
         events = [_invasion_event(live, uid)]
     elif report_inv is not None:
         events = [_invasion_report_event(report_inv, uid)]
-    elif request.query.get("inv") == "demo" and MAP_EVENTS:
-        troops = [{"x": t["x"], "y": t["y"]} for t in out[:8]]
-        ev = dict(MAP_EVENTS[0])
-        ev.update({
-            "demo": True, "result": "won",
-            "gather_secs": 10, "march_secs": 14, "battle_secs": 30,
-            "troops": troops,
-        })
-        events = [ev]
     else:
         events = MAP_EVENTS
     return web.json_response(
@@ -499,10 +489,8 @@ const MAXS = 9;               // максимальный зум; минимал
   world.scale.set(minScale); clampCam();
 
   // --- таверны ---
-  const inv = new URLSearchParams(location.search).get('inv');   // ?inv=demo — предпросмотр ивента
   let data;
-  try { data = await (await fetch('/api/taverns?uid='+encodeURIComponent(myId)
-        + (inv ? '&inv='+encodeURIComponent(inv) : ''))).json(); }
+  try { data = await (await fetch('/api/taverns?uid='+encodeURIComponent(myId))).json(); }
   catch(e){ bar.textContent='⚠ не загрузить таверны'; return; }
   const regions = data.regions || {};
   const taverns = data.taverns.map(t => ({...t, wx: t.x*W, wy: t.y*H}));  // мировые px
