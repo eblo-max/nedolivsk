@@ -284,10 +284,15 @@ const MAXS = 9;               // максимальный зум; минимал
     return node;
   }
 
+  // размер маркеров привязан к зуму (sublinear, с полом/потолком): при отдалении
+  // здания УМЕНЬШАЮТСЯ (видно отдельные), при приближении растут до предела.
+  function markerK(){ return Math.max(0.45, Math.min(1.2, Math.sqrt(world.scale.x/minScale) * 0.52)); }
+
   // ---------- кластеризация (жадная, по экранной дистанции) ----------
   function buildClusters(){
     for (const c of markers.children) c.destroy({children:true});
     markers.removeChildren();
+    const T = CLUSTER_T * markerK();   // порог слияния тоже масштабируется с маркерами
     const pts = taverns.map(t => ({t, s: screenOf(t.wx, t.wy)}));
     // приоритет посева: своя таверна и более высокий уровень — «центры» кластеров
     pts.sort((a,b)=> (Number(b.t.mine)-Number(a.t.mine)) || (b.t.level - a.t.level));
@@ -297,7 +302,7 @@ const MAXS = 9;               // максимальный зум; минимал
       const grp = [pts[i].t];
       for (let j=i+1;j<pts.length;j++){
         if (used[j]) continue;
-        if (Math.hypot(pts[j].s.x-pts[i].s.x, pts[j].s.y-pts[i].s.y) < CLUSTER_T){ used[j]=true; grp.push(pts[j].t); }
+        if (Math.hypot(pts[j].s.x-pts[i].s.x, pts[j].s.y-pts[i].s.y) < T){ used[j]=true; grp.push(pts[j].t); }
       }
       let node;
       if (grp.length === 1) node = makeBuilding(grp[0]);
@@ -315,15 +320,16 @@ const MAXS = 9;               // максимальный зум; минимал
   // налезает на другое здание и на уже размещённые подписи. Приоритет — своя
   // таверна и более высокий уровень (сортировка по _pri убыванием).
   function declutterLabels(){
+    const k = markerK();   // боксы коллизий — в текущем масштабе маркеров
     const blds = markers.children.filter(n => n._label);
     const foot = blds.map(n => { const s = screenOf(n.wx, n.wy);
-      return {n, l:s.x-SCREEN_W*0.5, r:s.x+SCREEN_W*0.5, t:s.y-SCREEN_W*1.05, b:s.y+3}; });
+      return {n, l:s.x-SCREEN_W*0.5*k, r:s.x+SCREEN_W*0.5*k, t:s.y-SCREEN_W*1.05*k, b:s.y+3}; });
     const hit = (a,b) => !(a.r < b.l || a.l > b.r || a.b < b.t || a.t > b.b);
     blds.sort((a,b) => b._pri - a._pri);
     const placed = [];
     for (const n of blds){
-      const s = screenOf(n.wx, n.wy), bw = n._labelBox.w, bh = n._labelBox.h;
-      const box = {l:s.x-bw/2, r:s.x+bw/2, t:s.y+8, b:s.y+8+bh};
+      const s = screenOf(n.wx, n.wy), bw = n._labelBox.w*k, bh = n._labelBox.h*k;
+      const box = {l:s.x-bw/2, r:s.x+bw/2, t:s.y+8*k, b:s.y+8*k+bh};
       let ok = true;
       for (const f of foot){ if (f.n !== n && hit(box, f)){ ok = false; break; } }
       if (ok) for (const p of placed){ if (hit(box, p)){ ok = false; break; } }
@@ -333,8 +339,9 @@ const MAXS = 9;               // максимальный зум; минимал
   }
   function reposition(){
     const showLabels = world.scale.x > LABEL_MIN;   // на сильном отдалении подписи прячем
+    const k = markerK();
     for (const node of markers.children){
-      const s = screenOf(node.wx, node.wy); node.x = s.x; node.y = s.y;
+      const s = screenOf(node.wx, node.wy); node.x = s.x; node.y = s.y; node.scale.set(k);
       if (node._label) node._label.visible = showLabels && node._labelAllowed;
     }
   }
