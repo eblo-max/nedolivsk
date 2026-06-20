@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -120,6 +121,15 @@ async def main() -> None:
 
     notifier_task = asyncio.create_task(notifier_loop(bot))
 
+    # Mini App карта: веб-сервер на $PORT (Railway даёт публичный домен). Без PORT
+    # (локально/воркер без веба) — не поднимаем, бот работает как обычно.
+    webapp_runner = None
+    port = os.environ.get("PORT")
+    if port:
+        from bot.webapp import run_webapp
+        webapp_runner = await run_webapp(int(port))
+        logging.info("Mini App карта поднята на порту %s", port)
+
     await _setup_commands(bot)
 
     await bot.delete_webhook(drop_pending_updates=True)
@@ -127,6 +137,8 @@ async def main() -> None:
         await dp.start_polling(bot)
     finally:
         notifier_task.cancel()
+        if webapp_runner is not None:
+            await webapp_runner.cleanup()
         await engine.dispose()
 
 

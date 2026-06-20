@@ -118,6 +118,17 @@ def slot_zone(slot_id: int) -> str | None:
     return ZONE_ORDER[idx] if 0 <= idx < len(ZONE_ORDER) else None
 
 
+def slot_norm_pos(slot_id: int) -> tuple[float, float] | None:
+    """Нормированная [0,1] позиция таверны слота (для Mini App / интерактивной
+    карты — клиент сам переведёт в пиксели по размеру world.png)."""
+    zone = slot_zone(slot_id)
+    if zone is None:
+        return None
+    pts = _zone_points(zone)
+    local = slot_id % 1000 - 1
+    return pts[local] if 0 <= local < len(pts) else None
+
+
 def _slot_pos(slot_id: int, w: int, h: int) -> tuple[int, int] | None:
     """Пиксельный центр таверны по слоту (из blue-noise точки зоны)."""
     zone = slot_zone(slot_id)

@@ -1,4 +1,4 @@
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot.db.models import Player
@@ -74,6 +74,11 @@ def tavern_kb(player: Player) -> InlineKeyboardMarkup:
 
     if raidmod.active_id() is not None:  # идёт глобальный рейд-босс — в бой!
         kb.button(text="⚔️ РЕЙД-БОСС — В БОЙ!", callback_data="raidopen", style="danger")
+        sizes.append(1)
+    from bot import webapp  # интерактивная карта мира (Mini App) — если хостинг задан
+    _murl = webapp.base_url()
+    if _murl:
+        kb.button(text="🗺 Карта мира", web_app=WebAppInfo(url=f"{_murl}/map"))
         sizes.append(1)
     if player.chat_id is None:  # одиночка — переключатель вестей мира в ЛС
         on = getattr(player, "dm_news", False)

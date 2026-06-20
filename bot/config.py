@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql+asyncpg://nedolivsk:nedolivsk@localhost:5432/nedolivsk"
     )
+    # Публичный https-домен Mini App (карта). Пусто → кнопку карты не показываем.
+    # На Railway можно не задавать — подхватится из RAILWAY_PUBLIC_DOMAIN (webapp.base_url).
+    webapp_base_url: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
