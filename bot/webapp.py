@@ -162,6 +162,18 @@ async def _hero_sprite(request: web.Request) -> web.Response:
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
+async def _fx_sprite(request: web.Request) -> web.Response:
+    # Стрип-эффект удара/взрыва: fire{n}.png — квадратные кадры (one-shot VFX).
+    try:
+        n = int(request.match_info["n"])
+    except (KeyError, ValueError):
+        raise web.HTTPNotFound()
+    p = ASSETS_DIR / "fx" / f"fire{n}.png"
+    if not (1 <= n <= 9) or not p.is_file():
+        raise web.HTTPNotFound()
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
+
+
 def build_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/", lambda r: web.Response(text="ok"))
@@ -171,6 +183,7 @@ def build_app() -> web.Application:
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
     app.router.add_get("/assets/boss/ork{n}_{anim}.png", _event_sprite)  # ивент-анимации
     app.router.add_get("/assets/heroes/hero{n}_{anim}.png", _hero_sprite)  # войска-герои
+    app.router.add_get("/assets/fx/fire{n}.png", _fx_sprite)  # эффекты ударов
     return app
 
 
@@ -579,6 +592,21 @@ const MAXS = 9;               // максимальный зум; минимал
       for (let d=0; d<end; d+=15){ const a=d, b=Math.min(end, d+8);
         pathLayer.moveTo(x1+ux*a, y1+uy*a).lineTo(x1+ux*b, y1+uy*b); }
     }
+    // эффекты ударов (огонь/взрыв) — one-shot, спавним по орку в бою
+    const FX = [];
+    for (const n of [1,2,3]){
+      try { const tx = await PIXI.Assets.load('/assets/fx/fire'+n+'.png');
+        FX.push(sliceFrames(tx, Math.max(1, Math.round(tx.width/tx.height)))); } catch(e){}
+    }
+    const hits = [];
+    function spawnHit(wx, wy, size){
+      if (!FX.length) return;
+      const fr = FX[(Math.random()*FX.length)|0];
+      const sp = new PIXI.AnimatedSprite(fr); sp.anchor.set(0.5); sp.loop=false;
+      sp.animationSpeed = 0.4; sp._wx=wx; sp._wy=wy; sp._size=size; sp._fs=fr[0].height||128;
+      sp.onComplete = () => { const i=hits.indexOf(sp); if(i>=0) hits.splice(i,1); sp.destroy(); };
+      sp.play(); eventLayer.addChild(sp); hits.push(sp);
+    }
     const G=ev.gather_secs, M=ev.march_secs, B=ev.battle_secs, END=4, TOTAL=G+M+B+END;
     const evEl = document.getElementById('ev');
     let start = performance.now()/1000, cur='', dieStarted=false, lastHurt=0;
@@ -590,6 +618,7 @@ const MAXS = 9;               // максимальный зум; минимал
     function fmt(s){ s=Math.max(0,Math.ceil(s)); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
     function reset(){ start=performance.now()/1000; cur=''; dieStarted=false; node.alpha=1; anim.tint=0xffffff;
       setAnim('idle');
+      for (const sp of hits.splice(0)) sp.destroy();   // убрать активные вспышки
       for (const u of units){ u.wx=u.ox; u.wy=u.oy; u.sp.alpha=1; u.sp.visible=false; uAnim(u,'walk'); } }
     setAnim('idle');
 
@@ -622,14 +651,17 @@ const MAXS = 9;               // максимальный зум; минимал
           u.wx = bx + Math.cos(u.ang)*u.rad*0.55; u.wy = by + Math.sin(u.ang)*u.rad*0.30 - fh*0.06;
           u.sp.visible=true; u.dir = (bx>=u.wx)?1:-1; uAnim(u,'attack'); }
         const s = performance.now()/1000;
-        if (s-lastHurt > 0.9){ lastHurt=s; anim.tint=0xff7a6a; setAnim('hurt'); }
+        if (s-lastHurt > 0.9){ lastHurt=s; anim.tint=0xff7a6a; setAnim('hurt');
+          spawnHit(bx + (Math.random()-0.5)*fw*0.4, by, 72);
+          if (Math.random()<0.5) spawnHit(bx + (Math.random()-0.5)*fw*0.5, by, 52); }
         else if (s-lastHurt > 0.32){ anim.tint=0xffffff; setAnim('idle'); }
       } else {                                        // ИТОГ
         const won = ev.result!=='lost';
         evEl.textContent = won ? '🏆 Орда разбита! Победа за городом' : '💀 Орки устояли…';
         if (won){
           hp.visible=false;
-          if (!dieStarted && A.die){ dieStarted=true; anim.tint=0xffffff; setAnim('die'); }
+          if (!dieStarted && A.die){ dieStarted=true; anim.tint=0xffffff; setAnim('die');
+            spawnHit(bx, by, 160); }   // большой взрыв при гибели орды
           node.alpha = Math.max(0, node.alpha - 0.012);
           for (const u of units){ u.dir=(bx>=u.wx)?1:-1; uAnim(u,'idle'); }
         } else {
@@ -640,6 +672,8 @@ const MAXS = 9;               // максимальный зум; минимал
       pathLayer.stroke({color:0xffe2a8, width:Math.max(1.4, 2*k), alpha:0.5});
       for (const u of units){ const s=screenOf(u.wx,u.wy); u.sp.x=s.x; u.sp.y=s.y;
         u.sp.scale.set(k*HSCALE); u.sp.scale.x = k*HSCALE*u.dir; }
+      for (const sp of hits){ const s=screenOf(sp._wx, sp._wy);
+        sp.x=s.x; sp.y=s.y - fh*0.34*k; sp.scale.set(k*sp._size/sp._fs); }
     });
   }
   function showEventCard(ev, e){
