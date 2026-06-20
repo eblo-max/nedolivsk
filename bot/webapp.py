@@ -167,6 +167,7 @@ const card = document.getElementById('card');
 const RING = {north_wilds:0x6ea8ff, green_valleys:0x6fd07a, red_wastes:0xe07a55};
 const SCREEN_W = 58;          // ширина здания НА ЭКРАНЕ (постоянная, не зависит от зума)
 const CLUSTER_T = 50;         // ближе этого (px на экране) — таверны сливаются в кластер
+const LABEL_MIN = 0.22;       // ниже этого масштаба подписи названий скрыты
 const MINS = 0.14, MAXS = 9;  // пределы зума
 
 (async () => {
@@ -232,6 +233,21 @@ const MINS = 0.14, MAXS = 9;  // пределы зума
     const lvl = new PIXI.Text({text:String(t.level), style:{fontFamily:'Georgia,serif',
       fontSize:13, fontWeight:'700', fill:0xfff3d6, stroke:{color:0x241809, width:4}}});
     lvl.anchor.set(0.5,1); lvl.y = -hs - 1; node.addChild(lvl);
+
+    // подпись-лента с названием под зданием (тёмная плашка для читаемости)
+    const raw = t.name || '';
+    const nm = raw.length > 18 ? raw.slice(0,17)+'…' : raw;
+    if (nm){
+      const lab = new PIXI.Container(); lab.eventMode = 'none'; lab.y = 9;
+      const label = new PIXI.Text({text:nm, style:{fontFamily:'Georgia,serif',
+        fontSize:12, fontWeight:'600', fill:0xf3e6c8, stroke:{color:0x140d06, width:3}}});
+      label.anchor.set(0.5, 0);
+      const bw = label.width + 10, bh = label.height + 4;
+      const lbg = new PIXI.Graphics().roundRect(-bw/2, -2, bw, bh, 6)
+        .fill({color:0x140d06, alpha:0.64}).stroke({color:0x6b522e, width:1, alpha:0.55});
+      lab.addChild(lbg); lab.addChild(label);
+      node.addChild(lab); node._label = lab;
+    }
     return node;
   }
 
@@ -280,7 +296,11 @@ const MINS = 0.14, MAXS = 9;  // пределы зума
     reposition();
   }
   function reposition(){
-    for (const node of markers.children){ const s = screenOf(node.wx, node.wy); node.x = s.x; node.y = s.y; }
+    const showLabels = world.scale.x > LABEL_MIN;   // на сильном отдалении подписи прячем
+    for (const node of markers.children){
+      const s = screenOf(node.wx, node.wy); node.x = s.x; node.y = s.y;
+      if (node._label) node._label.visible = showLabels;
+    }
   }
 
   // перерисовку коалесцируем по кадрам: пан — только перепозиционируем (дёшево),
