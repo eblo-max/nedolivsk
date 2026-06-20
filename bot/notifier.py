@@ -44,7 +44,7 @@ def _apply_trophy(player, drop: dict) -> str:
         return f"{drop['qty']} 🪙"
     if drop.get("kind") == "res":
         inventory.add(player, drop["res"], int(drop["qty"]))
-        return f"{balance.RESOURCE_NAMES.get(drop['res'], drop['res'])} ×{drop['qty']}"
+        return f"{invmod.res_label(drop['res'])} ×{drop['qty']}"
     return "загадочный трофей"
 
 

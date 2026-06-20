@@ -910,7 +910,11 @@ const MAXS = 9;               // максимальный зум; минимал
             spawnHit(bx, by - fh*0.2, 280);                              // большой взрыв
             spawnHit(bx-fw*0.3, by, 150); spawnHit(bx+fw*0.3, by, 150); }  // + по бокам
           node.alpha = Math.max(0, node.alpha - 0.012);
-          for (const u of units){ u.dir=(bx>=u.wx)?1:-1; uAnim(u,'idle'); }
+          for (const u of units){                       // победа — дружины идут домой
+            const dx=u.ox-u.wx, dy=u.oy-u.wy, dist=Math.hypot(dx,dy);
+            if (dist>5){ u.wx+=dx*0.05; u.wy+=dy*0.05; u.dir=(dx>=0)?1:-1; uAnim(u,'walk'); }
+            else uAnim(u,'idle');                        // дошёл до таверны — встал
+          }
         } else {
           hp.visible=true; drawHp(0.35); setAnim('idle'); anim.tint=0xffffff;
           for (const u of units){ uAnim(u,'die'); }

@@ -374,11 +374,19 @@ def _roll_trophy(rng) -> dict:
     return {"kind": "gold", "qty": rng.randint(100, 200), "rarity": "common"}
 
 
+def res_label(res: str) -> str:
+    """Эмодзи + русское имя ресурса/товара (сырьё RESOURCE_* ИЛИ товар GOODS_*).
+    Иначе «ingot/honey» показывались бы английскими буквами."""
+    emoji = (balance.RESOURCE_EMOJI.get(res) or getattr(balance, "GOODS_EMOJI", {}).get(res) or "")
+    name = (balance.RESOURCE_NAMES.get(res) or getattr(balance, "GOODS_NAMES", {}).get(res) or res)
+    return f"{emoji} {name}".strip()
+
+
 def _trophy_text(drop: dict) -> str:
     if drop.get("kind") == "gold":
         return f"{drop['qty']} 🪙"
     if drop.get("kind") == "res":
-        return f"{balance.RESOURCE_NAMES.get(drop['res'], drop['res'])} ×{drop['qty']}"
+        return f"{res_label(drop['res'])} ×{drop['qty']}"
     return "трофей"
 
 
