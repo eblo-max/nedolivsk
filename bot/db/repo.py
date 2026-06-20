@@ -1,10 +1,11 @@
+import json
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
-    Chronicle, CityState, KnownChat, LogEntry, LootDrop, MarketOrder,
+    Chronicle, CityState, Invasion, KnownChat, LogEntry, LootDrop, MarketOrder,
     Notification, Player, RaidBoss, Tavern, WorldState,
 )
 from bot.game import balance
@@ -114,6 +115,64 @@ def create_raid(session: AsyncSession, boss_key: str, gather_until) -> RaidBoss:
     raid = RaidBoss(boss_key=boss_key, status="gathering", gather_until=gather_until)
     session.add(raid)
     return raid
+
+
+# ── Ивент «Орда орков» (invasion) ──────────────────────────────────────────
+async def get_active_invasion(
+    session: AsyncSession, *, lock: bool = False
+) -> Invasion | None:
+    """Живой ивент (сбор ИЛИ бой). Один на весь мир."""
+    stmt = (select(Invasion)
+            .where(Invasion.status.in_(("gathering", "battle")))
+            .order_by(Invasion.id.desc()).limit(1))
+    if lock:
+        stmt = stmt.with_for_update()
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
+async def live_invasions(session: AsyncSession) -> list[Invasion]:
+    """Все живые ивенты — для тика жизненного цикла (обычно ≤1)."""
+    return list((await session.execute(
+        select(Invasion).where(Invasion.status.in_(("gathering", "battle")))
+        .with_for_update(skip_locked=True))).scalars().all())
+
+
+def create_invasion(session: AsyncSession, *, sprite: int, threshold: int,
+                    gather_until, resolve_at) -> Invasion:
+    """Создать ивент в фазе СБОРА (порог орды — снимок при спавне)."""
+    inv = Invasion(sprite=sprite, threshold=threshold, status="gathering",
+                   gather_until=gather_until, resolve_at=resolve_at)
+    session.add(inv)
+    return inv
+
+
+async def invasion_register(
+    session: AsyncSession, inv_id: int, player_id: int, record: dict
+) -> bool:
+    """Атомарно вписать бойца в реестр ивента — ТОЛЬКО поле registered, jsonb-слиянием
+    (как add_raid_panel: не читаем-перезаписываем строку целиком, иначе устаревший
+    снимок затёр бы чужие записи). Пишем лишь в фазе СБОРА и если ещё не записан.
+    Возвращает True, если запись прошла (иначе уже записан/сбор окончен)."""
+    res = await session.execute(
+        text("UPDATE invasion SET registered = COALESCE(registered, '{}'::jsonb) "
+             "|| jsonb_build_object(:pid, CAST(:rec AS jsonb)) "
+             "WHERE id = :id AND status = 'gathering' "
+             "AND NOT jsonb_exists(COALESCE(registered, '{}'::jsonb), :pid)"),
+        {"pid": str(player_id), "rec": json.dumps(record), "id": int(inv_id)},
+    )
+    return (res.rowcount or 0) > 0
+
+
+async def world_might_sum(session: AsyncSession) -> int:
+    """Суммарная военная мощь всех таверн мира (для порога орды при спавне).
+    Считаем в SQL по той же формуле, что invasion.tavern_might."""
+    from bot.game import invasion as inv
+    stmt = select(func.coalesce(func.sum(
+        inv.MIGHT_BASE
+        + func.greatest(Tavern.level, 1) * inv.MIGHT_PER_LEVEL
+        + func.coalesce(func.jsonb_array_length(Tavern.buildings), 0) * inv.MIGHT_PER_BUILDING
+    ), 0))
+    return int((await session.execute(stmt)).scalar_one() or 0)
 
 
 async def get_or_create_city(

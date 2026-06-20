@@ -14,14 +14,37 @@
 """
 
 import os
+from datetime import datetime, timezone
 
 from aiohttp import web
 
 from bot.db import repo
 from bot.db.base import session_factory
 from bot.game import balance, worldmap
+from bot.game import invasion as invmod
 
 ASSETS_DIR = worldmap.ASSETS_DIR
+
+
+def _invasion_event(inv) -> dict:
+    """Живой ивент «Орда орков» для карты: тот же таймлайн-формат, что демо, но
+    синхронизирован серверным временем (elapsed — секунды с начала сбора) и с
+    реальными войсками (записавшиеся таверны). Фронт крутит анимацию по elapsed."""
+    now = datetime.now(timezone.utc)
+    troops = [{"x": (r or {}).get("tx", 0.5), "y": (r or {}).get("ty", 0.5)}
+              for r in (inv.registered or {}).values()]
+    if inv.status in ("won", "lost"):
+        result = inv.status
+    else:   # ещё не решено — предсказываем для совпадения анимации итога
+        result = "won" if invmod.registered_might(inv) >= int(inv.threshold or 0) else "lost"
+    return {
+        "sprite": inv.sprite, "x": invmod.POS[0], "y": invmod.POS[1],
+        "name": invmod.NAME, "blurb": "Орда орков идёт на Недоливск — поднимай войско!",
+        "gather_secs": invmod.GATHER_MINUTES * 60,
+        "march_secs": invmod.MARCH_SECONDS, "battle_secs": invmod.BATTLE_SECONDS,
+        "elapsed": round(invmod.elapsed_secs(inv, now), 1),
+        "result": result, "troops": troops,
+    }
 
 # Самостоятельные анимированные ивент-объекты на карте (НЕ связаны с рейдами).
 # Каждый: sprite (орк 1..3), норм. позиция x/y (на суше!), имя и описание.
@@ -54,6 +77,7 @@ async def _api_taverns(request: web.Request) -> web.Response:
         uid = 0
     async with session_factory() as s:
         rows = await repo.get_map_taverns(s)
+        live = await repo.get_active_invasion(s)
     out = []
     for tav, pl in rows:
         # Со слотом — фикс. позиция; без слота (зона полна) — детерминированная
@@ -69,10 +93,11 @@ async def _api_taverns(request: web.Request) -> web.Response:
             "tier": worldmap.sprite_tier(tav.level),   # какой спрайт-здание рисовать
             "mine": bool(uid) and pl.id == uid,
         })
-    # Демо-ивент для предпросмотра анимации (?inv=demo): таймлайн + войска из
-    # реальных таверн. Реальная регистрация/таймеры подключатся позже (бэкенд).
-    events = MAP_EVENTS
-    if request.query.get("inv") == "demo" and MAP_EVENTS:
+    # Приоритет: живой ивент (реальный таймлайн по серверному времени) > демо
+    # (?inv=demo, предпросмотр) > статичный маркер орды (idle).
+    if live is not None:
+        events = [_invasion_event(live)]
+    elif request.query.get("inv") == "demo" and MAP_EVENTS:
         troops = [{"x": t["x"], "y": t["y"]} for t in out[:8]]
         ev = dict(MAP_EVENTS[0])
         ev.update({
@@ -81,6 +106,8 @@ async def _api_taverns(request: web.Request) -> web.Response:
             "troops": troops,
         })
         events = [ev]
+    else:
+        events = MAP_EVENTS
     return web.json_response(
         {"taverns": out, "regions": balance.REGIONS, "events": events},
         headers={"Cache-Control": "no-store"})
@@ -610,7 +637,10 @@ const MAXS = 9;               // максимальный зум; минимал
     }
     const G=ev.gather_secs, M=ev.march_secs, B=ev.battle_secs, END=4, TOTAL=G+M+B+END;
     const evEl = document.getElementById('ev');
-    let start = performance.now()/1000, cur='', dieStarted=false, lastHurt=0;
+    // демо крутит локально; живой ивент синхронизируем серверным elapsed (сек с
+    // начала сбора) — сдвигаем старт так, чтобы t совпало с фазой на сервере.
+    let start = performance.now()/1000 - (ev.demo ? 0 : (ev.elapsed||0));
+    let cur='', dieStarted=false, lastHurt=0;
     function setAnim(name){
       if (cur===name) return;
       const fr = name==='idle' ? idle : A[name]; if (!fr) return;
