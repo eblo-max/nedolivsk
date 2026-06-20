@@ -59,21 +59,24 @@ def test_win_boundary_inclusive():
 
 
 # ── раздача / штраф ────────────────────────────────────────────────────────
+def _result(won, dealt):                # минимальный результат симуляции для settle
+    return {"won": won, "dealt": dealt, "n": len(dealt)}
+
+
 def test_settle_win_rewards_by_contribution():
-    plan = inv.settle(_inv(_reg(10, 40), threshold=20), random.Random(1))   # победа
+    plan = inv.settle(_inv(_reg(10, 40)), _result(True, {1: 100, 2: 400}), random.Random(1))
     assert plan["won"] is True
-    # больше мощь — больше золота; репутация всем фикс
+    # больше НАНЕСЁННЫЙ УРОН — больше золота; репутация всем фикс
     assert plan["gold"][2] > plan["gold"][1] > 0
     assert plan["rep"][1] == plan["rep"][2] == inv.WIN_REP
-    # хабар-ресурсы каждому участнику
     assert set(plan["res"][1]) == set(inv.HAUL_RES)
-    # ровно один трофей случайному участнику
-    assert plan["trophy"] is not None and plan["trophy"]["pid"] in (1, 2)
+    # трофей — лучшему по урону (MVP = pid 2)
+    assert plan["trophy"] is not None and plan["trophy"]["pid"] == 2
     assert plan["trophy"]["drop"]["kind"] in ("gold", "res")
 
 
 def test_settle_loss_penalizes_registered_no_trophy():
-    plan = inv.settle(_inv(_reg(5, 5), threshold=1000), random.Random(1))   # провал
+    plan = inv.settle(_inv(_reg(5, 5)), _result(False, {1: 0, 2: 0}), random.Random(1))
     assert plan["won"] is False and plan["trophy"] is None
     assert all(g == -inv.LOSS_GOLD for g in plan["gold"].values())
     assert all(r == -inv.LOSS_REP for r in plan["rep"].values())
@@ -81,7 +84,7 @@ def test_settle_loss_penalizes_registered_no_trophy():
 
 
 def test_settle_empty_roster_is_loss_no_payouts():
-    plan = inv.settle(_inv({}, threshold=50), random.Random(1))
+    plan = inv.settle(_inv({}), _result(False, {}), random.Random(1))
     assert plan["won"] is False and plan["gold"] == {} and plan["trophy"] is None
 
 

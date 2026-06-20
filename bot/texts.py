@@ -3090,65 +3090,111 @@ def nightrun_crossroad(player, run: dict) -> str:
 
 
 # ── Ивент «Орда орков» (invasion) ───────────────────────────────────────────
-def _inv_force_line(inv) -> str:
+def _inv_roles(inv) -> str:
+    """Состав войск города по ролям: «🛡2 🏹4 🔭1 🗡1» (только ненулевые)."""
     from bot.game import invasion as invmod
-    have = invmod.registered_might(inv)
-    need = int(inv.threshold or 0)
-    n = invmod.registered_count(inv)
-    pct = round(100 * have / need) if need else 0
-    return f"⚔️ Войско: <b>{have}</b>/{need} силы (<b>{pct}%</b>) · таверн: {n}"
+    cnt: dict[str, int] = {}
+    for r in (inv.registered or {}).values():
+        role = (r or {}).get("role", "ratnik")
+        cnt[role] = cnt.get(role, 0) + 1
+    parts = [f"{invmod.ROLES[k][0]}{cnt[k]}" for k in ("tank", "archer", "scout", "ratnik")
+             if cnt.get(k)]
+    return " ".join(parts) if parts else "—"
+
+
+def invasion_role_label(role: str) -> str:
+    from bot.game import invasion as invmod
+    em, name = invmod.ROLES.get(role, ("🗡", "Ратники"))
+    return f"{em} {name}"
 
 
 def invasion_gather_screen(inv) -> str:
-    """Анонс/правка фазы сбора: обратный отсчёт, набранная сила, призыв."""
+    """Анонс/правка фазы сбора: обратный отсчёт, состав войск по ролям, призыв."""
     from bot.game import invasion as invmod
     left = invmod.gather_left(inv)
+    n = invmod.registered_count(inv)
     return "\n".join([
         "🪓 <b>ОРДА ОРКОВ ИДЁТ НА НЕДОЛИВСК!</b>",
         "<i>Дикая орда встала лагерем в северных снегах. Подымем дружины — "
         "или город разграбят.</i>",
         "",
-        _inv_force_line(inv),
-        f"⏳ Войска выступают через <b>{left // 60}:{left % 60:02d}</b>",
+        f"🏰 Войско города: <b>{n}</b> таверн — {_inv_roles(inv)}",
+        f"⏳ Выступаем через <b>{left // 60}:{left % 60:02d}</b>",
         "",
-        "Жми «⚔️ Поднять войско» — таверна вышлет дружину. Одолеем — добыча всем, "
-        "кто пришёл; не наберём силы — орки разорят поход.",
+        "Жми «⚔️ Поднять войско» — твоя роль определится по снаряге (🛡 броня → "
+        "авангард, 🏹 урон → стрелки, 🔭 удача → разведка). Нужен <b>микс</b>: "
+        "без танков орда прорвётся, без урона — уйдёт. Добыча — по вкладу.",
     ])
 
 
 def invasion_battle_screen(inv) -> str:
     """Правка при старте битвы — войска выступили."""
+    n = 0
+    try:
+        from bot.game import invasion as invmod
+        n = invmod.registered_count(inv)
+    except Exception:
+        pass
     return ("🪓 <b>ОРДА ОРКОВ — БИТВА!</b>\n"
             "<i>Дружины сошлись с ордой у северных снегов…</i>\n\n"
-            f"{_inv_force_line(inv)}\n"
-            "Исход решит сила приведённых войск. Глянь карту — войска уже идут! 🗺")
+            f"🏰 В бой пошло {n} дружин — {_inv_roles(inv)}\n"
+            "Исход решит композиция. Глянь карту — войска уже идут! 🗺")
 
 
 def invasion_push_dm(inv) -> str:
     """Пуш-анонс в личку при старте сбора."""
     return ("🪓 <b>Орда орков идёт на Недоливск!</b>\n"
             "<i>Идёт сбор (~20 мин).</i> Открой кабак и подними войско — "
-            "победим, добыча всем, кто пришёл.")
+            "роль определится по снаряге, добыча по вкладу.")
 
 
-def invasion_joined(might: int) -> str:
-    return (f"⚔️ Дружина выслана! Сила твоего войска: <b>{might}</b>. "
-            "Жди битвы — добыча по вкладу.")
-
-
-def invasion_result_chat(inv, won: bool) -> str:
-    """Общий анонс итога в чат."""
+def invasion_joined(record: dict) -> str:
+    """Подтверждение записи (тост): какая роль и боевой профиль войска."""
     from bot.game import invasion as invmod
-    have, need = invmod.registered_might(inv), int(inv.threshold or 0)
-    n = invmod.registered_count(inv)
-    if won:
-        return ("🏆🪓 <b>ОРДА ОРКОВ РАЗБИТА!</b>\n"
-                f"Город выставил <b>{have}</b> силы против {need} — и орда полегла. "
-                f"Дружины {n} таверн делят добычу. Слава Недоливску! 🍺")
-    return ("💀🪓 <b>ОРКИ УСТОЯЛИ…</b>\n"
-            f"Город собрал лишь <b>{have}</b> из {need} — войск не хватило, орда "
-            f"отбилась и пощипала обозы. {n} таверн зализывают раны. "
-            "В другой раз — всем миром!")
+    em, name = invmod.ROLES.get(record.get("role", "ratnik"), ("🗡", "Ратники"))
+    return (f"⚔️ Дружина выслана! Роль: {em} {name}.\n"
+            f"Урон {round(record.get('dmg', 0))} · крит {round(record.get('crit', 0) * 100)}% · "
+            f"броня {record.get('armor', 0)} · уворот {round(record.get('dodge', 0) * 100)}% · "
+            f"HP {record.get('hp', 0)}.\nЖди битвы — добыча по вкладу.")
+
+
+def _inv_top_lines(top: list) -> list:
+    """Строки «герои сечи» из снимка результата: [[name, role, dmg], ...]."""
+    from bot.game import invasion as invmod
+    out = []
+    for name, role, dmg in top:
+        if dmg <= 0:
+            continue
+        em = invmod.ROLES.get(role, ("🗡", ""))[0]
+        out.append(f"  {em} {escape(str(name))} — {dmg} урона")
+    return out
+
+
+def invasion_result_chat(inv) -> str:
+    """Общий анонс итога в чат из снимка inv.result (с боевой сводкой)."""
+    r = inv.result or {}
+    n = int(r.get("n", 0))
+    if n == 0:                                   # никто не пришёл
+        return ("💀🪓 <b>ОРКИ ПРИШЛИ, А ГОРОД СПАЛ…</b>\n"
+                "Никто не поднял войско — орда прошлась по округе без боя. Позор!")
+    rounds = int(r.get("rounds", 0))
+    top = _inv_top_lines(r.get("top") or [])
+    if r.get("won"):
+        lines = ["🏆🪓 <b>ОРДА ОРКОВ РАЗБИТА!</b>",
+                 f"Дружины <b>{n}</b> таверн сломили орду за {rounds} раундов. "
+                 "Слава Недоливску! 🍺"]
+        if top:
+            lines += ["", "⚔️ Герои сечи:"] + top
+        return "\n".join(lines)
+    hp_max = max(1, int(r.get("orc_hp_max", 1)))
+    hp_pct = round(100 * int(r.get("orc_hp_left", 0)) / hp_max)
+    lines = ["💀🪓 <b>ОРКИ УСТОЯЛИ…</b>",
+             f"<b>{n}</b> дружин не сдюжили — у орды осталось <b>{hp_pct}%</b> сил. "
+             "Похоже, не хватило связки: больше танков или больше урона. "
+             "В другой раз — всем миром!"]
+    if top:
+        lines += ["", "Кто рубился до конца:"] + top
+    return "\n".join(lines)
 
 
 def invasion_reward_dm(won: bool, gold: int, rep: int,

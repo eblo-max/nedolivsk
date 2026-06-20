@@ -84,6 +84,4 @@ async def cb_inv_join(cb: CallbackQuery, session: AsyncSession) -> None:
                                        reply_markup=invasion_gather_kb(fresh.id))
         except TelegramBadRequest:
             pass
-    await cb.answer(
-        f"⚔️ Дружина выслана! Сила войска: {record['might']}. "
-        "Жди битвы — добыча по вкладу.", show_alert=True)
+    await cb.answer(texts.invasion_joined(record), show_alert=True)

@@ -463,11 +463,11 @@ async def _notify_returned(bot: Bot) -> None:
                 if now >= (inv.gather_until or now):
                     if invmod.registered_count(inv) == 0:        # никто не пришёл
                         inv.status = "lost"
-                        inv.result = {"won": False, "have": 0,
-                                      "need": int(inv.threshold or 0), "n": 0}
+                        inv.result = {"won": False, "n": 0, "rounds": 0,
+                                      "orc_hp_left": 0, "orc_hp_max": 0, "top": []}
                         world.invasion_next_at = invmod.cooldown_until(now)
                         inv_edits.append((dict(inv.messages or {}),
-                                          texts.invasion_result_chat(inv, False), None))
+                                          texts.invasion_result_chat(inv), None))
                     else:                                        # войска выступили
                         inv.status = "battle"
                         inv_edits.append((dict(inv.messages or {}),
@@ -477,17 +477,21 @@ async def _notify_returned(bot: Bot) -> None:
                                       texts.invasion_gather_screen(inv),
                                       invasion_gather_kb(inv.id)))
             elif inv.status == "battle":
-                if now >= (inv.resolve_at or now):               # время исхода
-                    plan = invmod.settle(inv)
+                if now >= (inv.resolve_at or now):               # время исхода — СИМУЛЯЦИЯ
+                    parts = [dict(r, pid=int(pid))
+                             for pid, r in (inv.registered or {}).items()]
+                    sim = invmod.simulate(parts, seed=inv.id)
+                    plan = invmod.settle(inv, sim)
                     await _apply_invasion(session, inv, plan)
-                    inv.result = {"won": plan["won"],
-                                  "have": invmod.registered_might(inv),
-                                  "need": int(inv.threshold or 0),
-                                  "n": invmod.registered_count(inv)}
-                    inv.status = "won" if plan["won"] else "lost"
+                    inv.result = {"won": sim["won"], "n": sim["n"], "rounds": sim["rounds"],
+                                  "orc_hp_left": sim["orc_hp_left"],
+                                  "orc_hp_max": sim["orc_hp_max"],
+                                  "top": [[nm, role, dmg] for _p, nm, role, dmg
+                                          in invmod.top_contributors(inv, sim)]}
+                    inv.status = "won" if sim["won"] else "lost"
                     world.invasion_next_at = invmod.cooldown_until(now)
                     inv_edits.append((dict(inv.messages or {}),
-                                      texts.invasion_result_chat(inv, plan["won"]), None))
+                                      texts.invasion_result_chat(inv), None))
 
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
         world_news: list[str] = []  # глобальные вести для DM-дайджеста одиночкам

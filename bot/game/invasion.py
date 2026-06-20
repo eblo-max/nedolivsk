@@ -51,6 +51,7 @@ MIN_THRESHOLD = 50
 WIN_GOLD_BASE = 120
 WIN_GOLD_PER_MIGHT = 4.0
 WIN_REP = 8
+DAMAGE_POOL_PER_HEAD = 60    # доп. золото за бой, делится по ДОЛЕ нанесённого урона
 # Хабар (разграбили лагерь орды) — каждому участнику, диапазоны на бойца.
 HAUL_RES: dict[str, tuple[int, int]] = {"ore": (10, 20), "grain": (10, 18)}
 
@@ -330,31 +331,44 @@ def _roll_trophy(rng) -> dict:
     return {"kind": "gold", "qty": rng.randint(100, 200), "rarity": "common"}
 
 
-def settle(inv, rng=None) -> dict:
-    """План исхода (раздача/штраф). Чистый — применяет снаружи, с капами/полами.
-    Победа: каждому участнику золото (база + мощь×коэф) + репутация + хабар-ресурсы;
-    ОДНОМУ случайному — редкий трофей (равный шанс). Провал: записавшиеся теряют
-    немного золота и репутации. Возвращает
-    {won, gold:{pid:Δ}, rep:{pid:Δ}, res:{pid:{res:qty}}, trophy:{pid,drop}|None}."""
+def top_contributors(inv, result: dict, k: int = 3) -> list:
+    """Топ-бойцы по нанесённому урону: [(pid, name, role, dmg)] по убыванию."""
+    dealt = result.get("dealt", {})
+    rows = [(int(pid), (r or {}).get("name", ""), (r or {}).get("role", "ratnik"),
+             int(dealt.get(int(pid), 0))) for pid, r in (inv.registered or {}).items()]
+    rows.sort(key=lambda x: x[3], reverse=True)
+    return rows[:k]
+
+
+def settle(inv, result: dict, rng=None) -> dict:
+    """План исхода по РЕЗУЛЬТАТУ симуляции (раздача/штраф). Чистый — применяет
+    снаружи, с капами/полами. Победа: каждому золото (база + мощь×коэф + доля от
+    пула по НАНЕСЁННОМУ УРОНУ) + репутация + хабар; редкий трофей — лучшему бойцу
+    (MVP по урону). Провал: записавшиеся теряют немного золота и репутации.
+    Возвращает {won, gold:{pid:Δ}, rep:{pid:Δ}, res:{pid:{res:qty}}, trophy:{pid,drop}|None}."""
     import random as _random
     rng = rng or _random
-    won = is_won(inv)
+    won = bool(result.get("won"))
+    dealt = result.get("dealt", {})
+    total = sum(dealt.values()) or 1
+    pool = DAMAGE_POOL_PER_HEAD * result.get("n", 0)
     gold: dict[int, int] = {}
     rep: dict[int, int] = {}
     res: dict[int, dict] = {}
     trophy = None
-    reg = inv.registered or {}
-    for pid_s, r in reg.items():
+    for pid_s, r in (inv.registered or {}).items():
         pid = int(pid_s)
         might = int((r or {}).get("might", 0))
         if won:
-            gold[pid] = WIN_GOLD_BASE + round(might * WIN_GOLD_PER_MIGHT)
+            share = dealt.get(pid, 0) / total
+            gold[pid] = (WIN_GOLD_BASE + round(might * WIN_GOLD_PER_MIGHT)
+                         + round(share * pool))
             rep[pid] = WIN_REP
             res[pid] = {k: rng.randint(lo, hi) for k, (lo, hi) in HAUL_RES.items()}
         else:
             gold[pid] = -LOSS_GOLD
             rep[pid] = -LOSS_REP
-    if won and reg:
-        lucky = rng.choice([int(p) for p in reg])          # равный шанс каждому
-        trophy = {"pid": lucky, "drop": _roll_trophy(rng)}
+    if won and dealt:
+        mvp = max(dealt, key=dealt.get)                    # трофей — лучшему по урону
+        trophy = {"pid": int(mvp), "drop": _roll_trophy(rng)}
     return {"won": won, "gold": gold, "rep": rep, "res": res, "trophy": trophy}
