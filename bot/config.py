@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     # Публичный https-домен Mini App (карта). Пусто → кнопку карты не показываем.
     # На Railway можно не задавать — подхватится из RAILWAY_PUBLIC_DOMAIN (webapp.base_url).
     webapp_base_url: str = ""
+    # Короткое имя Direct-Link Mini App из BotFather (/newapp). Задано → анонс ивента
+    # в ГРУППАХ даёт url-кнопку t.me/<бот>/<app>?startapp=… (открывает карту прямо в
+    # Telegram). Пусто → в группах фолбэк на обычную кнопку записи.
+    webapp_short_name: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

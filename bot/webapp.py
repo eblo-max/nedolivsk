@@ -13,8 +13,13 @@
 зданию → карточка. Лимита на число таверн нет. Pixi тянется с CDN.
 """
 
+import hashlib
+import hmac
+import json
 import os
+import time
 from datetime import datetime, timezone
+from urllib.parse import parse_qsl
 
 from aiohttp import web
 
@@ -25,13 +30,51 @@ from bot.game import invasion as invmod
 
 ASSETS_DIR = worldmap.ASSETS_DIR
 
+# initData живёт сутки — отсекаем устаревшие/реплей.
+_INITDATA_MAX_AGE = 24 * 3600
 
-def _invasion_event(inv) -> dict:
+
+def _verify_init_data(init_data: str) -> int | None:
+    """Проверить Telegram WebApp initData (HMAC-SHA256 по токену бота). Возвращает
+    user_id, если подпись верна и свежая, иначе None. Это аутентификация запросов
+    с карты (без неё нельзя доверять, кто регистрируется)."""
+    from bot.config import settings
+    try:
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True))
+        recv = pairs.pop("hash", None)
+        if not recv:
+            return None
+        if abs(time.time() - int(pairs.get("auth_date", "0"))) > _INITDATA_MAX_AGE:
+            return None
+        check = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs))
+        secret = hmac.new(b"WebAppData", settings.bot_token.encode(), hashlib.sha256).digest()
+        calc = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(calc, recv):
+            return None
+        user = json.loads(pairs.get("user", "{}"))
+        uid = user.get("id")
+        return int(uid) if uid else None
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def _tavern_norm_pos(player) -> tuple[float, float]:
+    """Нормированная позиция таверны на карте (слот, иначе по региону)."""
+    tav = player.tavern
+    if tav is not None and tav.map_slot is not None:
+        p = worldmap.slot_norm_pos(tav.map_slot)
+        if p:
+            return p
+    return worldmap.region_point(player.region or "", player.id) or (0.5, 0.5)
+
+
+def _invasion_event(inv, uid: int = 0) -> dict:
     """Живой ивент «Орда орков» для карты: тот же таймлайн-формат, что демо, но
     синхронизирован серверным временем (elapsed — секунды с начала сбора) и с
     реальными войсками (записавшиеся таверны). Фронт крутит анимацию по elapsed."""
     now = datetime.now(timezone.utc)
-    troops = [{"x": (r or {}).get("tx", 0.5), "y": (r or {}).get("ty", 0.5)}
+    troops = [{"x": (r or {}).get("tx", 0.5), "y": (r or {}).get("ty", 0.5),
+               "role": (r or {}).get("role", "ratnik")}
               for r in (inv.registered or {}).values()]
     if inv.status in ("won", "lost"):
         result = inv.status
@@ -40,12 +83,15 @@ def _invasion_event(inv) -> dict:
         parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
         result = "won" if invmod.simulate(parts, seed=inv.id)["won"] else "lost"
     return {
-        "sprite": inv.sprite, "x": invmod.POS[0], "y": invmod.POS[1],
+        "id": inv.id, "sprite": inv.sprite, "x": invmod.POS[0], "y": invmod.POS[1],
         "name": invmod.NAME, "blurb": "Орда орков идёт на Недоливск — поднимай войско!",
         "gather_secs": invmod.GATHER_MINUTES * 60,
         "march_secs": invmod.MARCH_SECONDS, "battle_secs": invmod.BATTLE_SECONDS,
         "elapsed": round(invmod.elapsed_secs(inv, now), 1),
-        "result": result, "troops": troops,
+        "result": result, "troops": troops, "status": inv.status,
+        "n": invmod.registered_count(inv),
+        "me_registered": bool(uid) and str(uid) in (inv.registered or {}),
+        "my_role": (inv.registered or {}).get(str(uid), {}).get("role") if uid else None,
     }
 
 # Самостоятельные анимированные ивент-объекты на карте (НЕ связаны с рейдами).
@@ -98,7 +144,7 @@ async def _api_taverns(request: web.Request) -> web.Response:
     # Приоритет: живой ивент (реальный таймлайн по серверному времени) > демо
     # (?inv=demo, предпросмотр) > статичный маркер орды (idle).
     if live is not None:
-        events = [_invasion_event(live)]
+        events = [_invasion_event(live, uid)]
     elif request.query.get("inv") == "demo" and MAP_EVENTS:
         troops = [{"x": t["x"], "y": t["y"]} for t in out[:8]]
         ev = dict(MAP_EVENTS[0])
@@ -113,6 +159,42 @@ async def _api_taverns(request: web.Request) -> web.Response:
     return web.json_response(
         {"taverns": out, "regions": balance.REGIONS, "events": events},
         headers={"Cache-Control": "no-store"})
+
+
+async def _api_invasion_join(request: web.Request) -> web.Response:
+    """Регистрация на ивент ПРЯМО С КАРТЫ (мини-апп). Аутентификация — Telegram
+    initData (HMAC по токену бота). Атомарная запись (repo.invasion_register).
+    Возвращает {ok, role, dmg, crit, armor, dodge, hp, x, y} или {ok:False, error}."""
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        body = {}
+    uid = _verify_init_data(body.get("initData") or "")
+    if not uid:
+        return web.json_response({"ok": False, "error": "auth"}, status=401)
+    from bot.game import combat
+    async with session_factory() as s:
+        player = await repo.get_player(s, uid)
+        if player is None or not player.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        inv = await repo.get_active_invasion(s)
+        if inv is None or inv.status != "gathering":
+            return web.json_response({"ok": False, "error": "closed"})
+        already = invmod.is_registered(inv, player.id)
+        rec = invmod.make_record(player, player.tavern, _tavern_norm_pos(player),
+                                 combat.player_stats(player))
+        if not already:
+            ok = await repo.invasion_register(s, inv.id, player.id, rec)
+            if ok:
+                repo.add_log(s, "player", player.id, "⚔️ поднял войско (с карты)")
+                await s.commit()
+            else:
+                already = True
+    out = {"role": rec["role"], "dmg": round(rec["dmg"]), "crit": rec["crit"],
+           "armor": rec["armor"], "dodge": rec["dodge"], "hp": rec["hp"],
+           "x": rec["tx"], "y": rec["ty"], "already": already}
+    out["ok"] = True
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 
 async def _map_page(request: web.Request) -> web.Response:
@@ -208,6 +290,7 @@ def build_app() -> web.Application:
     app.router.add_get("/", lambda r: web.Response(text="ok"))
     app.router.add_get("/map", _map_page)
     app.router.add_get("/api/taverns", _api_taverns)
+    app.router.add_post("/api/invasion/join", _api_invasion_join)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
     app.router.add_get("/assets/boss/ork{n}_{anim}.png", _event_sprite)  # ивент-анимации
@@ -253,10 +336,25 @@ _MAP_HTML = """<!doctype html>
   .ev{position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:10;display:none;
     background:#2a160ae8;border:1px solid #c9803a;border-radius:11px;padding:7px 16px;
     font-size:13px;color:#ffe2a8;font-weight:700;box-shadow:0 4px 16px #000a;white-space:nowrap}
+  .reg{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:11;display:none;
+    width:min(92vw,420px);background:#241809f5;border:1px solid #c9803a;border-radius:14px;
+    padding:12px 14px;text-align:center;box-shadow:0 8px 28px #000b}
+  .reg .rt{font-size:16px;color:#ffd9a8;font-weight:700;margin-bottom:3px}
+  .reg .rs{font-size:12px;color:#d8c39a;margin-bottom:9px;min-height:15px}
+  .reg .rb{width:100%;padding:12px;border:none;border-radius:11px;background:#c0392b;
+    color:#fff;font:700 15px Georgia,serif;cursor:pointer}
+  .reg .rb:active{transform:scale(.98)} .reg .rb:disabled{opacity:.55}
+  .reg .rj{font-size:14px;color:#ffd24a;font-weight:700}
 </style></head>
 <body>
 <div class="vig"></div>
 <div class="ev" id="ev"></div>
+<div class="reg" id="reg">
+  <div class="rt" id="regTitle">🪓 Орда орков — сбор войск</div>
+  <div class="rs" id="regSub"></div>
+  <button class="rb" id="regBtn">⚔ Поднять войско</button>
+  <div class="rj" id="regJoined" style="display:none"></div>
+</div>
 <div class="bar" id="bar">🗺 Недоливск · загрузка…</div>
 <div class="hint">тащи · щипок/колесо — зум · тап по кружку — раскрыть</div>
 <div class="card" id="card">
@@ -527,6 +625,9 @@ const MAXS = 9;               // максимальный зум; минимал
   });
 
   // ---------- ивент-объекты (анимированные, самостоятельные) ----------
+  const RL = {tank:['🛡','Авангард'], archer:['🏹','Стрелки'],
+              scout:['🔭','Разведка'], ratnik:['🗡','Ратники']};
+  let liveInv = null;                       // живой ивент (для центровки + панели)
   for (const ev of (data.events || [])){
     try {
       const tex = await PIXI.Assets.load('/assets/boss/ork'+ev.sprite+'_idle.png');
@@ -534,7 +635,12 @@ const MAXS = 9;               // максимальный зум; минимал
       const node = buildEvent(ev, sliceFrames(tex, 10), fw, fh);
       eventLayer.addChild(node); eventNodes.push(node);
       if (ev.gather_secs != null) await setupInvasion(ev, node, fw, fh);   // полноценный ивент с боем
+      if (ev.gather_secs != null && !ev.demo) liveInv = ev;                // настоящий ивент
     } catch(e){ console.log('event load fail', e); }
+  }
+  if (liveInv){
+    centerOn(liveInv.x*W, liveInv.y*H, Math.max(minScale, 1.1));   // открываемся на орде
+    if (liveInv.status === 'gathering') setupRegPanel(liveInv);    // плашка регистрации
   }
   if (eventNodes.length){
     app.ticker.add(() => { const a = 0.10 + 0.12*(0.5 + 0.5*Math.sin(performance.now()/700));
@@ -720,6 +826,45 @@ const MAXS = 9;               // максимальный зум; минимал
     card.classList.add('show');
   }
   document.getElementById('cardx').onclick = () => card.classList.remove('show');
+
+  // ---------- плашка регистрации на карте (фаза сбора живого ивента) ----------
+  function setupRegPanel(ev){
+    const reg = document.getElementById('reg'), btn = document.getElementById('regBtn'),
+          sub = document.getElementById('regSub'), joined = document.getElementById('regJoined');
+    reg.style.display = 'block';
+    function paintJoined(role){
+      btn.style.display = 'none';
+      const rl = RL[role] || RL.ratnik;
+      joined.style.display = 'block';
+      joined.textContent = '✅ Ты в строю · ' + rl[0] + ' ' + rl[1];
+    }
+    if (ev.me_registered) paintJoined(ev.my_role);
+    const start = performance.now()/1000 - (ev.elapsed || 0);
+    app.ticker.add(() => {
+      const left = Math.max(0, (ev.gather_secs || 0) - (performance.now()/1000 - start));
+      if (left <= 0){ sub.textContent = 'Войска выступили — бой начался'; btn.disabled = true; }
+      else sub.textContent = '⏳ Выход через ' + Math.floor(left/60) + ':'
+        + String(Math.floor(left % 60)).padStart(2, '0') + ' · таверн: ' + (ev.n || 0);
+    });
+    btn.onclick = async () => {
+      btn.disabled = true; const was = btn.textContent; btn.textContent = 'Поднимаем…';
+      try {
+        const r = await fetch('/api/invasion/join', {method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({initData: (tg && tg.initData) || ''})});
+        const d = await r.json();
+        if (d.ok){
+          paintJoined(d.role);
+          try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch(e){}
+        } else {
+          btn.disabled = false; btn.textContent = was;
+          sub.textContent = ({no_tavern: 'Сначала заведи кабак в боте (/start)',
+            closed: 'Сбор уже закончился',
+            auth: 'Не удалось войти — открой карту через бота'}[d.error]) || 'Не вышло, попробуй ещё';
+        }
+      } catch(e){ btn.disabled = false; btn.textContent = was; sub.textContent = 'Сеть подвела — ещё раз'; }
+    };
+  }
 })();
 </script>
 </body></html>"""

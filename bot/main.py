@@ -132,6 +132,10 @@ async def main() -> None:
         webapp_runner = await run_webapp(int(port))
         logging.info("Mini App карта поднята на порту %s", port)
 
+    me = await bot.get_me()
+    from bot.keyboards.inline import set_bot_username
+    set_bot_username(me.username)   # для Direct-Link URL анонса орды (карта в группах)
+
     await _setup_commands(bot)
 
     await bot.delete_webhook(drop_pending_updates=True)

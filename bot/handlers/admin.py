@@ -14,7 +14,7 @@ from bot.db import repo
 from bot.db.models import Player, Tavern
 from bot.game import balance, invasion
 from bot.game import world as wld
-from bot.keyboards.inline import invasion_gather_kb
+from bot.keyboards.inline import invasion_announce_kb
 from bot.sender import deliver
 
 router = Router()
@@ -49,7 +49,7 @@ async def cmd_orc(message: Message, session: AsyncSession) -> None:
     msgs: dict[str, int] = {}
     for cid in chat_ids:
         sent = await deliver(lambda c=cid: send_invasion_announce(
-            message.bot, c, caption, invasion_gather_kb(inv.id)), what=f"orc→{cid}")
+            message.bot, c, caption, invasion_announce_kb(inv.id)), what=f"orc→{cid}")
         if sent is not None:
             msgs[str(cid)] = sent.message_id
     inv.messages = msgs

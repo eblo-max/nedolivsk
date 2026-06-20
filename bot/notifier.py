@@ -28,7 +28,7 @@ from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import (
     bonus_push_kb, buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb,
-    idle_nudge_kb, invasion_gather_kb, loot_kb, onboard_nudge_kb,
+    idle_nudge_kb, invasion_announce_kb, loot_kb, onboard_nudge_kb,
     raid_gather_kb, raid_kb,
 )
 
@@ -475,7 +475,7 @@ async def _notify_returned(bot: Bot) -> None:
                 else:                                            # идёт сбор — отсчёт
                     inv_edits.append((dict(inv.messages or {}),
                                       texts.invasion_gather_screen(inv),
-                                      invasion_gather_kb(inv.id)))
+                                      invasion_announce_kb(inv.id)))
             elif inv.status == "battle":
                 if now >= (inv.resolve_at or now):               # время исхода — СИМУЛЯЦИЯ
                     parts = [dict(r, pid=int(pid))

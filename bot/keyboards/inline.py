@@ -858,3 +858,30 @@ def invasion_gather_kb(inv_id: int) -> InlineKeyboardMarkup:
     kb.button(text="🔄 Обновить", callback_data=f"invref:{inv_id}")
     kb.adjust(1, 1)
     return kb.as_markup()
+
+
+# Имя бота — для Direct-Link Mini App URL в анонсах (ставится на старте из get_me).
+_BOT_USERNAME = ""
+
+
+def set_bot_username(username: str) -> None:
+    global _BOT_USERNAME
+    _BOT_USERNAME = (username or "").lstrip("@")
+
+
+def invasion_announce_kb(inv_id: int) -> InlineKeyboardMarkup:
+    """Кнопка анонса орды. Если настроен Direct-Link Mini App (webapp_short_name +
+    имя бота) — красная url-кнопка ОТКРЫВАЕТ КАРТУ на боссе (вся регистрация там).
+    Иначе фолбэк: обычная запись прямо в чате (callback)."""
+    from bot.config import settings
+    short = (getattr(settings, "webapp_short_name", "") or "").strip()
+    kb = InlineKeyboardBuilder()
+    if short and _BOT_USERNAME:
+        kb.button(text="⚔️ К ОРДЕ — открыть карту", style="danger",
+                  url=f"https://t.me/{_BOT_USERNAME}/{short}?startapp=inv{inv_id}")
+        kb.adjust(1)
+        return kb.as_markup()
+    kb.button(text="⚔️ Поднять войско", callback_data=f"invjoin:{inv_id}", style="danger")
+    kb.button(text="🔄 Обновить", callback_data=f"invref:{inv_id}")
+    kb.adjust(1, 1)
+    return kb.as_markup()
