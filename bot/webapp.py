@@ -388,7 +388,7 @@ _MAP_HTML = """<!doctype html>
   .ev{position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:10;display:none;
     background:#2a160ae8;border:1px solid #c9803a;border-radius:11px;padding:7px 16px;
     font-size:13px;color:#ffe2a8;font-weight:700;box-shadow:0 4px 16px #000a;white-space:nowrap}
-  .reg{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:11;display:none;
+  .reg{position:fixed;left:50%;bottom:16vh;transform:translateX(-50%);z-index:11;display:none;
     width:min(92vw,420px);background:#241809f5;border:1px solid #c9803a;border-radius:14px;
     padding:12px 14px;text-align:center;box-shadow:0 8px 28px #000b}
   .reg .rt{font-size:16px;color:#ffd9a8;font-weight:700;margin-bottom:3px}
@@ -397,10 +397,10 @@ _MAP_HTML = """<!doctype html>
     color:#fff;font:700 15px Georgia,serif;cursor:pointer}
   .reg .rb:active{transform:scale(.98)} .reg .rb:disabled{opacity:.55}
   .reg .rj{font-size:14px;color:#ffd24a;font-weight:700}
-  .rep{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:12;display:none;
-    width:min(96vw,470px);max-height:72vh;overflow:auto;background:#1c1206f8;
-    border:1px solid #c9803a;border-radius:14px 14px 0 0;padding:12px 12px 18px;
-    box-shadow:0 -6px 28px #000c}
+  .rep{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:12;display:none;
+    width:min(96vw,470px);max-height:78vh;overflow:auto;background:#1c1206f8;
+    border:1px solid #c9803a;border-radius:14px;padding:12px 12px 16px;
+    box-shadow:0 10px 34px #000d}
   .rep h3{margin:0 0 9px;font-size:15px;color:#ffd9a8;text-align:center;padding-right:18px}
   .rep .x{position:absolute;right:11px;top:8px;font-size:20px;color:#a98c5c;cursor:pointer;line-height:1}
   .rep table{width:100%;border-collapse:collapse;font-size:12px}
@@ -717,6 +717,20 @@ const MAXS = 9;               // максимальный зум; минимал
     centerOn(reportEv.x*W, reportEv.y*H, Math.max(minScale, 1.1));
     setupReportPanel(reportEv);                                    // боевая сводка
   }
+  // real-time: пока идёт/завершается ивент — опрашиваем сервер и обновляем карту
+  // при смене фазы (сбор→бой) или появлении сводки боя (без переоткрытия).
+  if (liveInv || reportEv){
+    const e0 = (data.events && data.events[0]) || {};
+    let sig = (e0.status || '') + '|' + (e0.report ? 'R' : '');
+    setInterval(async () => {
+      try {
+        const d = await (await fetch('/api/taverns?uid=' + encodeURIComponent(myId))).json();
+        const e = (d.events && d.events[0]) || {};
+        const ns = (e.status || '') + '|' + (e.report ? 'R' : '');
+        if (ns !== sig) location.reload();   // фаза сменилась/сводка готова → обновить
+      } catch(err){}
+    }, 9000);
+  }
   if (eventNodes.length){
     app.ticker.add(() => { const a = 0.10 + 0.12*(0.5 + 0.5*Math.sin(performance.now()/700));
       for (const ev of eventNodes) ev._glow.alpha = a; });   // мягкий пульс свечения
@@ -842,11 +856,12 @@ const MAXS = 9;               // максимальный зум; минимал
       const k = markerK();
       pathLayer.clear();
       const bs = screenOf(bx, by);
-      if (t < G){                                   // СБОР: пунктир «тянется» к орде
+      if (t < G){                                   // СБОР: войска СТОЯТ у таверн + пунктир к орде
         evEl.style.display='block';
         evEl.textContent = '⚔ Сбор войск · выход через '+Math.ceil(G-t)+'с · таверн: '+units.length;
         setAnim('idle'); hp.visible=false;
-        for (const u of units){ u.sp.visible=false;
+        for (const u of units){ u.wx=u.ox; u.wy=u.oy; u.sp.visible=true;
+          u.dir=(bx>=u.ox)?1:-1; uAnim(u,'idle');
           const us=screenOf(u.ox,u.oy); drawDotted(us.x,us.y, bs.x,bs.y, t/G); }
       } else if (t < G+M){                            // МАРШ: герои идут по пунктиру
         const p=(t-G)/M;
@@ -959,6 +974,7 @@ const MAXS = 9;               // максимальный зум; минимал
         if (d.ok){
           paintJoined(d.role);
           try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch(e){}
+          setTimeout(() => location.reload(), 1500);   // подтянуть свою дружину на карту
         } else {
           btn.disabled = false; btn.textContent = was;
           sub.textContent = ({no_tavern: 'Сначала заведи кабак в боте (/start)',
