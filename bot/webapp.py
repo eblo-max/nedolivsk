@@ -73,6 +73,25 @@ async def _world_png(request: web.Request) -> web.Response:
     return web.FileResponse(worldmap.MAP_FILE)
 
 
+_SPRITE_CACHE: dict[int, bytes] = {}
+
+
+def _trimmed_sprite_png(n: int) -> bytes | None:
+    # Обрезаем по альфе (как статичная карта в _load_sprite), чтобы низ картинки
+    # совпадал с основанием здания — иначе прозрачные поля снизу «подвешивают»
+    # таверну над землёй. Результат кешируем в памяти процесса.
+    if n in _SPRITE_CACHE:
+        return _SPRITE_CACHE[n]
+    img = worldmap._load_sprite(n)   # PIL.Image, уже crop по bbox; None если нет файла
+    if img is None:
+        return None
+    import io
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    _SPRITE_CACHE[n] = buf.getvalue()
+    return _SPRITE_CACHE[n]
+
+
 async def _tavern_sprite(request: web.Request) -> web.Response:
     # Спрайты-здания таверн по уровню (1..9) для 2.5D-диорамы. Только эти файлы —
     # не вся папка assets (там бывают служебные картинки).
@@ -82,10 +101,11 @@ async def _tavern_sprite(request: web.Request) -> web.Response:
         raise web.HTTPNotFound()
     if not 1 <= n <= 9:
         raise web.HTTPNotFound()
-    p = ASSETS_DIR / f"map_tavern_{n}.png"
-    if not p.is_file():
+    body = _trimmed_sprite_png(n)
+    if body is None:
         raise web.HTTPNotFound()
-    return web.FileResponse(p)
+    return web.Response(body=body, content_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 
 def build_app() -> web.Application:
@@ -205,6 +225,7 @@ const MINS = 0.18, MAXS = 6;  // пределы зума
 
     if (st){
       const sp = new PIXI.Sprite(st); sp.anchor.set(0.5, 1); sp.scale.set(w/st.width);
+      sp.y = Math.round(w*0.05);   // чуть утопить основание в землю (на тень)
       node.addChild(sp);
       sp.eventMode='static'; sp.cursor='pointer';
       sp.on('pointertap', ()=> showCard(t));
