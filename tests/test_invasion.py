@@ -1,5 +1,6 @@
 """Ивент «Орда орков»: мощь, порог, исход, раздача/штраф, фазы (чистая логика)."""
 
+import random
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -59,23 +60,29 @@ def test_win_boundary_inclusive():
 
 # ── раздача / штраф ────────────────────────────────────────────────────────
 def test_settle_win_rewards_by_contribution():
-    plan = inv.settle(_inv(_reg(10, 40), threshold=20))           # победа
+    plan = inv.settle(_inv(_reg(10, 40), threshold=20), random.Random(1))   # победа
     assert plan["won"] is True
     # больше мощь — больше золота; репутация всем фикс
     assert plan["gold"][2] > plan["gold"][1] > 0
     assert plan["rep"][1] == plan["rep"][2] == inv.WIN_REP
+    # хабар-ресурсы каждому участнику
+    assert set(plan["res"][1]) == set(inv.HAUL_RES)
+    # ровно один трофей случайному участнику
+    assert plan["trophy"] is not None and plan["trophy"]["pid"] in (1, 2)
+    assert plan["trophy"]["drop"]["kind"] in ("gold", "res")
 
 
-def test_settle_loss_penalizes_registered():
-    plan = inv.settle(_inv(_reg(5, 5), threshold=1000))           # провал
-    assert plan["won"] is False
+def test_settle_loss_penalizes_registered_no_trophy():
+    plan = inv.settle(_inv(_reg(5, 5), threshold=1000), random.Random(1))   # провал
+    assert plan["won"] is False and plan["trophy"] is None
     assert all(g == -inv.LOSS_GOLD for g in plan["gold"].values())
     assert all(r == -inv.LOSS_REP for r in plan["rep"].values())
+    assert plan["res"] == {}
 
 
 def test_settle_empty_roster_is_loss_no_payouts():
-    plan = inv.settle(_inv({}, threshold=50))
-    assert plan["won"] is False and plan["gold"] == {} and plan["rep"] == {}
+    plan = inv.settle(_inv({}, threshold=50), random.Random(1))
+    assert plan["won"] is False and plan["gold"] == {} and plan["trophy"] is None
 
 
 # ── фазы/тайминги ──────────────────────────────────────────────────────────

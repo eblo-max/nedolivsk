@@ -25,6 +25,7 @@ from bot.handlers import (
     group,
     hub,
     hunt,
+    invasion,
     loot,
     nightrun,
     raid,
@@ -69,6 +70,7 @@ async def _setup_commands(bot: Bot) -> None:
             public + [
                 BotCommand(command="admin", description="🛠 Админ-панель"),
                 BotCommand(command="fair", description="🎪 Запустить ярмарку (админ)"),
+                BotCommand(command="orc", description="🪓 Запустить Орду орков (админ)"),
                 BotCommand(command="reset", description="🔥 Сбросить игрока (админ)"),
             ],
             scope=BotCommandScopeChat(chat_id=settings.admin_id),
@@ -116,7 +118,7 @@ async def main() -> None:
         buildings.router, start.router, tavern.router, story.router,
         trade.router, auction.router, commands.router, loot.router,
         hunt.router, raid.router, bonus.router, referral.router, shop.router,
-        nightrun.router, hub.router, group.router
+        nightrun.router, invasion.router, hub.router, group.router
     )
 
     notifier_task = asyncio.create_task(notifier_loop(bot))

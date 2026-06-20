@@ -41,14 +41,29 @@ MIGHT_PER_BUILDING = 3
 COVERAGE = 0.40
 MIN_THRESHOLD = 50
 
-# ── Награды (победа): личные, по вкладу (мощи приведённого войска) ────────────
-WIN_GOLD_BASE = 40
-WIN_GOLD_PER_MIGHT = 2.0
-WIN_REP = 6
+# ── Награды (победа) ─────────────────────────────────────────────────────────
+# Ивент редкий (кулдаун 6ч), кооперативный и с риском провала → награда «вкусная»,
+# это «получка». Личное, по вкладу (мощи приведённого войска): золото + репутация +
+# трофейный хабар (ресурсы) каждому, и ОДИН редкий трофей случайному участнику.
+WIN_GOLD_BASE = 120
+WIN_GOLD_PER_MIGHT = 4.0
+WIN_REP = 8
+# Хабар (разграбили лагерь орды) — каждому участнику, диапазоны на бойца.
+HAUL_RES: dict[str, tuple[int, int]] = {"ore": (10, 20), "grain": (10, 18)}
+
+# Редкий ТРОФЕЙ — одному случайному участнику (равный шанс, чистый кооп). Веса в
+# промилле (сумма 1000). СЮДА позже сядут рецепты на уникальную сетовую снарягу
+# (kind="recipe") — слот и rarity уже заложены, осталось добавить вариант в ROLL.
+TROPHY_LOOT: tuple = (
+    ("gold", 520, (350, 650)),          # 🪙 джекпот-золото
+    ("res:ingot", 300, (20, 40)),       # слитки
+    ("res:honey", 180, (30, 60)),       # мёд (редкий ресурс)
+    # ("recipe", N, ("set_id", ...)),   # ← будущее: рецепт на сетовую шмотку
+)
 
 # ── Штраф (провал): записавшиеся понесли потери в неудачном походе ────────────
-LOSS_GOLD = 30
-LOSS_REP = 3
+LOSS_GOLD = 40
+LOSS_REP = 4
 
 
 def _now() -> datetime:
@@ -135,21 +150,43 @@ def is_won(inv) -> bool:
     return registered_might(inv) >= int(inv.threshold or 0)
 
 
-def settle(inv) -> dict:
-    """План исхода (раздача/штраф). Чистый — применяет снаружи, с капами.
-    Победа: личное золото = WIN_GOLD_BASE + мощь×коэф, +репутация.
-    Провал: записавшиеся теряют немного золота и репутации (поход не задался).
-    Возвращает {won, gold:{pid:Δ}, rep:{pid:Δ}}."""
+def _roll_trophy(rng) -> dict:
+    """Один редкий трофей: вид по весам TROPHY_LOOT. Расширяемо до рецептов."""
+    tag, _w, payload = rng.choices(TROPHY_LOOT, weights=[w for _, w, _ in TROPHY_LOOT])[0]
+    if tag == "gold":
+        return {"kind": "gold", "qty": rng.randint(*payload), "rarity": "rare"}
+    if tag.startswith("res:"):
+        return {"kind": "res", "res": tag.split(":", 1)[1],
+                "qty": rng.randint(*payload), "rarity": "rare"}
+    # if tag == "recipe": ...  # ← будущее: рецепт на сетовую снарягу (legendary)
+    return {"kind": "gold", "qty": rng.randint(100, 200), "rarity": "common"}
+
+
+def settle(inv, rng=None) -> dict:
+    """План исхода (раздача/штраф). Чистый — применяет снаружи, с капами/полами.
+    Победа: каждому участнику золото (база + мощь×коэф) + репутация + хабар-ресурсы;
+    ОДНОМУ случайному — редкий трофей (равный шанс). Провал: записавшиеся теряют
+    немного золота и репутации. Возвращает
+    {won, gold:{pid:Δ}, rep:{pid:Δ}, res:{pid:{res:qty}}, trophy:{pid,drop}|None}."""
+    import random as _random
+    rng = rng or _random
     won = is_won(inv)
     gold: dict[int, int] = {}
     rep: dict[int, int] = {}
-    for pid_s, r in (inv.registered or {}).items():
+    res: dict[int, dict] = {}
+    trophy = None
+    reg = inv.registered or {}
+    for pid_s, r in reg.items():
         pid = int(pid_s)
         might = int((r or {}).get("might", 0))
         if won:
             gold[pid] = WIN_GOLD_BASE + round(might * WIN_GOLD_PER_MIGHT)
             rep[pid] = WIN_REP
+            res[pid] = {k: rng.randint(lo, hi) for k, (lo, hi) in HAUL_RES.items()}
         else:
             gold[pid] = -LOSS_GOLD
             rep[pid] = -LOSS_REP
-    return {"won": won, "gold": gold, "rep": rep}
+    if won and reg:
+        lucky = rng.choice([int(p) for p in reg])          # равный шанс каждому
+        trophy = {"pid": lucky, "drop": _roll_trophy(rng)}
+    return {"won": won, "gold": gold, "rep": rep, "res": res, "trophy": trophy}

@@ -849,3 +849,12 @@ def raid_kb(raid_id: int) -> InlineKeyboardMarkup:
     kb.button(text="🔄 Обновить", callback_data=f"raidref:{raid_id}")
     kb.adjust(2)
     return kb.as_markup()
+
+
+def invasion_gather_kb(inv_id: int) -> InlineKeyboardMarkup:
+    """Фаза сбора ивента «Орда орков»: поднять войско таверны (публичная кнопка)."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⚔️ Поднять войско", callback_data=f"invjoin:{inv_id}", style="danger")
+    kb.button(text="🔄 Обновить", callback_data=f"invref:{inv_id}")
+    kb.adjust(1, 1)
+    return kb.as_markup()

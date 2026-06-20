@@ -1,23 +1,67 @@
 """Админ-команды. Работают только для ADMIN_ID из настроек."""
 
+from datetime import datetime, timedelta, timezone
+
 from aiogram import Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import announce
+from bot import announce, texts
 from bot.config import settings
 from bot.db import repo
 from bot.db.models import Player, Tavern
-from bot.game import balance
+from bot.game import balance, invasion
 from bot.game import world as wld
+from bot.keyboards.inline import invasion_gather_kb
+from bot.sender import deliver
 
 router = Router()
 
 
 def _is_admin(message: Message) -> bool:
     return settings.admin_id != 0 and message.from_user.id == settings.admin_id
+
+
+@router.message(Command("orc"))
+async def cmd_orc(message: Message, session: AsyncSession) -> None:
+    """Запустить ивент «Орда орков» вручную (порог = снимок мощи города)."""
+    if not _is_admin(message):
+        return
+    if await repo.get_active_invasion(session) is not None:
+        await message.answer("Орда уже идёт — дождись итога текущего ивента.")
+        return
+    now = datetime.now(timezone.utc)
+    total = await repo.world_might_sum(session)
+    threshold = invasion.horde_threshold(total)
+    g_until = invasion.gather_until(now)
+    inv = repo.create_invasion(session, sprite=invasion.SPRITE, threshold=threshold,
+                               gather_until=g_until, resolve_at=invasion.resolve_at(g_until))
+    world = await repo.get_or_create_world(session)
+    world.invasion_next_at = None          # активна — авто не спавнит поверх
+    await session.flush()                  # нужен inv.id для кнопок
+    repo.add_log(session, "admin", message.from_user.id,
+                 f"🪓 запущена Орда орков (порог {threshold}, сбор {invasion.GATHER_MINUTES} мин)")
+    from bot.handlers.invasion import send_invasion_announce
+    caption = texts.invasion_gather_screen(inv)
+    chat_ids = await repo.all_chat_ids(session)
+    msgs: dict[str, int] = {}
+    for cid in chat_ids:
+        sent = await deliver(lambda c=cid: send_invasion_announce(
+            message.bot, c, caption, invasion_gather_kb(inv.id)), what=f"orc→{cid}")
+        if sent is not None:
+            msgs[str(cid)] = sent.message_id
+    inv.messages = msgs
+    cut = now - timedelta(days=7)
+    pids = [r[0] for r in (await session.execute(
+        select(Player.id).where(Player.last_seen_at >= cut))).all()]
+    for uid in pids:
+        repo.queue_notify(session, uid, texts.invasion_push_dm(inv))
+    await message.answer(
+        f"🪓 Орда орков запущена! Порог орды: <b>{threshold}</b> "
+        f"(мощь города {total}). Сбор {invasion.GATHER_MINUTES} мин. "
+        f"В чаты: {len(msgs)}/{len(chat_ids)}. Пуш в личку: {len(pids)}.")
 
 
 @router.message(Command("reset"))

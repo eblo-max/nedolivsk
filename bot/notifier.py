@@ -22,16 +22,59 @@ from bot.game import loot
 from bot.game import market as marketmod
 from bot.game import npc
 from bot.game import raid as raidmod
+from bot.game import invasion as invmod
+from bot.game import inventory
 from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import (
     bonus_push_kb, buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb,
-    idle_nudge_kb, loot_kb, onboard_nudge_kb, raid_gather_kb, raid_kb,
+    idle_nudge_kb, invasion_gather_kb, loot_kb, onboard_nudge_kb,
+    raid_gather_kb, raid_kb,
 )
 
 CHECK_INTERVAL_SECONDS = 60
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_trophy(player, drop: dict) -> str:
+    """Применить редкий трофей победителю и вернуть человекочитаемую строку."""
+    if drop.get("kind") == "gold":
+        player.gold += int(drop["qty"])
+        return f"{drop['qty']} 🪙"
+    if drop.get("kind") == "res":
+        inventory.add(player, drop["res"], int(drop["qty"]))
+        return f"{balance.RESOURCE_NAMES.get(drop['res'], drop['res'])} ×{drop['qty']}"
+    return "загадочный трофей"
+
+
+async def _apply_invasion(session, inv, plan: dict) -> None:
+    """Применить исход ивента «Орда орков»: награды/штраф участникам + личные сводки.
+    Капы: золото не уходит в минус, репутация не ниже 0. Идемпотентность — снаружи
+    (резолв только при status=='battle' под локом строки ивента)."""
+    won = plan["won"]
+    trophy = plan.get("trophy")
+    for pid, dgold in plan["gold"].items():
+        player = await session.get(Player, int(pid), with_for_update=True)
+        if player is None:
+            continue
+        drep = int(plan["rep"].get(pid, 0))
+        if won:
+            player.gold += int(dgold)
+            player.reputation += drep
+            haul = plan["res"].get(pid) or {}
+            for res, qty in haul.items():
+                inventory.add(player, res, int(qty))
+            tline = None
+            if trophy and int(trophy["pid"]) == int(pid):
+                tline = _apply_trophy(player, trophy["drop"])
+            repo.queue_notify(session, int(pid),
+                              texts.invasion_reward_dm(True, int(dgold), drep, haul, tline))
+        else:
+            player.gold = max(0, player.gold + int(dgold))     # не в минус
+            player.reputation = max(0, player.reputation + drep)
+            repo.queue_notify(session, int(pid),
+                              texts.invasion_reward_dm(False, int(dgold), drep))
 
 
 async def _notify(bot: Bot, player: Player, text: str, markup) -> None:
@@ -412,6 +455,40 @@ async def _notify_returned(bot: Bot) -> None:
         raidmod.set_active(next(
             (b.id for b in live_raids if b.status in ("gathering", "active")), None))
 
+        # Ивент «Орда орков»: сбор → битва → резолв (раздача/штраф). Правки анонсов
+        # копим (messages, text, markup|None) и шлём ПОСЛЕ коммита, как у рейда.
+        inv_edits: list[tuple[dict, str, object]] = []
+        for inv in await repo.live_invasions(session):
+            if inv.status == "gathering":
+                if now >= (inv.gather_until or now):
+                    if invmod.registered_count(inv) == 0:        # никто не пришёл
+                        inv.status = "lost"
+                        inv.result = {"won": False, "have": 0,
+                                      "need": int(inv.threshold or 0), "n": 0}
+                        world.invasion_next_at = invmod.cooldown_until(now)
+                        inv_edits.append((dict(inv.messages or {}),
+                                          texts.invasion_result_chat(inv, False), None))
+                    else:                                        # войска выступили
+                        inv.status = "battle"
+                        inv_edits.append((dict(inv.messages or {}),
+                                          texts.invasion_battle_screen(inv), None))
+                else:                                            # идёт сбор — отсчёт
+                    inv_edits.append((dict(inv.messages or {}),
+                                      texts.invasion_gather_screen(inv),
+                                      invasion_gather_kb(inv.id)))
+            elif inv.status == "battle":
+                if now >= (inv.resolve_at or now):               # время исхода
+                    plan = invmod.settle(inv)
+                    await _apply_invasion(session, inv, plan)
+                    inv.result = {"won": plan["won"],
+                                  "have": invmod.registered_might(inv),
+                                  "need": int(inv.threshold or 0),
+                                  "n": invmod.registered_count(inv)}
+                    inv.status = "won" if plan["won"] else "lost"
+                    world.invasion_next_at = invmod.cooldown_until(now)
+                    inv_edits.append((dict(inv.messages or {}),
+                                      texts.invasion_result_chat(inv, plan["won"]), None))
+
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
         world_news: list[str] = []  # глобальные вести для DM-дайджеста одиночкам
 
@@ -598,6 +675,14 @@ async def _notify_returned(bot: Bot) -> None:
                     lambda c=int(cid_s), m=mid, t=rtext, mk=rmarkup, v=is_vid:
                     edit_raid_announce(bot, c, m, v, t, mk),
                     what=f"raid-edit→{cid_s}")
+        # Ивент «Орда орков»: правка анонса (отсчёт сбора → битва → итог).
+        from bot.handlers.invasion import edit_invasion_announce
+        for messages, itext, imarkup in inv_edits:
+            for cid_s, mid in messages.items():
+                await deliver(
+                    lambda c=int(cid_s), m=mid, t=itext, mk=imarkup:
+                    edit_invasion_announce(bot, c, m, t, mk),
+                    what=f"inv-edit→{cid_s}")
 
         # Анонсы городских ситуаций (после коммита).
         for chat_id, text in city_events:

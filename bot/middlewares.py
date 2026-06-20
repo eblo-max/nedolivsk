@@ -55,9 +55,9 @@ class PanelGuardMiddleware(BaseMiddleware):
         event: CallbackQuery,
         data: dict[str, Any],
     ) -> Any:
-        # Публичные кнопки в чате: подкидыш и рейд-босс — жмёт любой, не владелец.
+        # Публичные кнопки в чате: подкидыш, рейд-босс, ивент-орда — жмёт любой.
         if event.data and event.data.startswith(
-                ("loot:", "raidjoin:", "raidhit:", "raidref:")):
+                ("loot:", "raidjoin:", "raidhit:", "raidref:", "invjoin:", "invref:")):
             return await handler(event, data)
         msg = event.message
         if panels.is_group(msg):

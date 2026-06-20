@@ -3087,3 +3087,80 @@ def nightrun_crossroad(player, run: dict) -> str:
     nxt = _nr_next_odds(player, run)
     return (head + f"\n\nТы на распутье: ⬇️ глубже в ночь (~{nxt}% пройти, добыча жирнее) "
             f"или 🏠 свернуть с котомкой ({_nr_loot(run.get('satchel') or {})}).")
+
+
+# ── Ивент «Орда орков» (invasion) ───────────────────────────────────────────
+def _inv_force_line(inv) -> str:
+    from bot.game import invasion as invmod
+    have = invmod.registered_might(inv)
+    need = int(inv.threshold or 0)
+    n = invmod.registered_count(inv)
+    pct = round(100 * have / need) if need else 0
+    return f"⚔️ Войско: <b>{have}</b>/{need} силы (<b>{pct}%</b>) · таверн: {n}"
+
+
+def invasion_gather_screen(inv) -> str:
+    """Анонс/правка фазы сбора: обратный отсчёт, набранная сила, призыв."""
+    from bot.game import invasion as invmod
+    left = invmod.gather_left(inv)
+    return "\n".join([
+        "🪓 <b>ОРДА ОРКОВ ИДЁТ НА НЕДОЛИВСК!</b>",
+        "<i>Дикая орда встала лагерем в северных снегах. Подымем дружины — "
+        "или город разграбят.</i>",
+        "",
+        _inv_force_line(inv),
+        f"⏳ Войска выступают через <b>{left // 60}:{left % 60:02d}</b>",
+        "",
+        "Жми «⚔️ Поднять войско» — таверна вышлет дружину. Одолеем — добыча всем, "
+        "кто пришёл; не наберём силы — орки разорят поход.",
+    ])
+
+
+def invasion_battle_screen(inv) -> str:
+    """Правка при старте битвы — войска выступили."""
+    return ("🪓 <b>ОРДА ОРКОВ — БИТВА!</b>\n"
+            "<i>Дружины сошлись с ордой у северных снегов…</i>\n\n"
+            f"{_inv_force_line(inv)}\n"
+            "Исход решит сила приведённых войск. Глянь карту — войска уже идут! 🗺")
+
+
+def invasion_push_dm(inv) -> str:
+    """Пуш-анонс в личку при старте сбора."""
+    return ("🪓 <b>Орда орков идёт на Недоливск!</b>\n"
+            "<i>Идёт сбор (~20 мин).</i> Открой кабак и подними войско — "
+            "победим, добыча всем, кто пришёл.")
+
+
+def invasion_joined(might: int) -> str:
+    return (f"⚔️ Дружина выслана! Сила твоего войска: <b>{might}</b>. "
+            "Жди битвы — добыча по вкладу.")
+
+
+def invasion_result_chat(inv, won: bool) -> str:
+    """Общий анонс итога в чат."""
+    from bot.game import invasion as invmod
+    have, need = invmod.registered_might(inv), int(inv.threshold or 0)
+    n = invmod.registered_count(inv)
+    if won:
+        return ("🏆🪓 <b>ОРДА ОРКОВ РАЗБИТА!</b>\n"
+                f"Город выставил <b>{have}</b> силы против {need} — и орда полегла. "
+                f"Дружины {n} таверн делят добычу. Слава Недоливску! 🍺")
+    return ("💀🪓 <b>ОРКИ УСТОЯЛИ…</b>\n"
+            f"Город собрал лишь <b>{have}</b> из {need} — войск не хватило, орда "
+            f"отбилась и пощипала обозы. {n} таверн зализывают раны. "
+            "В другой раз — всем миром!")
+
+
+def invasion_reward_dm(won: bool, gold: int, rep: int,
+                       res: dict | None = None, trophy_line: str | None = None) -> str:
+    """Личная сводка участнику (победа — доля; провал — потери)."""
+    if won:
+        parts = [f"+{gold} 🪙", f"+{rep} молвы"]
+        for k, v in (res or {}).items():
+            parts.append(f"{RESOURCE_NAMES.get(k, k)} ×{v}")
+        out = "🏆 <b>Орда разбита!</b>\nТвоя доля: " + ", ".join(parts) + "."
+        if trophy_line:
+            out += f"\n🎁 <b>ТРОФЕЙ:</b> {trophy_line}"
+        return out
+    return (f"💀 <b>Орки устояли…</b>\nПоход стоил: −{abs(gold)} 🪙, −{abs(rep)} молвы. "
+            "Соберёмся в следующий раз — всем миром.")
