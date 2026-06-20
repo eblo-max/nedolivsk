@@ -70,6 +70,19 @@ async def cb_tavern(callback: CallbackQuery, session: AsyncSession) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data == "more")
+async def cb_more(callback: CallbackQuery, session: AsyncSession) -> None:
+    """Подменю «⋯ Ещё» — меняем только клавиатуру (экран таверны остаётся)."""
+    player = await _get_player(callback, session)
+    if player is None:
+        return
+    try:
+        await callback.message.edit_reply_markup(reply_markup=kb.tavern_more_kb(player))
+    except TelegramBadRequest:
+        pass
+    await callback.answer()
+
+
 @router.callback_query(F.data == "dmnews")
 async def cb_dmnews(callback: CallbackQuery, session: AsyncSession) -> None:
     """Одиночка переключает вести мира в ЛС (подкидыши и так шлём всем без группы)."""

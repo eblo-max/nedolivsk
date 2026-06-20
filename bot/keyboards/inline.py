@@ -113,6 +113,21 @@ def tavern_kb(player: Player, private: bool = True) -> InlineKeyboardMarkup:
         exp_label = f"⏳ Бригады в пути ({c.out}/{c.total})"
     else:
         exp_label = "⛏ Отправить бригады"
+    # ЯДРО на главной (основная петля): остальное — в подменю «⋯ Ещё», чтобы не
+    # пугать новичка простынёй. Контекстные CTA (рейд/бонус/гости…) остаются сверху.
+    kb.button(text=exp_label, callback_data="exp_menu")
+    kb.button(text="💰 Собрать доход", callback_data="income")
+    kb.button(text="🏪 Рынок", callback_data="market")
+    kb.button(text="📦 Склад", callback_data="warehouse")
+    kb.button(text="🏗 Пристройки", callback_data="buildings")
+    kb.button(text="🔨 Улучшить таверну", callback_data="upgrade")
+    kb.button(text="⋯ Ещё", callback_data="more")
+    kb.adjust(*sizes, 1, 2, 2, 1, 1)
+    return kb.as_markup()
+
+
+def tavern_more_kb(player: Player) -> InlineKeyboardMarkup:
+    """Подменю «⋯ Ещё»: второстепенные разделы (не на главной) + назад в таверну."""
     auc = player.tavern.auction or None
     if auc and auc.get("top_bid"):
         auc_label = f"🔨 Торги: {auc['top_bid']}🪙!"
@@ -120,19 +135,14 @@ def tavern_kb(player: Player, private: bool = True) -> InlineKeyboardMarkup:
         auc_label = "🔨 Торги идут"
     else:
         auc_label = "🔨 Аукцион"
-
-    kb.button(text=exp_label, callback_data="exp_menu")
-    kb.button(text="💰 Собрать доход", callback_data="income")
-    kb.button(text="🏪 Рынок", callback_data="market")
-    kb.button(text=auc_label, callback_data="auction")
-    kb.button(text="📦 Склад", callback_data="warehouse")
+    kb = InlineKeyboardBuilder()
     kb.button(text="🧍 Персонаж", callback_data="character")
-    kb.button(text="🏗 Пристройки", callback_data="buildings")
-    kb.button(text="🔨 Улучшить таверну", callback_data="upgrade")
+    kb.button(text=auc_label, callback_data="auction")
     kb.button(text="🌙 Ночная ходка", callback_data="nr:open")
-    kb.button(text="Об игре", callback_data="info", style="danger")
     kb.button(text="🍻 Позвать друга", callback_data="referral")
-    kb.adjust(*sizes, 1, 2, 2, 2, 1, 1, 1, 1)
+    kb.button(text="Об игре", callback_data="info", style="danger")
+    kb.button(text="🏠 В таверну", callback_data="tavern", style="success")
+    kb.adjust(2, 2, 1, 1)
     return kb.as_markup()
 
 
