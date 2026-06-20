@@ -154,7 +154,7 @@ async def _hero_sprite(request: web.Request) -> web.Response:
     except (KeyError, ValueError):
         raise web.HTTPNotFound()
     anim = request.match_info.get("anim", "walk")
-    if not (1 <= n <= 3) or anim not in _EVENT_ANIMS:
+    if not (1 <= n <= 6) or anim not in _EVENT_ANIMS:
         raise web.HTTPNotFound()
     p = ASSETS_DIR / "heroes" / f"hero{n}_{anim}.png"
     if not p.is_file():
@@ -567,8 +567,9 @@ const MAXS = 9;               // максимальный зум; минимал
       if (frac>0) hp.roundRect(-barW/2+1.5, barY+1.5, (barW-3)*frac, 8, 3).fill({color:0xc0392b});
     }
     // спрайты героев (3 модели) — раздаём таверне стабильно по координатам
+    const HERO_COUNT = 6;
     const HERO = {};
-    for (const h of [1,2,3]){ HERO[h] = {};
+    for (let h=1; h<=HERO_COUNT; h++){ HERO[h] = {};
       for (const a of ['walk','attack','die','idle']){
         try { HERO[h][a] = sliceFrames(await PIXI.Assets.load('/assets/heroes/hero'+h+'_'+a+'.png'), 10); } catch(e){}
       }
@@ -578,7 +579,7 @@ const MAXS = 9;               // максимальный зум; минимал
       u.sp.textures = fr; u.sp.loop = (name!=='die'); u.sp.gotoAndPlay(0); u.anim = name; }
     // войска — герои, выходят из таверн
     const units = (ev.troops||[]).map((t,i) => {
-      const h = 1 + (hashCoord(t.x, t.y) % 3);
+      const h = 1 + (hashCoord(t.x, t.y) % HERO_COUNT);
       const sp = new PIXI.AnimatedSprite(HERO[h].walk || [PIXI.Texture.EMPTY]);
       sp.anchor.set(0.5, 1); sp.animationSpeed = 0.22; sp.play(); sp.visible = false;
       eventLayer.addChild(sp);
