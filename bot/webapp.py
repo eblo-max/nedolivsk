@@ -369,8 +369,10 @@ _MAP_HTML = """<!doctype html>
     position:fixed;inset:0;overscroll-behavior:none;background:#0e1822;
     font:14px/1.4 Georgia,serif;color:#f3e6c8;-webkit-tap-highlight-color:transparent}
   canvas{display:block;touch-action:none}
-  .bar{position:fixed;left:8px;top:8px;z-index:10;background:#241809d8;border:1px solid #5a4527;
-    border-radius:10px;padding:6px 11px;font-size:12px;color:#e9d6a8;backdrop-filter:blur(3px)}
+  .bar{position:fixed;left:10px;bottom:10px;z-index:6;background:#241809cc;
+    border:1px solid #5a452788;border-radius:20px;padding:5px 13px;font-size:11px;
+    color:#d8c39a;letter-spacing:.2px;backdrop-filter:blur(4px);pointer-events:none;
+    box-shadow:0 2px 10px #0006;transition:opacity .2s}
   .card{position:fixed;left:50%;bottom:14px;transform:translateX(-50%) translateY(140%);
     z-index:10;width:min(92vw,420px);background:#241809f2;border:1px solid #6b522e;
     border-radius:14px;padding:12px 14px;box-shadow:0 8px 26px #000a;transition:transform .22s ease}
@@ -684,7 +686,7 @@ const MAXS = 9;               // максимальный зум; минимал
   app.stage.on('pointertap', () => card.classList.remove('show'));  // тап по пустому — закрыть
 
   // ---------- старт ----------
-  bar.textContent = '🗺 Недоливск · таверн на карте: ' + taverns.length;
+  bar.textContent = '🗺 Недоливск · ' + taverns.length + ' таверн';
   const mine = taverns.find(t=>t.mine);
   if (mine) centerOn(mine.wx, mine.wy, Math.max(minScale, 0.85)); else refresh();
   window.addEventListener('resize', () => {
@@ -910,6 +912,7 @@ const MAXS = 9;               // максимальный зум; минимал
     }
     body.innerHTML = html + '</table>';
     rep.style.display = 'block';
+    bar.style.display = 'none';            // на время сводки счётчик прячем
   }
   document.getElementById('repx').onclick = () => {
     document.getElementById('rep').style.display = 'none';
@@ -931,6 +934,7 @@ const MAXS = 9;               // максимальный зум; минимал
     const reg = document.getElementById('reg'), btn = document.getElementById('regBtn'),
           sub = document.getElementById('regSub'), joined = document.getElementById('regJoined');
     reg.style.display = 'block';
+    bar.style.display = 'none';            // плашка-счётчик не мешает регистрации
     function paintJoined(role){
       btn.style.display = 'none';
       const rl = RL[role] || RL.ratnik;
