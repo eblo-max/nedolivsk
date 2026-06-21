@@ -826,17 +826,20 @@ const MAXS = 9;               // максимальный зум; минимал
     let gTex=null; if (hasSquad){ try{ gTex=await PIXI.Assets.load('/assets/hud/squad_globe.png'); }catch(e){} }
     const GIW=226, GIH=219, GCX=112.5, GCY=100.5, GR=96;   // геометрия PNG: круг жидкости
     const hud = new PIXI.Container(); hud.visible=false; app.stage.addChild(hud);
-    if (gTex){ const gSpr = new PIXI.Sprite(gTex); hud.addChild(gSpr); }  // стекло/оправа — снизу
+    const gShadow = new PIXI.Graphics().ellipse(GCX, GCY+8, GR+8, GR+5).fill({color:0x000000, alpha:0.32});
+    hud.addChild(gShadow);                                               // мягкая тень-подложка
+    if (gTex){ const gSpr = new PIXI.Sprite(gTex); hud.addChild(gSpr); }  // стекло/оправа
     const liquid = new PIXI.Graphics(); hud.addChild(liquid);            // жидкость — поверх (полупрозрачная)
     const lmask = new PIXI.Graphics().circle(GCX, GCY, GR-2).fill(0xffffff);
     hud.addChild(lmask); liquid.mask = lmask;                            // не даём жидкости вылезти за круг
-    const gLabel = new PIXI.Text({text:'', style:{fontFamily:'Georgia,serif', fontSize:21,
+    const gLabel = new PIXI.Text({text:'', style:{fontFamily:'Georgia,serif', fontSize:20,
       fontWeight:'700', fill:0xffe9c2, stroke:{color:0x140d06, width:5}, align:'center'}});
-    gLabel.anchor.set(0.5, 0); hud.addChild(gLabel);
+    gLabel.anchor.set(0.5, 0.5); gLabel.position.set(GCX, GCY); hud.addChild(gLabel);   // число по центру орба
     function placeHud(){
-      const disp = Math.min(140, app.screen.width*0.32), s = disp/GIW;
-      hud.scale.set(s); hud.x = 14; hud.y = app.screen.height - GIH*s - 18;
-      gLabel.x = GCX; gLabel.y = GIH + 4;
+      const disp = Math.min(138, app.screen.width*0.30), s = disp/GIW;
+      hud.scale.set(s);
+      hud.x = app.screen.width - GIW*s - 16;                            // правый-нижний угол
+      hud.y = app.screen.height - GIH*s - 22;
     }
     placeHud(); window.addEventListener('resize', placeHud);
     function setGlobe(frac, color, label, notch){
