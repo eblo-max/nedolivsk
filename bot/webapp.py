@@ -18,7 +18,7 @@ import hmac
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl
 
 from aiohttp import web
@@ -113,19 +113,19 @@ def _invasion_event(inv, uid: int = 0) -> dict:
             b = b.replace(tzinfo=timezone.utc)
         return max(0.0, (b - a).total_seconds())
 
-    # тайминги — из РЕАЛЬНЫХ меток ивента (обычный/быстрый режим совпадут с картой)
-    gather_secs = _secs(inv.started_at, inv.gather_until) or invmod.GATHER_MINUTES * 60
-    window = _secs(inv.gather_until, inv.resolve_at)
-    march_secs = min(invmod.MARCH_SECONDS, window * 0.3) if window else invmod.MARCH_SECONDS
-    battle_secs = max(1.0, window - march_secs) if window else invmod.BATTLE_SECONDS
-    troops = [{"x": (r or {}).get("tx", 0.5), "y": (r or {}).get("ty", 0.5),
-               "role": (r or {}).get("role", "ratnik")}
-              for r in (inv.registered or {}).values()]
     # Та же детерминированная симуляция (сид=id) → реальный исход + ТАЙМЛАЙН
     # (HP орды/броня/баффы по раундам) для честной анимации полоски и баффов.
     parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
     sim = invmod.simulate(parts, seed=inv.id)
     result = inv.status if inv.status in ("won", "lost") else ("won" if sim["won"] else "lost")
+    # тайминги: сбор — из меток; марш фикс.; БОЙ — по реальному числу раундов (полоска
+    # тает в темпе симуляции и заканчивается, когда бой реально завершился).
+    gather_secs = _secs(inv.started_at, inv.gather_until) or invmod.GATHER_MINUTES * 60
+    march_secs = invmod.MARCH_SECONDS
+    battle_secs = invmod.battle_secs_for(sim["rounds"])
+    troops = [{"x": (r or {}).get("tx", 0.5), "y": (r or {}).get("ty", 0.5),
+               "role": (r or {}).get("role", "ratnik")}
+              for r in (inv.registered or {}).values()]
     return {
         "id": inv.id, "sprite": inv.sprite, "x": invmod.POS[0], "y": invmod.POS[1],
         "name": invmod.NAME, "blurb": "Орда орков идёт на Недоливск — поднимай войско!",
@@ -178,9 +178,21 @@ async def _api_taverns(request: web.Request) -> web.Response:
     # время боя ВЫШЛО (now ≥ resolve_at) → показываем сводку СРАЗУ (предсказанием),
     # не дожидаясь, пока нотифаер переключит статус/зарезолвит (лаг до тика ~60с).
     # Важно: НЕ только при status=='battle' — нотифаер мог ещё не флипнуть gathering→battle.
-    if live is not None and live.resolve_at:
-        ra = live.resolve_at if live.resolve_at.tzinfo else live.resolve_at.replace(tzinfo=timezone.utc)
-        if now >= ra:
+    if live is not None:
+        # реальный конец боя = сбор + марш + раунды×темп (из той же симуляции, что и
+        # анимация). НЕ полагаемся на resolve_at: при спавне он = дефолт, а нотифаер
+        # уточняет его лишь на тике (лаг ≤60с) — иначе сводка отставала бы от полоски.
+        end = None
+        if invmod.registered_count(live) > 0 and live.gather_until:
+            gu = (live.gather_until if live.gather_until.tzinfo
+                  else live.gather_until.replace(tzinfo=timezone.utc))
+            parts = [dict(r, pid=int(pid)) for pid, r in (live.registered or {}).items()]
+            rounds = invmod.simulate(parts, seed=live.id)["rounds"]
+            end = gu + timedelta(seconds=invmod.MARCH_SECONDS + invmod.battle_secs_for(rounds))
+        elif live.resolve_at:
+            end = (live.resolve_at if live.resolve_at.tzinfo
+                   else live.resolve_at.replace(tzinfo=timezone.utc))
+        if end is not None and now >= end:
             report_inv, live = live, None
     # уже зарезолвлен и недавно — показываем сводку из снимка
     if live is None and report_inv is None and latest and latest.status in ("won", "lost") and latest.resolve_at:

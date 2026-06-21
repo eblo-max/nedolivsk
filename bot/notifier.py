@@ -479,6 +479,14 @@ async def _notify_returned(bot: Bot) -> None:
                                           texts.invasion_result_chat(inv), None))
                     else:                                        # войска выступили
                         inv.status = "battle"
+                        # длина боя = реальное число раундов → resolve_at точно к финалу
+                        parts = [dict(r, pid=int(pid))
+                                 for pid, r in (inv.registered or {}).items()]
+                        bsec = invmod.battle_secs_for(invmod.simulate(parts, seed=inv.id)["rounds"])
+                        gu = inv.gather_until
+                        if gu.tzinfo is None:
+                            gu = gu.replace(tzinfo=timezone.utc)
+                        inv.resolve_at = gu + timedelta(seconds=invmod.MARCH_SECONDS + bsec)
                         inv_edits.append((dict(inv.messages or {}),
                                           texts.invasion_battle_screen(inv), None))
                 # пока идёт сбор — анонс НЕ правим (отсчёт/состав живут на карте);

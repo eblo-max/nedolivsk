@@ -58,8 +58,10 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
         b = base_url()
         kb = invasion_map_dm_kb(b + "/map") if b else None
         timing = (f"⚡ быстрый режим: сбор {invasion.FAST_GATHER_SECONDS}с, "
-                  f"бой ~{invasion.FAST_MARCH_SECONDS + invasion.FAST_BATTLE_SECONDS}с" if fast
-                  else f"сбор {invasion.GATHER_MINUTES} мин, бой ~{invasion.BATTLE_SECONDS // 60} мин")
+                  f"бой по темпу (~{invasion.FAST_MARCH_SECONDS}с марш + раунды)" if fast
+                  else f"сбор {invasion.GATHER_MINUTES} мин, бой по реальному темпу "
+                       f"(полоска HP тает раунд за раундом, "
+                       f"{invasion.MIN_BATTLE_SECONDS}–{invasion.MAX_BATTLE_SECONDS}с)")
         army = "\n🤖 Болванка-армия: 16 бойцов (🛡4 🗡6 ⚔️4 🔭2) — город уже силён." if seed_army else ""
         await message.answer(
             f"🪓 <b>Орда запущена в ТЕСТ-режиме</b> (без анонсов в чаты/лички).\n"
