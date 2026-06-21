@@ -373,7 +373,15 @@ def build_app() -> web.Application:
     app.router.add_get("/assets/boss/ork{n}_{anim}.png", _event_sprite)  # ивент-анимации
     app.router.add_get("/assets/heroes/hero{n}_{anim}.png", _hero_sprite)  # войска-герои
     app.router.add_get("/assets/fx/fire{n}.png", _fx_sprite)  # эффекты ударов
+    app.router.add_get("/assets/hud/squad_globe.png", _hud_globe)  # сфера HP дружины
     return app
+
+
+async def _hud_globe(request: web.Request) -> web.Response:
+    p = ASSETS_DIR / "hud" / "squad_globe.png"
+    if not p.is_file():
+        raise web.HTTPNotFound()
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
 async def run_webapp(port: int) -> web.AppRunner:
@@ -808,22 +816,39 @@ const MAXS = 9;               // максимальный зум; минимал
       if (frac>0) hp.roundRect(-barW/2+1.5, barY+1.5, (barW-3)*frac, 8, 3)
         .fill({color: warded?0x3d6fb0:0xc0392b});
     }
-    // полоска ДРУЖИНЫ (под полоской орды). На сборе — «готовность к победе»
-    // (наливается по мере записи, рубеж VL = победный состав); в бою — живое HP,
-    // тает с гибелью бойцов. hasSquad — только у настоящего ивента (есть данные).
+    // ── Сфера HP/ГОТОВНОСТИ ДРУЖИНЫ (HUD, экранная, левый-нижний угол) ──────────
+    // Жидкость в стеклянной сфере (арт fant_UI). На сборе — наливается «готовность
+    // к победе» (рубеж VL); в бою — живое HP дружины, тает с гибелью бойцов.
     const VL = 0.7;            // зеркалит invasion.VICTORY_LINE
     const hasSquad = (ev.army_hp_max||0) > 0;
-    const shp = new PIXI.Graphics(); shp.visible = false; node.addChild(shp);
-    const barYs = barY + 14;
     const readyCol = f => f>=VL ? 0x3fa34d : (f>=VL*0.6 ? 0xe0a020 : 0xc0392b);
     const hpCol    = f => f>0.5 ? 0x3fa34d : (f>0.25 ? 0xe0a020 : 0xc0392b);
-    function drawSquad(frac, color, notch){
-      frac = Math.max(0, Math.min(1, frac)); shp.clear();
-      shp.roundRect(-barW/2, barYs, barW, 9, 3).fill({color:0x0a0f08, alpha:0.85})
-        .stroke({color:0x3c5a2e, width:1});
-      if (frac>0) shp.roundRect(-barW/2+1.5, barYs+1.5, (barW-3)*frac, 6, 2).fill({color});
-      if (notch!=null){ const nx = -barW/2 + barW*notch;
-        shp.moveTo(nx, barYs-2).lineTo(nx, barYs+11).stroke({color:0xffe9a8, width:1.5, alpha:0.9}); }
+    let gTex=null; if (hasSquad){ try{ gTex=await PIXI.Assets.load('/assets/hud/squad_globe.png'); }catch(e){} }
+    const GIW=226, GIH=219, GCX=112.5, GCY=100.5, GR=96;   // геометрия PNG: круг жидкости
+    const hud = new PIXI.Container(); hud.visible=false; app.stage.addChild(hud);
+    if (gTex){ const gSpr = new PIXI.Sprite(gTex); hud.addChild(gSpr); }  // стекло/оправа — снизу
+    const liquid = new PIXI.Graphics(); hud.addChild(liquid);            // жидкость — поверх (полупрозрачная)
+    const lmask = new PIXI.Graphics().circle(GCX, GCY, GR-2).fill(0xffffff);
+    hud.addChild(lmask); liquid.mask = lmask;                            // не даём жидкости вылезти за круг
+    const gLabel = new PIXI.Text({text:'', style:{fontFamily:'Georgia,serif', fontSize:21,
+      fontWeight:'700', fill:0xffe9c2, stroke:{color:0x140d06, width:5}, align:'center'}});
+    gLabel.anchor.set(0.5, 0); hud.addChild(gLabel);
+    function placeHud(){
+      const disp = Math.min(140, app.screen.width*0.32), s = disp/GIW;
+      hud.scale.set(s); hud.x = 14; hud.y = app.screen.height - GIH*s - 18;
+      gLabel.x = GCX; gLabel.y = GIH + 4;
+    }
+    placeHud(); window.addEventListener('resize', placeHud);
+    function setGlobe(frac, color, label, notch){
+      if (!hasSquad) return;
+      hud.visible = true; frac = Math.max(0, Math.min(1, frac));
+      const yTop = (GCY+GR) - frac*2*GR;
+      liquid.clear();
+      if (frac>0){ liquid.rect(0, yTop, GIW, (GCY+GR)-yTop).fill({color, alpha:0.6});   // тело
+        liquid.rect(0, yTop, GIW, 5).fill({color:0xffffff, alpha:0.28}); }              // поверхность
+      if (notch!=null){ const ny=(GCY+GR)-notch*2*GR;                                    // победный рубеж
+        liquid.rect(0, ny-1, GIW, 2).fill({color:0xffe9a8, alpha:0.95}); }
+      gLabel.text = label || '';
     }
     // иконки активных баффов орды над полоской (по реальному таймлайну)
     const buffTxt = new PIXI.Text({text:'', style:{fontFamily:'Georgia,serif', fontSize:15,
@@ -917,10 +942,11 @@ const MAXS = 9;               // максимальный зум; минимал
         evEl.style.display = ev.demo ? 'block' : 'none';   // на сборе отсчёт показывает плашка регистрации
         evEl.textContent = '⚔ Сбор войск · выход через '+Math.ceil(G-t)+'с · таверн: '+units.length;
         setAnim('idle');
-        if (hasSquad){                                 // 🪓 орда полная vs 🛡 готовность дружины
+        if (hasSquad){                                 // 🪓 орда (бар) vs 🛡 сфера готовности
           hp.visible=true; drawHp(1);
           const rf = ev.ready!=null ? ev.ready : 0;
-          shp.visible=true; drawSquad(rf, readyCol(rf), VL);
+          const tag = rf>=VL ? 'ГОТОВЫ' : Math.min(99, Math.round(rf/VL*100))+'%';
+          setGlobe(rf, readyCol(rf), '🛡 '+tag, VL);
         } else { hp.visible=false; }
         for (const u of units){ u.wx=u.ox; u.wy=u.oy; u.sp.visible=true;
           u.dir=(bx>=u.ox)?1:-1; uAnim(u,'idle');
@@ -928,7 +954,7 @@ const MAXS = 9;               // максимальный зум; минимал
       } else if (t < G+M){                            // МАРШ: герои идут по пунктиру
         const p=(t-G)/M;
         evEl.textContent = '⚔ Войска идут к орде!'; setAnim('idle');
-        if (hasSquad){ hp.visible=true; drawHp(1); shp.visible=true; drawSquad(1, hpCol(1)); }
+        if (hasSquad){ hp.visible=true; drawHp(1); setGlobe(1, hpCol(1), '🛡 100%'); }
         else { hp.visible=false; }
         for (const u of units){
           const lp = Math.max(0, Math.min(1, (p-u.delay)/(1-u.delay)));
@@ -946,7 +972,7 @@ const MAXS = 9;               // максимальный зум; минимал
           const st=tl[idx]; warded=!!st.ward;
           drawHp(st.hp/ev.orc_hp_max, warded);
           if (hasSquad){ const af = st.army!=null ? st.army/ev.army_hp_max : 1;
-            shp.visible=true; drawSquad(af, hpCol(af)); }            // HP дружины тает по-настоящему
+            setGlobe(af, hpCol(af), '🛡 '+Math.round(af*100)+'%'); }   // HP дружины тает по-настоящему
           if (st.ward) bf+='🛡'; if (st.curse) bf+='💀'; if (st.adds>0) bf+='🐺'; if (st.enraged) bf+='🗣';
         } else { drawHp(1-bp); }                                    // демо — по таймеру
         buffTxt.visible = !!bf; buffTxt.text = bf;
@@ -964,7 +990,10 @@ const MAXS = 9;               // максимальный зум; минимал
         const won = ev.result!=='lost';
         evEl.textContent = won ? '🏆 Орда разбита! Победа за городом' : '💀 Орки устояли…';
         if (won){
-          hp.visible=false; shp.visible=false;
+          hp.visible=false;
+          if (hasSquad){ const last=ev.timeline&&ev.timeline.length?ev.timeline[ev.timeline.length-1]:null;
+            const af=last&&ev.army_hp_max?(last.army||0)/ev.army_hp_max:1;
+            setGlobe(af, hpCol(af), '🛡 '+Math.round(af*100)+'%'); }   // выжившие вернулись
           if (!dieStarted && A.die){ dieStarted=true; anim.tint=0xffffff; setAnim('die');
             spawnHit(bx, by - fh*0.2, 280);                              // большой взрыв
             spawnHit(bx-fw*0.3, by, 150); spawnHit(bx+fw*0.3, by, 150); }  // + по бокам
@@ -984,7 +1013,7 @@ const MAXS = 9;               // максимальный зум; минимал
             if (hasSquad) af = (last.army||0) / ev.army_hp_max;        // дружина выбита
           }
           hp.visible=true; drawHp(lf); setAnim('idle'); anim.tint=0xffffff;
-          if (hasSquad){ shp.visible=true; drawSquad(af, hpCol(af)); }
+          if (hasSquad){ setGlobe(af, hpCol(af), '🛡 '+Math.round(af*100)+'%'); }   // дружина выбита
           for (const u of units){ uAnim(u,'die'); }
         }
         if (!ev.demo && !reportFetched){ reportFetched=true; pollReport(); }   // сводка live, без reload
