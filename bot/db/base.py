@@ -254,6 +254,10 @@ async def create_tables() -> None:
             "ALTER TABLE raid_boss ADD COLUMN IF NOT EXISTS "
             "state JSONB NOT NULL DEFAULT '{}'::jsonb"
         ))
+        # Админ-рига дропа (опционально): фикс. победитель и трофей этого босса.
+        await conn.execute(text(
+            "ALTER TABLE raid_boss ADD COLUMN IF NOT EXISTS forced JSONB"
+        ))
         # Одиночке — вести мира в ЛС (опционально).
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "

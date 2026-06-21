@@ -518,6 +518,14 @@ def settle(boss, rng: random.Random | None = None) -> dict:
     per = spec.gold_pool // n if n else 0
     gold = {pid: per for pid in contrib} if per else {}
     winner, drop = None, None
+    forced = getattr(boss, "forced", None) or None
+    if contrib and forced:                                 # админ-рига: фикс. трофей игроку
+        winner = (int(forced["winner"]) if forced.get("winner") is not None
+                  else rng.choice(list(contrib)))
+        if forced.get("drop"):
+            drop = dict(forced["drop"])
+            drop.setdefault("rarity", _rarity_of(drop.get("kind", "")))
+        return {"gold": gold, "winner": winner, "drop": drop}
     if contrib:
         pids = list(contrib)
         winner = rng.choice(pids)                          # равный шанс каждому

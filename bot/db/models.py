@@ -247,6 +247,9 @@ class RaidBoss(Base):
     # Боевое состояние: {stun_until, ward_until, curse_until, adds_hp, adds_until,
     # cast_done (взятые HP-пороги), phase, second_wind} — заклинания/фазы боя.
     state: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Админ-рига дропа: {"winner": pid, "drop": {"kind","item_id","tier"}} | None.
+    # Если задано — settle отдаёт ИМЕННО этот трофей этому игроку (с обычным анонсом).
+    forced: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
     status: Mapped[str] = mapped_column(String(10), default="gathering")
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
