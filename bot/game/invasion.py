@@ -511,7 +511,9 @@ def settle(inv, result: dict, rng=None) -> dict:
     (MVP по урону). Провал: записавшиеся теряют немного золота и репутации.
     Возвращает {won, gold:{pid:Δ}, rep:{pid:Δ}, res:{pid:{res:qty}}, trophy:{pid,drop}|None}."""
     import random as _random
-    rng = rng or _random
+    # rng детерминирован по id ивента → ПРЕДСКАЗАННАЯ сводка на карте (до резолва)
+    # совпадает с тем, что реально начислит нотифаер; иначе хабар/трофей расходились бы.
+    rng = rng or _random.Random(int(getattr(inv, "id", 0) or 0))
     won = bool(result.get("won"))
     dealt = result.get("dealt", {})
     total = sum(dealt.values()) or 1
@@ -532,7 +534,9 @@ def settle(inv, result: dict, rng=None) -> dict:
         else:
             gold[pid] = -LOSS_GOLD
             rep[pid] = -LOSS_REP
-    if won and dealt:
-        mvp = max(dealt, key=dealt.get)                    # трофей — лучшему по урону
-        trophy = {"pid": int(mvp), "drop": _roll_trophy(rng)}
+    if won:
+        real = {p: d for p, d in dealt.items() if int(p) > 0}   # трофей — ЖИВОМУ MVP,
+        if real:                                                # не болванке (отриц. pid)
+            mvp = max(real, key=real.get)                       # лучший по урону
+            trophy = {"pid": int(mvp), "drop": _roll_trophy(rng)}
     return {"won": won, "gold": gold, "rep": rep, "res": res, "trophy": trophy}

@@ -433,12 +433,13 @@ _MAP_HTML = """<!doctype html>
   .snd:active{transform:scale(.94)}
   .vig{position:fixed;inset:0;pointer-events:none;z-index:5;
     background:radial-gradient(ellipse 78% 78% at 50% 50%, transparent 58%, #060a12 100%)}
-  .ev{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));
+  .ev{position:fixed;left:50%;top:calc(12px + env(safe-area-inset-top,0px));
     transform:translateX(-50%);z-index:10;display:none;
     background:#2a160af2;border:1px solid #c9803a;border-radius:22px;padding:8px 18px;
     font-size:13px;color:#ffe2a8;font-weight:700;letter-spacing:.2px;
     box-shadow:0 4px 18px #000b;white-space:nowrap;backdrop-filter:blur(3px)}
-  .reg{position:fixed;left:50%;bottom:16vh;transform:translateX(-50%);z-index:11;display:none;
+  .reg{position:fixed;left:50%;bottom:calc(172px + env(safe-area-inset-bottom,0px));
+    transform:translateX(-50%);z-index:11;display:none;
     width:min(92vw,420px);background:#241809f5;border:1px solid #c9803a;border-radius:14px;
     padding:12px 14px;text-align:center;box-shadow:0 8px 28px #000b}
   .reg .rt{font-size:16px;color:#ffd9a8;font-weight:700;margin-bottom:3px}
@@ -781,6 +782,9 @@ const MAXS = 9;               // максимальный зум; минимал
       if (ev.gather_secs != null && !ev.demo) liveInv = ev;                // настоящий ивент
       if (ev.report) reportEv = ev;                                        // сводка после боя
     } catch(e){ console.log('event load fail', e); }
+  }
+  if (liveInv || reportEv){            // во время ивента подсказка-жесты мешает банеру фазы (сверху)
+    const h = document.querySelector('.hint'); if (h) h.style.display = 'none';
   }
   if (liveInv){
     centerOn(liveInv.x*W, liveInv.y*H, Math.max(minScale, 1.1));   // открываемся на орде
