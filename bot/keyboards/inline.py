@@ -695,22 +695,30 @@ def forge_kb(player: Player | None = None) -> InlineKeyboardMarkup:
     equipment = getattr(player, "equipment", None) if player else None
     region = getattr(player, "region", None) if player else None
     kb = InlineKeyboardBuilder()
-    for item in CATALOG.values():
-        if not item.craftable:        # эксклюзив боссов в кузнице не куётся
+    for item in CATALOG.values():     # сперва то, что КУЁТСЯ
+        if not item.craftable:
             continue
         if item.id in REGION_GEAR and REGION_GEAR[item.id] != region:
             continue                  # чужой региональный пояс — скрафтить нельзя, скрываем
         tier = equipped_tier(equipment, item.id)
         label = f"{item.name} {TIER_STARS[tier]}" if tier else item.name
         kb.button(text=label, callback_data=f"forge_item:{item.id}")
+    for item in CATALOG.values():     # боссовый трофей — не куётся, но если он ЕСТЬ, покажем
+        if item.craftable:
+            continue
+        tier = equipped_tier(equipment, item.id)
+        if not tier:                  # нет у игрока — не маячим (увидит, когда выпадет)
+            continue
+        kb.button(text=f"🏆 {item.name} {TIER_STARS[tier]}", callback_data=f"forge_item:{item.id}")
     kb.button(text="↩️ Назад", callback_data="character")
     kb.adjust(2)
     return kb.as_markup()
 
 
-def forge_item_kb(item_id: str, maxed: bool = False) -> InlineKeyboardMarkup:
+def forge_item_kb(item_id: str, maxed: bool = False,
+                  craftable: bool = True) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
-    if not maxed:
+    if craftable and not maxed:       # боссовый трофей не куётся — кнопки заказа нет
         kb.button(text="⚒ Заказать", callback_data=f"forge_make:{item_id}", style="success")
     kb.button(text="↩️ В кузницу", callback_data="forge")
     kb.adjust(2)

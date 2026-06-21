@@ -88,7 +88,8 @@ async def cb_forge_item(callback: CallbackQuery, session: AsyncSession) -> None:
     cur_tier = items.equipped_tier(getattr(player, "equipment", None), item.id)
     next_tier = min(cur_tier + 1, items.TIER_MAX)
     caption = texts.forge_item_screen(item, player, cur_tier, next_tier)
-    markup = kb.forge_item_kb(item.id, maxed=cur_tier >= items.TIER_MAX)
+    markup = kb.forge_item_kb(item.id, maxed=cur_tier >= items.TIER_MAX,
+                              craftable=item.craftable)
     # Показываем картинку самой вещи (спрайт из assets/items/<sprite>.png).
     sprite = item.sprite or item.id
     img_path = character.ITEMS_DIR / f"{sprite}.png"

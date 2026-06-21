@@ -2573,6 +2573,15 @@ def _tier_bonus_line(item, tier: int) -> str:
 def forge_item_screen(item, player, cur_tier: int, next_tier: int) -> str:
     from bot.game import items as it
 
+    if not item.craftable:            # боссовый трофей — показываем, но не куётся
+        t = cur_tier or 1
+        return (
+            f"<b>{item.name} {it.TIER_STARS[t]}</b> · слот: {it.SLOTS[item.slot]}\n"
+            f"<i>{item.description}</i>\n\n"
+            f"Даёт: {_tier_bonus_line(item, t)}\n\n"
+            "🏆 <b>Трофей с босса</b> — в кузнице не куётся. Старший ярус выбивается "
+            "только дропом."
+        )
     if cur_tier >= it.TIER_MAX:
         return (
             f"<b>{item.name} {it.TIER_STARS[it.TIER_MAX]}</b> · "
