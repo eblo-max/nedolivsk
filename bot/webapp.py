@@ -502,16 +502,24 @@ const myId = tg?.initDataUnsafe?.user?.id || 0;
   bgm.volume = 0.42;
   let muted = false; try { muted = localStorage.getItem('map_mute') === '1'; } catch(e){}
   const paint = () => { btn.textContent = muted ? '🔇' : '🔊'; };
-  const tryPlay = () => { if (!muted){ const p = bgm.play(); if (p) p.catch(()=>{}); } };
-  const onGesture = () => { tryPlay();
-    document.removeEventListener('pointerdown', onGesture);
-    document.removeEventListener('touchstart', onGesture); };
-  paint(); tryPlay();                                  // вдруг автоплей разрешён
-  document.addEventListener('pointerdown', onGesture);  // иначе — на первый жест
-  document.addEventListener('touchstart', onGesture);
+  // Браузеры блокируют автоплей со звуком до жеста (Android — строго, iOS мягче).
+  // Снимаем жест-слушатели ТОЛЬКО когда play() реально запустился; иначе пробуем
+  // на КАЖДЫЙ следующий жест (а не сдаёмся после первого) — capture, чтобы поймать
+  // событие раньше карты.
+  const EVS = ['pointerdown','touchend','click','keydown'];
+  const arm = on => EVS.forEach(e => on
+    ? document.addEventListener(e, onGesture, {capture:true})
+    : document.removeEventListener(e, onGesture, {capture:true}));
+  function play(){
+    if (muted) return;
+    const p = bgm.play();
+    if (p && p.then) p.then(() => arm(false)).catch(() => {});  // не вышло — ждём след. жест
+  }
+  function onGesture(){ play(); }
+  paint(); play(); arm(true);                        // пробуем сразу (iOS) + ловим жест (Android)
   btn.addEventListener('click', (e) => { e.stopPropagation(); muted = !muted;
     try { localStorage.setItem('map_mute', muted ? '1' : '0'); } catch(_){}
-    if (muted) bgm.pause(); else tryPlay();
+    if (muted) bgm.pause(); else play();
     paint(); });
 })();
 const bar = document.getElementById('bar');
