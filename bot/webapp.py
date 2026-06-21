@@ -808,7 +808,7 @@ const MAXS = 9;               // максимальный зум; минимал
     }
     if (!avail.length || !taverns.length) return;
     const critters = [];
-    const N = Math.min(48, Math.max(14, Math.round(taverns.length*0.9)));
+    const N = Math.min(90, Math.max(24, Math.round(taverns.length*1.8)));
     for (let i=0;i<N;i++){
       const home = taverns[(Math.random()*taverns.length)|0];
       const sp = avail[(Math.random()*avail.length)|0];
