@@ -375,7 +375,21 @@ def build_app() -> web.Application:
     app.router.add_get("/assets/fx/fire{n}.png", _fx_sprite)  # эффекты ударов
     app.router.add_get("/assets/hud/squad_globe.png", _hud_globe)  # сфера HP дружины
     app.router.add_get("/assets/audio/festival.mp3", _audio_track)  # фоновая музыка карты
+    app.router.add_get("/assets/animals/{name}.png", _animal_sprite)  # бродячая живность
     return app
+
+
+_ANIMALS = {"horse", "foal", "goat", "goatling", "goose", "gosling", "rabbit", "rabbit_cub"}
+
+
+async def _animal_sprite(request: web.Request) -> web.Response:
+    name = request.match_info.get("name", "")
+    if name not in _ANIMALS:
+        raise web.HTTPNotFound()
+    p = ASSETS_DIR / "animals" / f"{name}.png"
+    if not p.is_file():
+        raise web.HTTPNotFound()
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
 async def _hud_globe(request: web.Request) -> web.Response:
@@ -547,6 +561,7 @@ const MAXS = 9;               // максимальный зум; минимал
   const world = new PIXI.Container();
   const bg = new PIXI.Sprite(bgTex); world.addChild(bg);
   app.stage.addChild(world);
+  const critterLayer = new PIXI.Container(); app.stage.addChild(critterLayer);  // живность (под маркерами)
   const pathLayer = new PIXI.Graphics(); app.stage.addChild(pathLayer);  // пунктир маршрутов
   const markers = new PIXI.Container(); markers.sortableChildren = true;
   app.stage.addChild(markers);
@@ -773,6 +788,55 @@ const MAXS = 9;               // максимальный зум; минимал
     if (world.scale.x < minScale) world.scale.set(minScale);
     clampCam(); refresh();
   });
+
+  // ---------- бродячая живность (амбиент): пасётся у поселений, тихо гуляет ----------
+  // Размер ПРОПОРЦИОНАЛЕН зданиям (масштаб по markerK, своя база на вид), чтобы не
+  // были ни огромными, ни мелкими. Спрайт-лист 6×8, ряд 2 = боковой шаг (вправо),
+  // флип по направлению. Привязаны к таверне (на суше), бродят в малом радиусе.
+  (async () => {
+    const SPECIES = [{n:'horse',h:30},{n:'foal',h:24},{n:'goat',h:21},{n:'goatling',h:15},
+                     {n:'goose',h:17},{n:'gosling',h:11},{n:'rabbit',h:15},{n:'rabbit_cub',h:10}];
+    const avail = [];
+    for (const s of SPECIES){
+      try {
+        const tex = await PIXI.Assets.load('/assets/animals/'+s.n+'.png');
+        const fw = tex.width/6, fh = tex.height/8, fr = [];     // сетка 6×8, кадр квадратный
+        for (let c=0;c<6;c++)
+          fr.push(new PIXI.Texture({source:tex.source, frame:new PIXI.Rectangle(c*fw, 2*fh, fw, fh)}));
+        s.frames = fr; s.fh = fh; avail.push(s);
+      } catch(e){}
+    }
+    if (!avail.length || !taverns.length) return;
+    const critters = [];
+    const N = Math.min(16, Math.max(6, Math.round(taverns.length*0.4)));
+    for (let i=0;i<N;i++){
+      const home = taverns[(Math.random()*taverns.length)|0];
+      const sp = avail[(Math.random()*avail.length)|0];
+      const an = new PIXI.AnimatedSprite(sp.frames);
+      an.anchor.set(0.5,0.9); an.animationSpeed = 0.12; an.play();
+      critterLayer.addChild(an);
+      const hx = home.wx + (Math.random()-0.5)*70, hy = home.wy + (Math.random()-0.5)*70;
+      critters.push({an, sp, hx, hy, wx:hx, wy:hy, tx:hx, ty:hy, dir:1, idle:Math.random()*4, moving:false});
+    }
+    const newTarget = c => { const r = 24+Math.random()*46, a = Math.random()*6.283;
+      c.tx = c.hx + Math.cos(a)*r; c.ty = c.hy + Math.sin(a)*r; };
+    let last = performance.now();
+    app.ticker.add(() => {
+      const now = performance.now(), dt = Math.min(0.05,(now-last)/1000); last = now;
+      const show = world.scale.x > LABEL_MIN, k = markerK();   // на сильном отдалении прячем
+      for (const c of critters){
+        c.an.visible = show; if (!show) continue;
+        if (c.moving){
+          const dx=c.tx-c.wx, dy=c.ty-c.wy, d=Math.hypot(dx,dy);
+          if (d < 1.5){ c.moving=false; c.idle = 1+Math.random()*4; c.an.gotoAndStop(0); }
+          else { const v=14*dt; c.wx += dx/d*v; c.wy += dy/d*v; c.dir = dx>=0?1:-1;
+                 if (!c.an.playing) c.an.play(); }
+        } else if ((c.idle -= dt) <= 0){ newTarget(c); c.moving = true; c.an.play(); }
+        const s = screenOf(c.wx,c.wy); c.an.x=s.x; c.an.y=s.y;
+        const sc = (c.sp.h/c.sp.fh)*k; c.an.scale.set(sc); c.an.scale.x = sc*c.dir;  // флип
+      }
+    });
+  })();
 
   // ---------- ивент-объекты (анимированные, самостоятельные) ----------
   const RL = {tank:['🛡','Авангард'], archer:['⚔️','Рубаки'],
