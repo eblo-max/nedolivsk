@@ -374,11 +374,19 @@ def build_app() -> web.Application:
     app.router.add_get("/assets/heroes/hero{n}_{anim}.png", _hero_sprite)  # войска-герои
     app.router.add_get("/assets/fx/fire{n}.png", _fx_sprite)  # эффекты ударов
     app.router.add_get("/assets/hud/squad_globe.png", _hud_globe)  # сфера HP дружины
+    app.router.add_get("/assets/audio/festival.mp3", _audio_track)  # фоновая музыка карты
     return app
 
 
 async def _hud_globe(request: web.Request) -> web.Response:
     p = ASSETS_DIR / "hud" / "squad_globe.png"
+    if not p.is_file():
+        raise web.HTTPNotFound()
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
+
+
+async def _audio_track(request: web.Request) -> web.Response:
+    p = ASSETS_DIR / "audio" / "festival.mp3"
     if not p.is_file():
         raise web.HTTPNotFound()
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
@@ -418,6 +426,11 @@ _MAP_HTML = """<!doctype html>
   .card .me{margin-top:7px;color:#ffd24a;font-weight:700}
   .card .x{position:absolute;right:9px;top:6px;font-size:20px;color:#a98c5c;cursor:pointer;line-height:1}
   .hint{position:fixed;right:8px;top:8px;z-index:10;font-size:11px;color:#9a8052;opacity:.85}
+  .snd{position:fixed;left:10px;top:calc(8px + env(safe-area-inset-top,0px));z-index:13;
+    width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:17px;cursor:pointer;background:#241809cc;border:1px solid #6b522e;color:#ffe2a8;
+    user-select:none;-webkit-user-select:none;box-shadow:0 2px 8px #0008}
+  .snd:active{transform:scale(.94)}
   .vig{position:fixed;inset:0;pointer-events:none;z-index:5;
     background:radial-gradient(ellipse 78% 78% at 50% 50%, transparent 58%, #060a12 100%)}
   .ev{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));
@@ -464,6 +477,8 @@ _MAP_HTML = """<!doctype html>
 </div>
 <div class="bar" id="bar">🗺 Недоливск · загрузка…</div>
 <div class="hint">тащи · щипок/колесо — зум · тап по кружку — раскрыть</div>
+<audio id="bgm" loop preload="auto" src="/assets/audio/festival.mp3"></audio>
+<div class="snd" id="snd">🔊</div>
 <div class="card" id="card">
   <span class="x" id="cardx">×</span>
   <div class="nm" id="cnm"></div>
@@ -478,6 +493,26 @@ if (tg){ tg.ready(); tg.expand();
   try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch(e){}
 }
 const myId = tg?.initDataUnsafe?.user?.id || 0;
+// фоновая музыка ярмарки — луп, с памятью вкл/выкл. Мобильные блокируют автоплей
+// до жеста — поэтому стартуем и сразу, и при первом касании; кнопка 🔊/🔇 глушит.
+(function(){
+  const bgm = document.getElementById('bgm'), btn = document.getElementById('snd');
+  if (!bgm || !btn) return;
+  bgm.volume = 0.42;
+  let muted = false; try { muted = localStorage.getItem('map_mute') === '1'; } catch(e){}
+  const paint = () => { btn.textContent = muted ? '🔇' : '🔊'; };
+  const tryPlay = () => { if (!muted){ const p = bgm.play(); if (p) p.catch(()=>{}); } };
+  const onGesture = () => { tryPlay();
+    document.removeEventListener('pointerdown', onGesture);
+    document.removeEventListener('touchstart', onGesture); };
+  paint(); tryPlay();                                  // вдруг автоплей разрешён
+  document.addEventListener('pointerdown', onGesture);  // иначе — на первый жест
+  document.addEventListener('touchstart', onGesture);
+  btn.addEventListener('click', (e) => { e.stopPropagation(); muted = !muted;
+    try { localStorage.setItem('map_mute', muted ? '1' : '0'); } catch(_){}
+    if (muted) bgm.pause(); else tryPlay();
+    paint(); });
+})();
 const bar = document.getElementById('bar');
 const card = document.getElementById('card');
 const RING = {north_wilds:0x6ea8ff, green_valleys:0x6fd07a, red_wastes:0xe07a55};
