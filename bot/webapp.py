@@ -380,7 +380,9 @@ def build_app() -> web.Application:
     return app
 
 
-_FARM = {"mill"}
+_FARM = {"mill", "miller_sowing", "bed1", "bed2", "bed3", "fence1", "fence2", "cart",
+         "rye1", "rye2", "cabbage1", "cabbage2", "pumpkin1", "pumpkin2",
+         "tomato1", "tomato2", "carrot1", "carrot2"}
 
 
 async def _farm_sprite(request: web.Request) -> web.Response:
@@ -853,40 +855,62 @@ const MAXS = 9;               // максимальный зум; минимал
     });
   })();
 
-  // ---------- фермы (мельницы) — ориентиры на пустой суше, В СТОРОНЕ от таверн ----------
+  // ---------- ферма-сценка (мельница + мельник + поле + забор) на пустой суше ----------
   // Точку ищем в центральной полосе (точно суша) с МАКС. зазором до ближайшей таверны
-  // → ставится в «пустоте», а не впритык к поселениям. Лопасти крутятся (3 кадра).
+  // → в «пустоте», а не впритык к поселениям. Вся сценка — один контейнер в пиксельных
+  // координатах мельницы (origin = низ мельницы), сортировка по Y для глубины.
   (async () => {
-    let tex; try { tex = await PIXI.Assets.load('/assets/farm/mill.png'); } catch(e){ return; }
-    const FW = tex.width/3, FH = tex.height, frames = [];
-    for (let c=0;c<3;c++)
-      frames.push(new PIXI.Texture({source:tex.source, frame:new PIXI.Rectangle(c*FW,0,FW,FH)}));
+    const load = async n => { try { return await PIXI.Assets.load('/assets/farm/'+n+'.png'); }
+                              catch(e){ return null; } };
+    const strip = (t, n) => { const fw=t.width/n, fr=[]; for (let i=0;i<n;i++)
+      fr.push(new PIXI.Texture({source:t.source, frame:new PIXI.Rectangle(i*fw,0,fw,t.height)})); return fr; };
+    const millTex = await load('mill');
+    if (!millTex) return;
+    const FH = millTex.height;                          // опорная высота (мельница)
+    const sowTex = await load('miller_sowing'), cartTex = await load('cart'), fenceTex = await load('fence1');
+    const bedTex = [await load('bed1'), await load('bed2'), await load('bed3')].filter(Boolean);
+    const cropTex = [];
+    for (const c of [['rye1','rye2'],['cabbage1','cabbage2'],['pumpkin1','pumpkin2'],
+                     ['tomato1','tomato2'],['carrot1','carrot2']]){
+      const a = await load(c[0]), b = await load(c[1]); if (a&&b) cropTex.push([a,b]);
+    }
+    const spr = (t, x, y, z) => { const s=new PIXI.Sprite(t); s.anchor.set(0.5,1); s.position.set(x,y); s.zIndex=z; return s; };
+    const anim = (fr, x, y, z, sp) => { const a=new PIXI.AnimatedSprite(fr); a.anchor.set(0.5,1);
+      a.position.set(x,y); a.zIndex=z; a.animationSpeed=sp; a.play(); return a; };
+    function buildFarm(){
+      const c = new PIXI.Container(); c.sortableChildren = true;
+      c.addChild(anim(strip(millTex,3), 0, 0, 0, 0.06));               // мельница (лопасти крутятся)
+      if (cartTex) c.addChild(spr(cartTex, -120, 4, 4));              // телега слева
+      let ci = 0;                                                      // поле грядок справа
+      for (let row=0; row<2; row++) for (let col=0; col<3; col++){
+        const bx = 120 + col*36, by = 18 - row*14;
+        if (bedTex.length) c.addChild(spr(bedTex[(row*3+col)%bedTex.length], bx, by, by));
+        if (cropTex.length){ c.addChild(anim(cropTex[ci%cropTex.length], bx, by, by+0.2, 0.03)); ci++; }
+      }
+      if (fenceTex) for (let x=108; x<=216; x+=30) c.addChild(spr(fenceTex, x, 28, 28));  // забор спереди
+      if (sowTex) c.addChild(anim(strip(sowTex,6), 98, 24, 24, 0.14)); // мельник сеет у поля
+      farmLayer.addChild(c);
+      return c;
+    }
     const cand = [];
     for (let gx=0.22; gx<=0.78; gx+=0.07)
       for (let gy=0.26; gy<=0.74; gy+=0.07) cand.push({x:gx, y:gy, gap:1e9});
-    for (const c of cand)
-      for (const t of taverns){ const d=Math.hypot(c.x-t.x, c.y-t.y); if (d<c.gap) c.gap=d; }
+    for (const cc of cand)
+      for (const t of taverns){ const d=Math.hypot(cc.x-t.x, cc.y-t.y); if (d<cc.gap) cc.gap=d; }
     cand.sort((a,b)=>b.gap-a.gap);
     const spots = [], want = 2;
-    for (const c of cand){
-      if (c.gap < 0.11) break;                          // нет достаточно пустого места
-      if (spots.every(o=>Math.hypot(o.x-c.x,o.y-c.y) > 0.22)) spots.push(c);
+    for (const cc of cand){
+      if (cc.gap < 0.11) break;
+      if (spots.every(o=>Math.hypot(o.x-cc.x,o.y-cc.y) > 0.22)) spots.push(cc);
       if (spots.length>=want) break;
     }
-    if (!spots.length) spots.push({x:0.5, y:0.5});      // фолбэк — центр
-    const mills = spots.map(s => {
-      const an = new PIXI.AnimatedSprite(frames);
-      an.anchor.set(0.5, 0.92); an.animationSpeed = 0.06; an.play();   // лопасти медленно крутятся
-      farmLayer.addChild(an);
-      return {an, wx:s.x*W, wy:s.y*H};
-    });
-    const BASE_H = 64;                                  // высота на экране при k=1
+    if (!spots.length) spots.push({x:0.5, y:0.5});
+    const farms = spots.map(s => ({node: buildFarm(), wx:s.x*W, wy:s.y*H}));
+    const BASE_H = 64;
     app.ticker.add(() => {
       const k = markerK();
-      for (const m of mills){
-        const sc = screenOf(m.wx, m.wy); m.an.x=sc.x; m.an.y=sc.y;
-        m.an.scale.set((BASE_H/FH)*k);
-      }
+      for (const f of farms){ const sc = screenOf(f.wx, f.wy);
+        f.node.x=sc.x; f.node.y=sc.y; f.node.scale.set((BASE_H/FH)*k); }
     });
   })();
 
