@@ -169,6 +169,9 @@ ENRAGE_AT, ENRAGE_MULT = 0.25, 1.5                 # 🗣 ярость: разо
 # продавить — аттриция ускоряется и выкашивает даже большой фронт. Без этого бой
 # выигрывался тупо числом; теперь нужна СИЛА (снаряга+явка), а не просто толпа.
 ENRAGE_RAMP = 0.06
+# Полоска «готовности» дружины на сборе: на этой доле бара состав становится
+# победным (ниже — красно/жёлтая зона «мало», выше — зелёная «победа в кармане»).
+VICTORY_LINE = 0.7
 ARCHER_ADDS_BONUS = 1.7      # стрелки бьют волков-миньонов сильнее
 SCOUT_CLEANSE = 0.6          # разведка ослабляет проклятье (по доле разведчиков)
 
@@ -216,12 +219,14 @@ def simulate(participants: list[dict], seed: int = 0) -> dict:
     n = len(participants)
     if n == 0:                      # пустой ростер — ВСЕ ключи на месте (иначе KeyError снаружи)
         return {"won": False, "rounds": 0, "orc_hp_max": 0, "orc_hp_left": 0,
+                "army_hp_max": 0, "army_hp_left": 0,
                 "dealt": {}, "stats": {}, "fell": [], "events": [],
                 "timeline": [], "n": 0}
     rng = random.Random(seed)
     power = sum(_unit_output(p, ORC_ARMOR) for p in participants) or 1.0
     orc_hp_max = max(MIN_ORC_HP, round(HP_PER_POWER * power ** HP_POWER_EXP))
     orc_hp = float(orc_hp_max)
+    army_hp_max = round(sum(p["hp"] for p in participants)) or 1   # общий запас HP дружины
     orc_atk = ORC_ATK
     units = [dict(p, hp_left=float(p["hp"]), alive=True, dealt=0.0, critdmg=0.0,
                   blocked=0.0) for p in participants]
@@ -277,12 +282,13 @@ def simulate(participants: list[dict], seed: int = 0) -> dict:
                 events.append((rounds, "adds_down", None))
         else:
             orc_hp -= orc_dmg
-        # снимок раунда для карты: HP/броня/баффы (после удара армии)
+        # снимок раунда для карты: HP орды/броня/баффы + HP дружины (после удара)
+        army_hp_now = round(sum(max(0.0, p["hp_left"]) for p in units if p["alive"]))
         timeline.append({
             "hp": max(0, round(orc_hp)), "armor": orc_armor,
             "ward": rounds <= ward_until, "curse": rounds <= curse_until,
             "adds": max(0, round(adds_hp)), "enraged": enraged,
-            "alive": len(alive),
+            "alive": len(alive), "army": army_hp_now,
         })
         if orc_hp <= 0:
             break
@@ -305,14 +311,30 @@ def simulate(participants: list[dict], seed: int = 0) -> dict:
                 p["alive"] = False
                 events.append((rounds, "fall", p["pid"]))
     won = orc_hp <= 0
+    army_hp_left = round(sum(max(0.0, p["hp_left"]) for p in units if p["alive"]))
     return {"won": won, "rounds": rounds, "orc_hp_max": orc_hp_max,
             "orc_hp_left": max(0, round(orc_hp)),
+            "army_hp_max": army_hp_max, "army_hp_left": army_hp_left,
             "dealt": {p["pid"]: round(p["dealt"]) for p in units},
             "stats": {p["pid"]: {"dmg": round(p["dealt"]), "crit": round(p["critdmg"]),
                                  "blocked": round(p["blocked"]), "fell": not p["alive"]}
                       for p in units},
             "fell": [p["pid"] for p in units if not p["alive"]],
             "events": events, "timeline": timeline, "n": n}
+
+
+def readiness(sim: dict) -> float:
+    """«Готовность к победе» 0..1 для полоски дружины на СБОРЕ. Победный рубеж —
+    VICTORY_LINE: ниже (проиграли бы сейчас) бар растёт по тому, сколько HP орды
+    успели бы продавить; на победе — уходит в зелёную зону с запасом по выжившим.
+    Непрерывна в точке победы: впритык-проигрыш и впритык-победа сходятся к рубежу."""
+    if not sim or sim.get("orc_hp_max", 0) <= 0:
+        return 0.0
+    if sim["won"]:
+        head = (sim.get("army_hp_left", 0) / sim["army_hp_max"]) if sim.get("army_hp_max") else 0.0
+        return min(1.0, VICTORY_LINE + (1 - VICTORY_LINE) * head)
+    chewed = 1 - sim["orc_hp_left"] / sim["orc_hp_max"]
+    return max(0.0, min(VICTORY_LINE - 0.01, VICTORY_LINE * chewed))
 
 
 # ── Тайминги/фазы ────────────────────────────────────────────────────────────

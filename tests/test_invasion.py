@@ -206,3 +206,22 @@ def test_build_report_rows_sorted_with_rewards():
     assert any(r["trophy"] for r in rep)                 # у MVP — трофей
     need = {"name", "role", "dmg", "crit", "blocked", "fell", "gold", "rep", "trophy", "pid"}
     assert all(need <= set(r) for r in rep)
+
+
+def test_army_hp_timeline_and_readiness():
+    # HP дружины есть в результате и в каждом снимке таймлайна, не растёт по ходу боя
+    a = _army({"tank": 3, "archer": 4, "scout": 2})
+    r = inv.simulate(a, seed=1)
+    assert r["army_hp_max"] > 0 and "army_hp_left" in r
+    tl = r["timeline"]
+    assert all("army" in s for s in tl)
+    assert tl[0]["army"] >= tl[-1]["army"]               # дружина только убывает
+    # пустой ростер — ключи на месте (иначе KeyError на /api/taverns)
+    e = inv.simulate([], seed=1)
+    assert e["army_hp_max"] == 0 and e["army_hp_left"] == 0
+    # «готовность»: победный состав — в зелёной зоне (≥ рубежа), проигрышный — ниже
+    win = inv.simulate(_army({"tank": 8, "archer": 8, "scout": 3}), 1)
+    lose = inv.simulate(_army({"tank": 1, "archer": 2}), 1)
+    assert win["won"] and inv.readiness(win) >= inv.VICTORY_LINE
+    assert not lose["won"] and 0.0 <= inv.readiness(lose) < inv.VICTORY_LINE
+    assert inv.readiness(e) == 0.0

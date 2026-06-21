@@ -138,6 +138,8 @@ def _invasion_event(inv, uid: int = 0) -> dict:
         "my_role": (inv.registered or {}).get(str(uid), {}).get("role") if uid else None,
         # реальная боевая динамика для карты:
         "orc_hp_max": sim["orc_hp_max"], "timeline": sim["timeline"],
+        # полоска дружины: запас HP (для боя) + «готовность к победе» (для сбора)
+        "army_hp_max": sim["army_hp_max"], "ready": round(invmod.readiness(sim), 3),
     }
 
 # Самостоятельные анимированные ивент-объекты на карте (НЕ связаны с рейдами).
@@ -260,9 +262,14 @@ async def _api_invasion_join(request: web.Request) -> web.Response:
                 await s.commit()
             else:
                 already = True
+        # пересчёт готовности после записи — чтобы полоска дружины долилась сразу
+        fresh = await repo.get_active_invasion(s) or inv
+        parts = [dict(r, pid=int(pid)) for pid, r in (fresh.registered or {}).items()]
+        sim = invmod.simulate(parts, seed=fresh.id)
     out = {"role": rec["role"], "dmg": round(rec["dmg"]), "crit": rec["crit"],
            "armor": rec["armor"], "dodge": rec["dodge"], "hp": rec["hp"],
-           "x": rec["tx"], "y": rec["ty"], "already": already}
+           "x": rec["tx"], "y": rec["ty"], "already": already,
+           "ready": round(invmod.readiness(sim), 3), "n": invmod.registered_count(fresh)}
     out["ok"] = True
     return web.json_response(out, headers={"Cache-Control": "no-store"})
 
@@ -801,6 +808,23 @@ const MAXS = 9;               // максимальный зум; минимал
       if (frac>0) hp.roundRect(-barW/2+1.5, barY+1.5, (barW-3)*frac, 8, 3)
         .fill({color: warded?0x3d6fb0:0xc0392b});
     }
+    // полоска ДРУЖИНЫ (под полоской орды). На сборе — «готовность к победе»
+    // (наливается по мере записи, рубеж VL = победный состав); в бою — живое HP,
+    // тает с гибелью бойцов. hasSquad — только у настоящего ивента (есть данные).
+    const VL = 0.7;            // зеркалит invasion.VICTORY_LINE
+    const hasSquad = (ev.army_hp_max||0) > 0;
+    const shp = new PIXI.Graphics(); shp.visible = false; node.addChild(shp);
+    const barYs = barY + 14;
+    const readyCol = f => f>=VL ? 0x3fa34d : (f>=VL*0.6 ? 0xe0a020 : 0xc0392b);
+    const hpCol    = f => f>0.5 ? 0x3fa34d : (f>0.25 ? 0xe0a020 : 0xc0392b);
+    function drawSquad(frac, color, notch){
+      frac = Math.max(0, Math.min(1, frac)); shp.clear();
+      shp.roundRect(-barW/2, barYs, barW, 9, 3).fill({color:0x0a0f08, alpha:0.85})
+        .stroke({color:0x3c5a2e, width:1});
+      if (frac>0) shp.roundRect(-barW/2+1.5, barYs+1.5, (barW-3)*frac, 6, 2).fill({color});
+      if (notch!=null){ const nx = -barW/2 + barW*notch;
+        shp.moveTo(nx, barYs-2).lineTo(nx, barYs+11).stroke({color:0xffe9a8, width:1.5, alpha:0.9}); }
+    }
     // иконки активных баффов орды над полоской (по реальному таймлайну)
     const buffTxt = new PIXI.Text({text:'', style:{fontFamily:'Georgia,serif', fontSize:15,
       fontWeight:'700', fill:0xffe2a8, stroke:{color:0x140d06, width:4}}});
@@ -892,13 +916,20 @@ const MAXS = 9;               // максимальный зум; минимал
       if (t < G){                                   // СБОР: войска СТОЯТ у таверн + пунктир к орде
         evEl.style.display = ev.demo ? 'block' : 'none';   // на сборе отсчёт показывает плашка регистрации
         evEl.textContent = '⚔ Сбор войск · выход через '+Math.ceil(G-t)+'с · таверн: '+units.length;
-        setAnim('idle'); hp.visible=false;
+        setAnim('idle');
+        if (hasSquad){                                 // 🪓 орда полная vs 🛡 готовность дружины
+          hp.visible=true; drawHp(1);
+          const rf = ev.ready!=null ? ev.ready : 0;
+          shp.visible=true; drawSquad(rf, readyCol(rf), VL);
+        } else { hp.visible=false; }
         for (const u of units){ u.wx=u.ox; u.wy=u.oy; u.sp.visible=true;
           u.dir=(bx>=u.ox)?1:-1; uAnim(u,'idle');
           const us=screenOf(u.ox,u.oy); drawDotted(us.x,us.y, bs.x,bs.y, t/G); }
       } else if (t < G+M){                            // МАРШ: герои идут по пунктиру
         const p=(t-G)/M;
-        evEl.textContent = '⚔ Войска идут к орде!'; setAnim('idle'); hp.visible=false;
+        evEl.textContent = '⚔ Войска идут к орде!'; setAnim('idle');
+        if (hasSquad){ hp.visible=true; drawHp(1); shp.visible=true; drawSquad(1, hpCol(1)); }
+        else { hp.visible=false; }
         for (const u of units){
           const lp = Math.max(0, Math.min(1, (p-u.delay)/(1-u.delay)));
           u.wx = u.ox + (bx-u.ox)*lp; u.wy = u.oy + (by-u.oy)*lp;
@@ -914,6 +945,8 @@ const MAXS = 9;               // максимальный зум; минимал
           const tl=ev.timeline, idx=Math.min(tl.length-1, Math.max(0, Math.floor(bp*tl.length)));
           const st=tl[idx]; warded=!!st.ward;
           drawHp(st.hp/ev.orc_hp_max, warded);
+          if (hasSquad){ const af = st.army!=null ? st.army/ev.army_hp_max : 1;
+            shp.visible=true; drawSquad(af, hpCol(af)); }            // HP дружины тает по-настоящему
           if (st.ward) bf+='🛡'; if (st.curse) bf+='💀'; if (st.adds>0) bf+='🐺'; if (st.enraged) bf+='🗣';
         } else { drawHp(1-bp); }                                    // демо — по таймеру
         buffTxt.visible = !!bf; buffTxt.text = bf;
@@ -931,7 +964,7 @@ const MAXS = 9;               // максимальный зум; минимал
         const won = ev.result!=='lost';
         evEl.textContent = won ? '🏆 Орда разбита! Победа за городом' : '💀 Орки устояли…';
         if (won){
-          hp.visible=false;
+          hp.visible=false; shp.visible=false;
           if (!dieStarted && A.die){ dieStarted=true; anim.tint=0xffffff; setAnim('die');
             spawnHit(bx, by - fh*0.2, 280);                              // большой взрыв
             spawnHit(bx-fw*0.3, by, 150); spawnHit(bx+fw*0.3, by, 150); }  // + по бокам
@@ -944,10 +977,14 @@ const MAXS = 9;               // максимальный зум; минимал
             u.dir = (u.ox>=u.wx)?1:-1; uAnim(u, rp<1 ? 'walk' : 'idle');
           }
         } else {
-          let lf=0.35;
-          if (ev.timeline && ev.timeline.length && ev.orc_hp_max)
-            lf = ev.timeline[ev.timeline.length-1].hp / ev.orc_hp_max;   // реальный остаток HP орды
+          let lf=0.35, af=0;
+          if (ev.timeline && ev.timeline.length && ev.orc_hp_max){
+            const last = ev.timeline[ev.timeline.length-1];
+            lf = last.hp / ev.orc_hp_max;                              // реальный остаток HP орды
+            if (hasSquad) af = (last.army||0) / ev.army_hp_max;        // дружина выбита
+          }
           hp.visible=true; drawHp(lf); setAnim('idle'); anim.tint=0xffffff;
+          if (hasSquad){ shp.visible=true; drawSquad(af, hpCol(af)); }
           for (const u of units){ uAnim(u,'die'); }
         }
         if (!ev.demo && !reportFetched){ reportFetched=true; pollReport(); }   // сводка live, без reload
@@ -1010,12 +1047,26 @@ const MAXS = 9;               // максимальный зум; минимал
       joined.textContent = '✅ Ты в строю · ' + rl[0] + ' ' + rl[1];
     }
     if (ev.me_registered) paintJoined(ev.my_role);
+    // опрос на сборе: чужие записи тоже наливают полоску готовности дружины
+    const poll = setInterval(async () => {
+      try {
+        const d = await (await fetch('/api/taverns?uid='+encodeURIComponent(myId))).json();
+        const e = (d.events||[]).find(x => x.gather_secs != null && !x.demo);
+        if (e && e.status === 'gathering'){
+          if (e.ready != null) ev.ready = e.ready;
+          if (e.n != null) ev.n = e.n;
+        } else { clearInterval(poll); }
+      } catch(_){}
+    }, 4000);
     const start = performance.now()/1000 - (ev.elapsed || 0);
     app.ticker.add(() => {
       const left = Math.max(0, (ev.gather_secs || 0) - (performance.now()/1000 - start));
       if (left <= 0){ reg.style.display = 'none'; return; }   // сбор окончен — плашка уходит
+      const rf = ev.ready!=null ? ev.ready : 0;
+      const tag = rf>=0.7 ? '✅ состав победный' : (rf>=0.42 ? '⚠️ почти — зовите ещё' : '🔴 войска мало');
       sub.textContent = '⏳ Выход через ' + Math.floor(left/60) + ':'
-        + String(Math.floor(left % 60)).padStart(2, '0') + ' · таверн: ' + (ev.n || 0);
+        + String(Math.floor(left % 60)).padStart(2, '0') + ' · таверн: ' + (ev.n || 0)
+        + ' · ' + tag;
     });
     btn.onclick = async () => {
       btn.disabled = true; const was = btn.textContent; btn.textContent = 'Поднимаем…';
@@ -1028,6 +1079,8 @@ const MAXS = 9;               // максимальный зум; минимал
           paintJoined(d.role);
           try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred('success'); } catch(e){}
           if (invAddTroop) invAddTroop({x: d.x, y: d.y});   // твоя дружина появляется на карте live
+          if (d.ready != null) ev.ready = d.ready;          // полоска готовности доливается сразу
+          if (d.n != null) ev.n = d.n;
         } else {
           btn.disabled = false; btn.textContent = was;
           sub.textContent = ({no_tavern: 'Сначала заведи кабак в боте (/start)',
