@@ -376,7 +376,21 @@ def build_app() -> web.Application:
     app.router.add_get("/assets/hud/squad_globe.png", _hud_globe)  # сфера HP дружины
     app.router.add_get("/assets/audio/festival.mp3", _audio_track)  # фоновая музыка карты
     app.router.add_get("/assets/animals/{name}.png", _animal_sprite)  # бродячая живность
+    app.router.add_get("/assets/farm/{name}.png", _farm_sprite)  # ферма (мельница) на карте
     return app
+
+
+_FARM = {"mill"}
+
+
+async def _farm_sprite(request: web.Request) -> web.Response:
+    name = request.match_info.get("name", "")
+    if name not in _FARM:
+        raise web.HTTPNotFound()
+    p = ASSETS_DIR / "farm" / f"{name}.png"
+    if not p.is_file():
+        raise web.HTTPNotFound()
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
 _ANIMALS = {"horse", "foal", "goat", "goatling", "goose", "gosling", "rabbit", "rabbit_cub"}
@@ -562,6 +576,7 @@ const MAXS = 9;               // максимальный зум; минимал
   const bg = new PIXI.Sprite(bgTex); world.addChild(bg);
   app.stage.addChild(world);
   const critterLayer = new PIXI.Container(); app.stage.addChild(critterLayer);  // живность (под маркерами)
+  const farmLayer = new PIXI.Container(); app.stage.addChild(farmLayer);  // фермы-ориентиры
   const pathLayer = new PIXI.Graphics(); app.stage.addChild(pathLayer);  // пунктир маршрутов
   const markers = new PIXI.Container(); markers.sortableChildren = true;
   app.stage.addChild(markers);
@@ -834,6 +849,43 @@ const MAXS = 9;               // максимальный зум; минимал
         } else if ((c.idle -= dt) <= 0){ newTarget(c); c.moving = true; c.an.play(); }
         const s = screenOf(c.wx,c.wy); c.an.x=s.x; c.an.y=s.y;
         const sc = (c.sp.h/c.sp.fh)*k; c.an.scale.set(sc); c.an.scale.x = sc*c.dir;  // флип
+      }
+    });
+  })();
+
+  // ---------- фермы (мельницы) — ориентиры на пустой суше, В СТОРОНЕ от таверн ----------
+  // Точку ищем в центральной полосе (точно суша) с МАКС. зазором до ближайшей таверны
+  // → ставится в «пустоте», а не впритык к поселениям. Лопасти крутятся (3 кадра).
+  (async () => {
+    let tex; try { tex = await PIXI.Assets.load('/assets/farm/mill.png'); } catch(e){ return; }
+    const FW = tex.width/3, FH = tex.height, frames = [];
+    for (let c=0;c<3;c++)
+      frames.push(new PIXI.Texture({source:tex.source, frame:new PIXI.Rectangle(c*FW,0,FW,FH)}));
+    const cand = [];
+    for (let gx=0.22; gx<=0.78; gx+=0.07)
+      for (let gy=0.26; gy<=0.74; gy+=0.07) cand.push({x:gx, y:gy, gap:1e9});
+    for (const c of cand)
+      for (const t of taverns){ const d=Math.hypot(c.x-t.x, c.y-t.y); if (d<c.gap) c.gap=d; }
+    cand.sort((a,b)=>b.gap-a.gap);
+    const spots = [], want = 2;
+    for (const c of cand){
+      if (c.gap < 0.11) break;                          // нет достаточно пустого места
+      if (spots.every(o=>Math.hypot(o.x-c.x,o.y-c.y) > 0.22)) spots.push(c);
+      if (spots.length>=want) break;
+    }
+    if (!spots.length) spots.push({x:0.5, y:0.5});      // фолбэк — центр
+    const mills = spots.map(s => {
+      const an = new PIXI.AnimatedSprite(frames);
+      an.anchor.set(0.5, 0.92); an.animationSpeed = 0.06; an.play();   // лопасти медленно крутятся
+      farmLayer.addChild(an);
+      return {an, wx:s.x*W, wy:s.y*H};
+    });
+    const BASE_H = 64;                                  // высота на экране при k=1
+    app.ticker.add(() => {
+      const k = markerK();
+      for (const m of mills){
+        const sc = screenOf(m.wx, m.wy); m.an.x=sc.x; m.an.y=sc.y;
+        m.an.scale.set((BASE_H/FH)*k);
       }
     });
   })();
