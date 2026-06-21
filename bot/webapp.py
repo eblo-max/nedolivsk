@@ -770,6 +770,7 @@ const MAXS = 9;               // максимальный зум; минимал
               scout:['🔭','Разведка'], ratnik:['🗡','Ратники']};
   let liveInv = null, reportEv = null;      // живой ивент / сводка боя
   let invAddTroop = null;                    // добавить свою дружину на карту live
+  let invSyncTroops = null;                  // пересобрать дружины под финальный состав
   for (const ev of (data.events || [])){
     try {
       const tex = await PIXI.Assets.load('/assets/boss/ork'+ev.sprite+'_idle.png');
@@ -851,14 +852,16 @@ const MAXS = 9;               // максимальный зум; минимал
       if (frac>0) hp.roundRect(-barW/2+1.5, barY+1.5, (barW-3)*frac, 8, 3)
         .fill({color: warded?0x3d6fb0:0xc0392b});
     }
-    // ── Сфера HP/ГОТОВНОСТИ ДРУЖИНЫ (HUD, экранная, левый-нижний угол) ──────────
+    // ── Сфера HP/ГОТОВНОСТИ ДРУЖИНЫ (HUD, экранная, правый-нижний угол) ─────────
     // Жидкость в стеклянной сфере (арт fant_UI). На сборе — наливается «готовность
     // к победе» (рубеж VL); в бою — живое HP дружины, тает с гибелью бойцов.
+    // squadOn() — ПРОВЕРЯЕТСЯ КАЖДЫЙ КАДР: ev.army_hp_max доливается опросом, когда
+    // кто-то записывается ПОСЛЕ открытия карты (иначе у раннего зрителя сфера мертва).
     const VL = 0.7;            // зеркалит invasion.VICTORY_LINE
-    const hasSquad = (ev.army_hp_max||0) > 0;
+    const squadOn = () => (ev.army_hp_max||0) > 0;
     const readyCol = f => f>=VL ? 0x3fa34d : (f>=VL*0.6 ? 0xe0a020 : 0xc0392b);
     const hpCol    = f => f>0.5 ? 0x3fa34d : (f>0.25 ? 0xe0a020 : 0xc0392b);
-    let gTex=null; if (hasSquad){ try{ gTex=await PIXI.Assets.load('/assets/hud/squad_globe.png'); }catch(e){} }
+    let gTex=null; try{ gTex=await PIXI.Assets.load('/assets/hud/squad_globe.png'); }catch(e){}
     const GIW=226, GIH=219, GCX=112.5, GCY=100.5, GR=96;   // геометрия PNG: круг жидкости
     const hud = new PIXI.Container(); hud.visible=false; app.stage.addChild(hud);
     const gShadow = new PIXI.Graphics().ellipse(GCX, GCY+8, GR+8, GR+5).fill({color:0x000000, alpha:0.32});
@@ -878,7 +881,7 @@ const MAXS = 9;               // максимальный зум; минимал
     }
     placeHud(); window.addEventListener('resize', placeHud);
     function setGlobe(frac, color, label, notch){
-      if (!hasSquad) return;
+      if (!squadOn()) return;
       hud.visible = true; frac = Math.max(0, Math.min(1, frac));
       const yTop = (GCY+GR) - frac*2*GR;
       liquid.clear();
@@ -886,7 +889,7 @@ const MAXS = 9;               // максимальный зум; минимал
         liquid.rect(0, yTop, GIW, 5).fill({color:0xffffff, alpha:0.28}); }              // поверхность
       if (notch!=null){ const ny=(GCY+GR)-notch*2*GR;                                    // победный рубеж
         liquid.rect(0, ny-1, GIW, 2).fill({color:0xffe9a8, alpha:0.95}); }
-      gLabel.text = label || '';
+      if (gLabel.text !== (label||'')) gLabel.text = label || '';   // не перерисовываем текст каждый кадр
     }
     // иконки активных баффов орды над полоской (по реальному таймлайну)
     const buffTxt = new PIXI.Text({text:'', style:{fontFamily:'Georgia,serif', fontSize:15,
@@ -914,6 +917,14 @@ const MAXS = 9;               // максимальный зум; минимал
     }
     const units = (ev.troops||[]).map((t,i)=>makeUnit(t,i));
     invAddTroop = (t) => { units.push(makeUnit(t, units.length)); };   // своя дружина live
+    function rebuildUnits(troops){            // пересобрать под финальный состав (новые записи)
+      for (const u of units) u.sp.destroy();
+      units.length = 0;
+      (troops||[]).forEach((t,i)=> units.push(makeUnit(t,i)));
+    }
+    invSyncTroops = (troops) => {             // вызывает опрос сбора при изменении числа
+      if (troops && troops.length !== units.length) rebuildUnits(troops);
+    };
     const HSCALE = 0.44;   // размер героя относительно карты
     // пунктир маршрута таверна→орда (экранные коорд., экранно-постоянный шаг)
     function drawDotted(x1,y1,x2,y2,prog){
@@ -936,7 +947,11 @@ const MAXS = 9;               // максимальный зум; минимал
       sp.onComplete = () => { const i=hits.indexOf(sp); if(i>=0) hits.splice(i,1); sp.destroy(); };
       sp.play(); eventLayer.addChild(sp); hits.push(sp);
     }
-    const G=ev.gather_secs, M=ev.march_secs, B=ev.battle_secs, END=4, TOTAL=G+M+B+END;
+    // G/M фиксированы; B (длина боя) может уточниться, когда опрос сбора подтянет
+    // финальный состав → читаем её и TOTAL вживую, иначе ранний зритель крутил бы
+    // бой по старому числу раундов.
+    const G=ev.gather_secs, M=ev.march_secs, END=4;
+    const B = () => (ev.battle_secs || 0), TOTAL = () => G+M+B()+END;
     const evEl = document.getElementById('ev');
     // демо крутит локально; живой ивент синхронизируем серверным elapsed (сек с
     // начала сбора) — сдвигаем старт так, чтобы t совпало с фазой на сервере.
@@ -970,7 +985,7 @@ const MAXS = 9;               // максимальный зум; минимал
 
     app.ticker.add(() => {
       let t = (performance.now()/1000) - start;
-      if (t > TOTAL){ if (ev.demo) { reset(); t = 0; } else t = TOTAL; }
+      if (t > TOTAL()){ if (ev.demo) { reset(); t = 0; } else t = TOTAL(); }
       const k = markerK();
       pathLayer.clear();
       const bs = screenOf(bx, by);
@@ -980,7 +995,7 @@ const MAXS = 9;               // максимальный зум; минимал
         evEl.style.display = ev.demo ? 'block' : 'none';   // на сборе отсчёт показывает плашка регистрации
         evEl.textContent = '⚔ Сбор войск · выход через '+Math.ceil(G-t)+'с · таверн: '+units.length;
         setAnim('idle');
-        if (hasSquad){                                 // 🪓 орда (бар) vs 🛡 сфера готовности
+        if (squadOn()){                                 // 🪓 орда (бар) vs 🛡 сфера готовности
           hp.visible=true; drawHp(1);
           const rf = ev.ready!=null ? ev.ready : 0;
           const tag = rf>=VL ? 'ГОТОВЫ' : Math.min(99, Math.round(rf/VL*100))+'%';
@@ -992,7 +1007,7 @@ const MAXS = 9;               // максимальный зум; минимал
       } else if (t < G+M){                            // МАРШ: герои идут по пунктиру
         const p=(t-G)/M;
         evEl.textContent = '⚔ Войска идут к орде!'; setAnim('idle');
-        if (hasSquad){ hp.visible=true; drawHp(1); setGlobe(1, hpCol(1), '🛡 100%'); }
+        if (squadOn()){ hp.visible=true; drawHp(1); setGlobe(1, hpCol(1), '🛡 100%'); }
         else { hp.visible=false; }
         for (const u of units){
           const lp = Math.max(0, Math.min(1, (p-u.delay)/(1-u.delay)));
@@ -1000,16 +1015,16 @@ const MAXS = 9;               // максимальный зум; минимал
           u.sp.visible = lp>0; u.dir = (bx>=u.ox)?1:-1; uAnim(u,'walk');
           const us=screenOf(u.ox,u.oy); drawDotted(us.x,us.y, bs.x,bs.y, 1);
         }
-      } else if (t < G+M+B){                          // БОЙ
-        const bp=(t-(G+M))/B;
-        evEl.textContent = '⚔ Битва · '+fmt(B*(1-bp));
+      } else if (t < G+M+B()){                        // БОЙ
+        const bp=(t-(G+M))/B();
+        evEl.textContent = '⚔ Битва · '+fmt(B()*(1-bp));
         hp.visible=true;
         let warded=false, bf='';
         if (ev.timeline && ev.timeline.length && ev.orc_hp_max){    // РЕАЛЬНАЯ динамика
           const tl=ev.timeline, idx=Math.min(tl.length-1, Math.max(0, Math.floor(bp*tl.length)));
           const st=tl[idx]; warded=!!st.ward;
           drawHp(st.hp/ev.orc_hp_max, warded);
-          if (hasSquad){ const af = st.army!=null ? st.army/ev.army_hp_max : 1;
+          if (squadOn()){ const af = st.army!=null ? st.army/ev.army_hp_max : 1;
             setGlobe(af, hpCol(af), '🛡 '+Math.round(af*100)+'%'); }   // HP дружины тает по-настоящему
           if (st.ward) bf+='🛡'; if (st.curse) bf+='💀'; if (st.adds>0) bf+='🐺'; if (st.enraged) bf+='🗣';
         } else { drawHp(1-bp); }                                    // демо — по таймеру
@@ -1029,7 +1044,7 @@ const MAXS = 9;               // максимальный зум; минимал
         evEl.textContent = won ? '🏆 Орда разбита! Победа за городом' : '💀 Орки устояли…';
         if (won){
           hp.visible=false;
-          if (hasSquad){ const last=ev.timeline&&ev.timeline.length?ev.timeline[ev.timeline.length-1]:null;
+          if (squadOn()){ const last=ev.timeline&&ev.timeline.length?ev.timeline[ev.timeline.length-1]:null;
             const af=last&&ev.army_hp_max?(last.army||0)/ev.army_hp_max:1;
             setGlobe(af, hpCol(af), '🛡 '+Math.round(af*100)+'%'); }   // выжившие вернулись
           if (!dieStarted && A.die){ dieStarted=true; anim.tint=0xffffff; setAnim('die');
@@ -1048,10 +1063,10 @@ const MAXS = 9;               // максимальный зум; минимал
           if (ev.timeline && ev.timeline.length && ev.orc_hp_max){
             const last = ev.timeline[ev.timeline.length-1];
             lf = last.hp / ev.orc_hp_max;                              // реальный остаток HP орды
-            if (hasSquad) af = (last.army||0) / ev.army_hp_max;        // дружина выбита
+            if (squadOn()) af = (last.army||0) / ev.army_hp_max;        // дружина выбита
           }
           hp.visible=true; drawHp(lf); setAnim('idle'); anim.tint=0xffffff;
-          if (hasSquad){ setGlobe(af, hpCol(af), '🛡 '+Math.round(af*100)+'%'); }   // дружина выбита
+          if (squadOn()){ setGlobe(af, hpCol(af), '🛡 '+Math.round(af*100)+'%'); }   // дружина выбита
           for (const u of units){ uAnim(u,'die'); }
         }
         if (!ev.demo && !reportFetched){ reportFetched=true; pollReport(); }   // сводка live, без reload
@@ -1088,6 +1103,7 @@ const MAXS = 9;               // максимальный зум; минимал
   }
   document.getElementById('repx').onclick = () => {
     document.getElementById('rep').style.display = 'none';
+    bar.style.display = '';                 // вернуть счётчик после закрытия сводки
   };
 
   function showEventCard(ev, e){
@@ -1122,6 +1138,15 @@ const MAXS = 9;               // максимальный зум; минимал
         if (e && e.status === 'gathering'){
           if (e.ready != null) ev.ready = e.ready;
           if (e.n != null) ev.n = e.n;
+          // синхронизируем БОЕВЫЕ данные с финальным составом — иначе у того, кто
+          // открыл карту раньше остальных, анимация/сфера считались бы по старому
+          // ростеру (и могли разойтись с реальным итогом боя).
+          if (e.army_hp_max != null) ev.army_hp_max = e.army_hp_max;
+          if (e.orc_hp_max != null) ev.orc_hp_max = e.orc_hp_max;
+          if (e.timeline) ev.timeline = e.timeline;
+          if (e.result) ev.result = e.result;
+          if (e.battle_secs != null) ev.battle_secs = e.battle_secs;
+          if (invSyncTroops && e.troops) invSyncTroops(e.troops);
         } else { clearInterval(poll); }
       } catch(_){}
     }, 4000);
