@@ -644,6 +644,7 @@ const MAXS = 9;               // максимальный зум; минимал
   const bg = new PIXI.Sprite(bgTex); world.addChild(bg);
   app.stage.addChild(world);
   const critterLayer = new PIXI.Container(); app.stage.addChild(critterLayer);  // живность (под маркерами)
+  const millRoute = new PIXI.Graphics(); app.stage.addChild(millRoute);  // дорога телеги к мельнице
   const farmLayer = new PIXI.Container(); app.stage.addChild(farmLayer);  // фермы-ориентиры
   const pathLayer = new PIXI.Graphics(); app.stage.addChild(pathLayer);  // пунктир маршрутов
   const markers = new PIXI.Container(); markers.sortableChildren = true;
@@ -1077,13 +1078,25 @@ const MAXS = 9;               // максимальный зум; минимал
   })();
   app.ticker.add(() => {
     if (millPanel.style.display!=='none') renderMillPanel();
+    millRoute.clear();
     if (!millRig) return;
     const mt = mineTav();
     if (millState && millState.state==='transit' && gatherMillPos && mt){
       const p = Math.max(0, Math.min(1, (millState.elapsed_secs + millLive())/(millState.trip_secs||1800)));
       const q = p<0.5 ? p*2 : (1-p)*2;                  // 0→1→0 (туда и обратно)
+      const a = screenOf(mt.wx, mt.wy), b = screenOf(gatherMillPos.wx, gatherMillPos.wy);
+      const k = markerK();
+      // ЯРКАЯ ДОРОГА таверна→мельница: тёмная окантовка + светлый пунктир поверх
+      const dx=b.x-a.x, dy=b.y-a.y, len=Math.hypot(dx,dy)||1, ux=dx/len, uy=dy/len;
+      millRoute.moveTo(a.x,a.y).lineTo(b.x,b.y)
+        .stroke({color:0x3a2410, width:Math.max(5,8*k), alpha:0.5, cap:'round'});  // казёнка
+      const dash=16*k, gap=10*k;
+      for (let d=0; d<len; d+=dash+gap){ const e=Math.min(len,d+dash);
+        millRoute.moveTo(a.x+ux*d, a.y+uy*d).lineTo(a.x+ux*e, a.y+uy*e); }
+      millRoute.stroke({color:0xffd98a, width:Math.max(3,4.5*k), alpha:0.95, cap:'round'});  // пунктир
+      // повозка
       const wx = mt.wx + (gatherMillPos.wx-mt.wx)*q, wy = mt.wy + (gatherMillPos.wy-mt.wy)*q;
-      const s = screenOf(wx,wy), k = markerK();
+      const s = screenOf(wx,wy);
       const sc = (46/millRig.HFH)*k;                    // размер повозки на экране
       const dir = (gatherMillPos.wx>=mt.wx ? 1 : -1) * (p<0.5 ? 1 : -1);
       millRig.node.visible=true; millRig.node.x=s.x; millRig.node.y=s.y;
