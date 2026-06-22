@@ -182,7 +182,8 @@ async def cb_exp_claim(callback: CallbackQuery, session: AsyncSession) -> None:
 
     claimed = logic.claim_expeditions(player)
     if not claimed:
-        await callback.answer("Бригады ещё не вернулись.", show_alert=True)
+        await callback.answer("Бригады ещё в пути — на экране видно, сколько им топать. "
+                              "Загляни позже за добычей.", show_alert=True)
         return
 
     await _safe_edit(callback, texts.expedition_claimed(claimed), kb.back_kb())
