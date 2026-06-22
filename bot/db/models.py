@@ -66,6 +66,7 @@ class Player(Base):
     # Вылазка «телега за зерном» к мельнице: отправка + привезённое (ждёт сбора).
     mill_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     mill_grain: Mapped[int] = mapped_column(default=0)
+    mill_notified: Mapped[bool] = mapped_column(default=False)  # пушнули о возврате телеги
 
     # Стройка пристройки (один слот за раз)
     build_item: Mapped[str | None] = mapped_column(String(32))

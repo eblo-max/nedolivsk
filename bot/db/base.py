@@ -257,6 +257,10 @@ async def create_tables() -> None:
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "mill_grain INTEGER NOT NULL DEFAULT 0"
         ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "mill_notified BOOLEAN NOT NULL DEFAULT FALSE"
+        ))
         # Боевое состояние рейд-босса: рык/реген/второе дыхание.
         await conn.execute(text(
             "ALTER TABLE raid_boss ADD COLUMN IF NOT EXISTS "

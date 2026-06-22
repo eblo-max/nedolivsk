@@ -94,6 +94,7 @@ def send(player, rng, now: datetime | None = None) -> bool:
     grain, _note = yield_grain(player, rng)
     player.mill_run_at = now or _now()
     player.mill_grain = grain
+    player.mill_notified = False        # новая вылазка — пуш о возврате ещё впереди
     return True
 
 

@@ -1055,25 +1055,40 @@ const MAXS = 9;               // максимальный зум; минимал
       }
     } catch(e){ millBtn.disabled=false; millBtn.textContent=was; millSub.textContent='Сеть подвела — ещё раз'; }
   };
-  // движущаяся телега на карте (своя вылазка): таверна → мельница → таверна
-  let millCart = null;
-  (async () => { try { const t = await PIXI.Assets.load('/assets/farm/cart.png');
-    millCart = new PIXI.Sprite(t); millCart.anchor.set(0.5,0.9); millCart.visible=false;
-    farmLayer.addChild(millCart); } catch(e){} })();
+  // движущаяся ПОВОЗКА (конь тянет телегу) на карте: таверна → мельница → таверна.
+  // Конь — боковой шаг (анимация), телега прицеплена сзади; вся повозка флипается
+  // по направлению (вправо/влево), конь идёт мордой вперёд.
+  let millRig = null;
+  (async () => {
+    let hTex, cTex;
+    try { hTex = await PIXI.Assets.load('/assets/animals/horse.png'); } catch(e){}
+    try { cTex = await PIXI.Assets.load('/assets/farm/cart.png'); } catch(e){}
+    if (!hTex) return;
+    const HFW = hTex.width/6, HFH = hTex.height/8, hf = [];     // 6×8, ряд 2 = боковой шаг
+    for (let c=0;c<6;c++)
+      hf.push(new PIXI.Texture({source:hTex.source, frame:new PIXI.Rectangle(c*HFW, 2*HFH, HFW, HFH)}));
+    const node = new PIXI.Container(); node.visible = false;
+    if (cTex){ const cart = new PIXI.Sprite(cTex); cart.anchor.set(0.5,1);   // телега СЗАДИ коня
+      cart.position.set(-26, -4); node.addChild(cart); }                    // дышло под коня
+    const horse = new PIXI.AnimatedSprite(hf); horse.anchor.set(0.5,0.72);   // якорь по НОГАМ коня
+    horse.animationSpeed = 0.18; horse.play(); node.addChild(horse);
+    farmLayer.addChild(node);
+    millRig = {node, HFH};
+  })();
   app.ticker.add(() => {
     if (millPanel.style.display!=='none') renderMillPanel();
-    if (!millCart) return;
+    if (!millRig) return;
     const mt = mineTav();
     if (millState && millState.state==='transit' && gatherMillPos && mt){
       const p = Math.max(0, Math.min(1, (millState.elapsed_secs + millLive())/(millState.trip_secs||1800)));
       const q = p<0.5 ? p*2 : (1-p)*2;                  // 0→1→0 (туда и обратно)
       const wx = mt.wx + (gatherMillPos.wx-mt.wx)*q, wy = mt.wy + (gatherMillPos.wy-mt.wy)*q;
       const s = screenOf(wx,wy), k = markerK();
-      millCart.visible=true; millCart.x=s.x; millCart.y=s.y;
-      const sc = (18/(millCart.texture.height||24))*k;
+      const sc = (46/millRig.HFH)*k;                    // размер повозки на экране
       const dir = (gatherMillPos.wx>=mt.wx ? 1 : -1) * (p<0.5 ? 1 : -1);
-      millCart.scale.set(sc); millCart.scale.x = sc*dir;
-    } else millCart.visible=false;
+      millRig.node.visible=true; millRig.node.x=s.x; millRig.node.y=s.y;
+      millRig.node.scale.set(sc); millRig.node.scale.x = sc*dir;
+    } else millRig.node.visible=false;
   });
 
   // ---------- ивент-объекты (анимированные, самостоятельные) ----------

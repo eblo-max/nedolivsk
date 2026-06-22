@@ -511,6 +511,19 @@ async def _notify_returned(bot: Bot) -> None:
         # Кэш «идёт сбор» для кнопки «в строй» в меню таверны (или None — сбор кончился).
         invmod.set_gathering(next((iv.id for iv in invs if iv.status == "gathering"), None))
 
+        # Телега за зерном вернулась — пуш в личку (один раз на вылазку, флаг mill_notified).
+        from bot.game import mill as millmod
+        mill_back = (await session.execute(
+            select(Player).where(
+                Player.mill_grain > 0,
+                Player.mill_notified.is_(False),
+                Player.mill_run_at.is_not(None),
+                Player.mill_run_at <= now - timedelta(seconds=millmod.TRIP_SECONDS),
+            ))).scalars().all()
+        for pl in mill_back:
+            repo.queue_notify(session, pl.id, texts.mill_back_dm(int(pl.mill_grain or 0)))
+            pl.mill_notified = True
+
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
         world_news: list[str] = []  # глобальные вести для DM-дайджеста одиночкам
 
