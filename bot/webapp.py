@@ -436,27 +436,8 @@ def build_app() -> web.Application:
     app.router.add_get("/assets/audio/festival.mp3", _audio_track)  # фоновая музыка карты
     app.router.add_get("/assets/animals/{name}.png", _animal_sprite)  # бродячая живность
     app.router.add_get("/assets/farm/{name}.png", _farm_sprite)  # ферма (мельница) на карте
-    app.router.add_get("/assets/ui/{name}.png", _ui_sprite)      # арт-куски интерфейса
-    app.router.add_get("/chartest", _chartest_page)              # ТЕСТ экрана «Персонаж»
     app.router.add_get("/phasertest", _phaser_page)              # ТЕСТ движка Phaser (сцена)
     return app
-
-
-_UI = {"personazh"}
-
-
-async def _ui_sprite(request: web.Request) -> web.Response:
-    name = request.match_info.get("name", "")
-    if name not in _UI:
-        raise web.HTTPNotFound()
-    p = ASSETS_DIR / "ui" / f"{name}.png"
-    if not p.is_file():
-        raise web.HTTPNotFound()
-    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
-
-
-async def _chartest_page(request: web.Request) -> web.Response:
-    return web.Response(text=_CHARTEST_HTML, content_type="text/html")
 
 
 async def _phaser_page(request: web.Request) -> web.Response:
@@ -571,45 +552,6 @@ _PHASER_HTML = """<!doctype html>
     scale:{mode:Phaser.Scale.RESIZE, autoCenter:Phaser.Scale.CENTER_BOTH,
            width:'100%', height:'100%'},
     scene:{preload,create,update}});
-</script>
-</body></html>"""
-
-
-_CHARTEST_HTML = """<!doctype html>
-<html lang="ru"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<title>Персонаж</title>
-<style>
-  *{margin:0;-webkit-tap-highlight-color:transparent}
-  body{background:#0a0805;display:flex;justify-content:center;min-height:100vh}
-  /* ТВОЯ полная картинка как экран; контейнер строго в её пропорции → наложения
-     по % совпадают на любом телефоне. Числа вписаны поверх плашек «__». */
-  .screen{position:relative;width:100%;max-width:480px;aspect-ratio:760/1351;
-    container-type:inline-size;background:#000 center/100% 100% no-repeat;
-    background-image:url('/assets/ui/personazh.png')}
-  .v{position:absolute;transform:translate(-50%,-50%);color:#ffe9c2;white-space:nowrap;
-    font:700 3.5cqw Georgia,'Times New Roman',serif;text-shadow:0 1px 2px #000,0 0 4px #000,0 0 4px #000}
-</style></head>
-<body><div class="screen" id="sc"></div>
-<script>
-  const tg=window.Telegram?.WebApp; if(tg){tg.ready();tg.expand();
-    try{tg.setHeaderColor&&tg.setHeaderColor('#120c06');}catch(e){}}
-  // Живые значения поверх «__» (образец). l/t — центр в % картинки; правится мгновенно.
-  const V=[
-    {l:46.0,t:53.2,x:'35 / 35'},   // Здоровье
-    {l:37.0,t:58.6,x:'12'},        // Урон
-    {l:38.0,t:62.1,x:'8'},         // Крит (% запечён)
-    {l:38.0,t:65.6,x:'4'},         // Броня
-    {l:37.0,t:69.1,x:'6'},         // Удача
-    {l:60.0,t:69.1,x:'12'},        // вылазка (% запечён)
-    {l:27.0,t:77.2,x:'15'},        // +доход
-    {l:27.0,t:80.6,x:'10'},        // +добыча
-    {l:25.5,t:84.1,x:'8'},         // -время
-  ];
-  const sc=document.getElementById('sc');
-  for(const v of V){ const d=document.createElement('div'); d.className='v';
-    d.style.left=v.l+'%'; d.style.top=v.t+'%'; d.textContent=v.x; sc.appendChild(d); }
 </script>
 </body></html>"""
 
