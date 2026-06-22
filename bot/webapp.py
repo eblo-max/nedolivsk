@@ -436,7 +436,26 @@ def build_app() -> web.Application:
     app.router.add_get("/assets/audio/festival.mp3", _audio_track)  # фоновая музыка карты
     app.router.add_get("/assets/animals/{name}.png", _animal_sprite)  # бродячая живность
     app.router.add_get("/assets/farm/{name}.png", _farm_sprite)  # ферма (мельница) на карте
+    app.router.add_get("/assets/ui/{name}.png", _ui_sprite)      # арт-куски интерфейса
+    app.router.add_get("/chartest", _chartest_page)              # ТЕСТ экрана «Персонаж»
     return app
+
+
+_UI = {"char_hero"}
+
+
+async def _ui_sprite(request: web.Request) -> web.Response:
+    name = request.match_info.get("name", "")
+    if name not in _UI:
+        raise web.HTTPNotFound()
+    p = ASSETS_DIR / "ui" / f"{name}.png"
+    if not p.is_file():
+        raise web.HTTPNotFound()
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
+
+
+async def _chartest_page(request: web.Request) -> web.Response:
+    return web.Response(text=_CHARTEST_HTML, content_type="text/html")
 
 
 _FARM = {"mill", "miller_sowing", "bed1", "bed2", "bed3", "fence1", "fence2", "cart",
@@ -487,6 +506,78 @@ async def run_webapp(port: int) -> web.AppRunner:
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", port).start()
     return runner
+
+
+_CHARTEST_HTML = """<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<title>Персонаж</title>
+<style>
+  :root{--gold:#e8c27a;--gold2:#ffd9a8;--bord:#6b522e;--bord2:#c9803a}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:Georgia,'Times New Roman',serif;color:var(--gold2);
+    background:#0e0a06 radial-gradient(130% 55% at 50% 0%, #2a1c0e 0%, #120c06 72%) fixed;}
+  .wrap{max-width:470px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+  .hero{width:100%;display:block}
+  .namebar{text-align:center;margin:-4px 0 8px;padding:0 14px}
+  .name{font-size:22px;font-weight:700;color:var(--gold2);letter-spacing:.4px;
+    text-shadow:0 2px 7px #000,0 0 2px #000}
+  .sub{font-size:12.5px;color:#c2a878;font-style:italic;margin-top:3px}
+  .panel{margin:8px 12px;background:linear-gradient(#241809,#19110a);border:1px solid var(--bord);
+    border-radius:12px;box-shadow:0 5px 16px #0009, inset 0 1px 0 #6b522e55;overflow:hidden}
+  .ph{text-align:center;font-size:15px;font-weight:700;color:var(--gold2);padding:8px;
+    letter-spacing:2.5px;background:linear-gradient(#3a2812,#28190d);border-bottom:1px solid var(--bord);
+    text-shadow:0 1px 2px #000}
+  .row{display:flex;align-items:center;gap:11px;padding:11px 15px;border-top:1px solid #3a2a1640;font-size:15px}
+  .ic{width:24px;text-align:center;font-size:18px}
+  .lbl{flex:1;color:#d8c39a}
+  .val{font-weight:700;color:var(--gold2)}
+  .hp{flex:1}
+  .hp .top{display:flex;justify-content:space-between}
+  .hpbar{height:14px;border-radius:7px;background:#140d06;border:1px solid #3a2a16;overflow:hidden;margin-top:6px}
+  .hpfill{height:100%;background:linear-gradient(#d94b3a,#9e241b)}
+  .foot{text-align:center;font-style:italic;color:#9a8052;font-size:12px;margin:4px 18px 4px}
+  .btns{display:flex;gap:8px;margin:10px 12px;margin-top:auto;
+    padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  .btn{flex:1;text-align:center;padding:13px 4px;border:1px solid var(--bord2);border-radius:11px;
+    background:linear-gradient(#2a1c0e,#1b1208);color:var(--gold2);font:700 14px Georgia,serif;
+    letter-spacing:.5px;cursor:pointer;box-shadow:0 3px 10px #0007, inset 0 1px 0 #6b522e55}
+  .btn:active{transform:scale(.97)}
+  .btn.main{border-color:#f0c352;box-shadow:0 0 14px #f0c35255,0 3px 10px #0008}
+</style></head>
+<body><div class="wrap">
+  <img class="hero" src="/assets/ui/char_hero.png" alt="">
+  <div class="namebar">
+    <div class="name" id="nm">Бородач, хозяин кабака</div>
+    <div class="sub" id="sub">«Морда кирпичом, руки в мозолях. Надето 6/11»</div>
+  </div>
+  <div class="panel">
+    <div class="ph">⚔ БОЕВЫЕ</div>
+    <div class="row"><div class="ic">❤️</div><div class="hp">
+      <div class="top"><span class="lbl">Здоровье</span><span class="val" id="hp">35 / 35</span></div>
+      <div class="hpbar"><div class="hpfill" id="hpf" style="width:100%"></div></div></div></div>
+    <div class="row"><div class="ic">⚔️</div><div class="lbl">Урон</div><div class="val" id="dmg">12</div></div>
+    <div class="row"><div class="ic">💥</div><div class="lbl">Крит</div><div class="val" id="crit">8%</div></div>
+    <div class="row"><div class="ic">🛡️</div><div class="lbl">Броня</div><div class="val" id="arm">4</div></div>
+    <div class="row"><div class="ic">🍀</div><div class="lbl">Удача</div><div class="val" id="luck">6 · вылазка 12%</div></div>
+  </div>
+  <div class="panel">
+    <div class="ph">🏠 ХОЗЯЙСТВО</div>
+    <div class="row"><div class="ic">🪙</div><div class="lbl">Доход</div><div class="val">+15%</div></div>
+    <div class="row"><div class="ic">⛏️</div><div class="lbl">Добыча</div><div class="val">+10%</div></div>
+    <div class="row"><div class="ic">⏳</div><div class="lbl">Время вылазок</div><div class="val">−8%</div></div>
+  </div>
+  <div class="foot">Голый трактирщик — смешной трактирщик. Загляни в кузницу.</div>
+  <div class="btns">
+    <div class="btn">← НАЗАД</div>
+    <div class="btn main">СНАРЯЖЕНИЕ</div>
+    <div class="btn">КРАФТ →</div>
+  </div>
+</div>
+<script>const tg=window.Telegram?.WebApp; if(tg){tg.ready();tg.expand();
+  try{tg.setHeaderColor&&tg.setHeaderColor('#120c06');}catch(e){}}</script>
+</body></html>"""
 
 
 _MAP_HTML = """<!doctype html>
