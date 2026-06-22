@@ -438,6 +438,7 @@ def build_app() -> web.Application:
     app.router.add_get("/assets/farm/{name}.png", _farm_sprite)  # ферма (мельница) на карте
     app.router.add_get("/assets/ui/{name}.png", _ui_sprite)      # арт-куски интерфейса
     app.router.add_get("/chartest", _chartest_page)              # ТЕСТ экрана «Персонаж»
+    app.router.add_get("/phasertest", _phaser_page)              # ТЕСТ движка Phaser (сцена)
     return app
 
 
@@ -456,6 +457,10 @@ async def _ui_sprite(request: web.Request) -> web.Response:
 
 async def _chartest_page(request: web.Request) -> web.Response:
     return web.Response(text=_CHARTEST_HTML, content_type="text/html")
+
+
+async def _phaser_page(request: web.Request) -> web.Response:
+    return web.Response(text=_PHASER_HTML, content_type="text/html")
 
 
 _FARM = {"mill", "miller_sowing", "bed1", "bed2", "bed3", "fence1", "fence2", "cart",
@@ -506,6 +511,68 @@ async def run_webapp(port: int) -> web.AppRunner:
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", port).start()
     return runner
+
+
+_PHASER_HTML = """<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+<title>Phaser-тест</title>
+<style>html,body{margin:0;height:100%;background:#15100a;overflow:hidden;
+  overscroll-behavior:none;touch-action:none}</style></head>
+<body>
+<script>
+  const tg=window.Telegram?.WebApp;
+  if(tg){tg.ready();tg.expand(); try{tg.disableVerticalSwipes&&tg.disableVerticalSwipes();}catch(e){}
+    try{tg.setHeaderColor&&tg.setHeaderColor('#15100a');}catch(e){}}
+
+  function preload(){
+    this.load.spritesheet('walk','/assets/heroes/hero1_walk.png',{frameWidth:112,frameHeight:140});
+  }
+  function drawBackdrop(s){
+    const w=s.scale.width, h=s.scale.height, top=h*0.40;
+    s.bg.clear();
+    s.bg.fillStyle(0x1b2433,1).fillRect(0,0,w,top);             // небо
+    s.bg.fillStyle(0x2e2114,1).fillRect(0,top,w,h-top);         // земля
+    s.bg.lineStyle(2,0x4a3a22,0.8).lineBetween(0,top,w,top);    // горизонт
+    s.hint.setPosition(w/2,22);
+  }
+  function depthScale(s,spr){
+    const h=s.scale.height, top=h*0.42;
+    const t=Phaser.Math.Clamp((spr.y-top)/(h-top),0,1);
+    spr.setScale(Phaser.Math.Linear(0.30,0.62,t));             // дальше=мельче, ближе=крупнее
+  }
+  function create(){
+    const s=this; s.bg=s.add.graphics();
+    s.hint=s.add.text(0,0,'🎮 Phaser-сцена · тапни — трактирщик пойдёт (с глубиной)',
+      {fontFamily:'Georgia,serif',fontSize:'15px',color:'#ffd9a8'}).setOrigin(0.5,0);
+    drawBackdrop(s);
+    s.anims.create({key:'walk',frames:s.anims.generateFrameNumbers('walk',{start:0,end:9}),
+      frameRate:13,repeat:-1});
+    s.hero=s.add.sprite(s.scale.width/2, s.scale.height*0.8,'walk',0).setOrigin(0.5,1);
+    depthScale(s,s.hero);
+    s.target=null;
+    s.input.on('pointerdown',p=>{ s.target={x:p.x,
+      y:Phaser.Math.Clamp(p.y, s.scale.height*0.43, s.scale.height*0.98)}; });
+    s.scale.on('resize',()=>drawBackdrop(s));
+  }
+  function update(t,dt){
+    const s=this, hero=s.hero; if(!hero) return;
+    if(!s.target){ if(hero.anims.isPlaying){hero.anims.stop(); hero.setFrame(0);} return; }
+    const dx=s.target.x-hero.x, dy=s.target.y-hero.y, d=Math.hypot(dx,dy);
+    if(d<3){ s.target=null; hero.anims.stop(); hero.setFrame(0); return; }
+    const v=150*(dt/1000); hero.x+=dx/d*v; hero.y+=dy/d*v;
+    hero.setFlipX(dx<0);
+    if(!hero.anims.isPlaying) hero.anims.play('walk');
+    depthScale(s,hero); hero.setDepth(hero.y);                 // Y-сортировка (глубина)
+  }
+  new Phaser.Game({type:Phaser.AUTO, backgroundColor:'#15100a',
+    scale:{mode:Phaser.Scale.RESIZE, autoCenter:Phaser.Scale.CENTER_BOTH,
+           width:'100%', height:'100%'},
+    scene:{preload,create,update}});
+</script>
+</body></html>"""
 
 
 _CHARTEST_HTML = """<!doctype html>
