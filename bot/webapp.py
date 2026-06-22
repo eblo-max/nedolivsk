@@ -171,9 +171,15 @@ async def _api_taverns(request: web.Request) -> web.Response:
         uid = int(request.query.get("uid", "0"))
     except ValueError:
         uid = 0
+    mill_state = None
     async with session_factory() as s:
         rows = await repo.get_map_taverns(s)
         latest = await repo.latest_invasion(s)
+        if uid:                                  # состояние вылазки телеги для зрителя
+            from bot.game import mill as millmod
+            me = await repo.get_player(s, uid)
+            if me is not None:
+                mill_state = millmod.state(me)
     now = datetime.now(timezone.utc)
     live = latest if (latest and latest.status in ("gathering", "battle")) else None
     report_inv = None
@@ -226,7 +232,7 @@ async def _api_taverns(request: web.Request) -> web.Response:
     else:
         events = MAP_EVENTS
     return web.json_response(
-        {"taverns": out, "regions": balance.REGIONS, "events": events},
+        {"taverns": out, "regions": balance.REGIONS, "events": events, "mill": mill_state},
         headers={"Cache-Control": "no-store"})
 
 
@@ -272,6 +278,57 @@ async def _api_invasion_join(request: web.Request) -> web.Response:
            "ready": round(invmod.readiness(sim), 3), "n": invmod.registered_count(fresh)}
     out["ok"] = True
     return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+async def _api_mill_run(request: web.Request) -> web.Response:
+    """Снарядить телегу за зерном (вылазка к мельнице). Auth — Telegram initData.
+    Фиксируем отправку + зарезервированный улов; кулдаун с момента отправки."""
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        body = {}
+    uid = _verify_init_data(body.get("initData") or "")
+    if not uid:
+        return web.json_response({"ok": False, "error": "auth"}, status=401)
+    import random as _random
+    from bot.game import mill as millmod
+    async with session_factory() as s:
+        player = await repo.get_player(s, uid, for_update=True)
+        if player is None or not player.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not millmod.send(player, _random):
+            return web.json_response({"ok": False, "error": "busy", "mill": millmod.state(player)})
+        repo.add_log(s, "player", player.id, "🛒 снарядил телегу за зерном")
+        await s.commit()
+        st = millmod.state(player)
+    return web.json_response({"ok": True, "mill": st}, headers={"Cache-Control": "no-store"})
+
+
+async def _api_mill_collect(request: web.Request) -> web.Response:
+    """Забрать привезённое зерно (если телега уже вернулась)."""
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        body = {}
+    uid = _verify_init_data(body.get("initData") or "")
+    if not uid:
+        return web.json_response({"ok": False, "error": "auth"}, status=401)
+    from bot.game import mill as millmod, inventory
+    async with session_factory() as s:
+        player = await repo.get_player(s, uid, for_update=True)
+        if player is None:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        base = millmod.base_grain(player)
+        grain = millmod.collect(player)
+        if grain <= 0:
+            return web.json_response({"ok": False, "error": "nothing", "mill": millmod.state(player)})
+        inventory.add(player, "grain", grain)
+        repo.add_log(s, "player", player.id, f"🌾 телега привезла зерно +{grain}")
+        await s.commit()
+        note = "rich" if grain >= base * 1.3 else ("mishap" if grain <= base * 0.75 else "")
+        st = millmod.state(player)
+    return web.json_response({"ok": True, "grain": grain, "note": note, "mill": st},
+                             headers={"Cache-Control": "no-store"})
 
 
 async def _map_page(request: web.Request) -> web.Response:
@@ -368,6 +425,8 @@ def build_app() -> web.Application:
     app.router.add_get("/map", _map_page)
     app.router.add_get("/api/taverns", _api_taverns)
     app.router.add_post("/api/invasion/join", _api_invasion_join)
+    app.router.add_post("/api/mill/run", _api_mill_run)        # вылазка телеги за зерном
+    app.router.add_post("/api/mill/collect", _api_mill_collect)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
     app.router.add_get("/assets/boss/ork{n}_{anim}.png", _event_sprite)  # ивент-анимации
@@ -484,6 +543,7 @@ _MAP_HTML = """<!doctype html>
     box-shadow:0 10px 34px #000d}
   .rep h3{margin:0 0 9px;font-size:15px;color:#ffd9a8;text-align:center;padding-right:18px}
   .rep .x{position:absolute;right:11px;top:8px;font-size:20px;color:#a98c5c;cursor:pointer;line-height:1}
+  .reg .x{position:absolute;right:11px;top:7px;font-size:20px;color:#a98c5c;cursor:pointer;line-height:1}
   .rep table{width:100%;border-collapse:collapse;font-size:11.5px}
   .rep th{color:#a98c5c;font-weight:600;text-align:right;padding:3px 4px}
   .rep th:first-child{text-align:left}
@@ -505,6 +565,12 @@ _MAP_HTML = """<!doctype html>
   <span class="x" id="repx">×</span>
   <h3 id="repTitle"></h3>
   <div id="repBody"></div>
+</div>
+<div class="reg" id="millPanel" style="display:none">
+  <span class="x" id="millx">×</span>
+  <div class="rt" id="millTitle">🌀 Мельница</div>
+  <div class="rs" id="millSub"></div>
+  <button class="rb" id="millBtn">🛒 Снарядить телегу</button>
 </div>
 <div class="bar" id="bar">🗺 Недоливск · загрузка…</div>
 <div class="hint">тащи · щипок/колесо — зум · тап по кружку — раскрыть</div>
@@ -855,6 +921,7 @@ const MAXS = 9;               // максимальный зум; минимал
     });
   })();
 
+  let gatherMillPos = null;            // {wx,wy} мельницы-вылазки (ставит ферма-блок ниже)
   // ---------- ферма-сценка (мельница + мельник + поле + забор) на пустой суше ----------
   // Точку ищем в центральной полосе (точно суша) с МАКС. зазором до ближайшей таверны
   // → в «пустоте», а не впритык к поселениям. Вся сценка — один контейнер в пиксельных
@@ -906,6 +973,11 @@ const MAXS = 9;               // максимальный зум; минимал
     }
     if (!spots.length) spots.push({x:0.5, y:0.5});
     const farms = spots.map(s => ({node: buildFarm(), wx:s.x*W, wy:s.y*H}));
+    if (farms.length){                                  // первая мельница — кликабельная вылазка
+      gatherMillPos = {wx: farms[0].wx, wy: farms[0].wy};
+      farms[0].node.eventMode = 'static'; farms[0].node.cursor = 'pointer';
+      farms[0].node.on('pointertap', e => { e.stopPropagation(); openMillPanel(); });
+    }
     const BASE_H = 64;
     app.ticker.add(() => {
       const k = markerK();
@@ -913,6 +985,96 @@ const MAXS = 9;               // максимальный зум; минимал
         f.node.x=sc.x; f.node.y=sc.y; f.node.scale.set((BASE_H/FH)*k); }
     });
   })();
+
+  // ---------- вылазка «телега за зерном»: панель + телега на карте ----------
+  let millState = data.mill || null;          // состояние вылазки зрителя
+  let millFetchT = performance.now()/1000;     // когда получили millState (для живого отсчёта)
+  let millHold = 0;                            // не перерисовывать панель (показываем итог сбора)
+  const millPanel = document.getElementById('millPanel');
+  const millSub = document.getElementById('millSub'), millBtn = document.getElementById('millBtn');
+  const mineTav = () => taverns.find(t => t.mine);
+  const millLive = () => performance.now()/1000 - millFetchT;
+  function setMill(st){ millState = st || null; millFetchT = performance.now()/1000; renderMillPanel(); }
+  function fmtT(s){ s=Math.max(0,Math.round(s)); const h=Math.floor(s/3600), m=Math.floor((s%3600)/60);
+    return h>0 ? (h+'ч '+String(m).padStart(2,'0')+'м') : (m+':'+String(s%60).padStart(2,'0')); }
+  function renderMillPanel(){
+    if (millPanel.style.display==='none' || performance.now()<millHold) return;
+    const st = millState || {state:'idle'};
+    if (st.state==='transit'){
+      const back = (st.trip_secs||1800) - (st.elapsed_secs + millLive());
+      millSub.textContent = '🛒 Телега в пути · вернётся через ' + fmtT(back);
+      millBtn.style.display = 'none';
+      if (back <= 0) pollMill();                         // доехала — обновим до «забрать»
+    } else if (st.state==='ready'){
+      millSub.textContent = '🌾 Телега вернулась — забирай зерно!';
+      millBtn.style.display=''; millBtn.disabled=false;
+      millBtn.textContent='🌾 Забрать зерно'; millBtn.dataset.act='collect';
+    } else if (st.state==='cooldown'){
+      millSub.textContent = '😴 Мельница отдыхает · телега снова через ' + fmtT((st.ready_in||0) - millLive());
+      millBtn.style.display = 'none';
+    } else {
+      millSub.textContent = 'Снаряди телегу — привезёт зерно с мельницы (~30 мин в пути).';
+      millBtn.style.display=''; millBtn.disabled=false;
+      millBtn.textContent='🛒 Снарядить телегу'; millBtn.dataset.act='run';
+    }
+  }
+  async function pollMill(){
+    try { const d = await (await fetch('/api/taverns?uid='+encodeURIComponent(myId))).json();
+      setMill(d.mill); } catch(_){}
+  }
+  function openMillPanel(){
+    millPanel.style.display='block'; millHold=0;
+    if (!mineTav()){ millSub.textContent='Сначала заведи кабак в боте (/start).';
+      millBtn.style.display='none'; return; }
+    renderMillPanel(); pollMill();
+  }
+  document.getElementById('millx').onclick = () => { millPanel.style.display='none'; };
+  millBtn.onclick = async () => {
+    const act = millBtn.dataset.act;
+    millBtn.disabled=true; const was=millBtn.textContent; millBtn.textContent='…';
+    try {
+      const r = await fetch(act==='collect' ? '/api/mill/collect' : '/api/mill/run',
+        {method:'POST', headers:{'Content-Type':'application/json'},
+         body:JSON.stringify({initData:(tg&&tg.initData)||''})});
+      const d = await r.json();
+      if (d.ok){
+        if (act==='collect'){
+          const note = d.note==='rich' ? ' · богатый помол!' : (d.note==='mishap' ? ' · тряхнуло, часть просыпал' : '');
+          millSub.textContent = '🌾 +' + d.grain + ' зерна' + note;
+          millBtn.style.display='none'; millHold = performance.now()+3500;   // подержать итог
+          try{ tg&&tg.HapticFeedback&&tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+        } else {
+          try{ tg&&tg.HapticFeedback&&tg.HapticFeedback.impactOccurred('medium'); }catch(e){}
+        }
+        setMill(d.mill);
+      } else {
+        millBtn.disabled=false; millBtn.textContent=was;
+        millSub.textContent = ({auth:'Открой карту через бота', no_tavern:'Сначала заведи кабак (/start)',
+          busy:'Телега ещё в деле / мельница отдыхает', nothing:'Забирать нечего'}[d.error]) || 'Не вышло, ещё раз';
+        if (d.mill) setMill(d.mill);
+      }
+    } catch(e){ millBtn.disabled=false; millBtn.textContent=was; millSub.textContent='Сеть подвела — ещё раз'; }
+  };
+  // движущаяся телега на карте (своя вылазка): таверна → мельница → таверна
+  let millCart = null;
+  (async () => { try { const t = await PIXI.Assets.load('/assets/farm/cart.png');
+    millCart = new PIXI.Sprite(t); millCart.anchor.set(0.5,0.9); millCart.visible=false;
+    farmLayer.addChild(millCart); } catch(e){} })();
+  app.ticker.add(() => {
+    if (millPanel.style.display!=='none') renderMillPanel();
+    if (!millCart) return;
+    const mt = mineTav();
+    if (millState && millState.state==='transit' && gatherMillPos && mt){
+      const p = Math.max(0, Math.min(1, (millState.elapsed_secs + millLive())/(millState.trip_secs||1800)));
+      const q = p<0.5 ? p*2 : (1-p)*2;                  // 0→1→0 (туда и обратно)
+      const wx = mt.wx + (gatherMillPos.wx-mt.wx)*q, wy = mt.wy + (gatherMillPos.wy-mt.wy)*q;
+      const s = screenOf(wx,wy), k = markerK();
+      millCart.visible=true; millCart.x=s.x; millCart.y=s.y;
+      const sc = (18/(millCart.texture.height||24))*k;
+      const dir = (gatherMillPos.wx>=mt.wx ? 1 : -1) * (p<0.5 ? 1 : -1);
+      millCart.scale.set(sc); millCart.scale.x = sc*dir;
+    } else millCart.visible=false;
+  });
 
   // ---------- ивент-объекты (анимированные, самостоятельные) ----------
   const RL = {tank:['🛡','Авангард'], archer:['⚔️','Рубаки'],

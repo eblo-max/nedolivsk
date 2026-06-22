@@ -249,6 +249,14 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS bourse_announced_at TIMESTAMPTZ"
         ))
+        # Вылазка «телега за зерном» к мельнице.
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS mill_run_at TIMESTAMPTZ"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "mill_grain INTEGER NOT NULL DEFAULT 0"
+        ))
         # Боевое состояние рейд-босса: рык/реген/второе дыхание.
         await conn.execute(text(
             "ALTER TABLE raid_boss ADD COLUMN IF NOT EXISTS "

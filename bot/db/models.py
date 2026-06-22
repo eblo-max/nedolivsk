@@ -63,6 +63,10 @@ class Player(Base):
     night_run: Mapped[dict] = mapped_column(JSONB, default=dict)
     night_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # Вылазка «телега за зерном» к мельнице: отправка + привезённое (ждёт сбора).
+    mill_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    mill_grain: Mapped[int] = mapped_column(default=0)
+
     # Стройка пристройки (один слот за раз)
     build_item: Mapped[str | None] = mapped_column(String(32))
     build_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
