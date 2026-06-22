@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import texts
+from bot import effects, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import character, items, logic
@@ -155,4 +155,5 @@ async def cb_craft_claim(callback: CallbackQuery, session: AsyncSession) -> None
         return
 
     await callback.answer(f"{result.item.name} {items.TIER_STARS[result.tier]} — твоё!")
+    await effects.react_msg(callback.message, "🎉")   # выковал вещь — праздник
     await _show_character(callback, player)

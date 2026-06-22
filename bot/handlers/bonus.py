@@ -5,7 +5,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import images, panels, texts
+from bot import effects, images, panels, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import buff
@@ -58,6 +58,7 @@ async def cb_bonus_go(callback: CallbackQuery, session: AsyncSession) -> None:
         return
     repo.add_log(session, "player", player.id, f"🎁 активировал баф «{res.boon.name}»")
     await _edit(callback, texts.bonus_screen(player), kb.bonus_kb(player))
+    await effects.react_msg(callback.message, "🎉")
     await callback.answer(texts.bonus_activated(res.boon, res.minutes), show_alert=True)
 
 

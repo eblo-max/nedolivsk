@@ -8,7 +8,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, FSInputFile, InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import images, texts
+from bot import effects, images, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import (
@@ -117,6 +117,7 @@ async def cb_newbie_claim(callback: CallbackQuery, session: AsyncSession) -> Non
     if total:
         repo.add_log(session, "player", player.id,
                      f"📜 забрал награды грамоты: {sum(total.values())} ед.")
+        await effects.react_msg(callback.message, "🎉")
     await callback.answer(texts.newbie_claimed(total), show_alert=True)
 
 
@@ -380,3 +381,4 @@ async def cb_upgrade_confirm(callback: CallbackQuery, session: AsyncSession) -> 
     else:
         await _safe_edit(callback, success_text, kb.back_kb())
     await callback.answer("Отгрохал! 🔨")
+    await effects.react_msg(callback.message, "🔥", big=True)   # веха — пусть искрит

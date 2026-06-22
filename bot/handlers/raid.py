@@ -15,7 +15,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, InputMediaPhoto, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot import images, texts
+from bot import effects, images, texts
 from bot.db import repo
 from bot.game import inventory, items, raid
 from bot.handlers import common
@@ -278,6 +278,7 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
     await session.commit()
     raid.set_active(None)  # босс мёртв — убрать кнопку «Рейд-босс» из меню
     await _safe_answer(cb, "💀 БОСС ПОВЕРЖЕН!", alert=True)
+    await effects.react_msg(cb.message, "🔥", big=True)   # добил босса — пусть полыхнёт
     # Правим анонс во ВСЕХ чатах, где висел босс: экран победы, кнопки убираем
     # (иначе в других чатах осталась бы живая «Бить» по мёртвому боссу). Без спама
     # в посторонние чаты — только туда, где он реально появлялся.
