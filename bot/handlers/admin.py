@@ -146,6 +146,7 @@ async def cmd_uitest(message: Message) -> None:
         return
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🧍 Персонаж (тест)", web_app=WebAppInfo(url=b + "/ui/index.html"))],
+        [InlineKeyboardButton(text="⚒ Кузница (тест)", web_app=WebAppInfo(url=b + "/ui/forge.html"))],
         [InlineKeyboardButton(text="🎒 Снаряжение (тест)", web_app=WebAppInfo(url=b + "/ui/snar.html"))],
     ])
     await message.answer("🎨 Премиум-экраны (тест мини-аппа):", reply_markup=kb)
