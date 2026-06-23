@@ -131,3 +131,21 @@ async def cmd_fair(message: Message, session: AsyncSession) -> None:
         f"🎪 Ярмарка открыта вручную на {balance.FAIR_DURATION_HOURS} ч. "
         f"Спрос ×{balance.FAIR_DEMAND_MULT:g}. Анонс ушёл в чаты: {len(chat_ids)}."
     )
+
+
+@router.message(Command("uitest"))
+async def cmd_uitest(message: Message) -> None:
+    """Тест premium-экранов мини-аппа на телефоне (только админ)."""
+    if not _is_admin(message):
+        return
+    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+    from bot.webapp import base_url
+    b = base_url()
+    if not b:
+        await message.answer("Нет webapp-домена (RAILWAY_PUBLIC_DOMAIN не задан).")
+        return
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🧍 Персонаж (тест)", web_app=WebAppInfo(url=b + "/ui/"))],
+        [InlineKeyboardButton(text="🎒 Снаряжение (тест)", web_app=WebAppInfo(url=b + "/ui/snar.html"))],
+    ])
+    await message.answer("🎨 Премиум-экраны (тест мини-аппа):", reply_markup=kb)

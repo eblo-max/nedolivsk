@@ -437,6 +437,9 @@ def build_app() -> web.Application:
     app.router.add_get("/assets/animals/{name}.png", _animal_sprite)  # бродячая живность
     app.router.add_get("/assets/farm/{name}.png", _farm_sprite)  # ферма (мельница) на карте
     app.router.add_get("/phasertest", _phaser_page)              # ТЕСТ движка Phaser (сцена)
+    ui_dir = ASSETS_DIR.parent / "webapp_preview"                # ТЕСТ premium-экранов (статика)
+    if ui_dir.is_dir():
+        app.router.add_static("/ui/", path=ui_dir, show_index=False)
     return app
 
 
