@@ -175,6 +175,32 @@ VICTORY_LINE = 0.7
 ARCHER_ADDS_BONUS = 1.7      # стрелки бьют волков-миньонов сильнее
 SCOUT_CLEANSE = 0.6          # разведка ослабляет проклятье (по доле разведчиков)
 
+# ── Урон орды масштабируется от СИЛЫ армии (а не фиксирован) ───────────────────
+# Прокачанный/большой город встречает БОЛЕЕ ЗЛУЮ орду — иначе сильная армия выходит
+# из боя без царапины и орда перестаёт быть угрозой. Рост сублинейный; ПОЛ 1.0 (на
+# слабой явке урон = ORC_ATK, тонкий баланс «5-7 слабых» не трогаем) и ПОТОЛОК —
+# анти-runaway. ATK_REF_POWER ≈ опорная боевая мощь «5-7 слабых ратников».
+ATK_REF_POWER = 110.0
+ATK_POWER_EXP = 0.5
+ATK_SCALE_CAP = 2.2
+
+# ── Эскалация между нашествиями (мета-прогрессия) ─────────────────────────────
+# Каждая ПОБЕДА мира делает следующую орду толще и злее (HP и урон ×escal). Так
+# город не перерастает угрозу. Снимок escal фиксируется на записи нашествия при
+# спавне (Invasion.escal), счётчик побед живёт в World.orc_wins.
+ESCAL_PER_WIN = 0.08         # +8% к HP и урону орды за каждую прошлую победу мира
+ESCAL_CAP = 2.5              # потолок (~после 19 побед)
+
+
+def escalation(orc_wins: int) -> float:
+    """Множитель силы орды от числа прошлых побед мира (для снимка при спавне)."""
+    return min(ESCAL_CAP, 1.0 + ESCAL_PER_WIN * max(0, int(orc_wins or 0)))
+
+
+def escal_of(inv) -> float:
+    """Снимок эскалации с записи нашествия (≥1.0). Безопасно для старых записей."""
+    return max(1.0, float(getattr(inv, "escal", 1.0) or 1.0))
+
 
 def role_of(stats: dict) -> str:
     """Роль из доминирующего стата билда (нормировано). Слабый билд → ратник."""
@@ -212,10 +238,12 @@ def _unit_output(p: dict, orc_armor: int) -> float:
     return (1 - p["crit"]) * max(1.0, p["dmg"] - orc_armor) + p["crit"] * 2 * p["dmg"]
 
 
-def simulate(participants: list[dict], seed: int = 0) -> dict:
+def simulate(participants: list[dict], seed: int = 0, escal: float = 1.0) -> dict:
     """Детерминированный бой армии против орды. participants — боевые профили с
-    полем pid. Возвращает {won, rounds, orc_hp_max, orc_hp_left, dealt:{pid:int},
+    полем pid. escal — множитель силы орды (эскалация между нашествиями, ≥1.0).
+    Возвращает {won, rounds, orc_hp_max, orc_hp_left, dealt:{pid:int},
     fell:[pid], events:[(round, kind, payload)], n}. Чистая — без БД/IO."""
+    escal = max(1.0, float(escal or 1.0))
     n = len(participants)
     if n == 0:                      # пустой ростер — ВСЕ ключи на месте (иначе KeyError снаружи)
         return {"won": False, "rounds": 0, "orc_hp_max": 0, "orc_hp_left": 0,
@@ -225,9 +253,12 @@ def simulate(participants: list[dict], seed: int = 0) -> dict:
     rng = random.Random(seed)
     power = sum(_unit_output(p, ORC_ARMOR) for p in participants) or 1.0
     orc_hp_max = max(MIN_ORC_HP, round(HP_PER_POWER * power ** HP_POWER_EXP))
+    orc_hp_max = round(orc_hp_max * escal)            # эскалация: толще с каждой победой
     orc_hp = float(orc_hp_max)
     army_hp_max = round(sum(p["hp"] for p in participants)) or 1   # общий запас HP дружины
-    orc_atk = ORC_ATK
+    # урон орды растёт от СИЛЫ армии (пол 1.0 — слабая явка как раньше; + эскалация)
+    atk_mult = min(ATK_SCALE_CAP, max(1.0, (power / ATK_REF_POWER) ** ATK_POWER_EXP))
+    orc_atk = ORC_ATK * atk_mult * escal
     units = [dict(p, hp_left=float(p["hp"]), alive=True, dealt=0.0, critdmg=0.0,
                   blocked=0.0) for p in participants]
     scout_frac = sum(1 for p in units if p["role"] == "scout") / n

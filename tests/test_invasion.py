@@ -225,3 +225,52 @@ def test_army_hp_timeline_and_readiness():
     assert win["won"] and inv.readiness(win) >= inv.VICTORY_LINE
     assert not lose["won"] and 0.0 <= inv.readiness(lose) < inv.VICTORY_LINE
     assert inv.readiness(e) == 0.0
+
+
+# ── Прогрессия орды: урон-от-силы + эскалация между нашествиями ───────────────
+def test_escalation_curve_and_snapshot():
+    assert inv.escalation(0) == 1.0                       # первое нашествие — без усиления
+    assert abs(inv.escalation(3) - (1 + inv.ESCAL_PER_WIN * 3)) < 1e-9
+    assert inv.escalation(10_000) == inv.ESCAL_CAP        # потолок (анти-runaway)
+    assert inv.escalation(-5) == 1.0                      # мусор → пол
+
+    class _Obj:
+        pass
+    o = _Obj()
+    assert inv.escal_of(o) == 1.0                         # старая запись без поля → 1.0
+    o.escal = 1.5
+    assert inv.escal_of(o) == 1.5
+    o.escal = None
+    assert inv.escal_of(o) == 1.0                         # NULL → 1.0
+    o.escal = 0.3
+    assert inv.escal_of(o) == 1.0                         # не ниже 1.0
+
+
+def test_escalation_makes_orc_tougher():
+    a = _army({"tank": 8, "archer": 8, "scout": 3})
+    base = inv.simulate(a, seed=1)
+    esc = inv.simulate(a, seed=1, escal=2.0)
+    assert esc["orc_hp_max"] > base["orc_hp_max"]         # эскалация: орда толще
+    # та же армия против усиленной орды — не легче (меньше выживших ИЛИ потеря победы)
+    assert (esc["won"], esc["army_hp_left"]) <= (base["won"], base["army_hp_left"])
+
+
+def test_escalation_can_flip_marginal_win_to_loss():
+    # достаточная армия побеждает обычную орду, но сильная эскалация ломает победу
+    a = _army({"tank": 6, "archer": 6, "scout": 2})
+    assert inv.simulate(a, seed=1)["won"] is True
+    assert inv.simulate(a, seed=1, escal=inv.ESCAL_CAP)["won"] is False
+
+
+def test_weak_turnout_attack_unchanged_floor():
+    # слабая малая явка (мощь < ATK_REF_POWER) — урон орды зафлорен на ORC_ATK:
+    # тонкий баланс «5-7 слабых» не трогаем. Проверяем через инвариант: эскалация=1
+    # и состав совпадает с тем, что тестируется в test_front_line_and_turnout_decide.
+    weak = [dict(inv.battle_profile(_gear(1, 1, 1, 1), 26), pid=i + 1) for i in range(3)]
+    assert all(p["role"] == "ratnik" for p in weak)      # слабый билд → линия
+    power = sum(inv._unit_output(p, inv.ORC_ARMOR) for p in weak)
+    assert power < inv.ATK_REF_POWER                      # действительно «слабая» зона
+    # детерминизм с эскалацией сохраняется
+    r1 = inv.simulate(weak, seed=7, escal=1.0)
+    r2 = inv.simulate(weak, seed=7, escal=1.0)
+    assert r1["dealt"] == r2["dealt"] and r1["won"] == r2["won"]

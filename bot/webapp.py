@@ -82,7 +82,7 @@ def _invasion_report_event(inv, uid: int = 0) -> dict:
     n, ohl, ohm = res.get("n"), res.get("orc_hp_left"), res.get("orc_hp_max")
     if not report:                       # ещё не зарезолвлено сервером — предсказываем
         parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
-        sim = invmod.simulate(parts, seed=inv.id)
+        sim = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv))
         plan = invmod.settle(inv, sim)
         report = invmod.build_report(inv, sim, plan)
         won, rounds, n = sim["won"], sim["rounds"], sim["n"]
@@ -116,7 +116,7 @@ def _invasion_event(inv, uid: int = 0) -> dict:
     # Та же детерминированная симуляция (сид=id) → реальный исход + ТАЙМЛАЙН
     # (HP орды/броня/баффы по раундам) для честной анимации полоски и баффов.
     parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
-    sim = invmod.simulate(parts, seed=inv.id)
+    sim = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv))
     result = inv.status if inv.status in ("won", "lost") else ("won" if sim["won"] else "lost")
     # тайминги: сбор — из меток; марш фикс.; БОЙ — по реальному числу раундов (полоска
     # тает в темпе симуляции и заканчивается, когда бой реально завершился).
@@ -195,7 +195,7 @@ async def _api_taverns(request: web.Request) -> web.Response:
             gu = (live.gather_until if live.gather_until.tzinfo
                   else live.gather_until.replace(tzinfo=timezone.utc))
             parts = [dict(r, pid=int(pid)) for pid, r in (live.registered or {}).items()]
-            rounds = invmod.simulate(parts, seed=live.id)["rounds"]
+            rounds = invmod.simulate(parts, seed=live.id, escal=invmod.escal_of(live))["rounds"]
             end = gu + timedelta(seconds=invmod.MARCH_SECONDS + invmod.battle_secs_for(rounds))
         elif live.resolve_at:
             end = (live.resolve_at if live.resolve_at.tzinfo
@@ -271,7 +271,7 @@ async def _api_invasion_join(request: web.Request) -> web.Response:
         # пересчёт готовности после записи — чтобы полоска дружины долилась сразу
         fresh = await repo.get_active_invasion(s) or inv
         parts = [dict(r, pid=int(pid)) for pid, r in (fresh.registered or {}).items()]
-        sim = invmod.simulate(parts, seed=fresh.id)
+        sim = invmod.simulate(parts, seed=fresh.id, escal=invmod.escal_of(fresh))
     out = {"role": rec["role"], "dmg": round(rec["dmg"]), "crit": rec["crit"],
            "armor": rec["armor"], "dodge": rec["dodge"], "hp": rec["hp"],
            "x": rec["tx"], "y": rec["ty"], "already": already,

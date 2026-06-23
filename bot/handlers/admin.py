@@ -35,6 +35,10 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
     args = (command.args or "").lower().split()
     fast = "fast" in args
     seed_army = "army" in args             # /orc fast army — болванка-армия для отладки
+    # /orc ... winsN — тест эскалации: посчитать escal как при N победах мира
+    # (только для ЭТОГО нашествия, постоянный счётчик world.orc_wins не трогаем).
+    wins_override = next((int(a[4:]) for a in args
+                          if a.startswith("wins") and a[4:].isdigit()), None)
     now = datetime.now(timezone.utc)
     total = await repo.world_might_sum(session)
     threshold = invasion.horde_threshold(total)
@@ -45,6 +49,9 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
         inv.registered = invasion.dummy_roster()   # 16 бойцов с человеч. никами
     world = await repo.get_or_create_world(session)
     world.invasion_next_at = None          # активна — авто не спавнит поверх
+    wins_for_escal = (wins_override if wins_override is not None
+                      else getattr(world, "orc_wins", 0))
+    inv.escal = invasion.escalation(wins_for_escal)   # снимок эскалации при спавне
     await session.flush()                  # нужен inv.id для кнопок
     invasion.set_gathering(inv.id)         # меню таверны сразу покажет «в строй» у ВСЕХ
     gsec = round((g_until - now).total_seconds())
@@ -65,7 +72,8 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
         army = "\n🤖 Болванка-армия: 16 бойцов (🛡4 🗡6 ⚔️4 🔭2) — город уже силён." if seed_army else ""
         await message.answer(
             f"🪓 <b>Орда запущена в ТЕСТ-режиме</b> (без анонсов в чаты/лички).\n"
-            f"Порог {threshold} (мощь города {total}). {timing}.{army}\n"
+            f"Порог {threshold} (мощь города {total}). Эскалация ×{inv.escal:.2f} "
+            f"(побед мира {getattr(world, 'orc_wins', 0)}). {timing}.{army}\n"
             "Открой карту — записывайся и тестируй:",
             reply_markup=kb)
         return
@@ -89,7 +97,9 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
             "живые добьют." if seed_army else "")
     await message.answer(
         f"🪓 Орда орков запущена! Порог орды: <b>{threshold}</b> "
-        f"(мощь города {total}). Сбор {invasion.GATHER_MINUTES} мин. "
+        f"(мощь города {total}). Эскалация: <b>×{inv.escal:.2f}</b> "
+        f"(побед мира {getattr(world, 'orc_wins', 0)}). "
+        f"Сбор {invasion.GATHER_MINUTES} мин. "
         f"В чаты: {len(msgs)}/{len(chat_ids)}. Пуш в личку: {len(pids)}.{army}")
 
 

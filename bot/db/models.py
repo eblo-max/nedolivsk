@@ -146,6 +146,8 @@ class WorldState(Base):
     event_good: Mapped[str | None] = mapped_column(String(16))  # товар «в моде» (спрос-событие)
     # Расписание ивента «Орда орков»: когда можно спавнить следующий (None — можно/пауза не задана).
     invasion_next_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Число ПОБЕД мира над ордой — двигает эскалацию (каждая победа усиливает следующую орду).
+    orc_wins: Mapped[int] = mapped_column(default=0)
 
 
 class KnownChat(Base):
@@ -280,6 +282,7 @@ class Invasion(Base):
     sprite: Mapped[int] = mapped_column(default=1)         # орк-модель (ork{sprite})
     registered: Mapped[dict] = mapped_column(JSONB, default=dict)
     threshold: Mapped[int] = mapped_column(default=0)      # порог орды (снимок при спавне)
+    escal: Mapped[float] = mapped_column(default=1.0)      # эскалация (снимок при спавне)
     status: Mapped[str] = mapped_column(String(10), default="gathering")
     messages: Mapped[dict] = mapped_column(JSONB, default=dict)
     result: Mapped[dict] = mapped_column(JSONB, default=dict)

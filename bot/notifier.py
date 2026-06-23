@@ -482,7 +482,8 @@ async def _notify_returned(bot: Bot) -> None:
                         # длина боя = реальное число раундов → resolve_at точно к финалу
                         parts = [dict(r, pid=int(pid))
                                  for pid, r in (inv.registered or {}).items()]
-                        bsec = invmod.battle_secs_for(invmod.simulate(parts, seed=inv.id)["rounds"])
+                        bsec = invmod.battle_secs_for(invmod.simulate(
+                            parts, seed=inv.id, escal=invmod.escal_of(inv))["rounds"])
                         gu = inv.gather_until
                         if gu.tzinfo is None:
                             gu = gu.replace(tzinfo=timezone.utc)
@@ -495,9 +496,11 @@ async def _notify_returned(bot: Bot) -> None:
                 if now >= (inv.resolve_at or now):               # время исхода — СИМУЛЯЦИЯ
                     parts = [dict(r, pid=int(pid))
                              for pid, r in (inv.registered or {}).items()]
-                    sim = invmod.simulate(parts, seed=inv.id)
+                    sim = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv))
                     plan = invmod.settle(inv, sim)
                     await _apply_invasion(session, inv, plan)
+                    if sim["won"]:        # победа мира → следующая орда сильнее
+                        world.orc_wins = int(getattr(world, "orc_wins", 0) or 0) + 1
                     inv.result = {"won": sim["won"], "n": sim["n"], "rounds": sim["rounds"],
                                   "orc_hp_left": sim["orc_hp_left"],
                                   "orc_hp_max": sim["orc_hp_max"],

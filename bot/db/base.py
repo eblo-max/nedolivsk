@@ -78,6 +78,14 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS invasion_next_at TIMESTAMPTZ"
         ))
+        # Эскалация орды: счётчик побед мира (World) + снимок множителя (Invasion).
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS orc_wins INTEGER NOT NULL DEFAULT 0"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE invasion ADD COLUMN IF NOT EXISTS "
+            "escal DOUBLE PRECISION NOT NULL DEFAULT 1.0"
+        ))
         # Лимит покупки на бирже (анти-абуз): окно 4ч по товарам.
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
