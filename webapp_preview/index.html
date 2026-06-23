@@ -5,6 +5,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   @font-face{font-family:'Gothic';src:url('assets/gothic.otf') format('opentype');
     font-weight:normal;font-display:swap}
@@ -132,9 +133,9 @@
   <div class="hero rise" style="animation-delay:.08s">
     <div class="portrait"><img src="assets/hero.png" alt=""></div>
     <div class="who">
-      <div class="nm">Бородач</div>
+      <div class="nm" id="nm">Бородач</div>
       <div class="sub">«Морда кирпичом, руки в мозолях»</div>
-      <span class="lv">УРОВЕНЬ 7</span>
+      <span class="lv" id="lv">УРОВЕНЬ 7</span>
     </div>
   </div>
   <div class="panel rise" style="animation-delay:.14s">
@@ -143,32 +144,32 @@
         <div class="liquid"><i id="hpliq"></i></div>
       </div>
       <div class="hpinfo"><div class="k">ЗДОРОВЬЕ</div>
-        <div class="v"><span data-count="35">0</span> <small>/ 35</small></div></div>
+        <div class="v"><span id="hp" data-count="35">0</span> <small id="hpmax">/ 35</small></div></div>
     </div>
   </div>
   <div class="panel rise" style="animation-delay:.2s">
     <div class="ph">БОЕВЫЕ</div>
     <div class="row"><div class="ic">⚔️</div><div class="body">
-      <div class="top"><span class="lbl">Урон</span><span class="val" style="color:#e8895a" data-count="12">0</span></div>
-      <div class="bar"><div class="fill" data-w="62" style="background:linear-gradient(90deg,#8a4a22,#e8895a)"></div></div></div></div>
+      <div class="top"><span class="lbl">Урон</span><span class="val" id="v_dmg" style="color:#e8895a" data-count="12">0</span></div>
+      <div class="bar"><div class="fill" id="b_dmg" data-w="62" style="background:linear-gradient(90deg,#8a4a22,#e8895a)"></div></div></div></div>
     <div class="row"><div class="ic">💥</div><div class="body">
-      <div class="top"><span class="lbl">Крит</span><span class="val" style="color:#edc05a"><span data-count="8">0</span>%</span></div>
-      <div class="bar"><div class="fill" data-w="40" style="background:linear-gradient(90deg,#8a6a20,#edc05a)"></div></div></div></div>
+      <div class="top"><span class="lbl">Крит</span><span class="val" style="color:#edc05a"><span id="v_crit" data-count="8">0</span>%</span></div>
+      <div class="bar"><div class="fill" id="b_crit" data-w="40" style="background:linear-gradient(90deg,#8a6a20,#edc05a)"></div></div></div></div>
     <div class="row"><div class="ic">🛡️</div><div class="body">
-      <div class="top"><span class="lbl">Броня</span><span class="val" style="color:#8fb1da" data-count="4">0</span></div>
-      <div class="bar"><div class="fill" data-w="28" style="background:linear-gradient(90deg,#3a5780,#8fb1da)"></div></div></div></div>
+      <div class="top"><span class="lbl">Броня</span><span class="val" id="v_armor" style="color:#8fb1da" data-count="4">0</span></div>
+      <div class="bar"><div class="fill" id="b_armor" data-w="28" style="background:linear-gradient(90deg,#3a5780,#8fb1da)"></div></div></div></div>
     <div class="row"><div class="ic">🍀</div><div class="body">
-      <div class="top"><span class="lbl">Удача</span><span class="val" style="color:#86c98a"><span data-count="6">0</span> · вылазка 12%</span></div>
-      <div class="bar"><div class="fill" data-w="35" style="background:linear-gradient(90deg,#39702f,#86c98a)"></div></div></div></div>
+      <div class="top"><span class="lbl">Удача</span><span class="val" style="color:#86c98a"><span id="v_luck" data-count="6">0</span> · вылазка <span id="luckyv">12</span>%</span></div>
+      <div class="bar"><div class="fill" id="b_luck" data-w="35" style="background:linear-gradient(90deg,#39702f,#86c98a)"></div></div></div></div>
   </div>
   <div class="panel rise" style="animation-delay:.26s">
     <div class="ph">ХОЗЯЙСТВО</div>
     <div class="row"><div class="ic">🪙</div><div class="body"><div class="top">
-      <span class="lbl">Доход</span><span class="val" style="color:var(--gold)">+<span data-count="15">0</span>%</span></div></div></div>
+      <span class="lbl">Доход</span><span class="val" style="color:var(--gold)">+<span id="e_income" data-count="15">0</span>%</span></div></div></div>
     <div class="row"><div class="ic">⛏️</div><div class="body"><div class="top">
-      <span class="lbl">Добыча</span><span class="val" style="color:#cdc7b6">+<span data-count="10">0</span>%</span></div></div></div>
+      <span class="lbl">Добыча</span><span class="val" style="color:#cdc7b6">+<span id="e_yield" data-count="10">0</span>%</span></div></div></div>
     <div class="row"><div class="ic">⏳</div><div class="body"><div class="top">
-      <span class="lbl">Время вылазок</span><span class="val" style="color:#cdc7b6">−<span data-count="8">0</span>%</span></div></div></div>
+      <span class="lbl">Время вылазок</span><span class="val" style="color:#cdc7b6">−<span id="e_speed" data-count="8">0</span>%</span></div></div></div>
   </div>
   <div class="foot rise" style="animation-delay:.3s">Голый трактирщик — смешной трактирщик. Загляни в кузницу.</div>
   <div class="btns rise" style="animation-delay:.34s">
@@ -176,14 +177,42 @@
   </div>
 </div>
 <script>
+  const tg=window.Telegram?.WebApp;
+  if(tg){tg.ready();tg.expand();try{tg.setHeaderColor&&tg.setHeaderColor('#0b0703')}catch(e){}}
+  const $=id=>document.getElementById(id);
+  const barW=(v,max)=>Math.max(5,Math.min(100,Math.round(v/max*100)));
+  let hpRatio=1;
+  function apply(d){           // живые данные с сервера (иначе — sample-плейсхолдеры)
+    if(!d) return;
+    $('nm').textContent=d.name;
+    $('lv').textContent='УРОВЕНЬ '+d.level;
+    $('hpmax').textContent='/ '+d.hp_max; $('hp').dataset.count=d.hp; hpRatio=d.hp/(d.hp_max||1);
+    $('v_dmg').dataset.count=d.dmg;   $('b_dmg').dataset.w=barW(d.dmg,40);
+    $('v_crit').dataset.count=d.crit; $('b_crit').dataset.w=barW(d.crit,75);
+    $('v_armor').dataset.count=d.armor;$('b_armor').dataset.w=barW(d.armor,30);
+    $('v_luck').dataset.count=d.luck; $('b_luck').dataset.w=barW(d.luck,30); $('luckyv').textContent=d.lucky;
+    $('e_income').dataset.count=d.income; $('e_yield').dataset.count=d.yield; $('e_speed').dataset.count=d.speed;
+  }
   function countUp(el,to,ms){const t0=performance.now();
     const f=t=>{const k=Math.min(1,(t-t0)/ms);el.textContent=Math.round(to*(1-Math.pow(1-k,3)));
       if(k<1)requestAnimationFrame(f);};requestAnimationFrame(f);}
-  addEventListener('load',()=>setTimeout(()=>{
+  function animate(){
     document.querySelectorAll('[data-count]').forEach(el=>countUp(el,+el.dataset.count,900));
     document.querySelectorAll('.fill').forEach(el=>el.style.width=el.dataset.w+'%');
-    document.getElementById('hpliq').style.height='100%';
-  },380));
+    $('hpliq').style.height=(hpRatio*100)+'%';
+  }
+  (async()=>{
+    let d=null;
+    try{
+      const ctrl=new AbortController(), to=setTimeout(()=>ctrl.abort(),4000);
+      const r=await fetch('/api/character',{method:'POST',signal:ctrl.signal,
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({initData:tg?.initData||''})});
+      clearTimeout(to);
+      const j=await r.json(); if(j&&j.ok)d=j;
+    }catch(e){}                       // нет/медленный API → sample-плейсхолдеры
+    apply(d);
+    setTimeout(animate,250);
+  })();
   const c=document.getElementById('fx'),x=c.getContext('2d');let W,H,P=[];
   function rs(){W=c.width=innerWidth;H=c.height=innerHeight;P=Array.from({length:Math.min(46,(W*H)/26000|0)},()=>sp());}
   function sp(){return{x:Math.random()*W,y:H+Math.random()*H,r:.6+Math.random()*1.8,v:.15+Math.random()*.5,s:Math.random()*6.28,a:.13+Math.random()*.38};}

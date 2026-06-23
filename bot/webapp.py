@@ -331,6 +331,38 @@ async def _api_mill_collect(request: web.Request) -> web.Response:
                              headers={"Cache-Control": "no-store"})
 
 
+async def _api_character(request: web.Request) -> web.Response:
+    """Живые данные экрана «Персонаж» (mini-app). Auth — Telegram initData.
+    Числа считаем ТОЧНО как texts.character_screen (та же боёвка/экономика)."""
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        body = {}
+    uid = _verify_init_data(body.get("initData") or "")
+    if not uid:
+        return web.json_response({"ok": False, "error": "auth"}, status=401)
+    from bot.game import balance as bal, combat, items
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        eq = p.equipment or {}
+        st = items.combat_stats(eq)
+        out = {
+            "ok": True, "name": (p.first_name or "Хозяин"), "level": int(p.tavern.level),
+            "worn": len(eq), "slots": len(items.SLOTS),
+            "hp": combat.current_hp(p), "hp_max": combat.max_hp(),
+            "dmg": bal.BASE_DAMAGE + st["damage"],
+            "crit": min(bal.HUNT_CRIT_CAP, st["crit"] + st["luck"] // 2),
+            "armor": st["armor"], "luck": st["luck"], "lucky": bal.lucky_chance(st["luck"]),
+            "income": round((items.income_multiplier(eq) - 1) * 100),
+            "yield": round((items.yield_multiplier(eq, "grain") - 1) * 100),
+            "speed": round((1 - items.speed_multiplier(eq)) * 100),
+            "pay": round((1 - items.pay_multiplier(eq)) * 100),
+        }
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
 async def _map_page(request: web.Request) -> web.Response:
     return web.Response(text=_MAP_HTML, content_type="text/html")
 
@@ -427,6 +459,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/invasion/join", _api_invasion_join)
     app.router.add_post("/api/mill/run", _api_mill_run)        # вылазка телеги за зерном
     app.router.add_post("/api/mill/collect", _api_mill_collect)
+    app.router.add_post("/api/character", _api_character)      # живые данные экрана персонажа
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
     app.router.add_get("/assets/boss/ork{n}_{anim}.png", _event_sprite)  # ивент-анимации
