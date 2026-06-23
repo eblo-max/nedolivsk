@@ -145,7 +145,7 @@ async def cmd_uitest(message: Message) -> None:
         await message.answer("Нет webapp-домена (RAILWAY_PUBLIC_DOMAIN не задан).")
         return
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🧍 Персонаж (тест)", web_app=WebAppInfo(url=b + "/ui/"))],
+        [InlineKeyboardButton(text="🧍 Персонаж (тест)", web_app=WebAppInfo(url=b + "/ui/index.html"))],
         [InlineKeyboardButton(text="🎒 Снаряжение (тест)", web_app=WebAppInfo(url=b + "/ui/snar.html"))],
     ])
     await message.answer("🎨 Премиум-экраны (тест мини-аппа):", reply_markup=kb)
