@@ -331,171 +331,6 @@ async def _api_mill_collect(request: web.Request) -> web.Response:
                              headers={"Cache-Control": "no-store"})
 
 
-async def _api_character(request: web.Request) -> web.Response:
-    """Живые данные экрана «Персонаж» (mini-app). Auth — Telegram initData.
-    Числа считаем ТОЧНО как texts.character_screen (та же боёвка/экономика)."""
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        body = {}
-    uid = _verify_init_data(body.get("initData") or "")
-    if not uid:
-        return web.json_response({"ok": False, "error": "auth"}, status=401)
-    from bot.game import balance as bal, combat, items
-    async with session_factory() as s:
-        p = await repo.get_player(s, uid)
-        if p is None or not p.tavern:
-            return web.json_response({"ok": False, "error": "no_tavern"})
-        eq = p.equipment or {}
-        st = items.combat_stats(eq)
-        out = {
-            "ok": True, "name": (p.first_name or "Хозяин"), "level": int(p.tavern.level),
-            "worn": len(eq), "slots": len(items.SLOTS),
-            "hp": combat.current_hp(p), "hp_max": combat.max_hp(),
-            "dmg": bal.BASE_DAMAGE + st["damage"],
-            "crit": min(bal.HUNT_CRIT_CAP, st["crit"] + st["luck"] // 2),
-            "armor": st["armor"], "luck": st["luck"], "lucky": bal.lucky_chance(st["luck"]),
-            "income": round((items.income_multiplier(eq) - 1) * 100),
-            "yield": round((items.yield_multiplier(eq, "grain") - 1) * 100),
-            "speed": round((1 - items.speed_multiplier(eq)) * 100),
-            "pay": round((1 - items.pay_multiplier(eq)) * 100),
-        }
-    return web.json_response(out, headers={"Cache-Control": "no-store"})
-
-
-# ═══════════════ КУЗНИЦА (mini-app) ═══════════════
-# Сервер — единственный источник правды: каталог строится из items.CATALOG,
-# крафт идёт через ту же logic.start_craft/claim_craft, что и текстовый бот.
-_BOSS_NAME = {"rat": "🐀 Крысиный Король", "troll": "👹 Болотный Тролль",
-              "dragon": "🐲 Древний Змей"}
-
-
-def _forge_catalog(player) -> tuple[list, list]:
-    """(куётся, трофеи) — как forge_kb: региональный пояс только своего региона."""
-    from bot.game import items
-    region = getattr(player, "region", None)
-    craft, boss = [], []
-    for it in items.CATALOG.values():
-        if it.id in items.REGION_GEAR and items.REGION_GEAR[it.id] != region:
-            continue                      # чужой региональный пояс — скрываем
-        row = {
-            "id": it.id, "sp": it.sprite or it.id, "nm": it.name,
-            "slot": items.SLOTS[it.slot], "d": it.description,
-            "h": it.craft_hours, "cost": dict(it.cost),
-            "income": it.income_pct, "yield": it.yield_pct, "ywood": it.yield_wood_pct,
-            "speed": it.speed_pct, "pay": it.pay_discount_pct,
-            "dmg": it.damage, "crit": it.crit, "armor": it.armor, "luck": it.luck,
-        }
-        if it.craftable:
-            craft.append(row)
-        else:
-            row["boss"] = _BOSS_NAME.get(it.id.split("_")[0], "🏆 Босс")
-            boss.append(row)
-    return craft, boss
-
-
-def _forge_state(player) -> dict:
-    """Полное состояние кузницы для UI: мошна, надетое, ковка, каталог."""
-    from bot.game import inventory, items, logic
-    owned: dict[str, int] = {}
-    for entry in (player.equipment or {}).values():
-        iid, tier = items.parse_entry(entry)
-        owned[iid] = tier
-    state, minutes = logic.craft_state(player)
-    craft_info: dict = {"state": state}
-    if state != "none" and player.craft_item:
-        iid, tier = items.parse_entry(player.craft_item)
-        it = items.CATALOG.get(iid)
-        craft_info.update({
-            "item_id": iid, "tier": tier, "minutes": minutes,
-            "name": it.name if it else iid,
-            "sp": (it.sprite or it.id) if it else iid,
-        })
-    res_keys = ("wood", "grain", "hops", "ingot", "hide", "fang",
-                "sinew", "ring", "pelt", "tusk", "chitin")
-    craft_cat, boss_cat = _forge_catalog(player)
-    return {
-        "ok": True, "gold": int(player.gold),
-        "res": {k: inventory.get(player, k) for k in res_keys},
-        "region": getattr(player, "region", "") or "",
-        "owned": owned, "craft": craft_info,
-        "craftCat": craft_cat, "bossCat": boss_cat,
-    }
-
-
-async def _forge_auth(request: web.Request):
-    """Общая часть: разобрать тело + проверить initData. -> (uid, body) | (None, resp)."""
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        body = {}
-    uid = _verify_init_data(body.get("initData") or "")
-    if not uid:
-        return None, web.json_response({"ok": False, "error": "auth"}, status=401)
-    return uid, body
-
-
-async def _api_forge(request: web.Request) -> web.Response:
-    """Состояние кузницы игрока (read-only)."""
-    uid, body = await _forge_auth(request)
-    if uid is None:
-        return body                       # это уже Response с ошибкой auth
-    async with session_factory() as s:
-        p = await repo.get_player(s, uid)
-        if p is None or not p.tavern:
-            return web.json_response({"ok": False, "error": "no_tavern"})
-        out = _forge_state(p)
-    return web.json_response(out, headers={"Cache-Control": "no-store"})
-
-
-async def _api_forge_order(request: web.Request) -> web.Response:
-    """Заказать ковку/перековку. Та же валидация, что cb_forge_make в боте."""
-    uid, body = await _forge_auth(request)
-    if uid is None:
-        return body
-    item_id = str(body.get("item_id") or "")
-    from bot.game import items, logic
-    async with session_factory() as s:
-        p = await repo.get_player(s, uid, for_update=True)
-        if p is None or not p.tavern:
-            return web.json_response({"ok": False, "error": "no_tavern"})
-        r = logic.start_craft(p, item_id)
-        if not r.ok:                      # busy | unknown | max_tier | not_enough
-            return web.json_response({"ok": False, "error": r.reason,
-                                      "state": _forge_state(p)})
-        nm = r.item.name if r.item else item_id
-        repo.add_log(s, "player", p.id, f"⚒ заказал ковку {nm} {items.TIER_STARS[r.tier]}")
-        await s.commit()
-        st = _forge_state(p)
-    return web.json_response({"ok": True, "tier": r.tier, "hours": r.hours, "state": st},
-                             headers={"Cache-Control": "no-store"})
-
-
-async def _api_forge_claim(request: web.Request) -> web.Response:
-    """Забрать готовую вещь — надевается в слот (logic.claim_craft)."""
-    uid, body = await _forge_auth(request)
-    if uid is None:
-        return body
-    from bot.game import items, logic
-    async with session_factory() as s:
-        p = await repo.get_player(s, uid, for_update=True)
-        if p is None or not p.tavern:
-            return web.json_response({"ok": False, "error": "no_tavern"})
-        r = logic.claim_craft(p)
-        if not r.ok:                      # none | not_ready
-            return web.json_response({"ok": False, "error": r.reason,
-                                      "minutes": getattr(r, "minutes_left", 0),
-                                      "state": _forge_state(p)})
-        repo.add_log(s, "player", p.id,
-                     f"🎁 забрал из кузницы {r.item.name} {items.TIER_STARS[r.tier]}")
-        await s.commit()
-        st = _forge_state(p)
-    return web.json_response({"ok": True, "state": st, "item": {
-        "id": r.item.id, "name": r.item.name, "tier": r.tier,
-        "stars": items.TIER_STARS[r.tier], "slot": items.SLOTS[r.item.slot],
-    }}, headers={"Cache-Control": "no-store"})
-
-
 async def _map_page(request: web.Request) -> web.Response:
     return web.Response(text=_MAP_HTML, content_type="text/html")
 
@@ -592,10 +427,6 @@ def build_app() -> web.Application:
     app.router.add_post("/api/invasion/join", _api_invasion_join)
     app.router.add_post("/api/mill/run", _api_mill_run)        # вылазка телеги за зерном
     app.router.add_post("/api/mill/collect", _api_mill_collect)
-    app.router.add_post("/api/character", _api_character)      # живые данные экрана персонажа
-    app.router.add_post("/api/forge", _api_forge)              # кузница: состояние + каталог
-    app.router.add_post("/api/forge/order", _api_forge_order)  # заказать ковку/перековку
-    app.router.add_post("/api/forge/claim", _api_forge_claim)  # забрать готовую вещь
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
     app.router.add_get("/assets/boss/ork{n}_{anim}.png", _event_sprite)  # ивент-анимации
@@ -606,9 +437,6 @@ def build_app() -> web.Application:
     app.router.add_get("/assets/animals/{name}.png", _animal_sprite)  # бродячая живность
     app.router.add_get("/assets/farm/{name}.png", _farm_sprite)  # ферма (мельница) на карте
     app.router.add_get("/phasertest", _phaser_page)              # ТЕСТ движка Phaser (сцена)
-    ui_dir = ASSETS_DIR.parent / "webapp_preview"                # ТЕСТ premium-экранов (статика)
-    if ui_dir.is_dir():
-        app.router.add_static("/ui/", path=ui_dir, show_index=False)
     return app
 
 
