@@ -93,20 +93,27 @@
     transform:translateX(-100%);animation:barsheen 3.2s ease-in-out 1.4s infinite}
   @keyframes barsheen{0%{transform:translateX(-100%)}30%,100%{transform:translateX(220%)}}
 
-  .hpwrap{display:flex;align-items:center;gap:16px;padding:11px 16px}
-  .globe{position:relative;flex:0 0 auto;width:116px;aspect-ratio:226/219;
-    background:center/100% 100% no-repeat;filter:drop-shadow(0 8px 16px #000a)}
-  .liquid{position:absolute;left:49.8%;top:45.9%;transform:translate(-50%,-50%);
-    width:85%;aspect-ratio:1;border-radius:50%;overflow:hidden}
-  .liquid i{position:absolute;left:0;right:0;bottom:0;height:0;
-    background:linear-gradient(#cf4a36,#8e2018);opacity:.66;transition:height 1.2s cubic-bezier(.2,.8,.2,1)}
-  .liquid i::before{content:"";position:absolute;left:-25%;right:-25%;top:0;height:8px;
-    background:#fff;opacity:.34;border-radius:50%;animation:slosh 3.5s ease-in-out infinite}
-  @keyframes slosh{0%,100%{transform:translateX(-6%) rotate(-1.5deg)}50%{transform:translateX(6%) rotate(1.5deg)}}
-  .hpinfo .k{font-family:var(--disp);font-size:12px;letter-spacing:2px;color:var(--dim);font-weight:700}
-  .hpinfo .v{font-family:var(--num);font-size:clamp(24px,7vw,30px);font-weight:900;color:var(--parch);
-    text-shadow:0 2px 7px #000,0 1px 0 #fff1;line-height:1.1}
-  .hpinfo .v small{font-size:.55em;color:var(--dim);font-weight:500}
+  .hpwrap{display:flex;flex-direction:column;gap:9px;padding:13px 16px 15px}
+  .hprow{display:flex;justify-content:space-between;align-items:baseline}
+  .hpk{font-family:var(--disp);font-size:12px;letter-spacing:2.5px;color:var(--dim);font-weight:700}
+  .hpval{font-family:var(--num);font-size:clamp(20px,6vw,26px);font-weight:900;color:var(--parch);
+    text-shadow:0 2px 6px #000,0 1px 0 #fff1;line-height:1}
+  .hpval small{font-size:.5em;color:var(--dim);font-weight:500;margin-left:2px}
+  /* горизонтальная HP-полоска: тёмный трек + золотая оправа */
+  .hptrack{position:relative;height:22px;border-radius:11px;overflow:hidden;
+    background:linear-gradient(#140d05,#241808);border:1px solid var(--line2);
+    box-shadow:inset 0 2px 6px #000c,inset 0 -1px 0 #ffffff10,0 1px 0 #ffffff10}
+  .hptrack::before{content:"";position:absolute;inset:0;border-radius:11px;pointer-events:none;
+    box-shadow:inset 0 0 0 1px #e7bf6333}
+  .hpfill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:11px 9px 9px 11px;
+    background:linear-gradient(90deg,#b3331f,#d8553a 60%,#e98a4e);
+    box-shadow:0 0 12px #d8553a66,inset 0 1px 0 #ffffff55,inset 0 -3px 6px #5a160c88;
+    transition:width 1.2s cubic-bezier(.2,.8,.2,1);overflow:hidden}
+  .hpfill::before{content:"";position:absolute;left:0;right:0;top:0;height:45%;border-radius:11px 9px 0 0;
+    background:linear-gradient(#ffffff4d,transparent)}
+  .hpfill::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(100deg,transparent 40%,#ffffff66 50%,transparent 60%);
+    transform:translateX(-100%);animation:barsheen 3.2s ease-in-out 1.6s infinite}
 
   .foot{font-family:var(--hand);text-align:center;font-style:italic;color:#988253;font-size:13px;margin:0 6px}
   .btns{display:flex;gap:9px;margin-top:auto}
@@ -140,11 +147,11 @@
   </div>
   <div class="panel rise" style="animation-delay:.14s">
     <div class="hpwrap">
-      <div class="globe" style="background-image:url(assets/globe.png)">
-        <div class="liquid"><i id="hpliq"></i></div>
+      <div class="hprow">
+        <span class="hpk">ЗДОРОВЬЕ</span>
+        <span class="hpval"><span id="hp" data-count="35">0</span><small id="hpmax">/ 35</small></span>
       </div>
-      <div class="hpinfo"><div class="k">ЗДОРОВЬЕ</div>
-        <div class="v"><span id="hp" data-count="35">0</span> <small id="hpmax">/ 35</small></div></div>
+      <div class="hptrack"><i id="hpfill" class="hpfill"></i></div>
     </div>
   </div>
   <div class="panel rise" style="animation-delay:.2s">
@@ -199,7 +206,7 @@
   function animate(){
     document.querySelectorAll('[data-count]').forEach(el=>countUp(el,+el.dataset.count,900));
     document.querySelectorAll('.fill').forEach(el=>el.style.width=el.dataset.w+'%');
-    $('hpliq').style.height=(hpRatio*100)+'%';
+    $('hpfill').style.width=(hpRatio*100)+'%';
   }
   (async()=>{
     let d=null;
