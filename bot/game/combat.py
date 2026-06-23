@@ -10,7 +10,7 @@ import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from bot.game import balance, buff, inventory, items
+from bot.game import balance, buff, economy, inventory, items
 
 
 @dataclass(frozen=True)
@@ -427,6 +427,7 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
         loot = roll_loot(enemy, stats.get("luck", 0), rng)
         loot["gold"] = int(loot["gold"] * buff.hunt_gold_mult(player))  # «Звериный нюх»
         player.gold += loot["gold"]
+        economy.record(player, "hunt", loot["gold"])
         for r, q in loot["res"].items():
             inventory.add(player, r, q)
         if loot["rep"]:
@@ -441,6 +442,7 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
 
     lost = player.gold // balance.HUNT_LOSS_GOLD_DIV  # щепотка золота при поражении
     player.gold -= lost
+    economy.record(player, "hunt", -lost)
     player.hp = balance.HP_LOSS_FLOOR
     _mark_recovery(player, now)
     return HuntResult(ok=True, enemy=enemy, fight=fight, gold_lost=lost,

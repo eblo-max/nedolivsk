@@ -5,14 +5,14 @@ from datetime import datetime, timedelta, timezone
 from aiogram import Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import announce, texts
 from bot.config import settings
 from bot.db import repo
 from bot.db.models import Player, Tavern
-from bot.game import balance, invasion
+from bot.game import balance, economy, invasion
 from bot.game import world as wld
 from bot.keyboards.inline import invasion_announce_kb
 from bot.sender import deliver
@@ -141,3 +141,57 @@ async def cmd_fair(message: Message, session: AsyncSession) -> None:
         f"🎪 Ярмарка открыта вручную на {balance.FAIR_DURATION_HOURS} ч. "
         f"Спрос ×{balance.FAIR_DEMAND_MULT:g}. Анонс ушёл в чаты: {len(chat_ids)}."
     )
+
+
+@router.message(Command("econ"))
+async def cmd_econ(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
+    """Бухгалтерия экономики (faucet/sink). /econ — сводка; /econ reset — обнулить окно."""
+    if not _is_admin(message):
+        return
+    world = await repo.get_or_create_world(session)
+    if (command.args or "").strip().lower() == "reset":
+        await session.execute(update(Player).values(econ={}))
+        world.econ_since = datetime.now(timezone.utc)
+        await message.answer("📊 Бухгалтерия обнулена — окно замера начато заново.")
+        return
+
+    rows = (await session.execute(select(Player.econ))).scalars().all()
+    agg: dict[str, int] = {}
+    for e in rows:
+        for k, v in (e or {}).items():
+            agg[k] = agg.get(k, 0) + int(v)
+
+    since = world.econ_since
+    days = None
+    if since is not None:
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=timezone.utc)
+        days = max((datetime.now(timezone.utc) - since).total_seconds() / 86400, 1e-6)
+
+    def per(v: int) -> str:
+        return f" ({v / days:+.0f}/дн)" if days else ""
+
+    def block(cats: dict[str, str]) -> tuple[list[str], int]:
+        lines, total = [], 0
+        for cat in sorted(cats, key=lambda c: -abs(agg.get(c, 0))):
+            v = agg.get(cat, 0)
+            if v == 0:
+                continue
+            total += v
+            lines.append(f"  {cats[cat]} — <b>{v:+}</b>{per(v)}")
+        return lines, total
+
+    fa, fa_tot = block(economy.FAUCETS)
+    si, si_tot = block(economy.SINKS)
+    net = fa_tot + si_tot
+    win = f"{days:.1f} дн" if days else "?"
+    out = [f"📊 <b>ЭКОНОМИКА</b> — окно {win}", ""]
+    out += ["🟢 <b>КРАНЫ</b> (приток):", *(fa or ["  —"]),
+            f"  <i>Итого крана: {fa_tot:+}{per(fa_tot)}</i>", ""]
+    out += ["🔴 <b>СТОКИ</b> (отток):", *(si or ["  —"]),
+            f"  <i>Итого стока: {si_tot:+}{per(si_tot)}</i>", ""]
+    out += [f"⚖️ <b>Чистый приток: {net:+}</b>{per(net)}",
+            "<i>+ = золото копится в мире (инфляция), − = осушается.</i>"]
+    await message.answer("\n".join(out))

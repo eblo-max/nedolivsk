@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import effects, images, texts
 from bot.db import repo
-from bot.game import inventory, items, raid
+from bot.game import economy, inventory, items, raid
 from bot.handlers import common
 from bot.keyboards.inline import raid_gather_kb, raid_kb
 from bot.sender import claim_edit, deliver
@@ -97,6 +97,7 @@ def _drop_apply(winner, drop: dict | None) -> str:
         return ""
     if drop["kind"] == "gold":
         winner.gold += drop["qty"]
+        economy.record(winner, "raid", int(drop["qty"]))
         return f"{drop['qty']} 🪙"
     if drop["kind"] == "res":
         inventory.add(winner, drop["res"], drop["qty"])
@@ -249,6 +250,7 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
         p = await repo.get_player(session, pid, for_update=True)
         if p is not None:
             p.gold += plan["gold"][pid]
+            economy.record(p, "raid", int(plan["gold"][pid]))
             repo.queue_notify(session, pid,
                               f"⚔️ Босс повержен! Твоя доля добычи: +{plan['gold'][pid]} 🪙")
     drop_line, winner_name = "", None

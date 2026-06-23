@@ -6,7 +6,8 @@ from datetime import datetime, timedelta, timezone
 
 from bot.db.models import Player, Tavern
 from bot.game import (
-    balance, buff, inventory, items, newbie, perks, production, season, worldevent,
+    balance, buff, economy, inventory, items, newbie, perks, production, season,
+    worldevent,
 )
 
 
@@ -220,6 +221,7 @@ def collect_income(
         return IncomeResult(ok=False)
 
     player.gold += passive  # пассив — сразу, без подтверждения
+    economy.record(player, "passive", passive)
     tavern.last_income_at = now
 
     # Рычаг 1: богачи пришли, дорогого пойла не нашлось — ушли НЕобслуженными.
@@ -368,6 +370,7 @@ def apply_retail(player: Player, tavern: Tavern, want: dict | None):
                * assortment_mult(sold))   # бонус за число РЕАЛЬНО проданных видов
     tavern.products = products
     player.gold += gold
+    economy.record(player, "retail", gold)
     total = sum(sold.values())
     rep_gain = add_goods_rep_progress(player, tavern, total * balance.REP_POINTS_RETAIL)
     if perks.has_fame(player):  # знаменитый кабак — доп. слава со сбыта гостям
@@ -418,6 +421,7 @@ def try_upgrade(player: Player, tavern: Tavern) -> UpgradeResult:
         return UpgradeResult(ok=False, reason="not_enough", cost=cost)
 
     inventory.pay(player, cost)
+    economy.record(player, "upgrade", -int(cost.get("gold", 0)))
 
     tavern.level += 1
     stats = balance.stats_for_level(tavern.level)
@@ -479,6 +483,7 @@ def start_craft(player: Player, item_id: str) -> CraftStart:
                           tier=tier, cost=c, hours=hours)
 
     inventory.pay(player, c)
+    economy.record(player, "forge", -int(c.get("gold", 0)))
     player.craft_item = items.make_entry(item_id, tier)
     player.craft_ends_at = _now() + timedelta(hours=hours)
     player.craft_notified = False

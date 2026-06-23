@@ -17,6 +17,7 @@ from bot.sender import deliver
 from bot.db.models import Player, Tavern
 from bot.game import auction as auctionmod
 from bot.game import balance
+from bot.game import economy
 from bot.game import city as citymod
 from bot.game import loot
 from bot.game import market as marketmod
@@ -41,6 +42,7 @@ def _apply_trophy(player, drop: dict) -> str:
     """Применить редкий трофей победителю и вернуть человекочитаемую строку."""
     if drop.get("kind") == "gold":
         player.gold += int(drop["qty"])
+        economy.record(player, "invasion", int(drop["qty"]))
         return f"{drop['qty']} 🪙"
     if drop.get("kind") == "res":
         inventory.add(player, drop["res"], int(drop["qty"]))
@@ -65,6 +67,7 @@ async def _apply_invasion(session, inv, plan: dict) -> None:
         drep = int(plan["rep"].get(pid, 0))
         if won:
             player.gold += int(dgold)
+            economy.record(player, "invasion", int(dgold))
             player.reputation = (player.reputation or 0) + drep
             if tav is not None:
                 tav.reputation = (tav.reputation or 0) + drep
@@ -77,7 +80,9 @@ async def _apply_invasion(session, inv, plan: dict) -> None:
             repo.queue_notify(session, int(pid),
                               texts.invasion_reward_dm(True, int(dgold), drep, haul, tline))
         else:
+            _before = player.gold
             player.gold = max(0, player.gold + int(dgold))     # не в минус
+            economy.record(player, "invasion", player.gold - _before)
             player.reputation = max(0, (player.reputation or 0) + drep)
             if tav is not None:
                 tav.reputation = max(0, (tav.reputation or 0) + drep)

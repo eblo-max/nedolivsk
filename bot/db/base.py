@@ -86,6 +86,14 @@ async def create_tables() -> None:
             "ALTER TABLE invasion ADD COLUMN IF NOT EXISTS "
             "escal DOUBLE PRECISION NOT NULL DEFAULT 1.0"
         ))
+        # Бухгалтерия золота (faucet/sink): накопитель на игроке + старт окна замера.
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "econ JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS econ_since TIMESTAMPTZ DEFAULT now()"
+        ))
         # Лимит покупки на бирже (анти-абуз): окно 4ч по товарам.
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "

@@ -8,7 +8,7 @@ from bot.db.models import (
     Chronicle, CityState, Invasion, KnownChat, LogEntry, LootDrop, MarketOrder,
     Notification, Player, RaidBoss, Tavern, WorldState,
 )
-from bot.game import balance
+from bot.game import balance, economy
 
 
 async def get_or_create_world(session: AsyncSession) -> WorldState:
@@ -617,7 +617,9 @@ async def grant_referral_rewards(session: AsyncSession, invitee: Player) -> dict
     if referrer is None or referrer.id == invitee.id:
         return None
     invitee.gold += balance.REFERRAL_INVITEE_GOLD
+    economy.record(invitee, "referral", balance.REFERRAL_INVITEE_GOLD)
     referrer.gold += balance.REFERRAL_INVITER_GOLD
+    economy.record(referrer, "referral", balance.REFERRAL_INVITER_GOLD)
     referrer.reputation += balance.REFERRAL_INVITER_REP
     if referrer.tavern is not None:
         referrer.tavern.reputation += balance.REFERRAL_INVITER_REP
@@ -629,6 +631,7 @@ async def grant_referral_rewards(session: AsyncSession, invitee: Player) -> dict
            and activated >= balance.REFERRAL_TIERS[referrer.ref_tier][0]):
         need, bonus = balance.REFERRAL_TIERS[referrer.ref_tier]
         referrer.gold += bonus
+        economy.record(referrer, "referral", bonus)
         referrer.ref_tier += 1
         queue_notify(session, referrer.id,
                      f"🏅 Зазывала: {need} друзей в деле — жирный бонус +{bonus} 🪙!")

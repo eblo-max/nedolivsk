@@ -12,7 +12,7 @@ from bot import effects, images, texts
 from bot.db import repo
 from bot.db.models import Player
 from bot.game import (
-    balance, logic, newbie, perks, season, story_engine, story_state,
+    balance, economy, logic, newbie, perks, season, story_engine, story_state,
 )
 from bot.game import city as citymod
 from bot.game import trade as trademod
@@ -235,6 +235,7 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
     if ce.skim_pct and result.gold > 0:  # воры/корона снимают долю с пассива
         result.skim = int(result.gold * ce.skim_pct)
         player.gold -= result.skim
+        economy.record(player, "skim", -result.skim)
 
     # Сбыт гостям — на ПОДТВЕРЖДЕНИЕ: показываем заказ, игрок решает наливать ли.
     if result.order:
@@ -308,6 +309,7 @@ async def cb_retail_sell(callback: CallbackQuery, session: AsyncSession) -> None
     if ce.skim_pct and gold > 0:  # воры/корона снимают долю и со сбыта
         skim = int(gold * ce.skim_pct)
         player.gold -= skim
+        economy.record(player, "skim", -skim)
     # Розница НЕ трогает единый оптовый рынок: гости пьют в своей таверне —
     # конечное потребление, замкнутый локальный контур.
     await _safe_edit(callback, texts.retail_sold(sold, gold, rep, skim,

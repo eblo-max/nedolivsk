@@ -8,7 +8,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from bot.game import inventory
+from bot.game import economy, inventory
 
 
 @dataclass(frozen=True)
@@ -156,6 +156,7 @@ def start_build(player, tavern, building_id: str) -> BuildStart:
                           cost=b.cost, hours=b.build_hours)
 
     inventory.pay(player, b.cost)
+    economy.record(player, "building", -int(b.cost.get("gold", 0)))
     player.build_item = building_id
     player.build_ends_at = _now() + timedelta(hours=b.build_hours)
     return BuildStart(ok=True, building=b, cost=b.cost, hours=b.build_hours)

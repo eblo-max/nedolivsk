@@ -11,7 +11,7 @@
 
 from datetime import datetime, timedelta, timezone
 
-from bot.game import inventory, story_state
+from bot.game import economy, inventory, story_state
 
 NEWBIE_MAX_LEVEL = 2          # «новичок», пока уровень таверны <= этого
 NEWBIE_GRACE_DAYS = 7        # поблажки — только первые N дней (анти-турель на ур.2)
@@ -119,6 +119,7 @@ def claim_all(player, tavern) -> dict:
         for r, amt in reward.items():
             if r == "gold":
                 player.gold += amt
+                economy.record(player, "bonus", amt)
             else:
                 inventory.add(player, r, amt)
             total[r] = total.get(r, 0) + amt
@@ -133,6 +134,7 @@ def grant_chest(player) -> dict | None:
     for r, amt in STARTER_CHEST.items():
         if r == "gold":
             player.gold += amt
+            economy.record(player, "bonus", amt)
         else:
             inventory.add(player, r, amt)
     story_state.add_flag(player, "nb_chest")

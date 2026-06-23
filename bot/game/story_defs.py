@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from html import escape
 
 from bot.db.models import Player
-from bot.game import balance, inventory, story_state
+from bot.game import balance, economy, inventory, story_state
 
 
 @dataclass
@@ -107,9 +107,11 @@ class Gold:
         amount *= self.sign
         if amount >= 0:
             ctx.player.gold += amount
+            economy.record(ctx.player, "story", amount)
         else:
             loss = min(-amount, balance.loss_cap(ctx.player.gold, ir))
             ctx.player.gold -= loss
+            economy.record(ctx.player, "story", -loss)
 
 
 class Res:

@@ -105,6 +105,9 @@ class Player(Base):
     # Лимит покупки на бирже (анти-абуз, как buy-limit в RuneScape): сколько
     # каждого товара куплено в текущем 4-часовом окне. {good: {"t": iso, "q": n}}.
     bourse_buys: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # Бухгалтерия золота (faucet/sink): {категория: суммарное золото}. Кран — плюс,
+    # сток — минус. Накопитель для замера потоков (см. bot/game/economy.py, /econ).
+    econ: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     tavern: Mapped["Tavern | None"] = relationship(
         back_populates="player", uselist=False, lazy="selectin"
@@ -148,6 +151,8 @@ class WorldState(Base):
     invasion_next_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Число ПОБЕД мира над ордой — двигает эскалацию (каждая победа усиливает следующую орду).
     orc_wins: Mapped[int] = mapped_column(default=0)
+    # Начало окна измерения экономики (faucet/sink). Сброс — /econ reset.
+    econ_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class KnownChat(Base):

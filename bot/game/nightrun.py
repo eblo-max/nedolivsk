@@ -16,7 +16,7 @@ balance.NIGHTRUN_*). Прокачка двигает порог рационал
 import random
 from datetime import datetime, timezone
 
-from bot.game import balance, combat, inventory
+from bot.game import balance, combat, economy, inventory
 
 UTC = timezone.utc
 BASE_HP = balance.BASE_HP
@@ -292,6 +292,7 @@ def bank(run: dict, player) -> dict:
     for k, v in sat.items():
         if k == "gold":
             player.gold += v
+            economy.record(player, "nightrun", v)
         else:
             inventory.add(player, k, v)
     run["banked"] = sat

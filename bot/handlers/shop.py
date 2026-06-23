@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import images, texts
 from bot.db import repo
-from bot.game import balance, inventory, logic, shop
+from bot.game import balance, economy, inventory, logic, shop
 from bot.handlers import common
 from bot.keyboards import inline as kb
 
@@ -64,6 +64,7 @@ async def cb_shop_buy(callback: CallbackQuery, session: AsyncSession) -> None:
         return
     cost = qty * shop.price(res)
     player.gold -= cost
+    economy.record(player, "shop", -cost)
     inventory.add(player, res, qty)
     shop.record_buy(player, res, qty)
     repo.add_log(session, "player", player.id,
@@ -105,6 +106,7 @@ async def cb_shop_fill(callback: CallbackQuery, session: AsyncSession) -> None:
         spent += shop.price(r) * q
         inventory.add(player, r, q)
         shop.record_buy(player, r, q)
+    economy.record(player, "shop", -spent)
     result = logic.try_upgrade(player, tavern)
     if not result.ok:   # перестраховка — не должно случиться после докупа
         await callback.answer("Что-то не сошлось — попробуй «Улучшить» вручную.",
