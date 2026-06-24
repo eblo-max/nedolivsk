@@ -705,6 +705,168 @@ async def _api_retail_hold(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "state": st}, headers={"Cache-Control": "no-store"})
 
 
+def _character_state(p) -> dict:
+    """Состояние Персонажа для мини-аппа — статы/снаряжение/кузница из тех же
+    функций бота (items/combat/logic)."""
+    from bot.game import balance as bal, combat, items as it, logic
+
+    eq = p.equipment or {}
+    cs = it.combat_stats(eq)
+    dmg = bal.BASE_DAMAGE + cs["damage"]
+    crit = min(bal.HUNT_CRIT_CAP, cs["crit"] + cs["luck"] // 2)
+
+    slots = []
+    for slot_key, slot_name in it.SLOTS.items():
+        entry = eq.get(slot_key)
+        item = it.CATALOG.get(it.parse_entry(entry)[0]) if entry else None
+        if item:
+            _, tier = it.parse_entry(entry)
+            slots.append({"slot": slot_key, "slot_name": slot_name, "id": item.id,
+                          "name": item.name, "tier": tier, "sprite": item.sprite or item.id,
+                          "trophy": not item.craftable})
+        else:
+            slots.append({"slot": slot_key, "slot_name": slot_name})
+
+    bonuses = []
+    im = it.income_multiplier(eq)
+    if im > 1: bonuses.append({"label": "Доход", "val": f"+{round((im - 1) * 100)}%"})
+    ym = it.yield_multiplier(eq, "grain")
+    if ym > 1: bonuses.append({"label": "Добыча", "val": f"+{round((ym - 1) * 100)}%"})
+    sm = it.speed_multiplier(eq)
+    if sm < 1: bonuses.append({"label": "Время вылазок", "val": f"−{round((1 - sm) * 100)}%"})
+    pm = it.pay_multiplier(eq)
+    if pm < 1: bonuses.append({"label": "Плата работникам", "val": f"−{round((1 - pm) * 100)}%"})
+
+    orc = None
+    if it.orc_set_complete(eq):
+        b = it.ORC_SET_BONUS
+        orc = {**b, "income": it.ORC_SET_INCOME_PCT}
+
+    state, minutes = logic.craft_state(p)
+    craft = {"state": state}
+    if state != "none" and p.craft_item:
+        iid, tier = it.parse_entry(p.craft_item)
+        cit = it.CATALOG.get(iid)
+        craft.update({"name": cit.name if cit else "вещь", "tier": tier, "minutes": minutes,
+                      "sprite": (cit.sprite or iid) if cit else None})
+
+    return {
+        "ok": True, "name": (p.first_name or "Хозяин").upper(),
+        "worn": len(eq), "slots_total": len(it.SLOTS),
+        "hp": {"cur": combat.current_hp(p), "max": combat.max_hp(), "regen": combat.regen_full_minutes(p)},
+        "damage": dmg, "crit": crit, "armor": cs["armor"], "luck": cs["luck"],
+        "vylazka": bal.lucky_chance(cs["luck"]),
+        "equipment": slots, "bonuses": bonuses, "orc": orc, "craft": craft,
+    }
+
+
+def _forge_state(p) -> dict:
+    """Список кузницы: куётся (с фильтром региона) + надетые трофеи; стоимость/ярус/часы."""
+    from bot import texts
+    from bot.game import balance as bal, items as it, logic
+
+    eq = p.equipment or {}
+    inv = p.inventory or {}
+    names = {"gold": "Золото", **bal.RESOURCE_NAMES}
+    state, minutes = logic.craft_state(p)
+
+    def mk(item, trophy):
+        cur = it.equipped_tier(eq, item.id)
+        maxed = trophy or cur >= it.TIER_MAX
+        nxt = cur if maxed else min(cur + 1, it.TIER_MAX)
+        cost = []
+        if not maxed:
+            for k, v in it.tier_cost(item, nxt).items():
+                if not v:
+                    continue
+                have = int(p.gold) if k == "gold" else int(inv.get(k, 0))
+                cost.append({"key": k, "name": names.get(k, k), "need": int(v), "have": have, "ok": have >= int(v)})
+        return {
+            "id": item.id, "name": item.name, "slot_name": it.SLOTS[item.slot],
+            "sprite": item.sprite or item.id, "desc": item.description,
+            "cur": cur, "next": nxt, "maxed": maxed, "trophy": trophy,
+            "gains_cur": texts._tier_bonus_line(item, cur) if cur else None,
+            "gains_next": texts._tier_bonus_line(item, nxt if nxt else it.TIER_MAX),
+            "cost": cost, "hours": it.tier_hours(item, nxt) if not maxed else 0,
+            "afford": bool(cost) and all(c["ok"] for c in cost),
+        }
+
+    out = [mk(i, False) for i in it.CATALOG.values()
+           if i.craftable and not (i.id in it.REGION_GEAR and it.REGION_GEAR[i.id] != p.region)]
+    out += [mk(i, True) for i in it.CATALOG.values()
+            if not i.craftable and it.equipped_tier(eq, i.id)]
+    pouch = {k: (int(p.gold) if k == "gold" else int(inv.get(k, 0)))
+             for k in ("gold", "wood", "grain", "hops", "ingot")}
+    return {"ok": True, "pouch": pouch, "items": out, "craft": {"state": state, "minutes": minutes}}
+
+
+async def _api_character(request: web.Request) -> web.Response:
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        st = _character_state(p)
+    return web.json_response(st, headers={"Cache-Control": "no-store"})
+
+
+async def _api_forge(request: web.Request) -> web.Response:
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        st = _forge_state(p)
+    return web.json_response(st, headers={"Cache-Control": "no-store"})
+
+
+async def _api_forge_make(request: web.Request) -> web.Response:
+    """Заказать ковку (logic.start_craft, оплата вперёд, один заказ за раз)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import logic
+    item_id = str(body.get("item_id") or "")
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        r = logic.start_craft(p, item_id)
+        if not r.ok:                           # busy | unknown | not_enough | max_tier
+            return web.json_response({"ok": False, "error": r.reason})
+        repo.add_log(s, "player", p.id, f"⚒ заказал ковку «{r.item.name}» ★{r.tier}")
+        await s.commit()
+        ch, fg = _character_state(p), _forge_state(p)
+    return web.json_response({"ok": True, "character": ch, "forge": fg,
+                              "item": r.item.name, "tier": r.tier, "hours": r.hours},
+                             headers={"Cache-Control": "no-store"})
+
+
+async def _api_craft_claim(request: web.Request) -> web.Response:
+    """Забрать готовую вещь — сразу надевается (logic.claim_craft)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import logic
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        r = logic.claim_craft(p)
+        if not r.ok:                           # none | not_ready
+            return web.json_response({"ok": False, "error": r.reason, "minutes": r.minutes_left})
+        repo.add_log(s, "player", p.id, f"🎁 выковал «{r.item.name}» ★{r.tier}")
+        await s.commit()
+        ch, fg = _character_state(p), _forge_state(p)
+    return web.json_response({"ok": True, "character": ch, "forge": fg,
+                              "item": r.item.name, "tier": r.tier},
+                             headers={"Cache-Control": "no-store"})
+
+
 def _init_user(init_data: str) -> dict:
     """Имя/username из (уже проверенного) initData — для создания игрока в онбординге."""
     try:
@@ -868,6 +1030,10 @@ def build_app() -> web.Application:
     app.router.add_post("/api/expedition_start", _api_expedition_start)  # отправить бригаду
     app.router.add_post("/api/retail_sell", _api_retail_sell)  # налить гостям (продать заказ)
     app.router.add_post("/api/retail_hold", _api_retail_hold)  # придержать товар
+    app.router.add_post("/api/character", _api_character)  # персонаж: статы/снаряга/кузница
+    app.router.add_post("/api/forge", _api_forge)        # список кузницы
+    app.router.add_post("/api/forge_make", _api_forge_make)  # заказать ковку
+    app.router.add_post("/api/craft_claim", _api_craft_claim)  # забрать готовую вещь
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы

@@ -1,4 +1,269 @@
-import Placeholder from './_Placeholder'
+import { useState } from 'react'
+import { useApi } from '../hooks'
+import { api } from '../api'
+import { haptic, hapticNotify } from '../telegram'
+import { ResIcon, fmt } from '../components/icons'
+import Sheet from '../components/Sheet'
+
+interface Slot { slot: string; slot_name: string; id?: string; name?: string; tier?: number; sprite?: string; trophy?: boolean }
+interface Craft { state: string; name?: string; tier?: number; minutes?: number; sprite?: string }
+interface CharState {
+  ok: boolean; name: string; worn: number; slots_total: number
+  hp: { cur: number; max: number; regen: number }
+  damage: number; crit: number; armor: number; luck: number; vylazka: number
+  equipment: Slot[]; bonuses: { label: string; val: string }[]
+  orc: { damage: number; crit: number; armor: number; luck: number; income: number } | null
+  craft: Craft
+}
+interface ForgeCost { key: string; name: string; need: number; have: number; ok: boolean }
+interface ForgeItem {
+  id: string; name: string; slot_name: string; sprite: string; desc: string
+  cur: number; next: number; maxed: boolean; trophy: boolean
+  gains_cur: string | null; gains_next: string; cost: ForgeCost[]; hours: number; afford: boolean
+}
+interface ForgeState { ok: boolean; pouch: Record<string, number>; items: ForgeItem[]; craft: { state: string; minutes: number } }
+
+const stars = (t?: number) => '★'.repeat(t || 0)
+const sprite = (s?: string) => `${import.meta.env.BASE_URL}items/${s}.png`
+
+const SAMPLE: CharState = {
+  ok: true, name: 'ХОЗЯИН', worn: 3, slots_total: 11,
+  hp: { cur: 78, max: 100, regen: 44 }, damage: 25, crit: 12, armor: 18, luck: 8, vylazka: 16,
+  equipment: [
+    { slot: 'head', slot_name: 'Голова', id: 'leather_cap', name: 'Шапка трактирщика', tier: 2, sprite: 'shapka' },
+    { slot: 'chest', slot_name: 'Грудь', id: 'fartuk', name: 'Фартук трактирщика', tier: 1, sprite: 'bronya' },
+    { slot: 'left_hand', slot_name: 'Левая рука' },
+    { slot: 'right_hand', slot_name: 'Правая рука', id: 'master_axe', name: 'Топор хозяйский', tier: 1, sprite: 'master_axe' },
+    { slot: 'weapon', slot_name: 'Оружие' }, { slot: 'belt', slot_name: 'Пояс' },
+    { slot: 'legs', slot_name: 'Ноги' }, { slot: 'boots', slot_name: 'Сапоги' },
+    { slot: 'amulet', slot_name: 'Амулет' }, { slot: 'talisman', slot_name: 'Талисман' },
+    { slot: 'bag', slot_name: 'Сумка' },
+  ],
+  bonuses: [{ label: 'Доход', val: '+15%' }, { label: 'Добыча', val: '+5%' }],
+  orc: null, craft: { state: 'none' },
+}
+
 export default function Character() {
-  return <Placeholder title="ПЕРСОНАЖ" sub="ХОЗЯИН КАБАКА" note="Характеристики, снаряжение и кузница — переносим следующим этапом." />
+  const { data, loading, set } = useApi<CharState>('character', SAMPLE)
+  const [view, setView] = useState<'doll' | 'forge'>('doll')
+  const [forge, setForge] = useState<ForgeState | null>(null)
+  const [pick, setPick] = useState<ForgeItem | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [toast, setToast] = useState('')
+  const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
+
+  if (loading && !data) return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
+  const c = data ?? SAMPLE
+
+  async function openForge() {
+    haptic('light'); setView('forge')
+    try { const r = await api<ForgeState>('forge'); setForge(r) }
+    catch { setForge(FORGE_SAMPLE) }
+  }
+  async function claim() {
+    if (busy) return
+    haptic('medium'); setBusy(true)
+    try {
+      const r = await api<{ character: CharState; forge: ForgeState; item: string; tier: number }>('craft_claim')
+      set(r.character); setForge(r.forge); hapticNotify('success'); flash(`${r.item} ${stars(r.tier)} — твоё!`)
+    } catch { hapticNotify('warning'); flash('Ещё не готово') }
+    finally { setBusy(false) }
+  }
+  async function make(item: ForgeItem) {
+    if (busy) return
+    haptic('medium'); setBusy(true)
+    try {
+      const r = await api<{ character: CharState; forge: ForgeState; item: string; tier: number; hours: number }>('forge_make', { item_id: item.id })
+      set(r.character); setForge(r.forge); hapticNotify('success')
+      flash(`Мастер взялся: ${r.item} ${stars(r.tier)} · ${r.hours} ч`); setPick(null)
+    } catch (e) {
+      hapticNotify('warning')
+      const code = (e as { code?: string })?.code
+      flash(code === 'busy' ? 'Мастер занят заказом' : code === 'not_enough' ? 'Не хватает на ковку' : code === 'max_tier' ? 'Лучше не выкуют' : 'Не вышло')
+    } finally { setBusy(false) }
+  }
+
+  const craftBanner = (st: Craft) => {
+    if (st.state === 'ready') return (
+      <button className="btn gold rise" disabled={busy} onClick={claim} style={{ marginBottom: 2 }}>
+        🎁 Забрать готовую вещь{st.name ? ` · ${st.name} ${stars(st.tier)}` : ''}
+      </button>
+    )
+    if (st.state === 'active') return (
+      <div className="card rise"><div className="card-b" style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
+        {st.sprite && <img className="ti-img" style={{ width: 34, height: 34 }} src={sprite(st.sprite)} alt="" />}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: 'var(--disp)', fontSize: 13, color: 'var(--brass)', letterSpacing: 1 }}>⚒ МАСТЕР КУЁТ</div>
+          <div className="muted" style={{ fontSize: 13 }}>{st.name} {stars(st.tier)} — ещё {Math.floor((st.minutes || 0) / 60)} ч {(st.minutes || 0) % 60} мин</div>
+        </div>
+      </div></div>
+    )
+    return null
+  }
+
+  // ── КУЗНИЦА ──
+  if (view === 'forge') {
+    const f = forge
+    return (
+      <>
+        <div className="hero rise" style={{ paddingTop: 2 }}>
+          <div className="nm" style={{ fontSize: 22 }}>⚒ КУЗНИЦА</div>
+          <div className="flavor">«Мастер плюёт на ладони и косится на твоё золото. Один заказ за раз, деньги вперёд.»</div>
+        </div>
+        {f && (
+          <div className="chips rise" style={{ justifyContent: 'center' }}>
+            {Object.entries(f.pouch).map(([k, v]) => v > 0 || k === 'gold'
+              ? <span key={k} className="chip"><ResIcon k={k} /> <b style={{ fontFamily: 'var(--num)' }}>{fmt(v)}</b></span> : null)}
+          </div>
+        )}
+        {f && craftBanner(c.craft)}
+        {!f ? <div className="center" style={{ padding: 30 }}><div className="spin" /></div> : (
+          <div className="card rise"><div className="card-b" style={{ gap: 8 }}>
+            {f.items.map((it) => (
+              <button key={it.id} className="forge-row" onClick={() => { haptic('light'); setPick(it) }}>
+                <img className="fr-img" src={sprite(it.sprite)} alt="" loading="lazy" />
+                <span className="fr-txt">
+                  <b>{it.trophy ? '🏆 ' : ''}{it.name} <span className="stars">{stars(it.cur)}</span></b>
+                  <small>{it.slot_name}{it.gains_cur ? ` · ${it.gains_cur}` : ''}</small>
+                </span>
+                <span className="act-chev">›</span>
+              </button>
+            ))}
+          </div></div>
+        )}
+        <button className="btn rise" onClick={() => { haptic('light'); setView('doll') }}>← Персонаж</button>
+        {pick && <ItemSheet item={pick} busy={busy} craftState={c.craft.state} onMake={make} onClose={() => setPick(null)} />}
+        {toast && <div className="toast">{toast}</div>}
+      </>
+    )
+  }
+
+  // ── ПЕРСОНАЖ (кукла) ──
+  return (
+    <>
+      <div className="hero rise">
+        <div className="nm">{c.name}</div>
+        <div className="meta"><span className="region">Хозяин кабака</span>
+          <span className="region">🎒 надето {c.worn}/{c.slots_total}</span></div>
+        <div className="orn"><b>✦</b></div>
+      </div>
+
+      {craftBanner(c.craft)}
+
+      <div className="card rise" style={{ animationDelay: '.04s' }}>
+        <div className="card-h"><span className="he">⚔</span>БОЕВЫЕ</div>
+        <div className="card-b">
+          <div className="res">
+            <div className="top"><span className="rn">❤ Здоровье</span>
+              <span className="rv">{c.hp.cur}/{c.hp.max}{c.hp.cur < c.hp.max ? ` · ⏳ ${Math.floor(c.hp.regen / 60)}ч ${c.hp.regen % 60}м` : ''}</span></div>
+            <div className="bar"><i style={{ width: `${Math.round(c.hp.cur / c.hp.max * 100)}%` }} /></div>
+          </div>
+        </div>
+        <div className="grid2" style={{ paddingTop: 4 }}>
+          <Tile icon="⚔" v={c.damage} l="Урон" />
+          <Tile icon="💥" v={`${c.crit}%`} l="Крит" />
+          <Tile icon="🛡" v={c.armor} l="Броня" />
+          <Tile img="stat/luck.png" v={`${c.luck} · ${c.vylazka}%`} l="Удача" />
+        </div>
+      </div>
+
+      {c.bonuses.length > 0 && (
+        <div className="card rise" style={{ animationDelay: '.08s' }}>
+          <div className="card-h"><span className="he">🏠</span>ХОЗЯЙСТВО</div>
+          <div className="chips">{c.bonuses.map((b, i) => (
+            <span key={i} className="chip">{b.label} <b style={{ color: 'var(--green)', fontFamily: 'var(--num)' }}>{b.val}</b></span>))}</div>
+        </div>
+      )}
+
+      {c.orc && (
+        <div className="card rise orc-set" style={{ animationDelay: '.1s' }}>
+          <div className="card-b"><div style={{ fontFamily: 'var(--disp)', color: 'var(--ember)', fontWeight: 700, letterSpacing: 1 }}>🪓 СЕТ ОРДЫ СОБРАН</div>
+            <div className="muted" style={{ fontSize: 13.5 }}>Ярость орды: +{c.orc.damage} урон · +{c.orc.crit}% крит · +{c.orc.armor} броня · +{c.orc.luck} удача · +{c.orc.income}% доход</div>
+          </div>
+        </div>
+      )}
+
+      <div className="card rise" style={{ animationDelay: '.12s' }}>
+        <div className="card-h"><span className="he">🎽</span>СНАРЯЖЕНИЕ</div>
+        <div className="eq-grid">
+          {c.equipment.map((s) => (
+            <div key={s.slot} className={`eq-slot${s.id ? '' : ' empty'}`}>
+              {s.id
+                ? <><img className="eq-img" src={sprite(s.sprite)} alt="" loading="lazy" />
+                    <span className="eq-txt"><b>{s.trophy ? '🏆 ' : ''}{s.name}</b><small className="stars">{stars(s.tier)} · {s.slot_name}</small></span></>
+                : <><span className="eq-dot" /><span className="eq-txt"><b className="muted">{s.slot_name}</b><small>пусто</small></span></>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button className="btn gold rise" style={{ animationDelay: '.16s' }} onClick={openForge}>⚒ В кузницу</button>
+      {toast && <div className="toast">{toast}</div>}
+    </>
+  )
+}
+
+function ItemSheet({ item, busy, craftState, onMake, onClose }: {
+  item: ForgeItem; busy: boolean; craftState: string; onMake: (i: ForgeItem) => void; onClose: () => void
+}) {
+  const canForge = !item.trophy && !item.maxed
+  return (
+    <Sheet icon={sprite(item.sprite)} title={item.name.toUpperCase()} onClose={onClose}>
+      <div className="item-hero">
+        <img src={sprite(item.sprite)} alt="" />
+        <div>
+          <div className="ih-name">{item.name} <span className="stars">{stars(item.trophy || item.maxed ? item.cur : item.next)}</span></div>
+          <div className="muted" style={{ fontSize: 13 }}>{item.slot_name}{item.cur > 0 && !item.maxed ? ` · перековка ${stars(item.cur)} → ${stars(item.next)}` : ''}</div>
+        </div>
+      </div>
+      <p className="sheet-desc">«{item.desc}»</p>
+
+      <div className="sheet-row"><span>{item.maxed ? 'Даёт' : 'Будет давать'}</span>
+        <b style={{ color: 'var(--gold-2)', textAlign: 'right' }}>{item.gains_next || '—'}</b></div>
+      {!item.maxed && <div className="sheet-row"><span>Ковать</span><b>{item.hours} ч</b></div>}
+
+      {canForge && item.cost.length > 0 && (
+        <>
+          <div className="sheet-sub" style={{ marginTop: 12 }}>ЦЕНА</div>
+          <div className="sheet-list">
+            {item.cost.map((c, i) => (
+              <div key={i} className="sheet-task">
+                <ResIcon k={c.key} /><span className="l">{c.name}</span>
+                <span className="r" style={{ color: c.ok ? 'var(--green)' : 'var(--crimson)' }}>{fmt(c.have)} / {fmt(c.need)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {item.trophy
+        ? <p className="muted" style={{ fontStyle: 'italic', marginTop: 12 }}>🏆 Трофей с босса — в кузнице не куётся. Старший ярус только дропом.</p>
+        : item.maxed
+          ? <p className="muted" style={{ fontStyle: 'italic', marginTop: 12 }}>Мастерская работа — лучше уже не выкуют.</p>
+          : <button className="btn gold" style={{ marginTop: 14 }} disabled={busy || !item.afford || craftState !== 'none'}
+              onClick={() => onMake(item)}>
+              {craftState !== 'none' ? 'Мастер занят' : item.afford ? `⚒ Сковать ${stars(item.next)}` : 'Не хватает ресурсов'}
+            </button>}
+    </Sheet>
+  )
+}
+
+function Tile({ icon, img, v, l }: { icon?: string; img?: string; v: string | number; l: string }) {
+  return (
+    <div className="tile">
+      {img ? <img className="ti-img" src={`${import.meta.env.BASE_URL}${img}`} alt="" loading="lazy" />
+        : <span className="ti">{icon}</span>}
+      <div><div className="tv">{v}</div><div className="tl">{l}</div></div>
+    </div>
+  )
+}
+
+const FORGE_SAMPLE: ForgeState = {
+  ok: true, pouch: { gold: 1340, wood: 60, grain: 80, hops: 45, ingot: 12 },
+  craft: { state: 'none', minutes: 0 },
+  items: [
+    { id: 'leather_cap', name: 'Шапка трактирщика', slot_name: 'Голова', sprite: 'shapka', desc: 'Скрывает похмелье и лысину.', cur: 2, next: 3, maxed: false, trophy: false, gains_cur: '+10% доход · 🛡4', gains_next: '+15% доход · 🛡6', hours: 6, afford: true, cost: [{ key: 'gold', name: 'Золото', need: 7200, have: 1340, ok: false }, { key: 'grain', name: 'Зерно', need: 720, have: 80, ok: false }] },
+    { id: 'kovsh', name: 'Ковш боевой', slot_name: 'Оружие', sprite: 'oruzhie', desc: 'Черпает эль, проламывает черепа.', cur: 0, next: 1, maxed: false, trophy: false, gains_cur: null, gains_next: '+10% добыча · ⚔14 · 💥7%', hours: 6, afford: true, cost: [{ key: 'gold', name: 'Золото', need: 1650, have: 1340, ok: false }, { key: 'ingot', name: 'Слиток', need: 18, have: 12, ok: false }] },
+    { id: 'rat_crown', name: 'Корона Крысиного Короля', slot_name: 'Голова', sprite: 'rat_crown', desc: 'Крысы кланялись — теперь кланяйся ты.', cur: 1, next: 1, maxed: true, trophy: true, gains_cur: '+3% доход · 🛡6 · 🍀4', gains_next: '+3% доход · 🛡6 · 🍀4', hours: 0, afford: false, cost: [] },
+  ],
 }

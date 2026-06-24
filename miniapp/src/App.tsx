@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
-import { setBackButton } from './telegram'
+import { pushBack, popBack } from './telegram'
 import BottomNav from './components/BottomNav'
 import Splash from './screens/Splash'
 import Tavern from './screens/Tavern'
@@ -15,11 +15,12 @@ export default function App() {
   const nav = useNavigate()
 
   // на под-экранах нативная «назад» Telegram возвращает в Таверну
-  // (панели-модалки сами перехватывают «назад» поверх этого, см. ActionSheet)
+  // (панели-модалки кладут свой обработчик ПОВЕРХ этого через pushBack)
   useEffect(() => {
-    if (intro) return
-    if (loc.pathname !== '/') setBackButton(() => nav('/'))
-    else setBackButton(null)
+    if (intro || loc.pathname === '/') return
+    const cb = () => nav('/')
+    pushBack(cb)
+    return () => popBack(cb)
   }, [loc.pathname, intro, nav])
 
   return (

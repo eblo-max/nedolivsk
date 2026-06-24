@@ -80,14 +80,22 @@ export function hapticNotify(type: 'success' | 'warning' | 'error') {
   try { tg?.HapticFeedback?.notificationOccurred(type) } catch { /* */ }
 }
 
-/** Нативная кнопка «назад» Telegram — навешиваем на колбэк (для стек-навигации).
- * Снимаем прошлый обработчик перед новым, иначе onClick копит хендлеры и «назад»
- * срабатывает многократно. */
+/** Нативная кнопка «назад» Telegram — СТЕК обработчиков (под-экран → панель → …).
+ * Активен верх стека; пусто — кнопка скрыта. pushBack при входе, popBack при выходе.
+ * Снимаем прошлый onClick перед новым (иначе хендлеры копятся). */
+const _backStack: (() => void)[] = []
 let _backCb: (() => void) | null = null
-export function setBackButton(onClick: (() => void) | null) {
+function _applyBack() {
   const b = tg?.BackButton
   if (!b) return
   if (_backCb) { b.offClick(_backCb); _backCb = null }
-  if (onClick) { _backCb = onClick; b.onClick(onClick); b.show() }
+  const top = _backStack[_backStack.length - 1]
+  if (top) { _backCb = top; b.onClick(top); b.show() }
   else b.hide()
+}
+export function pushBack(cb: () => void) { _backStack.push(cb); _applyBack() }
+export function popBack(cb: () => void) {
+  const i = _backStack.lastIndexOf(cb)
+  if (i >= 0) _backStack.splice(i, 1)
+  _applyBack()
 }

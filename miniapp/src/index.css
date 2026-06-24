@@ -261,6 +261,39 @@ body {
 .region-card .rt em { font-family:var(--num); font-style:normal; font-size:12px; font-weight:700; color:var(--brass); letter-spacing:.3px; margin-top:2px; }
 .onb-err { font-family:var(--text); font-size:14px; color:var(--crimson); text-align:center; margin-top:10px; font-style:italic; }
 
+/* ── Персонаж: снаряжение, кузница, деталь предмета ── */
+.stars { color:var(--gold); letter-spacing:1px; font-size:.9em; }
+.eq-grid { display:flex; flex-direction:column; gap:6px; padding:11px 14px; }
+.eq-slot { display:flex; align-items:center; gap:11px; padding:7px 10px; border-radius:9px;
+  background:linear-gradient(#26190b,#180f06); border:1px solid var(--line); }
+.eq-slot.empty { background:#170f07; border-style:dashed; border-color:#3a2a14; }
+.eq-img { width:34px; height:34px; object-fit:contain; flex:0 0 auto; filter:drop-shadow(0 1px 2px #000a); }
+.eq-dot { width:34px; height:34px; flex:0 0 auto; border-radius:8px; border:1px dashed #4a3719; }
+.eq-txt { display:flex; flex-direction:column; min-width:0; }
+.eq-txt b { font-family:var(--text); font-weight:600; font-size:14px; color:#dccaa6; line-height:1.2;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.eq-txt small { font-family:var(--text); font-size:12px; color:var(--dim); }
+
+.orc-set { border-color:var(--ember) !important; box-shadow:0 0 16px #cf5a2a33,0 8px 24px #000b; }
+
+/* строка кузницы (кликабельный предмет) */
+.forge-row { display:flex; align-items:center; gap:11px; width:100%; text-align:left; cursor:pointer;
+  padding:8px 9px; border-radius:10px; color:var(--parch);
+  background:linear-gradient(#2c1d0d,#1c1208); border:1px solid var(--line2);
+  transition:transform .08s,border-color .12s; }
+.forge-row:active { transform:scale(.99); border-color:var(--brass); }
+.fr-img { width:40px; height:40px; object-fit:contain; flex:0 0 auto; filter:drop-shadow(0 1px 2px #000a); }
+.fr-txt { flex:1; min-width:0; display:flex; flex-direction:column; }
+.fr-txt b { font-family:var(--text); font-weight:600; font-size:14.5px; color:#e7d6b2; line-height:1.2; }
+.fr-txt small { font-family:var(--text); font-size:12.5px; color:var(--dim);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* деталь предмета в bottom-sheet */
+.item-hero { display:flex; align-items:center; gap:14px; margin-bottom:4px; }
+.item-hero img { width:66px; height:66px; object-fit:contain; flex:0 0 auto;
+  filter:drop-shadow(0 3px 6px #000c); image-rendering:auto; }
+.ih-name { font-family:var(--disp); font-weight:700; font-size:16px; color:#f3e8cb; line-height:1.15; }
+
 /* ── bottom-sheet панель действия (бонус/грамота/бригады) ── */
 .sheet-ov { position:fixed; inset:0; z-index:40; background:#000b; backdrop-filter:blur(2px);
   display:flex; align-items:flex-end; justify-content:center; animation:ov-in .2s ease;
