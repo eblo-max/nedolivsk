@@ -18,7 +18,7 @@ BUILD_COST_MULT = 1.4
 
 def cost_of(b: "Building") -> dict:
     """Актуальная стоимость пристройки с учётом множителя (для оплаты/проверки/показа)."""
-    return {k: max(1, math.ceil(v * BUILD_COST_MULT)) for k, v in b.cost.items()}
+    return {k: (max(1, math.ceil(v * BUILD_COST_MULT)) if v else 0) for k, v in b.cost.items()}
 
 
 @dataclass(frozen=True)

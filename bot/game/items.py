@@ -81,7 +81,7 @@ def tier_cost(item: "Item", tier: int) -> dict:
     if TEST_FREE_CRAFT:
         return {k: 0 for k in item.cost}
     mult = TIER_COST_MULT[tier] * GEAR_COST_MULT
-    return {k: max(1, math.ceil(v * mult)) for k, v in item.cost.items()}
+    return {k: (max(1, math.ceil(v * mult)) if v else 0) for k, v in item.cost.items()}
 
 
 def tier_hours(item: "Item", tier: int) -> int:
