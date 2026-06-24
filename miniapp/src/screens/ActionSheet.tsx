@@ -17,12 +17,16 @@ interface Panel {
   // expedition
   free?: number; total?: number; out?: number; ready?: number; next_minutes?: number
   pay?: number; goals?: Goal[]; resources?: ResOpt[]
+  // retail
+  items?: { key: string; name: string; emoji: string; qty: number; price: number; sum: number }[]
+  empty?: boolean
 }
 
 const TITLE: Record<string, { ic: string; t: string }> = {
   bonus: { ic: 'bonus', t: 'ОПОХМЕЛ' },
   newbie: { ic: 'scroll', t: 'ГРАМОТА НОВОСЁЛА' },
   expedition: { ic: 'pickaxe', t: 'БРИГАДЫ РАБОТНИКОВ' },
+  retail: { ic: 'beer', t: 'ГОСТИ ЖДУТ ЗАКАЗ' },
 }
 
 // образцы для оффлайн-превью (когда нет /api)
@@ -40,6 +44,10 @@ const SAMPLE: Record<string, Panel> = {
       { key: 'hops', name: 'Хмель', amount: 8 }, { key: 'ore', name: 'Руда', amount: 6 },
       { key: 'stone', name: 'Камень', amount: 5 }, { key: 'clay', name: 'Глина', amount: 7 },
     ] },
+  retail: { kind: 'retail', total: 84, items: [
+    { key: 'ale1', name: 'Эль', emoji: '🍺', qty: 6, price: 9, sum: 54 },
+    { key: 'pie', name: 'Пирог', emoji: '🥧', qty: 2, price: 15, sum: 30 },
+  ] },
 }
 
 export default function ActionSheet({ kind, onState, onClose, flash }: {
@@ -109,7 +117,8 @@ export default function ActionSheet({ kind, onState, onClose, flash }: {
             : panel.error ? <p className="muted" style={{ fontStyle: 'italic' }}>Не загрузилось — закрой и попробуй ещё.</p>
               : kind === 'bonus' ? <BonusBody p={panel} busy={busy} onFire={fire} />
                 : kind === 'newbie' ? <NewbieBody p={panel} busy={busy} onFire={fire} />
-                  : <ExpedBody p={panel} busy={busy} onExped={exped} />}
+                  : kind === 'retail' ? <RetailBody p={panel} busy={busy} onFire={fire} />
+                    : <ExpedBody p={panel} busy={busy} onExped={exped} />}
         </div>
       </div>
     </div>
@@ -164,6 +173,35 @@ function NewbieBody({ p, busy, onFire }: { p: Panel; busy: boolean; onFire: (pat
           return t ? `Грамота: +${fmt(t)} в закрома` : 'Награды забраны'
         })}>
         {p.claimable ? '🎁 Забрать награды' : 'Пока забирать нечего'}
+      </button>
+    </>
+  )
+}
+
+function RetailBody({ p, busy, onFire }: { p: Panel; busy: boolean; onFire: (path: string, done: (r: Record<string, unknown>) => string) => void }) {
+  if (p.empty) return <p className="sheet-desc">«Гости уже разошлись — заказа нет.»</p>
+  return (
+    <>
+      <p className="sheet-desc">«Гости распробовали — хотят выкупить товар прямо из погреба.»</p>
+      <div className="sheet-list">
+        {(p.items ?? []).map((it, i) => (
+          <div key={i} className="sheet-task">
+            <span className="m">{it.emoji}</span>
+            <span className="l">{it.name} <b style={{ fontFamily: 'var(--num)' }}>×{it.qty}</b></span>
+            <span className="r">{fmt(it.sum)} 🪙</span>
+          </div>
+        ))}
+      </div>
+      <div className="sheet-row" style={{ marginTop: 8 }}>
+        <span>Налить гостям на</span><b style={{ color: 'var(--gold-2)', fontSize: 16 }}>{fmt(p.total ?? 0)} 🪙</b>
+      </div>
+      <button className="btn gold" style={{ marginTop: 14 }} disabled={busy}
+        onClick={() => onFire('retail_sell', (r) => r.sold ? `+${fmt((r.gold as number) ?? 0)} 🪙 · +${r.rep} репутации` : 'Товар разошёлся')}>
+        🍺 Налить гостям
+      </button>
+      <button className="btn" style={{ marginTop: 9 }} disabled={busy}
+        onClick={() => onFire('retail_hold', () => 'Придержал товар')}>
+        Придержать товар
       </button>
     </>
   )

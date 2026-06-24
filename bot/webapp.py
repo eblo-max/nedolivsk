@@ -359,9 +359,12 @@ def _tavern_state(p, t) -> dict:
     maxed = t.level >= bal.MAX_LEVEL
     pct = texts._upgrade_pct(p, t)
 
-    from bot.game import newbie as newbiemod
+    from bot.game import newbie as newbiemod, story_state as ss
 
     now: list[dict] = []
+    if ss.get_retail(p):                       # гости ждут заказ — выкупят товар из погреба
+        now.append({"icon": "🍺", "text": "Гости ждут заказ", "sub": "выкупят товар из погреба",
+                    "badge": "ready", "action": "retail"})
     act = buffmod.active(p)
     if act is not None:
         now.append({"icon": act.emoji, "text": f"Баф «{act.name}»",
@@ -444,9 +447,14 @@ async def _api_collect(request: web.Request) -> web.Response:
         collected = int(getattr(res, "passive", 0) or 0)
         if collected > 0:
             repo.add_log(s, "player", p.id, f"🪙 собрал доход +{collected}")
+        order = getattr(res, "order", None)        # гости хотят выкупить товар из погреба
+        if order:
+            from bot.game import story_state
+            story_state.set_retail(p, order)
         await s.commit()
         st = _tavern_state(p, p.tavern)
-    return web.json_response({"ok": True, "collected": collected, "state": st},
+    return web.json_response({"ok": True, "collected": collected, "state": st,
+                              "retail": bool(order)},
                              headers={"Cache-Control": "no-store"})
 
 
@@ -496,6 +504,17 @@ def _panel_data(p, t, kind: str) -> dict:
         return {"kind": "newbie", "tasks": tasks, "claimable": nb.claimable(p, t),
                 "perks": nb.perks_active(p), "grace_days": nb.NEWBIE_GRACE_DAYS}
 
+    if kind == "retail":
+        from bot.game import production as prod, story_state
+        want = story_state.get_retail(p)
+        if not want:
+            return {"kind": "retail", "empty": True}
+        items = [{"key": k, "name": prod.GOODS[k].name, "emoji": prod.GOODS[k].emoji,
+                  "qty": int(n), "price": prod.GOODS[k].price, "sum": int(n) * prod.GOODS[k].price}
+                 for k, n in sorted(want.items(), key=lambda kv: -prod.GOODS[kv[0]].price)
+                 if k in prod.GOODS]
+        return {"kind": "retail", "items": items, "total": logic.retail_total(want, p)}
+
     # expedition — статус бригад, «на что копить», список ресурсов для отправки
     c = logic.expedition_counts(p, t)
     level = t.level
@@ -521,7 +540,7 @@ async def _api_panel(request: web.Request) -> web.Response:
     if uid is None:
         return body
     kind = str(body.get("kind") or "")
-    if kind not in ("bonus", "newbie", "expedition"):
+    if kind not in ("bonus", "newbie", "expedition", "retail"):
         return web.json_response({"ok": False, "error": "bad_kind"})
     async with session_factory() as s:
         p = await repo.get_player(s, uid)
@@ -622,6 +641,46 @@ async def _api_expedition(request: web.Request) -> web.Response:
         panel = _panel_data(p, p.tavern, "expedition")
     return web.json_response({"ok": True, "state": st, "claimed": total, "panel": panel},
                              headers={"Cache-Control": "no-store"})
+
+
+async def _api_retail_sell(request: web.Request) -> web.Response:
+    """Налить гостям — продать заказанный товар из погреба (logic.apply_retail)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import logic, newbie, story_state
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        want = story_state.get_retail(p)
+        if not want:
+            return web.json_response({"ok": False, "error": "gone"})
+        sold, gold, rep = logic.apply_retail(p, p.tavern, want)
+        story_state.set_retail(p, None)
+        if sold:
+            newbie.mark(p, "nb_sale")          # веха грамоты новосёла
+            repo.add_log(s, "player", p.id, f"🍺 налил гостям: +{gold} 🪙, +{rep} репутации")
+        await s.commit()
+        st = _tavern_state(p, p.tavern)
+    return web.json_response({"ok": True, "state": st, "gold": gold, "rep": rep, "sold": bool(sold)},
+                             headers={"Cache-Control": "no-store"})
+
+
+async def _api_retail_hold(request: web.Request) -> web.Response:
+    """Придержать товар — отклонить заказ гостей."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import story_state
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        story_state.set_retail(p, None)
+        await s.commit()
+        st = _tavern_state(p, p.tavern)
+    return web.json_response({"ok": True, "state": st}, headers={"Cache-Control": "no-store"})
 
 
 def _init_user(init_data: str) -> dict:
@@ -785,6 +844,8 @@ def build_app() -> web.Application:
     app.router.add_post("/api/newbie", _api_newbie)      # забрать грамоту новосёла
     app.router.add_post("/api/expedition", _api_expedition)  # забрать добычу бригад
     app.router.add_post("/api/expedition_start", _api_expedition_start)  # отправить бригаду
+    app.router.add_post("/api/retail_sell", _api_retail_sell)  # налить гостям (продать заказ)
+    app.router.add_post("/api/retail_hold", _api_retail_hold)  # придержать товар
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы

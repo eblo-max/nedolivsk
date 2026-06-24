@@ -27,6 +27,7 @@ const SAMPLE: TavernState = {
   gold: 1340, income_rate: 18, income_ready: 126, reputation: 27,
   capacity: 24, comfort: 12, luck_pct: 8, gear_worn: 1, gear_slots: 11,
   now: [
+    { icon: '🍺', text: 'Гости ждут заказ', sub: 'выкупят товар из погреба', badge: 'ready', action: 'retail' },
     { icon: '🎁', text: 'Бонус дня готов', sub: 'забери и активируй', badge: 'ready', action: 'bonus' },
     { icon: '📜', text: 'Грамота новосёла', sub: 'награда ждёт', badge: 'ready', action: 'newbie' },
     { icon: '⛏', text: 'Бригады вернулись (1)', sub: 'забирай добычу', badge: 'ready', action: 'expedition' },
@@ -62,9 +63,10 @@ export default function Tavern() {
     if (busy || t.income_ready <= 0) return
     haptic('medium'); setBusy(true)
     try {
-      const r = await api<{ collected: number; state: TavernState }>('collect')
+      const r = await api<{ collected: number; state: TavernState; retail?: boolean }>('collect')
       set(r.state); hapticNotify('success')
       flash(r.collected > 0 ? `+${fmt(r.collected)} 🪙 в казну` : 'Касса пуста')
+      if (r.retail) setTimeout(() => setSheet('retail'), 350)   // гости ждут заказ — панель сбыта
     } catch { flash('Касса не открылась — попробуй ещё') }
     finally { setBusy(false) }
   }
@@ -189,7 +191,7 @@ function Ticker({ items }: { items: string[] }) {
 
 const ACT_ICON: Record<string, string> = {
   '⛏': 'pickaxe', '🔨': 'hammer', '🏗': 'hammer',
-  '🎁': 'bonus', '📜': 'scroll', '🏭': 'forge',
+  '🎁': 'bonus', '📜': 'scroll', '🏭': 'forge', '🍺': 'beer',
 }
 
 function ActivityRow({ a, onAct }: { a: Activity; onAct: (a: Activity) => void }) {
