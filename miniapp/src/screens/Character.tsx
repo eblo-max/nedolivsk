@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
@@ -56,7 +56,7 @@ const SAMPLE: CharState = {
 }
 
 export default function Character() {
-  const { data, loading, set } = useApi<CharState>('character', SAMPLE)
+  const { data, loading, set, reload } = useApi<CharState>('character', SAMPLE)
   const [view, setView] = useState<'doll' | 'forge'>('doll')
   const [forge, setForge] = useState<ForgeState | null>(null)
   const [pick, setPick] = useState<ForgeItem | null>(null)
@@ -64,6 +64,20 @@ export default function Character() {
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
+
+  // реалтайм: тихо обновляем живые данные (HP/реген/таймер ковки) — периодически
+  // и при возврате в приложение; пауза во время действия/открытой панели
+  const guard = useRef({ busy, pick, healOpen })
+  guard.current = { busy, pick, healOpen }
+  useEffect(() => {
+    const refresh = () => {
+      const g = guard.current
+      if (document.visibilityState === 'visible' && !g.busy && !g.pick && !g.healOpen) reload()
+    }
+    const iv = setInterval(refresh, 20000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', refresh) }
+  }, [reload])
 
   if (loading && !data) return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
   const c = data ?? SAMPLE
