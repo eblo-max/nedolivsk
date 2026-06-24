@@ -26,6 +26,11 @@ interface ForgeState { ok: boolean; pouch: Record<string, number>; items: ForgeI
 const stars = (t?: number) => '★'.repeat(t || 0)
 const sprite = (s?: string) => `${import.meta.env.BASE_URL}items/${s}.png`
 
+// раскладка слотов вокруг фигуры: левая колонка | герой | правая колонка, снизу — ряд
+const COL_L = ['head', 'chest', 'left_hand', 'belt']
+const COL_R = ['weapon', 'right_hand', 'amulet', 'talisman']
+const ROW_B = ['legs', 'boots', 'bag']
+
 const SAMPLE: CharState = {
   ok: true, name: 'ХОЗЯИН', worn: 3, slots_total: 11,
   hp: { cur: 78, max: 100, regen: 44 }, damage: 25, crit: 12, armor: 18, luck: 8, vylazka: 16,
@@ -59,6 +64,13 @@ export default function Character() {
     haptic('light'); setView('forge')
     try { const r = await api<ForgeState>('forge'); setForge(r) }
     catch { setForge(FORGE_SAMPLE) }
+  }
+  // тап по надетой вещи на кукле → кузница с её деталью (посмотреть/перековать)
+  async function openItem(id: string) {
+    haptic('light')
+    let f = forge
+    if (!f) { try { f = await api<ForgeState>('forge') } catch { f = FORGE_SAMPLE } setForge(f) }
+    setView('forge'); setPick(f.items.find((x) => x.id === id) ?? null)
   }
   async function claim() {
     if (busy) return
@@ -141,11 +153,18 @@ export default function Character() {
   // ── ПЕРСОНАЖ (кукла) ──
   return (
     <>
-      <div className="hero rise">
+      <div className="hero rise" style={{ paddingBottom: 0 }}>
         <div className="nm">{c.name}</div>
         <div className="meta"><span className="region">Хозяин кабака</span>
           <span className="region">🎒 надето {c.worn}/{c.slots_total}</span></div>
-        <div className="orn"><b>✦</b></div>
+      </div>
+
+      {/* кукла: герой (анимированный) парит в воздухе, слоты по бокам — без рамки */}
+      <div className="doll rise">
+        <div className="doll-col">{COL_L.map((k) => <SlotBox key={k} s={bySlot(c, k)} onTap={openItem} onEmpty={openForge} />)}</div>
+        <div className="doll-fig"><img className="doll-hero" src={`${import.meta.env.BASE_URL}character/hero.png`} alt="Хозяин" /></div>
+        <div className="doll-col">{COL_R.map((k) => <SlotBox key={k} s={bySlot(c, k)} onTap={openItem} onEmpty={openForge} />)}</div>
+        <div className="doll-bottom">{ROW_B.map((k) => <SlotBox key={k} s={bySlot(c, k)} onTap={openItem} onEmpty={openForge} />)}</div>
       </div>
 
       {craftBanner(c.craft)}
@@ -182,20 +201,6 @@ export default function Character() {
           </div>
         </div>
       )}
-
-      <div className="card rise" style={{ animationDelay: '.12s' }}>
-        <div className="card-h"><span className="he">🎽</span>СНАРЯЖЕНИЕ</div>
-        <div className="eq-grid">
-          {c.equipment.map((s) => (
-            <div key={s.slot} className={`eq-slot${s.id ? '' : ' empty'}`}>
-              {s.id
-                ? <><img className="eq-img" src={sprite(s.sprite)} alt="" loading="lazy" />
-                    <span className="eq-txt"><b>{s.trophy ? '🏆 ' : ''}{s.name}</b><small className="stars">{stars(s.tier)} · {s.slot_name}</small></span></>
-                : <><span className="eq-dot" /><span className="eq-txt"><b className="muted">{s.slot_name}</b><small>пусто</small></span></>}
-            </div>
-          ))}
-        </div>
-      </div>
 
       <button className="btn gold rise" style={{ animationDelay: '.16s' }} onClick={openForge}>⚒ В кузницу</button>
       {toast && <div className="toast">{toast}</div>}
@@ -246,6 +251,19 @@ function ItemSheet({ item, busy, craftState, onMake, onClose }: {
             </button>}
     </Sheet>
   )
+}
+
+const bySlot = (c: CharState, k: string): Slot =>
+  c.equipment.find((s) => s.slot === k) ?? { slot: k, slot_name: k }
+
+function SlotBox({ s, onTap, onEmpty }: { s: Slot; onTap: (id: string) => void; onEmpty: () => void }) {
+  if (s.id) return (
+    <button className={`slot t${s.tier || 1}`} aria-label={s.name} title={s.name} onClick={() => onTap(s.id!)}>
+      <img src={sprite(s.sprite)} alt="" loading="lazy" />
+      {(s.tier || 1) > 1 && <span className="slot-t">{stars(s.tier)}</span>}
+    </button>
+  )
+  return <button className="slot empty" aria-label={s.slot_name} title={`${s.slot_name} — пусто`} onClick={onEmpty} />
 }
 
 function Tile({ icon, img, v, l }: { icon?: string; img?: string; v: string | number; l: string }) {

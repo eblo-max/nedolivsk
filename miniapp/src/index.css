@@ -263,16 +263,29 @@ body {
 
 /* ── Персонаж: снаряжение, кузница, деталь предмета ── */
 .stars { color:var(--gold); letter-spacing:1px; font-size:.9em; }
-.eq-grid { display:flex; flex-direction:column; gap:6px; padding:11px 14px; }
-.eq-slot { display:flex; align-items:center; gap:11px; padding:7px 10px; border-radius:9px;
-  background:linear-gradient(#26190b,#180f06); border:1px solid var(--line); }
-.eq-slot.empty { background:#170f07; border-style:dashed; border-color:#3a2a14; }
-.eq-img { width:34px; height:34px; object-fit:contain; flex:0 0 auto; filter:drop-shadow(0 1px 2px #000a); }
-.eq-dot { width:34px; height:34px; flex:0 0 auto; border-radius:8px; border:1px dashed #4a3719; }
-.eq-txt { display:flex; flex-direction:column; min-width:0; }
-.eq-txt b { font-family:var(--text); font-weight:600; font-size:14px; color:#dccaa6; line-height:1.2;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.eq-txt small { font-family:var(--text); font-size:12px; color:var(--dim); }
+
+/* кукла: герой по центру + квадраты-слоты по бокам и снизу */
+.doll { display:grid; grid-template-columns:60px 1fr 60px; gap:9px; align-items:center; padding:12px 12px 14px; }
+.doll-col { display:flex; flex-direction:column; gap:9px; }
+.doll-fig { display:flex; align-items:flex-end; justify-content:center; min-height:236px; position:relative; }
+.doll-fig::after { content:""; position:absolute; bottom:6px; left:50%; transform:translateX(-50%);
+  width:64%; height:16px; border-radius:50%; background:radial-gradient(#000a,transparent 70%); }   /* тень-пьедестал */
+.doll-hero { max-height:248px; max-width:100%; width:auto; object-fit:contain;
+  filter:drop-shadow(0 5px 8px #000a); image-rendering:auto; position:relative; z-index:1; }
+.doll-bottom { grid-column:1 / -1; display:flex; justify-content:center; gap:9px; }
+
+.slot { width:60px; height:60px; flex:0 0 auto; border-radius:10px; padding:5px; cursor:pointer; position:relative;
+  background:linear-gradient(#2c1d0d,#180f06); border:1px solid var(--line2);
+  box-shadow:inset 0 1px 0 #ffffff0e,0 2px 6px #0007;
+  display:flex; align-items:center; justify-content:center; transition:transform .08s,border-color .12s; }
+.slot:active { transform:scale(.93); }
+.slot img { width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 1px 2px #0009); }
+.slot.empty { border-style:dashed; border-color:#3d2c15; background:#160e06; box-shadow:none; }
+.slot.empty::after { content:""; width:7px; height:7px; border-radius:50%; background:#3d2c15; }
+.slot.t2 { border-color:#c2c7d6; box-shadow:0 0 8px #c2c7d655,inset 0 1px 0 #fff2; }   /* добротный */
+.slot.t3 { border-color:#e7c454; box-shadow:0 0 10px #e7c45488,inset 0 1px 0 #fff2; }   /* мастерский */
+.slot-t { position:absolute; bottom:0; right:3px; font-size:8px; line-height:1; color:var(--gold);
+  text-shadow:0 1px 0 #000,0 0 3px #000; letter-spacing:0; }
 
 .orc-set { border-color:var(--ember) !important; box-shadow:0 0 16px #cf5a2a33,0 8px 24px #000b; }
 
