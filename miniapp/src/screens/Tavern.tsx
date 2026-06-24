@@ -9,7 +9,7 @@ interface TavernState {
   gold: number; income_rate: number; income_ready: number; reputation: number
   capacity: number; comfort: number; luck_pct: number; gear_worn: number; gear_slots: number
   now: Activity[]
-  storage: ResLine[]; cellar: { emoji: string; name: string; qty: number }[]
+  storage: ResLine[]; cellar: { key: string; emoji: string; name: string; qty: number }[]
   world: string[]
   next_upgrade?: Record<string, number>; upgrade_pct?: number | null; maxed?: boolean
 }
@@ -33,9 +33,9 @@ const SAMPLE: TavernState = {
     { key: 'ingot', emoji: '🔩', name: 'Слиток', have: 6, cap: 50 },
   ],
   cellar: [
-    { emoji: '🍺', name: 'Эль', qty: 12 },
-    { emoji: '🍖', name: 'Жаркое', qty: 4 },
-    { emoji: '🥧', name: 'Пирог', qty: 3 },
+    { key: 'ale1', emoji: '🍺', name: 'Эль', qty: 12 },
+    { key: 'roast', emoji: '🍖', name: 'Жаркое', qty: 4 },
+    { key: 'pie', emoji: '🥧', name: 'Пирог', qty: 3 },
   ],
   world: [
     '🍂 Осень — спрос на горячее растёт',
@@ -120,7 +120,7 @@ export default function Tavern() {
         <div className="chips">
           {t.cellar.length
             ? t.cellar.map((p, i) => (
-                <span key={i} className="chip">{p.emoji} {p.name} <b style={{ fontFamily: 'var(--num)' }}>×{p.qty}</b></span>
+                <span key={i} className="chip"><GoodIcon k={p.key} emoji={p.emoji} /> {p.name} <b style={{ fontFamily: 'var(--num)' }}>×{p.qty}</b></span>
               ))
             : <span className="muted" style={{ fontStyle: 'italic', padding: '2px 0' }}>Пусто — гони товар на продажу</span>}
         </div>
@@ -223,6 +223,18 @@ function ResIcon({ k, emoji, size }: { k: string; emoji?: string; size?: number 
     const st = size ? { width: size, height: size } : undefined
     return <img className="ric" style={st} src={`${import.meta.env.BASE_URL}res/${k}.png`} alt="" loading="lazy" />
   }
+  return <span className="ric-e">{emoji ?? '•'}</span>
+}
+
+// иконки готовых товаров (погреб) — miniapp/public/goods/<file>.png
+const GOOD_ICON: Record<string, string> = {
+  ale1: 'ale', ale2: 'ale', ale3: 'ale', mead: 'mead', sbiten: 'sbiten', wine: 'wine',
+  roast: 'roast', bread: 'bread', pie: 'pie', cured: 'cured', smoked_fish: 'smoked_fish',
+  cheese: 'cheese', butter: 'butter',
+}
+function GoodIcon({ k, emoji }: { k: string; emoji?: string }) {
+  const f = GOOD_ICON[k]
+  if (f) return <img className="ric" src={`${import.meta.env.BASE_URL}goods/${f}.png`} alt="" loading="lazy" />
   return <span className="ric-e">{emoji ?? '•'}</span>
 }
 
