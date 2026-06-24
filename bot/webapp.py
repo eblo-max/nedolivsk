@@ -17,6 +17,7 @@ import hashlib
 import hmac
 import json
 import os
+import pathlib
 import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl
@@ -29,6 +30,8 @@ from bot.game import balance, worldmap
 from bot.game import invasion as invmod
 
 ASSETS_DIR = worldmap.ASSETS_DIR
+# Собранный React-мини-апп (Vite → miniapp/dist; собирается в Docker, отдаётся под /app).
+MINIAPP_DIST = pathlib.Path(__file__).resolve().parent.parent / "miniapp" / "dist"
 
 # initData живёт сутки — отсекаем устаревшие/реплей.
 _INITDATA_MAX_AGE = 24 * 3600
@@ -419,10 +422,26 @@ async def _fx_sprite(request: web.Request) -> web.Response:
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
+async def _spa(request: web.Request) -> web.Response:
+    """Отдача React-мини-аппа под /app с SPA-fallback: реальный файл из dist
+    (assets/gothic.otf/…) — отдаём, иначе любой путь → index.html (клиент-роутинг)."""
+    if not MINIAPP_DIST.is_dir():
+        return web.Response(text="mini-app не собран", status=503)
+    tail = request.match_info.get("tail", "")
+    target = (MINIAPP_DIST / tail).resolve()
+    # защита от выхода за пределы dist + отдаём только существующие файлы
+    if tail and target.is_file() and str(target).startswith(str(MINIAPP_DIST.resolve())):
+        cache = "no-store" if target.name == "index.html" else "public, max-age=86400"
+        return web.FileResponse(target, headers={"Cache-Control": cache})
+    return web.FileResponse(MINIAPP_DIST / "index.html", headers={"Cache-Control": "no-store"})
+
+
 def build_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/", lambda r: web.Response(text="ok"))
     app.router.add_get("/map", _map_page)
+    app.router.add_get("/app", _spa)                  # React-мини-апп (каркас игры)
+    app.router.add_get("/app/{tail:.*}", _spa)        # SPA-fallback + статика dist
     app.router.add_get("/api/taverns", _api_taverns)
     app.router.add_post("/api/invasion/join", _api_invasion_join)
     app.router.add_post("/api/mill/run", _api_mill_run)        # вылазка телеги за зерном
