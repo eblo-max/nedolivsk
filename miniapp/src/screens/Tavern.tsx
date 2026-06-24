@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
+import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Onboarding from './Onboarding'
+import ActionSheet from './ActionSheet'
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
@@ -47,6 +49,7 @@ export default function Tavern() {
   const [toast, setToast] = useState('')
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState(false)
+  const [sheet, setSheet] = useState<string | null>(null)
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
 
   // ещё нет таверны — стартовый экран (создание игрока + таверны)
@@ -65,23 +68,9 @@ export default function Tavern() {
     } catch { flash('Касса не открылась — попробуй ещё') }
     finally { setBusy(false) }
   }
-  async function act(a: Activity) {
-    if (busy || !a.action) return
-    haptic('medium'); setBusy(true)
-    try {
-      const r = await api<{ state: TavernState; boon?: string; minutes?: number; claimed?: number; reward?: Record<string, number> }>(a.action)
-      set(r.state); hapticNotify('success')
-      if (a.action === 'bonus') flash(`Баф «${r.boon}» на ${r.minutes} мин!`)
-      else if (a.action === 'expedition') flash(`+${fmt(r.claimed ?? 0)} добра с бригад`)
-      else if (a.action === 'newbie') {
-        const tot = r.reward ? Object.values(r.reward).reduce((s, v) => s + v, 0) : 0
-        flash(tot ? `Грамота: +${fmt(tot)} в закрома` : 'Награды забраны')
-      } else flash('Готово')
-    } catch (e) {
-      hapticNotify('warning')
-      const code = (e as { code?: string })?.code
-      flash(code === 'busy' ? 'Баф уже гуляет' : code === 'nothing' ? 'Забирать нечего' : 'Не вышло — попробуй ещё')
-    } finally { setBusy(false) }
+  function openSheet(a: Activity) {
+    if (!a.action) return
+    haptic('light'); setSheet(a.action)
   }
   async function upgrade() {
     if (busy) return
@@ -129,7 +118,7 @@ export default function Tavern() {
       {/* сейчас */}
       <div className="card rise" style={{ animationDelay: '.08s' }}>
         <div className="card-h"><span className="he">⚡</span>СЕЙЧАС</div>
-        <div className="card-b">{t.now.map((a, i) => <ActivityRow key={i} a={a} onAct={act} busy={busy} />)}</div>
+        <div className="card-b">{t.now.map((a, i) => <ActivityRow key={i} a={a} onAct={openSheet} />)}</div>
       </div>
 
       {/* заведение */}
@@ -180,6 +169,7 @@ export default function Tavern() {
         </div>
       )}
 
+      {sheet && <ActionSheet kind={sheet} onState={(s) => set(s as TavernState)} onClose={() => setSheet(null)} flash={flash} />}
       {toast && <div className="toast">{toast}</div>}
     </>
   )
@@ -202,13 +192,12 @@ const ACT_ICON: Record<string, string> = {
   '🎁': 'bonus', '📜': 'scroll', '🏭': 'forge',
 }
 
-function ActivityRow({ a, onAct, busy }: { a: Activity; onAct: (a: Activity) => void; busy: boolean }) {
+function ActivityRow({ a, onAct }: { a: Activity; onAct: (a: Activity) => void }) {
   const img = a.icon ? ACT_ICON[a.icon] : undefined
   const go = !!a.action
   return (
     <div className={`act${go ? ' act-go' : ''}`}
-      onClick={go && !busy ? () => onAct(a) : undefined}
-      role={go ? 'button' : undefined} aria-disabled={go && busy}>
+      onClick={go ? () => onAct(a) : undefined} role={go ? 'button' : undefined}>
       <div className="top">
         {img
           ? <img className="ai-img" src={`${import.meta.env.BASE_URL}act/${img}.png`} alt="" loading="lazy" />
@@ -256,29 +245,3 @@ function CostTile({ k, need, have }: { k: string; need: number; have: number }) 
   )
 }
 
-// иконки ресурсов: miniapp/public/res/<ключ>.png (золото/слиток — тоже иконки)
-const RES_HAS = new Set([
-  'gold', 'ingot', 'wood', 'grain', 'hops', 'stone', 'ore', 'clay',
-  'honey', 'milk', 'berries', 'fish', 'game', 'herbs', 'salt', 'water',
-])
-function ResIcon({ k, emoji, size }: { k: string; emoji?: string; size?: number }) {
-  if (RES_HAS.has(k)) {
-    const st = size ? { width: size, height: size } : undefined
-    return <img className="ric" style={st} src={`${import.meta.env.BASE_URL}res/${k}.png`} alt="" loading="lazy" />
-  }
-  return <span className="ric-e">{emoji ?? '•'}</span>
-}
-
-// иконки товаров: miniapp/public/goods/<file>.png
-const GOOD_ICON: Record<string, string> = {
-  ale1: 'ale', ale2: 'ale', ale3: 'ale', mead: 'mead', sbiten: 'sbiten', wine: 'wine',
-  roast: 'roast', bread: 'bread', pie: 'pie', cured: 'cured', smoked_fish: 'smoked_fish',
-  cheese: 'cheese', butter: 'butter',
-}
-function GoodIcon({ k }: { k: string }) {
-  const f = GOOD_ICON[k]
-  if (f) return <img className="ric" src={`${import.meta.env.BASE_URL}goods/${f}.png`} alt="" loading="lazy" />
-  return <span className="ric-e">🍽</span>
-}
-
-const fmt = (n: number) => (n >= 10000 ? `${(n / 1000).toFixed(1)}к` : `${n}`)

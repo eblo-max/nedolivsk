@@ -469,6 +469,92 @@ async def _api_upgrade(request: web.Request) -> web.Response:
                              headers={"Cache-Control": "no-store"})
 
 
+def _panel_data(p, t, kind: str) -> dict:
+    """Данные для bottom-sheet панели действия (бонус/грамота/бригады) —
+    те же функции/тексты, что и экраны бота, в JSON."""
+    from bot import texts
+    from bot.game import balance as bal, buff as buffmod, logic, newbie as nb, season
+
+    if kind == "bonus":
+        act = buffmod.active(p)
+        if act is not None:
+            return {"kind": "bonus", "active": True, "emoji": act.emoji, "name": act.name,
+                    "desc": act.desc, "minutes_left": buffmod.minutes_left(p)}
+        boon = buffmod.offer(p)
+        if boon is None:
+            return {"kind": "bonus", "active": False, "available": False}
+        return {"kind": "bonus", "active": False, "available": True,
+                "emoji": boon.emoji, "name": boon.name, "desc": boon.desc,
+                "hours": buffmod.BUFF_HOURS, "reset_h": buffmod.offer_hours_left(p)}
+
+    if kind == "newbie":
+        tasks = [{"label": label, "reward": texts._reward_str(reward),
+                  "status": "claimed" if claimed else ("ready" if done else "todo")}
+                 for _k, label, reward, done, claimed in nb.states(p, t)]
+        return {"kind": "newbie", "tasks": tasks, "claimable": nb.claimable(p, t),
+                "perks": nb.perks_active(p), "grace_days": nb.NEWBIE_GRACE_DAYS}
+
+    # expedition — статус бригад, «на что копить», список ресурсов для отправки
+    c = logic.expedition_counts(p, t)
+    level = t.level
+    goals, _tot = logic.expedition_goals(p, t)
+    goal_list = [{"label": label,
+                  "items": [{"key": r, "name": bal.RESOURCE_NAMES.get(r, r), "qty": q}
+                            for r, q in short.items()]}
+                 for label, short in goals]
+    resources = []
+    if c.free > 0:
+        for res in bal.RESOURCES:
+            amt = int(bal.expedition_yield(res, level, p.region) * season.yield_mult(res))
+            resources.append({"key": res, "name": bal.RESOURCE_NAMES.get(res, res), "amount": amt})
+    return {"kind": "expedition", "free": c.free, "total": c.total, "out": c.out,
+            "ready": c.ready, "next_minutes": c.next_minutes,
+            "pay": bal.worker_pay(level), "hours": bal.EXPEDITION_HOURS,
+            "goals": goal_list, "resources": resources}
+
+
+async def _api_panel(request: web.Request) -> web.Response:
+    """Снапшот данных для bottom-sheet панели (чтение)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    kind = str(body.get("kind") or "")
+    if kind not in ("bonus", "newbie", "expedition"):
+        return web.json_response({"ok": False, "error": "bad_kind"})
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        panel = _panel_data(p, p.tavern, kind)
+    return web.json_response({"ok": True, "panel": panel},
+                             headers={"Cache-Control": "no-store"})
+
+
+async def _api_expedition_start(request: web.Request) -> web.Response:
+    """Отправить бригаду за ресурсом — logic.start_expedition (плата вперёд)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import balance as bal, logic
+    res_key = str(body.get("resource") or "")
+    if res_key not in bal.RESOURCES:
+        return web.json_response({"ok": False, "error": "bad_resource"})
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        r = logic.start_expedition(p, p.tavern, res_key)
+        if not r.ok:                           # no_slot | no_gold
+            return web.json_response({"ok": False, "error": r.reason,
+                                      "panel": _panel_data(p, p.tavern, "expedition")})
+        repo.add_log(s, "player", p.id, f"⛏ отправил бригаду за {bal.RESOURCE_NAMES.get(res_key, res_key)}")
+        await s.commit()
+        st = _tavern_state(p, p.tavern)
+        panel = _panel_data(p, p.tavern, "expedition")
+    return web.json_response({"ok": True, "state": st, "panel": panel},
+                             headers={"Cache-Control": "no-store"})
+
+
 async def _api_bonus(request: web.Request) -> web.Response:
     """Активировать «бонус дня» (опохмел) — buff.refresh + buff.activate."""
     uid, body = await _auth(request)
@@ -531,7 +617,8 @@ async def _api_expedition(request: web.Request) -> web.Response:
         repo.add_log(s, "player", p.id, f"🎒 забрал добычу бригад: {total} ед.")
         await s.commit()
         st = _tavern_state(p, p.tavern)
-    return web.json_response({"ok": True, "state": st, "claimed": total},
+        panel = _panel_data(p, p.tavern, "expedition")
+    return web.json_response({"ok": True, "state": st, "claimed": total, "panel": panel},
                              headers={"Cache-Control": "no-store"})
 
 
@@ -695,6 +782,8 @@ def build_app() -> web.Application:
     app.router.add_post("/api/bonus", _api_bonus)        # активировать бонус дня
     app.router.add_post("/api/newbie", _api_newbie)      # забрать грамоту новосёла
     app.router.add_post("/api/expedition", _api_expedition)  # забрать добычу бригад
+    app.router.add_post("/api/expedition_start", _api_expedition_start)  # отправить бригаду
+    app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
