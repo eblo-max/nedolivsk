@@ -74,13 +74,19 @@ export default function ActionSheet({ kind, initial, onCache, onState, onClose, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind])
 
-  // блокируем прокрутку главного экрана, пока панель открыта (скролл — только внутри)
+  // пока панель открыта: блокируем прокрутку фона и прячем нижнюю навигацию,
+  // иначе навбар (с safe-area снизу) перекрывает низ панели на телефоне
   useEffect(() => {
     const scroll = document.querySelector('.scroll') as HTMLElement | null
-    if (!scroll) return
-    const prev = scroll.style.overflowY
-    scroll.style.overflowY = 'hidden'
-    return () => { scroll.style.overflowY = prev }
+    const nav = document.querySelector('.nav') as HTMLElement | null
+    const prevOv = scroll?.style.overflowY
+    const prevNav = nav?.style.display
+    if (scroll) scroll.style.overflowY = 'hidden'
+    if (nav) nav.style.display = 'none'
+    return () => {
+      if (scroll) scroll.style.overflowY = prevOv ?? ''
+      if (nav) nav.style.display = prevNav ?? ''
+    }
   }, [])
 
   function close() {
