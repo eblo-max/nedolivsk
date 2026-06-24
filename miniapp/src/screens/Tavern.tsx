@@ -174,11 +174,16 @@ function Ticker({ items }: { items: string[] }) {
   )
 }
 
+const ACT_ICON: Record<string, string> = { '⛏': 'pickaxe', '🔨': 'hammer', '🏗': 'hammer' }
+
 function ActivityRow({ a }: { a: Activity }) {
+  const img = a.icon ? ACT_ICON[a.icon] : undefined
   return (
     <div className="act">
       <div className="top">
-        {a.icon && <span className="ai">{a.icon}</span>}
+        {img
+          ? <img className="ai-img" src={`${import.meta.env.BASE_URL}act/${img}.png`} alt="" loading="lazy" />
+          : a.icon && <span className="ai">{a.icon}</span>}
         <span className="txt">{a.text}{a.sub && <small>{a.sub}</small>}</span>
         {a.badge && <span className={`badge ${a.badge}`}>{a.badge === 'ready' ? 'ГОТОВО' : 'ждём'}</span>}
       </div>
