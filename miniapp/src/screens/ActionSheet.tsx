@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { haptic, hapticNotify } from '../telegram'
+import { haptic, hapticNotify, setBackButton } from '../telegram'
 import { ResIcon, fmt } from '../components/icons'
 
 interface Task { label: string; reward: string; status: 'claimed' | 'ready' | 'todo' }
@@ -93,6 +93,13 @@ export default function ActionSheet({ kind, initial, onCache, onState, onClose, 
     if (closing) return
     setClosing(true); setTimeout(onClose, 240)
   }
+
+  // нативная кнопка «назад» Telegram закрывает панель (а не сворачивает всё приложение)
+  useEffect(() => {
+    setBackButton(close)
+    return () => setBackButton(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // активировать бонус / забрать грамоту — действие и закрытие
   async function fire(path: string, done: (r: Record<string, unknown>) => string) {

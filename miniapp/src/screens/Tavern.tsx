@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
@@ -46,13 +46,24 @@ const SAMPLE: TavernState = {
 }
 
 export default function Tavern() {
-  const { data, loading, error, set } = useApi<TavernState>('state', SAMPLE)
+  const { data, loading, error, set, reload } = useApi<TavernState>('state', SAMPLE)
   const [toast, setToast] = useState('')
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState(false)
   const [sheet, setSheet] = useState<string | null>(null)
   const panelCache = useRef<Record<string, unknown>>({})
-  const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const flash = (m: string) => {
+    setToast(m); clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(''), 2200)
+  }
+
+  // вернулись в приложение — тихо обновляем состояние (таймеры/доход не висят устаревшими)
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === 'visible' && !sheet) reload() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [reload, sheet])
 
   // ещё нет таверны — стартовый экран (создание игрока + таверны)
   if (error === 'no_tavern' && !created)
