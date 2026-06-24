@@ -9,7 +9,7 @@ interface TavernState {
   gold: number; income_rate: number; income_ready: number; reputation: number
   capacity: number; comfort: number; luck_pct: number; gear_worn: number; gear_slots: number
   now: Activity[]
-  storage: ResLine[]; cellar: string
+  storage: ResLine[]; cellar: { emoji: string; name: string; qty: number }[]
   world: string[]
   next_upgrade?: Record<string, number>; upgrade_pct?: number | null; maxed?: boolean
 }
@@ -32,7 +32,11 @@ const SAMPLE: TavernState = {
     { key: 'hops', emoji: '🌿', name: 'Хмель', have: 45, cap: 200 },
     { key: 'ingot', emoji: '🔩', name: 'Слиток', have: 6, cap: 50 },
   ],
-  cellar: '🍺 Эль ×12 · 🍖 Жаркое ×4',
+  cellar: [
+    { emoji: '🍺', name: 'Эль', qty: 12 },
+    { emoji: '🍖', name: 'Жаркое', qty: 4 },
+    { emoji: '🥧', name: 'Пирог', qty: 3 },
+  ],
   world: [
     '🍂 Осень — спрос на горячее растёт',
     '🎪 Ярмарка ещё 2 ч — сбывай товар',
@@ -71,8 +75,8 @@ export default function Tavern() {
       <div className="card rise" style={{ animationDelay: '.04s' }}>
         <div className="card-h"><span className="he">💰</span>ДОХОД<span className="cnt">+{t.income_rate}/ч</span></div>
         <div className="card-b">
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontFamily: 'var(--num)' }}>
-            <b style={{ fontSize: 22 }}>🪙</b>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontFamily: 'var(--num)' }}>
+            <ResIcon k="gold" size={28} />
             <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--gold-2)', fontVariantNumeric: 'tabular-nums' }}>{fmt(t.gold)}</span>
             <span className="muted" style={{ fontFamily: 'var(--text)', fontSize: 14 }}>в мошне</span>
           </div>
@@ -106,18 +110,28 @@ export default function Tavern() {
         <div className="card-h"><span className="he">📦</span>СКЛАД</div>
         <div className="card-b">
           {t.storage.map((r) => <ResBar key={r.key} r={r} />)}
-          <div className="res"><div className="top"><span style={{ fontSize: 15 }}>🛢</span>
-            <span className="rn">Погреб</span><span className="rv" style={{ fontFamily: 'var(--text)', fontWeight: 500 }}>{t.cellar}</span></div></div>
+        </div>
+      </div>
+
+      {/* ── погреб ── */}
+      <div className="card rise" style={{ animationDelay: '.2s' }}>
+        <div className="card-h"><span className="he">🛢</span>ПОГРЕБ
+          <span className="cnt">{t.cellar.reduce((s, p) => s + p.qty, 0)} порций</span></div>
+        <div className="chips">
+          {t.cellar.length
+            ? t.cellar.map((p, i) => (
+                <span key={i} className="chip">{p.emoji} {p.name} <b style={{ fontFamily: 'var(--num)' }}>×{p.qty}</b></span>
+              ))
+            : <span className="muted" style={{ fontStyle: 'italic', padding: '2px 0' }}>Пусто — гони товар на продажу</span>}
         </div>
       </div>
 
       {/* ── улучшить ── */}
       {!t.maxed && t.next_upgrade && (
-        <div className="card rise" style={{ animationDelay: '.2s' }}>
+        <div className="card rise" style={{ animationDelay: '.24s' }}>
           <div className="card-h"><span className="he">🔨</span>ПЕРЕСТРОЙКА
             {t.upgrade_pct != null && <span className="cnt">{t.upgrade_pct}%</span>}</div>
           <div className="card-b">
-            {t.upgrade_pct != null && <div className="bar g"><i style={{ width: `${t.upgrade_pct}%` }} /></div>}
             <div className="grid2" style={{ padding: 0 }}>
               {Object.entries(t.next_upgrade).map(([k, v]) => (
                 <CostTile key={k} k={k} need={v} have={k === 'gold' ? t.gold : (t.storage.find((s) => s.key === k)?.have ?? 0)} />
@@ -172,7 +186,7 @@ function ResBar({ r }: { r: ResLine }) {
   return (
     <div className="res">
       <div className={`top${full ? ' full' : ''}`}>
-        <span style={{ fontSize: 15 }}>{r.emoji}</span>
+        <ResIcon k={r.key} emoji={r.emoji} />
         <span className="rn">{r.name}</span>
         <span className="rv">{r.have}<span className="cap"> / {r.cap}</span></span>
       </div>
@@ -190,13 +204,26 @@ function CostTile({ k, need, have }: { k: string; need: number; have: number }) 
   const ok = have >= need
   return (
     <div className="tile" style={{ padding: '8px 10px' }}>
-      <span className="ti" style={{ fontSize: 18 }}>{e}</span>
+      <ResIcon k={k} emoji={e} />
       <div>
         <div className="tv" style={{ fontSize: 14, color: ok ? 'var(--green)' : 'var(--crimson)' }}>{have}/{need}</div>
         <div className="tl">{n}</div>
       </div>
     </div>
   )
+}
+
+// Иконки ресурсов лежат в miniapp/public/res/<ключ>.png (CraftPix-набор).
+const RES_HAS = new Set([
+  'gold', 'ingot', 'wood', 'grain', 'hops', 'stone', 'ore', 'clay',
+  'honey', 'milk', 'berries', 'fish', 'game', 'herbs', 'salt', 'water',
+])
+function ResIcon({ k, emoji, size }: { k: string; emoji?: string; size?: number }) {
+  if (RES_HAS.has(k)) {
+    const st = size ? { width: size, height: size } : undefined
+    return <img className="ric" style={st} src={`${import.meta.env.BASE_URL}res/${k}.png`} alt="" loading="lazy" />
+  }
+  return <span className="ric-e">{emoji ?? '•'}</span>
 }
 
 const fmt = (n: number) => (n >= 10000 ? `${(n / 1000).toFixed(1)}к` : `${n}`)
