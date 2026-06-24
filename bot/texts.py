@@ -2545,7 +2545,8 @@ def character_screen(player, craft_line: str = "") -> str:
     if it.orc_set_complete(equipment):           # собран орочий сет — бонус «ярость орды»
         b = it.ORC_SET_BONUS
         parts += ["", f"🪓 <b>СЕТ ОРДЫ СОБРАН</b> — ярость орды: "
-                  f"+{b['damage']} урон · +{b['armor']} броня · +{b['luck']} удача"]
+                  f"+{b['damage']} урон · +{b['crit']}% крит · +{b['armor']} броня · "
+                  f"+{b['luck']} удача · +{it.ORC_SET_INCOME_PCT}% доход"]
     parts += ["", "<i>Голый трактирщик — смешной трактирщик. Загляни в кузницу.</i>"]
     return "\n".join(parts)
 

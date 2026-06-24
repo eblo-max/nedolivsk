@@ -79,9 +79,12 @@ GEAR_RES_FLOOR = 250
 GEAR_RES_FLOOR_MAX = 320
 _SCARCE = {"ingot", "hide", "fang", "sinew", "ring", "pelt", "tusk", "chitin", "orc_scrap"}
 
-# Орочий сет: полный комплект из 3 вещей даёт боевой бонус (см. combat_stats).
+# Орочий сет: полный комплект из 3 вещей даёт «ярость орды» — сильный боевой бонус
+# (см. combat_stats) + немного дохода (income_multiplier). Сделан ЯВНО лучшим, т.к.
+# собирается дольше всего (лотерея обрывков с побед над Ордой).
 ORC_SET = ("orc_helm", "orc_plate", "orc_axe")
-ORC_SET_BONUS = {"damage": 6, "armor": 6, "luck": 4}
+ORC_SET_BONUS = {"damage": 10, "crit": 6, "armor": 12, "luck": 6}
+ORC_SET_INCOME_PCT = 5
 
 
 def parse_entry(entry: str) -> tuple[str, int]:
@@ -359,7 +362,10 @@ def equipped_items(equipment: dict | None) -> list[tuple[Item, int]]:
 
 
 def income_multiplier(equipment: dict | None) -> float:
-    return 1 + sum(i.income_pct * t for i, t in equipped_items(equipment)) / 100
+    pct = sum(i.income_pct * t for i, t in equipped_items(equipment))
+    if orc_set_complete(equipment):              # сет-бонус: + доход за полный комплект
+        pct += ORC_SET_INCOME_PCT
+    return 1 + pct / 100
 
 
 def yield_multiplier(equipment: dict | None, resource: str) -> float:
