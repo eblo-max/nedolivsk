@@ -33,7 +33,14 @@ const SAMPLE: TavernState = {
     { key: 'ingot', emoji: '🔩', name: 'Слиток', have: 6, cap: 50 },
   ],
   cellar: '🍺 Эль ×12 · 🍖 Жаркое ×4',
-  world: ['🍂 Осень', '🎪 Ярмарка ещё 2 ч', '🌧 Ливень в долинах'],
+  world: [
+    '🍂 Осень — спрос на горячее растёт',
+    '🎪 Ярмарка ещё 2 ч — сбывай товар',
+    '🌧 Ливень в долинах — вылазки медленнее',
+    '🪓 Орда орков точит топоры на севере',
+    '📈 Цены на хмель подскочили',
+    '🐀 В подвалах кого-то завелось…',
+  ],
   next_upgrade: { gold: 715, wood: 220, grain: 180, hops: 120 },
   upgrade_pct: 60,
 }
@@ -45,15 +52,8 @@ export default function Tavern() {
 
   return (
     <>
-      {/* ── липкий HUD ресурсов ── */}
-      <div className="hud">
-        <span className="c g"><b>🪙</b>{fmt(t.gold)}</span>
-        {t.storage.slice(0, 3).map((r) => (
-          <span key={r.key} className="c"><b>{r.emoji}</b>{r.have}</span>
-        ))}
-        <span className="sp" />
-        <span className="c"><b>⭐</b>{t.reputation}</span>
-      </div>
+      {/* ── бегущая строка вестей мира ── */}
+      <Ticker items={t.world} />
 
       {/* ── идентичность ── */}
       <div className="hero rise">
@@ -61,6 +61,7 @@ export default function Tavern() {
         <div className="meta">
           <span className="lvl">★ УРОВЕНЬ {t.level}</span>
           <span className="region">📍 {t.region}</span>
+          <span className="region">⭐ {t.reputation} молвы</span>
         </div>
         <div className="orn"><b>✦</b></div>
         <div className="flavor">«{t.flavor}»</div>
@@ -70,6 +71,11 @@ export default function Tavern() {
       <div className="card rise" style={{ animationDelay: '.04s' }}>
         <div className="card-h"><span className="he">💰</span>ДОХОД<span className="cnt">+{t.income_rate}/ч</span></div>
         <div className="card-b">
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontFamily: 'var(--num)' }}>
+            <b style={{ fontSize: 22 }}>🪙</b>
+            <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--gold-2)', fontVariantNumeric: 'tabular-nums' }}>{fmt(t.gold)}</span>
+            <span className="muted" style={{ fontFamily: 'var(--text)', fontSize: 14 }}>в мошне</span>
+          </div>
           <button className="btn gold" disabled={t.income_ready <= 0} onClick={() => haptic('medium')}>
             {t.income_ready > 0 ? `Собрать выручку  +${fmt(t.income_ready)} 🪙` : 'Касса пуста — гости копят жажду'}
           </button>
@@ -122,12 +128,19 @@ export default function Tavern() {
         </div>
       )}
 
-      {/* ── мир ── */}
-      <div className="card rise" style={{ animationDelay: '.24s' }}>
-        <div className="card-h"><span className="he">🌍</span>МИР</div>
-        <div className="chips">{t.world.map((w, i) => <span key={i} className="chip">{w}</span>)}</div>
-      </div>
     </>
+  )
+}
+
+function Ticker({ items }: { items: string[] }) {
+  const seq = items.length ? [...items, ...items] : ['Тишь да гладь в Недоливске…']
+  return (
+    <div className="ticker">
+      <div className="lbl">📜 ВЕСТИ</div>
+      <div className="vp"><div className="ticker-track">
+        {seq.map((w, i) => <span className="it" key={i}>{w}</span>)}
+      </div></div>
+    </div>
   )
 }
 

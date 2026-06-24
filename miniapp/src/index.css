@@ -52,19 +52,23 @@ body {
 .rise { opacity:0; transform:translateY(12px); animation:rise .42s cubic-bezier(.2,.7,.2,1) forwards; }
 @keyframes rise { to { opacity:1; transform:none; } }
 
-/* ── липкий верхний HUD ресурсов (канон: всегда на виду) ── */
-.hud {
+/* ── липкая бегущая строка вестей мира (живой общий мир) ── */
+.ticker {
   position:fixed; top:0; left:0; right:0; z-index:6; height:calc(var(--hud-h) + var(--sa-top));
-  padding:var(--sa-top) 10px 0; max-width:480px; margin:0 auto;
-  display:flex; align-items:center; gap:7px;
-  background:linear-gradient(#1c1206f2,#140d07e6); border-bottom:1px solid var(--line2);
+  padding-top:var(--sa-top); max-width:480px; margin:0 auto; display:flex; align-items:center; overflow:hidden;
+  background:linear-gradient(#1c1206f2,#140d07e6); border-bottom:1px solid var(--brass-d);
   box-shadow:0 4px 16px #000a; backdrop-filter:blur(6px);
 }
-.hud .c { display:flex; align-items:center; gap:4px; font-family:var(--num); font-weight:700;
-  font-size:13.5px; font-variant-numeric:tabular-nums; color:var(--parch); white-space:nowrap; }
-.hud .c b { font-size:14px; filter:drop-shadow(0 1px 1px #000); }
-.hud .c.g { color:var(--gold-2); }
-.hud .sp { flex:1; }
+.ticker .lbl { flex:0 0 auto; display:flex; align-items:center; gap:5px; padding:0 11px; align-self:stretch;
+  font-family:var(--disp); font-weight:700; font-size:10px; letter-spacing:1px; color:var(--brass);
+  background:linear-gradient(#3a2611,#211608); border-right:1px solid var(--brass-d); }
+.ticker .vp { flex:1; overflow:hidden; position:relative; align-self:stretch; }
+.ticker-track { position:absolute; top:0; left:0; height:100%; display:flex; align-items:center;
+  white-space:nowrap; animation:ticker 28s linear infinite; will-change:transform; }
+.ticker-track:hover { animation-play-state:paused; }
+.ticker-track .it { font-family:var(--text); font-size:14px; color:var(--parch); display:inline-flex; align-items:center; }
+.ticker-track .it::after { content:"◆"; color:var(--brass); font-size:7px; margin:0 20px; opacity:.65; }
+@keyframes ticker { from { transform:translateX(0); } to { transform:translateX(-50%); } }
 
 /* ── идентичность таверны (hero) ── */
 .hero { position:relative; text-align:center; padding:6px 0 2px; }
