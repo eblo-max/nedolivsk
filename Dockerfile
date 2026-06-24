@@ -3,9 +3,10 @@ FROM node:20-slim AS miniapp
 ENV NODE_ENV=development
 WORKDIR /m
 COPY miniapp/package.json miniapp/package-lock.json ./
-# --include=dev: Railway собирает с NODE_ENV=production → иначе npm выкинет
-# vite/typescript (они в devDependencies) и `npm run build` упадёт «vite: not found».
-RUN npm ci --include=dev
+# npm install (не ci): lock сгенерён на Windows и не содержит linux-вариантов
+# платформенных optional-deps (@emnapi/* от oxlint) — строгий npm ci на них падает.
+# install их доставит под linux; --include=dev форсит vite/typescript (Railway = NODE_ENV=production).
+RUN npm install --include=dev --no-audit --no-fund
 COPY miniapp/ ./
 RUN npm run build      # → /m/dist (отдаётся питоном под /app)
 
