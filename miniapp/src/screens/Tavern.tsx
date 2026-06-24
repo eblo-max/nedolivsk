@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
@@ -51,6 +51,7 @@ export default function Tavern() {
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState(false)
   const [sheet, setSheet] = useState<string | null>(null)
+  const panelCache = useRef<Record<string, unknown>>({})
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
 
   // ещё нет таверны — стартовый экран (создание игрока + таверны)
@@ -171,7 +172,9 @@ export default function Tavern() {
         </div>
       )}
 
-      {sheet && <ActionSheet kind={sheet} onState={(s) => set(s as TavernState)} onClose={() => setSheet(null)} flash={flash} />}
+      {sheet && <ActionSheet kind={sheet} initial={panelCache.current[sheet]}
+        onCache={(k, d) => { panelCache.current[k] = d }}
+        onState={(s) => set(s as TavernState)} onClose={() => setSheet(null)} flash={flash} />}
       {toast && <div className="toast">{toast}</div>}
     </>
   )

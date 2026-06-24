@@ -50,22 +50,28 @@ const SAMPLE: Record<string, Panel> = {
   ] },
 }
 
-export default function ActionSheet({ kind, onState, onClose, flash }: {
+export default function ActionSheet({ kind, initial, onCache, onState, onClose, flash }: {
   kind: string
+  initial?: unknown
+  onCache?: (kind: string, data: unknown) => void
   onState: (s: unknown) => void
   onClose: () => void
   flash: (m: string) => void
 }) {
-  const [panel, setPanel] = useState<Panel | null>(null)
+  // если панель уже открывалась — сразу рисуем прошлые данные (полная высота, без спиннера),
+  // а свежие подтягиваем фоном; первое открытие показывает крупный спиннер
+  const [panel, setPanel] = useState<Panel | null>((initial as Panel) ?? null)
   const [busy, setBusy] = useState(false)
   const [closing, setClosing] = useState(false)
+  const cache = (d: Panel) => { setPanel(d); onCache?.(kind, d) }
 
   useEffect(() => {
     let live = true
     api<{ panel: Panel }>('panel', { kind })
-      .then((r) => { if (live) setPanel(r.panel) })
-      .catch(() => { if (live) setPanel(SAMPLE[kind] ?? { kind, error: true }) })
+      .then((r) => { if (live) cache(r.panel) })
+      .catch(() => { if (live) setPanel((p) => p ?? (SAMPLE[kind] ?? { kind, error: true })) })
     return () => { live = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind])
 
   // блокируем прокрутку главного экрана, пока панель открыта (скролл — только внутри)
@@ -103,7 +109,7 @@ export default function ActionSheet({ kind, onState, onClose, flash }: {
     haptic('medium'); setBusy(true)
     try {
       const r = await api<Record<string, unknown>>(path, body)
-      onState(r.state); if (r.panel) setPanel(r.panel as Panel); hapticNotify('success'); flash(ok(r))
+      onState(r.state); if (r.panel) cache(r.panel as Panel); hapticNotify('success'); flash(ok(r))
     } catch (e) {
       hapticNotify('warning')
       const code = (e as { code?: string })?.code
@@ -122,7 +128,7 @@ export default function ActionSheet({ kind, onState, onClose, flash }: {
           <button className="sheet-x" onClick={close} aria-label="Закрыть">✕</button>
         </div>
         <div className="sheet-b">
-          {!panel ? <div className="center" style={{ padding: 30 }}><div className="spin" /></div>
+          {!panel ? <div className="center" style={{ minHeight: 260 }}><div className="spin" /></div>
             : panel.error ? <p className="muted" style={{ fontStyle: 'italic' }}>Не загрузилось — закрой и попробуй ещё.</p>
               : kind === 'bonus' ? <BonusBody p={panel} busy={busy} onFire={fire} />
                 : kind === 'newbie' ? <NewbieBody p={panel} busy={busy} onFire={fire} />
