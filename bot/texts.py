@@ -633,10 +633,11 @@ def building_detail(building, player: Player, tavern: Tavern) -> str:
             f"Работники освободятся через {_fmt_minutes(m)}."
         )
 
+    from bot.game import buildings as _bld
     return (
         head + gives +
         f"\n\n⏱ Стройка: {building.build_hours} ч\n\n"
-        f"💰 <b>Стоимость</b>\n{_cost_block(building.cost, player)}"
+        f"💰 <b>Стоимость</b>\n{_cost_block(_bld.cost_of(building), player)}"
     )
 
 
@@ -648,9 +649,10 @@ def build_started(building, hours: int) -> str:
 
 
 def build_not_enough(building, player: Player) -> str:
+    from bot.game import buildings as _bld
     return (
         f"😕 На <b>{building.name}</b> не хватает.\n"
-        f"Надо: {_cost_line(building.cost, player)}\n"
+        f"Надо: {_cost_line(_bld.cost_of(building), player)}\n"
         "Гони работников за сырьём и возвращайся."
     )
 

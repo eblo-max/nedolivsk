@@ -5,6 +5,7 @@
 Картинки предметов: assets/items/<item_id>.png (прозрачный фон).
 """
 
+import math
 from dataclasses import dataclass
 
 
@@ -55,6 +56,9 @@ TIER_NAMES = {1: "обычный", 2: "добротный", 3: "мастерск
 TIER_STARS = {1: "★", 2: "★★", 3: "★★★"}
 TIER_COST_MULT = {1: 1, 2: 3, 3: 8}     # цена ковки данного яруса
 TIER_INVESTED = {1: 1, 2: 4, 3: 12}     # суммарно вложено к ярусу (для ВВП)
+# Общий множитель цены ковки (золото+ресурсы). Поднят для борьбы с инфляцией:
+# базовые цены задавались при дефиците золота, теперь золото обесценилось.
+GEAR_COST_MULT = 1.5
 
 
 def parse_entry(entry: str) -> tuple[str, int]:
@@ -76,8 +80,8 @@ def make_entry(item_id: str, tier: int) -> str:
 def tier_cost(item: "Item", tier: int) -> dict:
     if TEST_FREE_CRAFT:
         return {k: 0 for k in item.cost}
-    mult = TIER_COST_MULT[tier]
-    return {k: v * mult for k, v in item.cost.items()}
+    mult = TIER_COST_MULT[tier] * GEAR_COST_MULT
+    return {k: max(1, math.ceil(v * mult)) for k, v in item.cost.items()}
 
 
 def tier_hours(item: "Item", tier: int) -> int:

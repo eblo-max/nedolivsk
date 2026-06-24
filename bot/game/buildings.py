@@ -5,10 +5,20 @@
 на этих зданиях — следующий шаг.
 """
 
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from bot.game import economy, inventory
+
+# Общий множитель стоимости пристроек (золото+сырьё). Поднят как золото/ресурсо-сток
+# против инфляции (см. /econ). Меняй здесь, чтобы крутить цену всех пристроек разом.
+BUILD_COST_MULT = 1.4
+
+
+def cost_of(b: "Building") -> dict:
+    """Актуальная стоимость пристройки с учётом множителя (для оплаты/проверки/показа)."""
+    return {k: max(1, math.ceil(v * BUILD_COST_MULT)) for k, v in b.cost.items()}
 
 
 @dataclass(frozen=True)
@@ -151,15 +161,16 @@ def start_build(player, tavern, building_id: str) -> BuildStart:
         return BuildStart(ok=False, reason="requires", building=b)
     if rep_locked(tavern, b):
         return BuildStart(ok=False, reason="reputation", building=b)
-    if not inventory.can_afford(player, b.cost):
+    cost = cost_of(b)
+    if not inventory.can_afford(player, cost):
         return BuildStart(ok=False, reason="not_enough", building=b,
-                          cost=b.cost, hours=b.build_hours)
+                          cost=cost, hours=b.build_hours)
 
-    inventory.pay(player, b.cost)
-    economy.record(player, "building", -int(b.cost.get("gold", 0)))
+    inventory.pay(player, cost)
+    economy.record(player, "building", -int(cost.get("gold", 0)))
     player.build_item = building_id
     player.build_ends_at = _now() + timedelta(hours=b.build_hours)
-    return BuildStart(ok=True, building=b, cost=b.cost, hours=b.build_hours)
+    return BuildStart(ok=True, building=b, cost=cost, hours=b.build_hours)
 
 
 def invested_value(tavern) -> int:
