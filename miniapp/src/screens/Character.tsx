@@ -171,8 +171,9 @@ export default function Character() {
 
       {/* боевые — плавающая лента, без рамки */}
       <div className="statband rise" style={{ animationDelay: '.04s' }}>
+        <div className="cap">БОЕВЫЕ</div>
         <div className="stat-hp">
-          <span className="shp-lbl">❤ Здоровье</span>
+          <span className="shp-ic">❤</span>
           <div className="bar"><i style={{ width: `${Math.round(c.hp.cur / c.hp.max * 100)}%` }} /></div>
           <span className="shp-val">{c.hp.cur}/{c.hp.max}{c.hp.cur < c.hp.max ? ` · ${Math.floor(c.hp.regen / 60)}ч ${c.hp.regen % 60}м` : ''}</span>
         </div>
@@ -185,9 +186,11 @@ export default function Character() {
       </div>
 
       {c.bonuses.length > 0 && (
-        <div className="stat-econ rise" style={{ animationDelay: '.08s' }}>
-          <span className="se-lbl">🏠 Хозяйство</span>
-          {c.bonuses.map((b, i) => <span key={i} className="se">{b.label} <b>{b.val}</b></span>)}
+        <div className="statband rise" style={{ animationDelay: '.08s' }}>
+          <div className="cap">ХОЗЯЙСТВО</div>
+          <div className="stat-econ">
+            {c.bonuses.map((b, i) => <span key={i} className="se">{b.label} <b>{b.val}</b></span>)}
+          </div>
         </div>
       )}
 
