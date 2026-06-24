@@ -169,36 +169,31 @@ export default function Character() {
 
       {craftBanner(c.craft)}
 
-      <div className="card rise" style={{ animationDelay: '.04s' }}>
-        <div className="card-h"><span className="he">⚔</span>БОЕВЫЕ</div>
-        <div className="card-b">
-          <div className="res">
-            <div className="top"><span className="rn">❤ Здоровье</span>
-              <span className="rv">{c.hp.cur}/{c.hp.max}{c.hp.cur < c.hp.max ? ` · ⏳ ${Math.floor(c.hp.regen / 60)}ч ${c.hp.regen % 60}м` : ''}</span></div>
-            <div className="bar"><i style={{ width: `${Math.round(c.hp.cur / c.hp.max * 100)}%` }} /></div>
-          </div>
+      {/* боевые — плавающая лента, без рамки */}
+      <div className="statband rise" style={{ animationDelay: '.04s' }}>
+        <div className="stat-hp">
+          <span className="shp-lbl">❤ Здоровье</span>
+          <div className="bar"><i style={{ width: `${Math.round(c.hp.cur / c.hp.max * 100)}%` }} /></div>
+          <span className="shp-val">{c.hp.cur}/{c.hp.max}{c.hp.cur < c.hp.max ? ` · ${Math.floor(c.hp.regen / 60)}ч ${c.hp.regen % 60}м` : ''}</span>
         </div>
-        <div className="grid2" style={{ paddingTop: 4 }}>
-          <Tile icon="⚔" v={c.damage} l="Урон" />
-          <Tile icon="💥" v={`${c.crit}%`} l="Крит" />
-          <Tile icon="🛡" v={c.armor} l="Броня" />
-          <Tile img="stat/luck.png" v={`${c.luck} · ${c.vylazka}%`} l="Удача" />
+        <div className="stat-ribbon">
+          <span className="si"><b>⚔</b>{c.damage}</span>
+          <span className="si"><b>💥</b>{c.crit}%</span>
+          <span className="si"><b>🛡</b>{c.armor}</span>
+          <span className="si"><img className="ric" src={`${import.meta.env.BASE_URL}stat/luck.png`} alt="" />{c.luck}<small> · {c.vylazka}%</small></span>
         </div>
       </div>
 
       {c.bonuses.length > 0 && (
-        <div className="card rise" style={{ animationDelay: '.08s' }}>
-          <div className="card-h"><span className="he">🏠</span>ХОЗЯЙСТВО</div>
-          <div className="chips">{c.bonuses.map((b, i) => (
-            <span key={i} className="chip">{b.label} <b style={{ color: 'var(--green)', fontFamily: 'var(--num)' }}>{b.val}</b></span>))}</div>
+        <div className="stat-econ rise" style={{ animationDelay: '.08s' }}>
+          <span className="se-lbl">🏠 Хозяйство</span>
+          {c.bonuses.map((b, i) => <span key={i} className="se">{b.label} <b>{b.val}</b></span>)}
         </div>
       )}
 
       {c.orc && (
-        <div className="card rise orc-set" style={{ animationDelay: '.1s' }}>
-          <div className="card-b"><div style={{ fontFamily: 'var(--disp)', color: 'var(--ember)', fontWeight: 700, letterSpacing: 1 }}>🪓 СЕТ ОРДЫ СОБРАН</div>
-            <div className="muted" style={{ fontSize: 13.5 }}>Ярость орды: +{c.orc.damage} урон · +{c.orc.crit}% крит · +{c.orc.armor} броня · +{c.orc.luck} удача · +{c.orc.income}% доход</div>
-          </div>
+        <div className="stat-orc rise" style={{ animationDelay: '.1s' }}>
+          <b>🪓 СЕТ ОРДЫ</b> +{c.orc.damage} урон · +{c.orc.crit}% крит · +{c.orc.armor} броня · +{c.orc.luck} удача · +{c.orc.income}% доход
         </div>
       )}
 
@@ -264,16 +259,6 @@ function SlotBox({ s, onTap, onEmpty }: { s: Slot; onTap: (id: string) => void; 
     </button>
   )
   return <button className="slot empty" aria-label={s.slot_name} title={`${s.slot_name} — пусто`} onClick={onEmpty} />
-}
-
-function Tile({ icon, img, v, l }: { icon?: string; img?: string; v: string | number; l: string }) {
-  return (
-    <div className="tile">
-      {img ? <img className="ti-img" src={`${import.meta.env.BASE_URL}${img}`} alt="" loading="lazy" />
-        : <span className="ti">{icon}</span>}
-      <div><div className="tv">{v}</div><div className="tl">{l}</div></div>
-    </div>
-  )
 }
 
 const FORGE_SAMPLE: ForgeState = {
