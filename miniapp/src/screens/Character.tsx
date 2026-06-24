@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
-import { haptic, hapticNotify } from '../telegram'
+import { haptic, hapticNotify, initData } from '../telegram'
 import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
 
@@ -56,7 +56,7 @@ const SAMPLE: CharState = {
 }
 
 export default function Character() {
-  const { data, loading, set, reload } = useApi<CharState>('character', SAMPLE)
+  const { data, loading, error, set, reload } = useApi<CharState>('character', SAMPLE)
   const [view, setView] = useState<'doll' | 'forge'>('doll')
   const [forge, setForge] = useState<ForgeState | null>(null)
   const [pick, setPick] = useState<ForgeItem | null>(null)
@@ -80,6 +80,13 @@ export default function Character() {
   }, [reload])
 
   if (loading && !data) return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
+  // в реальном Telegram сбой загрузки — честная ошибка, а не подмена заглушкой
+  if (error && error !== 'no_tavern' && initData()) return (
+    <div className="center" style={{ flex: 1, flexDirection: 'column', gap: 14, padding: 26, textAlign: 'center' }}>
+      <div className="muted" style={{ fontStyle: 'italic' }}>Не удалось загрузить персонажа.</div>
+      <button className="btn gold" style={{ maxWidth: 220 }} onClick={() => reload()}>Повторить</button>
+    </div>
+  )
   const c = data ?? SAMPLE
 
   async function openForge() {

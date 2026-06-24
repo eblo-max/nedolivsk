@@ -753,7 +753,7 @@ def _character_state(p) -> dict:
     # лечение: чем можно подлечиться из погреба (combat.heal)
     from bot.game import production as prod
     hp_cur, hp_max = combat.current_hp(p), combat.max_hp()
-    prods = (t.products or {})
+    prods = (p.tavern.products if p.tavern else None) or {}
     heal_opts = [{"key": k, "name": prod.GOODS[k].name, "emoji": prod.GOODS[k].emoji,
                   "hp": bal.HEAL_VALUES[k], "qty": int(prods.get(k, 0))}
                  for k in bal.HEAL_VALUES if k in prod.GOODS and int(prods.get(k, 0)) > 0]
