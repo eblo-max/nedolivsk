@@ -91,21 +91,3 @@ export function setBackButton(onClick: (() => void) | null) {
   if (onClick) { _backCb = onClick; b.onClick(onClick); b.show() }
   else b.hide()
 }
-
-/** Нативная нижняя кнопка Telegram (MainButton) — для главного действия экрана.
- * Возвращает true, если кнопка доступна (есть Telegram), иначе false — тогда
- * рисуем свою кнопку в интерфейсе. Цвет под наш «золотой» CTA. */
-let _mainCb: (() => void) | null = null
-export function setMainButton(opts: { text: string; onClick: () => void; enabled?: boolean } | null): boolean {
-  const b = tg?.MainButton
-  if (!b) return false
-  if (_mainCb) { b.offClick(_mainCb); _mainCb = null }
-  if (opts) {
-    b.setParams({ text: opts.text, color: '#cf9a3c', text_color: '#241501',
-                  is_active: opts.enabled !== false, is_visible: true })
-    _mainCb = opts.onClick; b.onClick(opts.onClick)
-  } else {
-    b.hide()
-  }
-  return true
-}

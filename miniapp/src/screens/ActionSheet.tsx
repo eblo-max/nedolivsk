@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { haptic, hapticNotify, setBackButton, setMainButton } from '../telegram'
+import { haptic, hapticNotify, setBackButton } from '../telegram'
 import { ResIcon, fmt } from '../components/icons'
 
 interface Task { label: string; reward: string; status: 'claimed' | 'ready' | 'todo' }
@@ -223,19 +223,6 @@ function NewbieBody({ p, busy, onFire }: { p: Panel; busy: boolean; onFire: (pat
 }
 
 function UpgradeBody({ p, busy, onFire }: { p: Panel; busy: boolean; onFire: (path: string, done: (r: Record<string, unknown>) => string) => void }) {
-  const [native, setNative] = useState(false)
-  const confirm = () => onFire('upgrade', (r) => `Таверна выросла до ур. ${r.level}!`)
-
-  // нативная кнопка Telegram (MainButton) как подтверждение; если её нет
-  // (браузер/старый клиент) — рисуем свою кнопку в панели
-  useEffect(() => {
-    if (p.maxed) return
-    const ok = setMainButton({ text: `⬆ Улучшить до ур. ${p.next}`, enabled: !!p.affordable && !busy, onClick: confirm })
-    setNative(ok)
-    return () => { setMainButton(null) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p.affordable, p.next, p.maxed, busy])
-
   if (p.maxed) return <p className="sheet-desc">«Выше строить некуда — ты легенда Недоливска.»</p>
   return (
     <>
@@ -254,12 +241,10 @@ function UpgradeBody({ p, busy, onFire }: { p: Panel; busy: boolean; onFire: (pa
         <div key={i} className="sheet-row"><span>{g.label}</span>
           <b>{g.frm} <span style={{ color: 'var(--brass)' }}>→</span> {g.to}</b></div>
       ))}
-      {!native && (
-        <button className="btn gold" style={{ marginTop: 14 }} disabled={busy || !p.affordable} onClick={confirm}>
-          {p.affordable ? `⬆ Улучшить до ур. ${p.next}` : 'Не хватает ресурсов'}
-        </button>
-      )}
-      {native && !p.affordable && <div className="onb-err">Не хватает ресурсов на перестройку</div>}
+      <button className="btn gold" style={{ marginTop: 14 }} disabled={busy || !p.affordable}
+        onClick={() => onFire('upgrade', (r) => `Таверна выросла до ур. ${r.level}!`)}>
+        {p.affordable ? `⬆ Улучшить до ур. ${p.next}` : 'Не хватает ресурсов'}
+      </button>
     </>
   )
 }
