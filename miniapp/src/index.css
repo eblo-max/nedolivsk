@@ -268,7 +268,10 @@ body {
 .sheet-ov.out { animation:ov-out .24s ease forwards; }
 @keyframes ov-in { from { opacity:0; } }
 @keyframes ov-out { to { opacity:0; } }
-.sheet { width:100%; max-width:480px; max-height:86vh; display:flex; flex-direction:column;
+/* высоту ограничиваем РЕАЛЬНЫМ стабильным вьюпортом Telegram (на мобиле апп — BottomSheet,
+   где 100vh может быть больше видимой области); фолбэк на 86vh вне Telegram */
+.sheet { width:100%; max-width:480px; display:flex; flex-direction:column;
+  max-height:calc(var(--tg-viewport-stable-height, 100vh) * 0.86);
   background-image:var(--wood),var(--glass); background-repeat:repeat,no-repeat;
   border:1px solid #9c7838; border-bottom:none; border-radius:16px 16px 0 0;
   box-shadow:0 -12px 44px #000d; padding-bottom:calc(var(--sa-bottom) + 10px);

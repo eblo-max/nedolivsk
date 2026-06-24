@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import { setBackButton } from './telegram'
 import BottomNav from './components/BottomNav'
 import Splash from './screens/Splash'
 import Tavern from './screens/Tavern'
@@ -10,6 +11,17 @@ import MapScreen from './screens/MapScreen'
 
 export default function App() {
   const [intro, setIntro] = useState(true)
+  const loc = useLocation()
+  const nav = useNavigate()
+
+  // на под-экранах нативная «назад» Telegram возвращает в Таверну
+  // (панели-модалки сами перехватывают «назад» поверх этого, см. ActionSheet)
+  useEffect(() => {
+    if (intro) return
+    if (loc.pathname !== '/') setBackButton(() => nav('/'))
+    else setBackButton(null)
+  }, [loc.pathname, intro, nav])
+
   return (
     <>
       <div className="fx-glow" />
