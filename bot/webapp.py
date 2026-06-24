@@ -334,6 +334,135 @@ async def _api_mill_collect(request: web.Request) -> web.Response:
                              headers={"Cache-Control": "no-store"})
 
 
+async def _auth(request: web.Request):
+    """Разобрать тело + проверить initData. -> (uid, body) | (None, Response-ошибка)."""
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        body = {}
+    uid = _verify_init_data(body.get("initData") or "")
+    if not uid:
+        return None, web.json_response({"ok": False, "error": "auth"}, status=401)
+    return uid, body
+
+
+def _tavern_state(p, t) -> dict:
+    """Состояние Таверны для мини-аппа — собрано из ТЕХ ЖЕ функций, что и текстовый
+    экран бота (texts/logic/balance), но структурировано в JSON. Чистое чтение."""
+    from bot import texts
+    from bot.game import balance as bal, buff as buffmod, items, logic
+    from bot.game import city as citymod, production as prod, season as seasonmod
+
+    chat_id = getattr(p, "chat_id", None)
+    eq = p.equipment or {}
+    cs = items.combat_stats(eq)
+    maxed = t.level >= bal.MAX_LEVEL
+    pct = texts._upgrade_pct(p, t)
+
+    now: list[dict] = []
+    act = buffmod.active(p)
+    if act is not None:
+        now.append({"icon": act.emoji, "text": f"Баф «{act.name}»",
+                    "sub": f"ещё {buffmod.minutes_left(p)} мин"})
+    elif buffmod.offer(p) is not None:
+        now.append({"icon": "🎁", "text": "Бонус дня готов", "sub": "забери и активируй", "badge": "ready"})
+    c = logic.expedition_counts(p, t)
+    if c.ready and c.out:
+        now.append({"icon": "⛏", "text": f"Бригады: {c.ready} готовы, {c.out} в пути", "sub": f"возврат ~{c.next_minutes} мин"})
+    elif c.ready:
+        now.append({"icon": "⛏", "text": f"Бригады вернулись ({c.ready})", "sub": "забирай добычу", "badge": "ready"})
+    elif c.out:
+        now.append({"icon": "⛏", "text": f"Бригады в пути: {c.out}/{c.total}", "sub": f"возврат ~{c.next_minutes} мин"})
+    else:
+        now.append({"icon": "⛏", "text": "Бригады свободны", "sub": "гони за добром"})
+    pa, pr = texts._producer_counts(t)
+    if pr:
+        now.append({"icon": "🏭", "text": f"Пристройки: {pr} готовы — забирай", "badge": "ready"})
+    elif pa:
+        now.append({"icon": "🏭", "text": f"Пристройки: {pa} в работе"})
+    bl = texts._build_line(p)
+    if bl:
+        now.append({"icon": "🏗", "text": bl.replace("🏗 ", "", 1)})
+    if not maxed and pct is not None:
+        now.append({"icon": "🔨", "text": f"Перестройка до ур. {t.level + 1}",
+                    "sub": f"{pct}% — копим ресурсы", "progress": pct / 100, "gold": True})
+
+    inv = p.inventory or {}
+    storage = [{"key": r, "name": bal.RESOURCE_NAMES.get(r, r), "amount": int(inv.get(r, 0))}
+               for r in bal.RESOURCES if int(inv.get(r, 0)) > 0]
+    cellar = [{"key": k, "name": prod.GOODS[k].name, "qty": int(q)}
+              for k, q in (t.products or {}).items() if q and k in prod.GOODS]
+
+    return {
+        "ok": True, "name": t.name, "level": int(t.level),
+        "region": bal.REGIONS.get(p.region, p.region or ""),
+        "flavor": texts._flavor_line(p, t, chat_id, seasonmod, citymod),
+        "gold": int(p.gold), "income_rate": int(t.income_rate),
+        "income_ready": int(texts._pending_income(t)), "reputation": int(t.reputation or 0),
+        "capacity": int(t.capacity), "comfort": int(t.comfort),
+        "luck_pct": int(bal.lucky_chance(cs["luck"] + buffmod.luck_bonus(p))),
+        "gear_worn": len(eq), "gear_slots": len(items.SLOTS),
+        "now": now, "storage": storage, "cellar": cellar,
+        "world": texts._world_lines(chat_id, seasonmod, citymod),
+        "next_upgrade": (None if maxed else bal.upgrade_cost(t.level)),
+        "upgrade_pct": pct, "maxed": maxed,
+    }
+
+
+async def _api_state(request: web.Request) -> web.Response:
+    """Снапшот Таверны (read-only)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        out = _tavern_state(p, p.tavern)
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+async def _api_collect(request: web.Request) -> web.Response:
+    """Собрать накопленный доход (пассив) — та же logic.collect_income, что у бота."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import logic
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        res = logic.collect_income(p, p.tavern)
+        collected = int(getattr(res, "passive", 0) or 0)
+        if collected > 0:
+            repo.add_log(s, "player", p.id, f"🪙 собрал доход +{collected}")
+        await s.commit()
+        st = _tavern_state(p, p.tavern)
+    return web.json_response({"ok": True, "collected": collected, "state": st},
+                             headers={"Cache-Control": "no-store"})
+
+
+async def _api_upgrade(request: web.Request) -> web.Response:
+    """Улучшить таверну — та же logic.try_upgrade (валидация ресурсов/макс-уровня)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import logic
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        r = logic.try_upgrade(p, p.tavern)
+        if not r.ok:                       # not_enough | max_level
+            return web.json_response({"ok": False, "error": r.reason,
+                                      "state": _tavern_state(p, p.tavern)})
+        repo.add_log(s, "player", p.id, f"🔨 улучшил таверну до ур. {r.new_level}")
+        await s.commit()
+        st = _tavern_state(p, p.tavern)
+    return web.json_response({"ok": True, "level": r.new_level, "state": st},
+                             headers={"Cache-Control": "no-store"})
+
+
 async def _map_page(request: web.Request) -> web.Response:
     return web.Response(text=_MAP_HTML, content_type="text/html")
 
@@ -446,6 +575,9 @@ def build_app() -> web.Application:
     app.router.add_post("/api/invasion/join", _api_invasion_join)
     app.router.add_post("/api/mill/run", _api_mill_run)        # вылазка телеги за зерном
     app.router.add_post("/api/mill/collect", _api_mill_collect)
+    app.router.add_post("/api/state", _api_state)        # снапшот Таверны (mini-app)
+    app.router.add_post("/api/collect", _api_collect)    # собрать доход
+    app.router.add_post("/api/upgrade", _api_upgrade)    # улучшить таверну
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
     app.router.add_get("/assets/boss/ork{n}_{anim}.png", _event_sprite)  # ивент-анимации

@@ -171,6 +171,13 @@ body {
 .ric { width:22px; height:22px; object-fit:contain; flex:0 0 auto; filter:drop-shadow(0 1px 1px #000a); }
 .ric-e { font-size:18px; width:22px; text-align:center; flex:0 0 auto; filter:drop-shadow(0 1px 1px #000); }
 
+/* всплывающее уведомление */
+.toast { position:fixed; left:50%; bottom:calc(var(--nav-h) + 18px + var(--sa-bottom));
+  transform:translateX(-50%); z-index:30; max-width:88%;
+  font-family:var(--disp); font-weight:700; font-size:13px; letter-spacing:.4px; color:#241501;
+  background:linear-gradient(var(--gold-2),#cf9a3c); border:1px solid #f6dd92; border-radius:9px;
+  padding:11px 18px; box-shadow:0 8px 24px #000a; animation:rise .25s ease forwards; text-align:center; }
+
 /* утилиты */
 .center { display:flex; align-items:center; justify-content:center; }
 .muted { color:var(--dim); }
