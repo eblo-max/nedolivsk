@@ -86,18 +86,6 @@ export default function Tavern() {
     if (!a.action) return
     haptic('light'); setSheet(a.action)
   }
-  async function upgrade() {
-    if (busy) return
-    haptic('medium'); setBusy(true)
-    try {
-      const r = await api<{ level: number; state: TavernState }>('upgrade')
-      set(r.state); hapticNotify('success'); flash(`Таверна выросла до ур. ${r.level}!`)
-    } catch (e) {
-      hapticNotify('warning')
-      const code = (e as { code?: string })?.code
-      flash(code === 'not_enough' ? 'Не хватает на перестройку' : code === 'max_level' ? 'Выше строить некуда' : 'Артель не вышла')
-    } finally { setBusy(false) }
-  }
 
   return (
     <>
@@ -178,7 +166,7 @@ export default function Tavern() {
                 <CostTile key={k} k={k} need={v} have={k === 'gold' ? t.gold : (t.storage.find((s) => s.key === k)?.amount ?? 0)} />
               ))}
             </div>
-            <button className="btn" disabled={busy} onClick={upgrade}>⬆ Улучшить до уровня {t.level + 1}</button>
+            <button className="btn" disabled={busy} onClick={() => { haptic('light'); setSheet('upgrade') }}>⬆ Улучшить до уровня {t.level + 1}</button>
           </div>
         </div>
       )}

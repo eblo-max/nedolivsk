@@ -504,6 +504,28 @@ def _panel_data(p, t, kind: str) -> dict:
         return {"kind": "newbie", "tasks": tasks, "claimable": nb.claimable(p, t),
                 "perks": nb.perks_active(p), "grace_days": nb.NEWBIE_GRACE_DAYS}
 
+    if kind == "upgrade":
+        from bot.game import balance as bal
+        if t.level >= bal.MAX_LEVEL:
+            return {"kind": "upgrade", "maxed": True}
+        cost = bal.upgrade_cost(t.level)
+        ns = bal.stats_for_level(t.level + 1)
+        inv = p.inventory or {}
+        names = {"gold": "Золото", **bal.RESOURCE_NAMES}
+        items = []
+        for k, v in cost.items():
+            have = int(p.gold) if k == "gold" else int(inv.get(k, 0))
+            items.append({"key": k, "name": names.get(k, k), "need": int(v),
+                          "have": have, "ok": have >= int(v)})
+        gains = [
+            {"label": "Места", "frm": int(t.capacity), "to": int(ns["capacity"])},
+            {"label": "Уют", "frm": int(t.comfort), "to": int(ns["comfort"])},
+            {"label": "Доход/ч", "frm": int(t.income_rate), "to": int(ns["income_rate"])},
+        ]
+        return {"kind": "upgrade", "level": int(t.level), "next": int(t.level) + 1,
+                "cost": items, "gains": gains, "affordable": all(i["ok"] for i in items),
+                "gold_cost": int(cost.get("gold", 0))}
+
     if kind == "retail":
         from bot.game import production as prod, story_state
         want = story_state.get_retail(p)
@@ -540,7 +562,7 @@ async def _api_panel(request: web.Request) -> web.Response:
     if uid is None:
         return body
     kind = str(body.get("kind") or "")
-    if kind not in ("bonus", "newbie", "expedition", "retail"):
+    if kind not in ("bonus", "newbie", "expedition", "retail", "upgrade"):
         return web.json_response({"ok": False, "error": "bad_kind"})
     async with session_factory() as s:
         p = await repo.get_player(s, uid)

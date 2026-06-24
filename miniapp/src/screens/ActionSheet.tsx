@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { haptic, hapticNotify, setBackButton } from '../telegram'
+import { haptic, hapticNotify, setBackButton, setMainButton } from '../telegram'
 import { ResIcon, fmt } from '../components/icons'
 
 interface Task { label: string; reward: string; status: 'claimed' | 'ready' | 'todo' }
@@ -20,6 +20,10 @@ interface Panel {
   // retail
   items?: { key: string; name: string; emoji: string; qty: number; price: number; sum: number }[]
   empty?: boolean
+  // upgrade
+  level?: number; next?: number; maxed?: boolean; affordable?: boolean; gold_cost?: number
+  cost?: { key: string; name: string; need: number; have: number; ok: boolean }[]
+  gains?: { label: string; frm: number; to: number }[]
 }
 
 const TITLE: Record<string, { ic: string; t: string }> = {
@@ -27,6 +31,7 @@ const TITLE: Record<string, { ic: string; t: string }> = {
   newbie: { ic: 'scroll', t: 'ГРАМОТА НОВОСЁЛА' },
   expedition: { ic: 'pickaxe', t: 'БРИГАДЫ РАБОТНИКОВ' },
   retail: { ic: 'beer', t: 'ГОСТИ ЖДУТ ЗАКАЗ' },
+  upgrade: { ic: 'hammer', t: 'ПЕРЕСТРОЙКА' },
 }
 
 // образцы для оффлайн-превью (когда нет /api)
@@ -48,6 +53,16 @@ const SAMPLE: Record<string, Panel> = {
     { key: 'ale1', name: 'Эль', emoji: '🍺', qty: 6, price: 9, sum: 54 },
     { key: 'pie', name: 'Пирог', emoji: '🥧', qty: 2, price: 15, sum: 30 },
   ] },
+  upgrade: { kind: 'upgrade', level: 2, next: 3, affordable: true, gold_cost: 715,
+    cost: [
+      { key: 'gold', name: 'Золото', need: 715, have: 1340, ok: true },
+      { key: 'wood', name: 'Дерево', need: 220, have: 260, ok: true },
+      { key: 'grain', name: 'Зерно', need: 180, have: 90, ok: false },
+    ],
+    gains: [
+      { label: 'Места', frm: 20, to: 25 }, { label: 'Уют', frm: 2, to: 3 },
+      { label: 'Доход/ч', frm: 18, to: 26 },
+    ] },
 }
 
 export default function ActionSheet({ kind, initial, onCache, onState, onClose, flash }: {
@@ -146,7 +161,8 @@ export default function ActionSheet({ kind, initial, onCache, onState, onClose, 
               : kind === 'bonus' ? <BonusBody p={panel} busy={busy} onFire={fire} />
                 : kind === 'newbie' ? <NewbieBody p={panel} busy={busy} onFire={fire} />
                   : kind === 'retail' ? <RetailBody p={panel} busy={busy} onFire={fire} />
-                    : <ExpedBody p={panel} busy={busy} onExped={exped} />}
+                    : kind === 'upgrade' ? <UpgradeBody p={panel} busy={busy} onFire={fire} />
+                      : <ExpedBody p={panel} busy={busy} onExped={exped} />}
         </div>
       </div>
     </div>
@@ -202,6 +218,48 @@ function NewbieBody({ p, busy, onFire }: { p: Panel; busy: boolean; onFire: (pat
         })}>
         {p.claimable ? '🎁 Забрать награды' : 'Пока забирать нечего'}
       </button>
+    </>
+  )
+}
+
+function UpgradeBody({ p, busy, onFire }: { p: Panel; busy: boolean; onFire: (path: string, done: (r: Record<string, unknown>) => string) => void }) {
+  const [native, setNative] = useState(false)
+  const confirm = () => onFire('upgrade', (r) => `Таверна выросла до ур. ${r.level}!`)
+
+  // нативная кнопка Telegram (MainButton) как подтверждение; если её нет
+  // (браузер/старый клиент) — рисуем свою кнопку в панели
+  useEffect(() => {
+    if (p.maxed) return
+    const ok = setMainButton({ text: `⬆ Улучшить до ур. ${p.next}`, enabled: !!p.affordable && !busy, onClick: confirm })
+    setNative(ok)
+    return () => { setMainButton(null) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.affordable, p.next, p.maxed, busy])
+
+  if (p.maxed) return <p className="sheet-desc">«Выше строить некуда — ты легенда Недоливска.»</p>
+  return (
+    <>
+      <div className="sheet-sub">ВЫЛОЖИШЬ</div>
+      <div className="sheet-list">
+        {(p.cost ?? []).map((c, i) => (
+          <div key={i} className="sheet-task">
+            <ResIcon k={c.key} />
+            <span className="l">{c.name}</span>
+            <span className="r" style={{ color: c.ok ? 'var(--green)' : 'var(--crimson)' }}>{fmt(c.have)} / {fmt(c.need)}</span>
+          </div>
+        ))}
+      </div>
+      <div className="sheet-sub" style={{ marginTop: 14 }}>ПОЛУЧИШЬ · ур. {p.next}</div>
+      {(p.gains ?? []).map((g, i) => (
+        <div key={i} className="sheet-row"><span>{g.label}</span>
+          <b>{g.frm} <span style={{ color: 'var(--brass)' }}>→</span> {g.to}</b></div>
+      ))}
+      {!native && (
+        <button className="btn gold" style={{ marginTop: 14 }} disabled={busy || !p.affordable} onClick={confirm}>
+          {p.affordable ? `⬆ Улучшить до ур. ${p.next}` : 'Не хватает ресурсов'}
+        </button>
+      )}
+      {native && !p.affordable && <div className="onb-err">Не хватает ресурсов на перестройку</div>}
     </>
   )
 }
