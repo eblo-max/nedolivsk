@@ -11,9 +11,12 @@ def _p(gold=1000, inv=None, buys=None):
 
 
 def test_price_is_base_times_markup():
-    assert shop.price("wood") == 6           # 2.0 × 3
-    assert shop.price("grain") == 8          # 2.5 × 3 → ceil
-    assert shop.price("hops") == 12          # 4.0 × 3
+    import math
+    m = balance.SHOP_PRICE_MARKUP
+    assert shop.price("wood") == math.ceil(balance.RESOURCE_PRICE["wood"] * m)
+    assert shop.price("grain") == math.ceil(balance.RESOURCE_PRICE["grain"] * m)
+    assert shop.price("hops") == math.ceil(balance.RESOURCE_PRICE["hops"] * m)
+    assert shop.price("wood") > balance.RESOURCE_PRICE["wood"]   # наценка вверх
 
 
 def test_sellable_only_raw_no_semiproducts():
@@ -23,7 +26,7 @@ def test_sellable_only_raw_no_semiproducts():
 
 
 def test_max_affordable_capped_by_gold():
-    p = _p(gold=20)                          # хватит на 3 дерева (6 каждое)
+    p = _p(gold=shop.price("wood") * 3 + 1)  # хватит ровно на 3 дерева
     assert shop.max_affordable(p, "wood") == 3
 
 
@@ -45,4 +48,4 @@ def test_shortfall_and_bill():
     cost = {"gold": 250, "wood": 75, "grain": 60, "hops": 40}
     short = shop.shortfall(have, cost)
     assert short == {"wood": 25, "grain": 60, "hops": 40}
-    assert shop.bill({"wood": 10}) == 60      # 10 × 6
+    assert shop.bill({"wood": 10}) == 10 * shop.price("wood")   # докупка по цене лавки

@@ -207,6 +207,7 @@ def collect_income(
     mult = items.income_multiplier(getattr(player, "equipment", None))
     passive = int(tavern.income_rate * hours * mult * perks.passive_mult(player)
                   * buff.gold_mult(player) * worldevent.income_mult(player))
+    passive -= int(passive * balance.WORKER_UPKEEP_PCT)   # содержание (анти-инфляция, сток)
 
     order, premium_unsold, premium_left = _retail_demand(
         tavern, hours, demand_mult, perks.food_mult(player))
