@@ -26,6 +26,7 @@ interface ForgeItem {
 interface ForgeState { ok: boolean; pouch: Record<string, number>; items: ForgeItem[]; craft: { state: string; minutes: number } }
 
 const stars = (t?: number) => '★'.repeat(t || 0)
+const TIER_NAME: Record<number, string> = { 1: 'обычный', 2: 'добротный', 3: 'мастерский' }
 const sprite = (s?: string) => `${import.meta.env.BASE_URL}items/${s}.png`
 
 // раскладка слотов вокруг фигуры: левая колонка | герой | правая колонка, снизу — ряд
@@ -173,6 +174,7 @@ export default function Character() {
         <div className="nm">{c.name}</div>
         <div className="meta"><span className="region">Хозяин кабака</span>
           <span className="region"><img className="meta-ic" src={`${import.meta.env.BASE_URL}stat/gear.png`} alt="" /> надето {c.worn}/{c.slots_total}</span></div>
+        <div className="flavor" style={{ margin: '6px 14px 0', fontSize: 13.5 }}>«Морда кирпичом, руки в мозолях.»</div>
       </div>
 
       {/* кукла: герой (анимированный) парит в воздухе, слоты по бокам — без рамки */}
@@ -221,6 +223,7 @@ export default function Character() {
         </div>
       )}
 
+      <div className="flavor rise" style={{ margin: '8px 14px 4px', fontSize: 13.5, animationDelay: '.14s' }}>«Голый трактирщик — смешной трактирщик. Загляни в кузницу.»</div>
       <button className="btn gold rise" style={{ animationDelay: '.16s' }} onClick={openForge}>⚒ В кузницу</button>
       {healOpen && <HealSheet full={c.heal.full} options={c.heal.options} busy={busy} onHeal={heal} onClose={() => setHealOpen(false)} />}
       {toast && <div className="toast">{toast}</div>}
@@ -264,7 +267,7 @@ function ItemSheet({ item, busy, craftState, onMake, onClose }: {
         <img src={sprite(item.sprite)} alt="" />
         <div>
           <div className="ih-name">{item.name} <span className="stars">{stars(item.trophy || item.maxed ? item.cur : item.next)}</span></div>
-          <div className="muted" style={{ fontSize: 13 }}>{item.slot_name}{item.cur > 0 && !item.maxed ? ` · перековка ${stars(item.cur)} → ${stars(item.next)}` : ''}</div>
+          <div className="muted" style={{ fontSize: 13 }}>{item.slot_name}{item.cur > 0 && !item.maxed ? ` · перековка ${stars(item.cur)} → ${stars(item.next)} (${TIER_NAME[item.next]})` : !item.maxed ? ` · ${TIER_NAME[item.next]}` : ''}</div>
         </div>
       </div>
       <p className="sheet-desc">«{item.desc}»</p>
