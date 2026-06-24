@@ -4,15 +4,23 @@
    функциональный текст — читаемый (Cinzel + EB Garamond, контраст, трекинг). */
 
 :root {
-  --parch:#efe3c6; --silver:#cdc7b6; --gold:#e7bf63; --gold-2:#f6d885; --bronze:#c0904c;
+  --parch:#ecdfc2; --silver:#cdc7b6;
+  --gold:#e7bf63; --gold-2:#f6d885;          /* ЯРКОЕ золото — ТОЛЬКО монета и CTA «Собрать» */
+  --brass:#c2965a; --brass-d:#7a5c2e;        /* тусклая латунь — рамки/заголовки/акценты */
+  --copper:#b06a3c; --amber:#e0903c; --ember:#cf5a2a;   /* эль/янтарь/угли — прогресс/блики */
   --crimson:#cf4a36; --green:#86c98a; --blue:#8fb1da;
-  --dim:#a8946d; --line:#52401f; --line2:#8a6a32; --ink:#0b0703;
+  --dim:#a08a63; --line:#4a3719; --line2:#7a5c2e; --ink:#0c0805;
   --disp:'Cinzel',Georgia,serif;            /* заголовки/лейблы/кнопки */
   --num:'Cinzel',Georgia,serif;             /* числа — табличные */
   --text:'EB Garamond',Georgia,serif;       /* текст/флейвор/мелкие подписи */
-  --glass:linear-gradient(160deg,rgba(52,37,18,.72),rgba(20,13,7,.82));
-  --panel-br:14px;
-  --stud:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9'%3E%3Crect x='1.6' y='1.6' width='5.8' height='5.8' transform='rotate(45 4.5 4.5)' fill='%23e7bf63' stroke='%238a6a32' stroke-width='.6'/%3E%3C/svg%3E");
+  /* панель — тёмное состаренное дерево (доски), а не «стекло-люкс» */
+  --glass:linear-gradient(168deg,rgba(46,31,17,.94),rgba(24,15,8,.96));
+  --panel-br:13px;
+  /* латунная заклёпка по углам (тусклый металл вместо золотого ромба) */
+  --stud:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Ccircle cx='5' cy='5' r='3.2' fill='%23b0853f' stroke='%235a4320' stroke-width='.8'/%3E%3Ccircle cx='4.2' cy='4.2' r='1' fill='%23e6c98a' opacity='.7'/%3E%3C/svg%3E");
+  /* лёгкая текстура досок для карточек */
+  --wood:repeating-linear-gradient(90deg,rgba(0,0,0,0) 0 38px,rgba(0,0,0,.13) 38px 39px),
+         repeating-linear-gradient(0deg,rgba(255,210,140,.018) 0 3px,rgba(0,0,0,.05) 3px 6px);
   --sa-top:0px; --sa-bottom:0px; --nav-h:62px; --hud-h:46px;
 }
 
@@ -21,12 +29,12 @@ html, body, #root { height:100%; }
 body {
   font-family:var(--text); color:var(--parch); background:var(--ink); overflow:hidden;
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; user-select:none;
-  background-image:radial-gradient(120% 70% at 50% -10%,#3a2a12 0%,#191108 48%,#0a0603 100%);
+  background-image:radial-gradient(120% 70% at 50% -8%,#3a2410 0%,#1a1207 46%,#0a0604 100%);
 }
 
-/* фон-атмосфера */
+/* фон-атмосфера: угли очага (тёплый дым, не золотой блеск) */
 .fx-glow,.fx-grain,.fx-vig { position:fixed; inset:0; pointer-events:none; z-index:0; }
-.fx-glow { background:radial-gradient(60% 38% at 50% 10%,#7a4a16 0%,transparent 66%); animation:flick 7s ease-in-out infinite; }
+.fx-glow { background:radial-gradient(62% 40% at 50% 8%,#8a3e0e 0%,#5a2c0c 30%,transparent 66%); animation:flick 6s ease-in-out infinite; }
 @keyframes flick { 0%,100%{opacity:.7} 30%{opacity:1} 55%{opacity:.78} 75%{opacity:.92} }
 .fx-grain { opacity:.045; mix-blend-mode:overlay;
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
@@ -63,9 +71,9 @@ body {
 .hero .nm { font-family:var(--disp); font-weight:900; font-size:clamp(21px,6vw,28px); letter-spacing:2px;
   color:#f3e8cb; text-shadow:0 1px 0 #000,0 3px 10px #000a; line-height:1.05; }
 .hero .meta { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:7px; flex-wrap:wrap; }
-.lvl { font-family:var(--disp); font-weight:700; font-size:11px; letter-spacing:1px; color:#241501;
-  background:linear-gradient(var(--gold-2),#cf9a3c); border-radius:5px; padding:3px 9px;
-  box-shadow:0 2px 7px #0008,inset 0 1px 0 #fff8; }
+.lvl { font-family:var(--disp); font-weight:700; font-size:11px; letter-spacing:1px; color:#231603;
+  background:linear-gradient(#d6ab66,#8a5f2c); border:1px solid #5a4320; border-radius:5px; padding:3px 9px;
+  box-shadow:0 2px 7px #0008,inset 0 1px 0 #ffffff66; }
 .region { font-family:var(--text); font-size:13px; color:var(--dim); }
 .flavor { font-family:var(--text); font-style:italic; text-align:center; color:#b6a079; font-size:14px;
   line-height:1.4; margin:7px 8px 0; }
@@ -75,15 +83,15 @@ body {
 .orn b { color:var(--gold); font-size:9px; }
 
 /* ── карточка-секция ── */
-.card { position:relative; background:var(--glass); border:1px solid var(--line); border-radius:var(--panel-br);
-  box-shadow:0 8px 26px #0009,inset 0 1px 0 #ffffff10;
-  background-image:var(--stud),var(--stud),var(--stud),var(--stud),var(--glass);
-  background-repeat:no-repeat;
-  background-position:6px 6px,calc(100% - 6px) 6px,6px calc(100% - 6px),calc(100% - 6px) calc(100% - 6px),0 0;
+.card { position:relative; background:var(--glass); border:1px solid var(--brass-d); border-radius:var(--panel-br);
+  box-shadow:0 8px 24px #000b,inset 0 1px 0 #ffffff0d,inset 0 0 0 1px #00000040;
+  background-image:var(--stud),var(--stud),var(--stud),var(--stud),var(--wood),var(--glass);
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,repeat,no-repeat;
+  background-position:6px 6px,calc(100% - 6px) 6px,6px calc(100% - 6px),calc(100% - 6px) calc(100% - 6px),0 0,0 0;
   overflow:hidden; }
 .card-h { font-family:var(--disp); display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700;
-  letter-spacing:3px; color:#d8a85a; padding:10px 14px; background:linear-gradient(#3a2810,#241808);
-  border-bottom:1px solid var(--line); text-shadow:0 1px 0 #000; }
+  letter-spacing:3px; color:var(--brass); padding:10px 14px;
+  background:linear-gradient(#3a2611,#211608); border-bottom:1px solid var(--brass-d); text-shadow:0 1px 0 #000; }
 .card-h .he { font-size:15px; letter-spacing:0; }
 .card-h .cnt { margin-left:auto; font-family:var(--text); font-weight:600; letter-spacing:0; font-size:12px; color:var(--dim); }
 .card-b { padding:12px 14px; display:flex; flex-direction:column; gap:11px; }
@@ -104,7 +112,7 @@ body {
 .bar > i { display:block; height:100%; border-radius:4px;
   background:linear-gradient(90deg,#b3331f,#d8553a 60%,#e98a4e); box-shadow:0 0 8px #d8553a55;
   transition:width .9s cubic-bezier(.2,.8,.2,1); }
-.bar.g > i { background:linear-gradient(90deg,#caa14e,var(--gold)); box-shadow:0 0 8px #e7bf6355; }
+.bar.g > i { background:linear-gradient(90deg,#a9703f,var(--amber)); box-shadow:0 0 8px #e0903c44; }
 
 /* ── сетка статов 2×2 (Заведение) ── */
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:9px; padding:12px 14px; }
