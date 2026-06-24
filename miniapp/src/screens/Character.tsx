@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
@@ -174,7 +174,7 @@ export default function Character() {
         <div className="cap">БОЕВЫЕ</div>
         <div className="stat-hp">
           <span className="shp-ic">❤</span>
-          <div className="bar"><i style={{ width: `${Math.round(c.hp.cur / c.hp.max * 100)}%` }} /></div>
+          <HpBar cur={c.hp.cur} max={c.hp.max} />
           <span className="shp-val">{c.hp.cur}/{c.hp.max}{c.hp.cur < c.hp.max ? ` · ${Math.floor(c.hp.regen / 60)}ч ${c.hp.regen % 60}м` : ''}</span>
         </div>
         <div className="stat-ribbon">
@@ -248,6 +248,21 @@ function ItemSheet({ item, busy, craftState, onMake, onClose }: {
               {craftState !== 'none' ? 'Мастер занят' : item.afford ? `⚒ Сковать ${stars(item.next)}` : 'Не хватает ресурсов'}
             </button>}
     </Sheet>
+  )
+}
+
+// чистый HP-бар: заливка плавно анимируется от 0 при заходе (без бликов и точек)
+function HpBar({ cur, max }: { cur: number; max: number }) {
+  const pct = max > 0 ? Math.max(0, Math.min(100, Math.round((cur / max) * 100))) : 0
+  const [w, setW] = useState(0)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setW(pct)))
+    return () => cancelAnimationFrame(id)
+  }, [pct])
+  return (
+    <div className="hpbar">
+      <div className="hpbar-fill" style={{ width: `${w}%` }} />
+    </div>
   )
 }
 
