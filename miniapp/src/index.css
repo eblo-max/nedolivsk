@@ -263,7 +263,8 @@ body {
 
 /* ── bottom-sheet панель действия (бонус/грамота/бригады) ── */
 .sheet-ov { position:fixed; inset:0; z-index:40; background:#000b; backdrop-filter:blur(2px);
-  display:flex; align-items:flex-end; justify-content:center; animation:ov-in .2s ease; }
+  display:flex; align-items:flex-end; justify-content:center; animation:ov-in .2s ease;
+  overscroll-behavior:contain; touch-action:none; }
 .sheet-ov.out { animation:ov-out .24s ease forwards; }
 @keyframes ov-in { from { opacity:0; } }
 @keyframes ov-out { to { opacity:0; } }
@@ -282,7 +283,9 @@ body {
 .sheet-ic { width:26px; height:26px; object-fit:contain; filter:drop-shadow(0 1px 2px #000a); }
 .sheet-x { margin-left:auto; width:30px; height:30px; border-radius:8px; border:1px solid var(--line2);
   background:#241808; color:var(--dim); font-size:13px; cursor:pointer; flex:0 0 auto; }
-.sheet-b { padding:14px 16px 8px; overflow-y:auto; display:flex; flex-direction:column; }
+.sheet-b { padding:14px 16px 8px; display:flex; flex-direction:column;
+  flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain; touch-action:pan-y; }
 .sheet-lead { font-family:var(--text); font-size:16px; color:#cbb487; }
 .sheet-desc { font-family:var(--text); font-style:italic; color:#b6a079; font-size:15px; line-height:1.4; margin:8px 0; }
 .sheet-row { display:flex; justify-content:space-between; align-items:center; padding:7px 1px;

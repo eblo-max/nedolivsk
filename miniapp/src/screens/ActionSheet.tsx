@@ -68,6 +68,15 @@ export default function ActionSheet({ kind, onState, onClose, flash }: {
     return () => { live = false }
   }, [kind])
 
+  // блокируем прокрутку главного экрана, пока панель открыта (скролл — только внутри)
+  useEffect(() => {
+    const scroll = document.querySelector('.scroll') as HTMLElement | null
+    if (!scroll) return
+    const prev = scroll.style.overflowY
+    scroll.style.overflowY = 'hidden'
+    return () => { scroll.style.overflowY = prev }
+  }, [])
+
   function close() {
     if (closing) return
     setClosing(true); setTimeout(onClose, 240)
