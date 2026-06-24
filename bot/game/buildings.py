@@ -5,20 +5,40 @@
 на этих зданиях — следующий шаг.
 """
 
+import hashlib
 import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from bot.game import economy, inventory
 
-# Общий множитель стоимости пристроек (золото+сырьё). Поднят как золото/ресурсо-сток
-# против инфляции (см. /econ). Меняй здесь, чтобы крутить цену всех пристроек разом.
+# Множители стоимости пристроек (раздельно золото/сырьё — антиинфляция, /econ):
+#   BUILD_COST_MULT — золото; BUILD_RES_MULT — обычное сырьё (расход выше).
+# Сырьё ещё и с «живым» разбросом на пристройку+ресурс (детерминирован, стабилен) —
+# чтобы цифры не были круглыми/одинаковыми.
 BUILD_COST_MULT = 1.4
+BUILD_RES_MULT = 2.2
+
+
+def _stable(key: str, lo: int, hi: int) -> int:
+    """Детерминированное число в [lo, hi] по ключу (hashlib — стабильно между запусками)."""
+    h = int(hashlib.md5(key.encode()).hexdigest(), 16)
+    return lo + h % (hi - lo + 1)
 
 
 def cost_of(b: "Building") -> dict:
-    """Актуальная стоимость пристройки с учётом множителя (для оплаты/проверки/показа)."""
-    return {k: (max(1, math.ceil(v * BUILD_COST_MULT)) if v else 0) for k, v in b.cost.items()}
+    """Актуальная стоимость пристройки: золото ×BUILD_COST_MULT, обычное сырьё
+    ×BUILD_RES_MULT с разбросом ±~15% (для оплаты/проверки/показа — едино)."""
+    out = {}
+    for k, v in b.cost.items():
+        if not v:
+            out[k] = 0
+        elif k == "gold":
+            out[k] = max(1, math.ceil(v * BUILD_COST_MULT))
+        else:
+            jitter = _stable(f"{b.id}:{k}", 92, 118) / 100   # 0.92..1.18
+            out[k] = max(1, math.ceil(v * BUILD_RES_MULT * jitter))
+    return out
 
 
 @dataclass(frozen=True)
