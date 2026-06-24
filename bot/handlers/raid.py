@@ -112,14 +112,23 @@ def _drop_apply(winner, drop: dict | None) -> str:
         tier = int(drop.get("tier", 1))
         stars = items.TIER_STARS.get(tier, "★")
         eq = dict(winner.equipment or {})
-        if item.slot not in eq:
+        slot_entry = eq.get(item.slot)
+        slot_item, slot_tier = (items.parse_entry(slot_entry) if slot_entry else (None, 0))
+        # слот свободен ИЛИ занят ТЕМ ЖЕ предметом меньшего яруса → надеть/улучшить
+        if slot_item is None or (slot_item == item.id and tier > slot_tier):
             eq[item.slot] = items.make_entry(item.id, tier)
             winner.equipment = eq
+            if slot_item == item.id:
+                return (f"🛡 «{item.name}» улучшена "
+                        f"{items.TIER_STARS.get(slot_tier, '★')}→{stars}!")
             return f"🛡 снаряга «{item.name}» {stars} (надета!)"
-        # слот занят — компенсация слитками тем щедрее, чем выше ярус
+        # дубликат (такой же/ниже ярус) ИЛИ слот занят другим → компенсация слитками
         comp = 15 * tier
         inventory.add(winner, "ingot", comp)
-        return f"слитки ×{comp} (на «{item.name}» {stars} уже есть снаряга)"
+        if slot_item == item.id:
+            return (f"слитки ×{comp} (на «{item.name}» уже есть "
+                    f"{items.TIER_STARS.get(slot_tier, '★')}, не ниже)")
+        return f"слитки ×{comp} (слот «{items.SLOTS.get(item.slot, item.slot)}» занят другой снарягой)"
     return ""
 
 
