@@ -380,9 +380,11 @@ def _tavern_state(p, t) -> dict:
         now.append({"icon": "⛏", "text": f"Бригады вернулись ({c.ready})", "sub": "забирай добычу",
                     "badge": "ready", "action": "expedition"})
     elif c.out:
-        now.append({"icon": "⛏", "text": f"Бригады в пути: {c.out}/{c.total}", "sub": f"возврат ~{c.next_minutes} мин"})
+        now.append({"icon": "⛏", "text": f"Бригады в пути: {c.out}/{c.total}",
+                    "sub": f"возврат ~{c.next_minutes} мин · отправь ещё", "action": "expedition"})
     else:
-        now.append({"icon": "⛏", "text": "Бригады свободны", "sub": "гони за добром"})
+        now.append({"icon": "⛏", "text": "Бригады свободны", "sub": "отправь за добром",
+                    "action": "expedition"})
     pa, pr = texts._producer_counts(t)
     if pr:
         now.append({"icon": "🏭", "text": f"Пристройки: {pr} готовы", "sub": "забери в разделе", "badge": "ready"})
