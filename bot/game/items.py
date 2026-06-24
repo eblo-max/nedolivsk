@@ -56,9 +56,15 @@ TIER_NAMES = {1: "обычный", 2: "добротный", 3: "мастерск
 TIER_STARS = {1: "★", 2: "★★", 3: "★★★"}
 TIER_COST_MULT = {1: 1, 2: 3, 3: 8}     # цена ковки данного яруса
 TIER_INVESTED = {1: 1, 2: 4, 3: 12}     # суммарно вложено к ярусу (для ВВП)
-# Общий множитель цены ковки (золото+ресурсы). Поднят для борьбы с инфляцией:
-# базовые цены задавались при дефиците золота, теперь золото обесценилось.
+# Множители цены ковки. Раздельно, чтобы крутить золото и сырьё независимо:
+#   GEAR_COST_MULT  — золото (поднят против инфляции — золото обесценилось);
+#   GEAR_RES_MULT   — ОБЫЧНОЕ сырьё (дерево/зерно/хмель/…): расход выше, чтобы ковка
+#                     жгла ресурсы заметно (и была сток-цепочкой, а не «на сдачу»);
+#   слиток и охот-компоненты (_SCARCE) НЕ раздуваем сверх золотого — они и так
+#   редкие/гейт (горн, охота, региональный зверь), иначе ковка станет неподъёмной.
 GEAR_COST_MULT = 1.5
+GEAR_RES_MULT = 2.5
+_SCARCE = {"ingot", "hide", "fang", "sinew", "ring", "pelt", "tusk", "chitin"}
 
 
 def parse_entry(entry: str) -> tuple[str, int]:
@@ -80,8 +86,15 @@ def make_entry(item_id: str, tier: int) -> str:
 def tier_cost(item: "Item", tier: int) -> dict:
     if TEST_FREE_CRAFT:
         return {k: 0 for k in item.cost}
-    mult = TIER_COST_MULT[tier] * GEAR_COST_MULT
-    return {k: (max(1, math.ceil(v * mult)) if v else 0) for k, v in item.cost.items()}
+    tmult = TIER_COST_MULT[tier]
+    out = {}
+    for k, v in item.cost.items():
+        if not v:
+            out[k] = 0
+            continue
+        m = GEAR_COST_MULT if (k == "gold" or k in _SCARCE) else GEAR_RES_MULT
+        out[k] = max(1, math.ceil(v * tmult * m))
+    return out
 
 
 def tier_hours(item: "Item", tier: int) -> int:
