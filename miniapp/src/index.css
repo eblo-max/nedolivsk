@@ -264,6 +264,9 @@ body {
 /* ── Персонаж: снаряжение, кузница, деталь предмета ── */
 .stars { color:var(--gold); letter-spacing:1px; font-size:.9em; }
 
+.meta-ic { width:15px; height:15px; object-fit:contain; vertical-align:-3px; margin-right:1px;
+  filter:drop-shadow(0 1px 1px #000a); }
+
 /* кукла: герой по центру + квадраты-слоты по бокам и снизу */
 .doll { display:grid; grid-template-columns:60px 1fr 60px; gap:9px; align-items:center; padding:12px 12px 14px; }
 .doll-col { display:flex; flex-direction:column; gap:9px; }

@@ -172,7 +172,7 @@ export default function Character() {
       <div className="hero rise" style={{ paddingBottom: 0 }}>
         <div className="nm">{c.name}</div>
         <div className="meta"><span className="region">Хозяин кабака</span>
-          <span className="region">🎒 надето {c.worn}/{c.slots_total}</span></div>
+          <span className="region"><img className="meta-ic" src={`${import.meta.env.BASE_URL}stat/gear.png`} alt="" /> надето {c.worn}/{c.slots_total}</span></div>
       </div>
 
       {/* кукла: герой (анимированный) парит в воздухе, слоты по бокам — без рамки */}
