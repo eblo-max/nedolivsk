@@ -82,7 +82,7 @@ export default function Tavern() {
         <div className="meta">
           <span className="lvl">★ УРОВЕНЬ {t.level}</span>
           <span className="region">📍 {t.region}</span>
-          <span className="region">⭐ {t.reputation} молвы</span>
+          <span className="region">⭐ {t.reputation} репутации</span>
         </div>
         <div className="orn"><b>✦</b></div>
         <div className="flavor">«{t.flavor}»</div>
@@ -115,8 +115,8 @@ export default function Tavern() {
         <div className="grid2">
           <Tile icon="👥" v={t.capacity} l="Места" />
           <Tile icon="✨" v={t.comfort} l="Уют" />
-          <Tile icon="🍀" v={`${t.luck_pct}%`} l="Удача" />
-          <Tile icon="🎒" v={`${t.gear_worn}/${t.gear_slots}`} l="Снаряга" />
+          <Tile img="stat/luck.png" v={`${t.luck_pct}%`} l="Удача" />
+          <Tile img="stat/gear.png" v={`${t.gear_worn}/${t.gear_slots}`} l="Снаряга" />
         </div>
       </div>
 
@@ -187,8 +187,15 @@ function ActivityRow({ a }: { a: Activity }) {
   )
 }
 
-function Tile({ icon, v, l }: { icon: string; v: string | number; l: string }) {
-  return <div className="tile"><span className="ti">{icon}</span><div><div className="tv">{v}</div><div className="tl">{l}</div></div></div>
+function Tile({ icon, img, v, l }: { icon?: string; img?: string; v: string | number; l: string }) {
+  return (
+    <div className="tile">
+      {img
+        ? <img className="ti-img" src={`${import.meta.env.BASE_URL}${img}`} alt="" loading="lazy" />
+        : <span className="ti">{icon}</span>}
+      <div><div className="tv">{v}</div><div className="tl">{l}</div></div>
+    </div>
+  )
 }
 
 function ResCell({ r }: { r: ResLine }) {

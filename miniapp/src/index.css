@@ -127,6 +127,7 @@ body {
 .tile { display:flex; align-items:center; gap:10px; padding:10px 11px; border-radius:10px;
   background:linear-gradient(#26190b,#180f06); border:1px solid var(--line); }
 .tile .ti { font-size:21px; filter:drop-shadow(0 1px 1px #000); }
+.tile .ti-img { width:27px; height:27px; object-fit:contain; flex:0 0 auto; filter:drop-shadow(0 1px 1px #000a); }
 .tile .tv { font-family:var(--num); font-weight:700; font-size:17px; color:var(--parch); line-height:1; font-variant-numeric:tabular-nums; }
 .tile .tl { font-family:var(--text); font-size:12px; color:var(--dim); margin-top:2px; }
 
