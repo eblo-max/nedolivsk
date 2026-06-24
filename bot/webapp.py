@@ -750,13 +750,22 @@ def _character_state(p) -> dict:
         craft.update({"name": cit.name if cit else "вещь", "tier": tier, "minutes": minutes,
                       "sprite": (cit.sprite or iid) if cit else None})
 
+    # лечение: чем можно подлечиться из погреба (combat.heal)
+    from bot.game import production as prod
+    hp_cur, hp_max = combat.current_hp(p), combat.max_hp()
+    prods = (t.products or {})
+    heal_opts = [{"key": k, "name": prod.GOODS[k].name, "emoji": prod.GOODS[k].emoji,
+                  "hp": bal.HEAL_VALUES[k], "qty": int(prods.get(k, 0))}
+                 for k in bal.HEAL_VALUES if k in prod.GOODS and int(prods.get(k, 0)) > 0]
+
     return {
         "ok": True, "name": (p.first_name or "Хозяин").upper(),
         "worn": len(eq), "slots_total": len(it.SLOTS),
-        "hp": {"cur": combat.current_hp(p), "max": combat.max_hp(), "regen": combat.regen_full_minutes(p)},
+        "hp": {"cur": hp_cur, "max": hp_max, "regen": combat.regen_full_minutes(p)},
         "damage": dmg, "crit": crit, "armor": cs["armor"], "luck": cs["luck"],
         "vylazka": bal.lucky_chance(cs["luck"]),
         "equipment": slots, "bonuses": bonuses, "orc": orc, "craft": craft,
+        "heal": {"can": hp_cur < hp_max, "full": hp_cur >= hp_max, "options": heal_opts},
     }
 
 
@@ -843,6 +852,28 @@ async def _api_forge_make(request: web.Request) -> web.Response:
         ch, fg = _character_state(p), _forge_state(p)
     return web.json_response({"ok": True, "character": ch, "forge": fg,
                               "item": r.item.name, "tier": r.tier, "hours": r.hours},
+                             headers={"Cache-Control": "no-store"})
+
+
+async def _api_heal(request: web.Request) -> web.Response:
+    """Подлечиться — съесть порцию из погреба, +HP (combat.heal)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import combat
+    key = str(body.get("key") or "")
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        res = combat.heal(p, key)
+        if res is None:
+            return web.json_response({"ok": False, "error": "cant",
+                                      "character": _character_state(p)})
+        repo.add_log(s, "player", p.id, f"🍖 подлечился (+{res['healed']} HP)")
+        await s.commit()
+        ch = _character_state(p)
+    return web.json_response({"ok": True, "character": ch, "healed": res["healed"], "hp": res["hp"]},
                              headers={"Cache-Control": "no-store"})
 
 
@@ -1034,6 +1065,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/forge", _api_forge)        # список кузницы
     app.router.add_post("/api/forge_make", _api_forge_make)  # заказать ковку
     app.router.add_post("/api/craft_claim", _api_craft_claim)  # забрать готовую вещь
+    app.router.add_post("/api/heal", _api_heal)          # подлечиться (еда из погреба)
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы

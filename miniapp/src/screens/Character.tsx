@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
-import { ResIcon, fmt } from '../components/icons'
+import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
 
 interface Slot { slot: string; slot_name: string; id?: string; name?: string; tier?: number; sprite?: string; trophy?: boolean }
 interface Craft { state: string; name?: string; tier?: number; minutes?: number; sprite?: string }
+interface HealOpt { key: string; name: string; emoji: string; hp: number; qty: number }
 interface CharState {
   ok: boolean; name: string; worn: number; slots_total: number
   hp: { cur: number; max: number; regen: number }
@@ -14,6 +15,7 @@ interface CharState {
   equipment: Slot[]; bonuses: { label: string; val: string }[]
   orc: { damage: number; crit: number; armor: number; luck: number; income: number } | null
   craft: Craft
+  heal: { can: boolean; full: boolean; options: HealOpt[] }
 }
 interface ForgeCost { key: string; name: string; need: number; have: number; ok: boolean }
 interface ForgeItem {
@@ -46,6 +48,10 @@ const SAMPLE: CharState = {
   ],
   bonuses: [{ label: 'Доход', val: '+15%' }, { label: 'Добыча', val: '+5%' }],
   orc: null, craft: { state: 'none' },
+  heal: { can: true, full: false, options: [
+    { key: 'roast', name: 'Жаркое', emoji: '🍖', hp: 12, qty: 4 },
+    { key: 'ale1', name: 'Эль', emoji: '🍺', hp: 4, qty: 12 },
+  ] },
 }
 
 export default function Character() {
@@ -53,6 +59,7 @@ export default function Character() {
   const [view, setView] = useState<'doll' | 'forge'>('doll')
   const [forge, setForge] = useState<ForgeState | null>(null)
   const [pick, setPick] = useState<ForgeItem | null>(null)
+  const [healOpen, setHealOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
@@ -79,6 +86,15 @@ export default function Character() {
       const r = await api<{ character: CharState; forge: ForgeState; item: string; tier: number }>('craft_claim')
       set(r.character); setForge(r.forge); hapticNotify('success'); flash(`${r.item} ${stars(r.tier)} — твоё!`)
     } catch { hapticNotify('warning'); flash('Ещё не готово') }
+    finally { setBusy(false) }
+  }
+  async function heal(key: string) {
+    if (busy) return
+    haptic('medium'); setBusy(true)
+    try {
+      const r = await api<{ character: CharState; healed: number }>('heal', { key })
+      set(r.character); hapticNotify('success'); flash(`+${r.healed} ❤`)
+    } catch { hapticNotify('warning'); flash('Лечиться нечем') }
     finally { setBusy(false) }
   }
   async function make(item: ForgeItem) {
@@ -177,6 +193,11 @@ export default function Character() {
           <HpBar cur={c.hp.cur} max={c.hp.max} />
           <span className="shp-val">{c.hp.cur}/{c.hp.max}{c.hp.cur < c.hp.max ? ` · ${Math.floor(c.hp.regen / 60)}ч ${c.hp.regen % 60}м` : ''}</span>
         </div>
+        {c.heal.can && (
+          <button className="heal-btn" onClick={() => { haptic('light'); setHealOpen(true) }}>
+            🍖 Подлечиться{c.heal.options.length ? '' : ' — нечем'}
+          </button>
+        )}
         <div className="stat-ribbon">
           <span className="si"><b>⚔</b>{c.damage}</span>
           <span className="si"><b>💥</b>{c.crit}%</span>
@@ -201,8 +222,35 @@ export default function Character() {
       )}
 
       <button className="btn gold rise" style={{ animationDelay: '.16s' }} onClick={openForge}>⚒ В кузницу</button>
+      {healOpen && <HealSheet full={c.heal.full} options={c.heal.options} busy={busy} onHeal={heal} onClose={() => setHealOpen(false)} />}
       {toast && <div className="toast">{toast}</div>}
     </>
+  )
+}
+
+function HealSheet({ full, options, busy, onHeal, onClose }: {
+  full: boolean; options: HealOpt[]; busy: boolean; onHeal: (key: string) => void; onClose: () => void
+}) {
+  return (
+    <Sheet title="🍖 ПОДЛЕЧИТЬСЯ" onClose={onClose}>
+      <p className="sheet-desc">«Что съешь — в погреб не вернётся. Жаркое сытнее эля.»</p>
+      {full
+        ? <p className="muted" style={{ fontStyle: 'italic', marginTop: 8 }}>Сыт и здоров — лечиться незачем.</p>
+        : options.length === 0
+          ? <p className="muted" style={{ fontStyle: 'italic', marginTop: 8 }}>В погребе пусто — свари жаркое на кухне или налей дешёвого эля.</p>
+          : (
+            <div className="sheet-list">
+              {options.map((o) => (
+                <button key={o.key} className="forge-row" disabled={busy} onClick={() => onHeal(o.key)}>
+                  <GoodIcon k={o.key} />
+                  <span className="fr-txt"><b>{o.name} <span style={{ color: 'var(--green)' }}>+{o.hp} ❤</span></b>
+                    <small>в погребе {o.qty}</small></span>
+                  <span className="act-chev">›</span>
+                </button>
+              ))}
+            </div>
+          )}
+    </Sheet>
   )
 }
 
