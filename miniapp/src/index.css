@@ -116,6 +116,18 @@ body {
 .act .badge.ready { color:#1c2a13; background:linear-gradient(#a8d98c,var(--green)); box-shadow:0 0 10px #86c98a55; }
 .act .badge.wait { color:var(--dim); border:1px solid var(--line2); }
 
+/* единый бокс для всех строк «Сейчас» — ровный вертикальный ритм */
+.card-b > .act { margin:0 -6px; padding:8px 9px; border-radius:10px; }
+/* кликабельная строка действия (бонус/грамота/бригады — забрать в один тап) */
+.act-go { cursor:pointer;
+  background:linear-gradient(#30200f,#211509); border:1px solid #7a5c2e66;
+  box-shadow:inset 0 1px 0 #ffffff10; transition:transform .08s,border-color .14s,filter .14s; }
+.act-go:active { transform:scale(.985); border-color:var(--brass); filter:brightness(1.08); }
+.act-go[aria-disabled="true"] { opacity:.55; pointer-events:none; }
+.act-chev { flex:0 0 auto; width:11px; text-align:center; align-self:center;
+  font-family:var(--disp); font-weight:700; font-size:21px; line-height:1;
+  color:var(--brass); text-shadow:0 1px 0 #000; }
+
 /* прогресс-бар с таймером */
 .bar { height:7px; border-radius:4px; background:#120a038c; box-shadow:inset 0 1px 2px #000; overflow:hidden; position:relative; }
 .bar > i { display:block; height:100%; border-radius:4px;
@@ -179,6 +191,75 @@ body {
   font-family:var(--disp); font-weight:700; font-size:13px; letter-spacing:.4px; color:#241501;
   background:linear-gradient(var(--gold-2),#cf9a3c); border:1px solid #f6dd92; border-radius:9px;
   padding:11px 18px; box-shadow:0 8px 24px #000a; animation:rise .25s ease forwards; text-align:center; }
+
+/* кружка пива (CraftPix) вместо эмодзи — в орнаменте заголовка и на CTA */
+.orn-ic { width:20px; height:20px; object-fit:contain; vertical-align:middle;
+  filter:drop-shadow(0 0 5px #000) drop-shadow(0 1px 2px #000c); }
+.btn-ic { height:24px; width:auto; vertical-align:-6px; margin-right:9px;
+  filter:drop-shadow(0 1px 2px #0008); }
+
+/* ── заставка запуска (таверна отдаляется ~10 c) ── */
+.splash { position:fixed; inset:0; z-index:50; overflow:hidden;
+  background:radial-gradient(120% 80% at 50% 40%,#2a1a0c 0%,#140d07 55%,#070402 100%);
+  animation:splash-in .5s ease both; }
+.splash.out { animation:splash-out .42s ease forwards; }
+@keyframes splash-in { from{opacity:0} to{opacity:1} }
+@keyframes splash-out { to{opacity:0; transform:scale(1.04)} }
+
+.splash-scene { position:absolute; inset:0; overflow:hidden;
+  display:flex; align-items:center; justify-content:center; }
+/* живая сцена (анимированный PNG): по высоте экрана и шире его — камера качается влево/вправо */
+.splash-img { height:106%; width:auto; max-width:none; image-rendering:pixelated;
+  will-change:transform; animation:splash-pan 20s ease-in-out forwards; }
+/* от центра уезжает вправо, потом влево и в итоге возвращается в центр (не упираясь в стены) */
+@keyframes splash-pan {
+  0%   { transform:translateX(0); }
+  28%  { transform:translateX(-22%); }   /* камера вправо */
+  64%  { transform:translateX(22%); }    /* камера влево */
+  100% { transform:translateX(0); }      /* обратно в центр */
+}
+
+/* виньетка + затемнение сверху/снизу — читаемость заголовка и кнопки */
+.splash-veil { position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(140% 100% at 50% 50%,transparent 52%,#0008 100%),
+    linear-gradient(#0a0604e6 0%,#0a060455 13%,transparent 28%,transparent 64%,#0a0604cc 86%,#0a0604f4 100%); }
+
+.splash-top { position:absolute; top:0; left:0; right:0; padding:calc(var(--sa-top) + 22px) 16px 0;
+  text-align:center; z-index:2; }
+.splash-top .orn { margin-top:3px; }   /* держим кружку в тёмной шапке, не на сцене */
+.splash-bottom { position:absolute; bottom:0; left:0; right:0; padding:0 22px calc(var(--sa-bottom) + 30px);
+  z-index:2; max-width:480px; margin:0 auto; }
+.splash-tag { font-family:var(--text); font-style:italic; font-size:15px; color:#cbb487;
+  text-align:center; margin-bottom:14px; text-shadow:0 1px 4px #000; line-height:1.35; }
+.splash-cta { font-size:16px; letter-spacing:1.5px; padding:16px; animation:cta-bob 2.4s ease-in-out infinite; }
+@keyframes cta-bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+
+/* ── стартовый экран (онбординг) ── */
+.onb { display:flex; flex-direction:column; gap:11px; }
+.title { font-family:var(--disp); font-weight:900; text-align:center; letter-spacing:3px;
+  font-size:clamp(26px,8vw,38px); color:#f3e8cb; text-shadow:0 1px 0 #000,0 4px 14px #000b; line-height:1.02; padding-top:6px; }
+.title small { display:block; font-weight:700; font-size:11px; letter-spacing:3px; color:var(--brass); margin-top:6px; }
+.card-q { font-family:var(--text); font-size:16px; color:#dccaa6; line-height:1.35; }
+.onb-input { width:100%; margin:11px 0 9px; padding:13px 14px; border-radius:10px;
+  font-family:var(--disp); font-weight:700; font-size:17px; letter-spacing:.5px; color:#f3e8cb;
+  background:linear-gradient(#1a1107,#120b05); border:1px solid var(--line2);
+  box-shadow:inset 0 2px 6px #000a; outline:none; }
+.onb-input:focus { border-color:var(--brass); box-shadow:inset 0 2px 6px #000a,0 0 0 2px #c2965a44; }
+.onb-input::placeholder { color:#6e5a38; font-weight:600; }
+.region-card { display:flex; align-items:center; gap:13px; text-align:left; width:100%; cursor:pointer;
+  padding:13px 14px; border-radius:11px; color:var(--parch); border:1px solid var(--line2);
+  background:linear-gradient(#2c1e0d,#180f06); box-shadow:0 4px 12px #0008,inset 0 1px 0 #ffffff10;
+  transition:transform .08s,border-color .12s; }
+.region-card:active { transform:translateY(1px) scale(.99); }
+.region-card:not(:disabled):hover { border-color:var(--brass); }
+.region-card:disabled { filter:grayscale(.6) brightness(.7); cursor:default; }
+.region-card .re { font-size:30px; flex:0 0 auto; filter:drop-shadow(0 2px 3px #000a); }
+.region-card .rt { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.region-card .rt b { font-family:var(--disp); font-weight:700; font-size:15px; letter-spacing:.5px; color:#f3e8cb; }
+.region-card .rt small { font-family:var(--text); font-style:italic; font-size:13px; color:#b6a079; }
+.region-card .rt em { font-family:var(--num); font-style:normal; font-size:12px; font-weight:700; color:var(--brass); letter-spacing:.3px; margin-top:2px; }
+.onb-err { font-family:var(--text); font-size:14px; color:var(--crimson); text-align:center; margin-top:10px; font-style:italic; }
 
 /* утилиты */
 .center { display:flex; align-items:center; justify-content:center; }

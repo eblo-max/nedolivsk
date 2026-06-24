@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
+import Onboarding from './Onboarding'
 
-interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean }
+interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
 interface CellarLine { key: string; name: string; qty: number }
 interface TavernState {
@@ -24,10 +25,10 @@ const SAMPLE: TavernState = {
   gold: 1340, income_rate: 18, income_ready: 126, reputation: 27,
   capacity: 24, comfort: 12, luck_pct: 8, gear_worn: 1, gear_slots: 11,
   now: [
-    { icon: '⛏', text: 'Бригады в пути: 1 из 2', sub: 'возврат ~14 мин' },
-    { icon: '🏭', text: 'Пристройки: 1 готовы — забирай', badge: 'ready' },
-    { icon: '🎁', text: 'Бонус дня готов', sub: 'забери и активируй', badge: 'ready' },
-    { icon: '🔨', text: 'Перестройка до ур. 3', sub: '60% — копим ресурсы', progress: 0.6, gold: true },
+    { icon: '🎁', text: 'Бонус дня готов', sub: 'забери и активируй', badge: 'ready', action: 'bonus' },
+    { icon: '📜', text: 'Грамота новосёла', sub: 'награда ждёт', badge: 'ready', action: 'newbie' },
+    { icon: '⛏', text: 'Бригады вернулись (1)', sub: 'забирай добычу', badge: 'ready', action: 'expedition' },
+    { icon: '🏭', text: 'Пристройки: 1 готовы', sub: 'забери в разделе', badge: 'ready' },
   ],
   storage: [
     { key: 'wood', name: 'Дерево', amount: 60 }, { key: 'grain', name: 'Зерно', amount: 80 },
@@ -42,11 +43,15 @@ const SAMPLE: TavernState = {
 }
 
 export default function Tavern() {
-  const { data, loading, set } = useApi<TavernState>('state', SAMPLE)
+  const { data, loading, error, set } = useApi<TavernState>('state', SAMPLE)
   const [toast, setToast] = useState('')
   const [busy, setBusy] = useState(false)
+  const [created, setCreated] = useState(false)
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
 
+  // ещё нет таверны — стартовый экран (создание игрока + таверны)
+  if (error === 'no_tavern' && !created)
+    return <Onboarding onCreated={(st) => { set(st as TavernState); setCreated(true) }} />
   if (loading && !data) return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
   const t = data ?? SAMPLE
 
@@ -59,6 +64,24 @@ export default function Tavern() {
       flash(r.collected > 0 ? `+${fmt(r.collected)} 🪙 в казну` : 'Касса пуста')
     } catch { flash('Касса не открылась — попробуй ещё') }
     finally { setBusy(false) }
+  }
+  async function act(a: Activity) {
+    if (busy || !a.action) return
+    haptic('medium'); setBusy(true)
+    try {
+      const r = await api<{ state: TavernState; boon?: string; minutes?: number; claimed?: number; reward?: Record<string, number> }>(a.action)
+      set(r.state); hapticNotify('success')
+      if (a.action === 'bonus') flash(`Баф «${r.boon}» на ${r.minutes} мин!`)
+      else if (a.action === 'expedition') flash(`+${fmt(r.claimed ?? 0)} добра с бригад`)
+      else if (a.action === 'newbie') {
+        const tot = r.reward ? Object.values(r.reward).reduce((s, v) => s + v, 0) : 0
+        flash(tot ? `Грамота: +${fmt(tot)} в закрома` : 'Награды забраны')
+      } else flash('Готово')
+    } catch (e) {
+      hapticNotify('warning')
+      const code = (e as { code?: string })?.code
+      flash(code === 'busy' ? 'Баф уже гуляет' : code === 'nothing' ? 'Забирать нечего' : 'Не вышло — попробуй ещё')
+    } finally { setBusy(false) }
   }
   async function upgrade() {
     if (busy) return
@@ -106,7 +129,7 @@ export default function Tavern() {
       {/* сейчас */}
       <div className="card rise" style={{ animationDelay: '.08s' }}>
         <div className="card-h"><span className="he">⚡</span>СЕЙЧАС</div>
-        <div className="card-b">{t.now.map((a, i) => <ActivityRow key={i} a={a} />)}</div>
+        <div className="card-b">{t.now.map((a, i) => <ActivityRow key={i} a={a} onAct={act} busy={busy} />)}</div>
       </div>
 
       {/* заведение */}
@@ -174,18 +197,25 @@ function Ticker({ items }: { items: string[] }) {
   )
 }
 
-const ACT_ICON: Record<string, string> = { '⛏': 'pickaxe', '🔨': 'hammer', '🏗': 'hammer' }
+const ACT_ICON: Record<string, string> = {
+  '⛏': 'pickaxe', '🔨': 'hammer', '🏗': 'hammer',
+  '🎁': 'bonus', '📜': 'scroll', '🏭': 'forge',
+}
 
-function ActivityRow({ a }: { a: Activity }) {
+function ActivityRow({ a, onAct, busy }: { a: Activity; onAct: (a: Activity) => void; busy: boolean }) {
   const img = a.icon ? ACT_ICON[a.icon] : undefined
+  const go = !!a.action
   return (
-    <div className="act">
+    <div className={`act${go ? ' act-go' : ''}`}
+      onClick={go && !busy ? () => onAct(a) : undefined}
+      role={go ? 'button' : undefined} aria-disabled={go && busy}>
       <div className="top">
         {img
           ? <img className="ai-img" src={`${import.meta.env.BASE_URL}act/${img}.png`} alt="" loading="lazy" />
           : a.icon && <span className="ai">{a.icon}</span>}
         <span className="txt">{a.text}{a.sub && <small>{a.sub}</small>}</span>
         {a.badge && <span className={`badge ${a.badge}`}>{a.badge === 'ready' ? 'ГОТОВО' : 'ждём'}</span>}
+        <span className="act-chev" aria-hidden>{go ? '›' : ''}</span>
       </div>
       {a.progress != null && <div className={`bar${a.gold ? ' g' : ''}`}><i style={{ width: `${Math.round(a.progress * 100)}%` }} /></div>}
     </div>

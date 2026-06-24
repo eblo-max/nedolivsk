@@ -359,33 +359,39 @@ def _tavern_state(p, t) -> dict:
     maxed = t.level >= bal.MAX_LEVEL
     pct = texts._upgrade_pct(p, t)
 
+    from bot.game import newbie as newbiemod
+
     now: list[dict] = []
     act = buffmod.active(p)
     if act is not None:
         now.append({"icon": act.emoji, "text": f"Баф «{act.name}»",
                     "sub": f"ещё {buffmod.minutes_left(p)} мин"})
     elif buffmod.offer(p) is not None:
-        now.append({"icon": "🎁", "text": "Бонус дня готов", "sub": "забери и активируй", "badge": "ready"})
+        now.append({"icon": "🎁", "text": "Бонус дня готов", "sub": "забери и активируй",
+                    "badge": "ready", "action": "bonus"})
+    if newbiemod.claimable(p, t):              # грамота новосёла — награда ждёт
+        now.append({"icon": "📜", "text": "Грамота новосёла", "sub": "награда ждёт",
+                    "badge": "ready", "action": "newbie"})
     c = logic.expedition_counts(p, t)
     if c.ready and c.out:
-        now.append({"icon": "⛏", "text": f"Бригады: {c.ready} готовы, {c.out} в пути", "sub": f"возврат ~{c.next_minutes} мин"})
+        now.append({"icon": "⛏", "text": f"Бригады: {c.ready} готовы, {c.out} в пути",
+                    "sub": f"возврат ~{c.next_minutes} мин · забери готовых", "badge": "ready", "action": "expedition"})
     elif c.ready:
-        now.append({"icon": "⛏", "text": f"Бригады вернулись ({c.ready})", "sub": "забирай добычу", "badge": "ready"})
+        now.append({"icon": "⛏", "text": f"Бригады вернулись ({c.ready})", "sub": "забирай добычу",
+                    "badge": "ready", "action": "expedition"})
     elif c.out:
         now.append({"icon": "⛏", "text": f"Бригады в пути: {c.out}/{c.total}", "sub": f"возврат ~{c.next_minutes} мин"})
     else:
         now.append({"icon": "⛏", "text": "Бригады свободны", "sub": "гони за добром"})
     pa, pr = texts._producer_counts(t)
     if pr:
-        now.append({"icon": "🏭", "text": f"Пристройки: {pr} готовы — забирай", "badge": "ready"})
+        now.append({"icon": "🏭", "text": f"Пристройки: {pr} готовы", "sub": "забери в разделе", "badge": "ready"})
     elif pa:
         now.append({"icon": "🏭", "text": f"Пристройки: {pa} в работе"})
     bl = texts._build_line(p)
     if bl:
         now.append({"icon": "🏗", "text": bl.replace("🏗 ", "", 1)})
-    if not maxed and pct is not None:
-        now.append({"icon": "🔨", "text": f"Перестройка до ур. {t.level + 1}",
-                    "sub": f"{pct}% — копим ресурсы", "progress": pct / 100, "gold": True})
+    # перестройку не дублируем в «Сейчас» — она отдельной карточкой ниже
 
     inv = p.inventory or {}
     storage = [{"key": r, "name": bal.RESOURCE_NAMES.get(r, r), "amount": int(inv.get(r, 0))}
@@ -460,6 +466,114 @@ async def _api_upgrade(request: web.Request) -> web.Response:
         await s.commit()
         st = _tavern_state(p, p.tavern)
     return web.json_response({"ok": True, "level": r.new_level, "state": st},
+                             headers={"Cache-Control": "no-store"})
+
+
+async def _api_bonus(request: web.Request) -> web.Response:
+    """Активировать «бонус дня» (опохмел) — buff.refresh + buff.activate."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import buff as buffmod
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        buffmod.refresh(p)
+        res = buffmod.activate(p)
+        if not res.ok:                         # busy (баф уже идёт) | none (нет предложения)
+            return web.json_response({"ok": False, "error": res.reason or "none",
+                                      "state": _tavern_state(p, p.tavern)})
+        repo.add_log(s, "player", p.id, f"🎁 активировал баф «{res.boon.name}»")
+        await s.commit()
+        st = _tavern_state(p, p.tavern)
+    return web.json_response({"ok": True, "state": st,
+                              "boon": res.boon.name, "minutes": res.minutes},
+                             headers={"Cache-Control": "no-store"})
+
+
+async def _api_newbie(request: web.Request) -> web.Response:
+    """Забрать награды «грамоты новосёла» — newbie.claim_all."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import newbie
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not newbie.claimable(p, p.tavern):
+            return web.json_response({"ok": False, "error": "nothing"})
+        total = newbie.claim_all(p, p.tavern)
+        if total:
+            repo.add_log(s, "player", p.id,
+                         f"📜 забрал награды грамоты: {sum(total.values())} ед.")
+        await s.commit()
+        st = _tavern_state(p, p.tavern)
+    return web.json_response({"ok": True, "state": st, "reward": total},
+                             headers={"Cache-Control": "no-store"})
+
+
+async def _api_expedition(request: web.Request) -> web.Response:
+    """Забрать добычу вернувшихся бригад — logic.claim_expeditions."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import logic
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        claimed = logic.claim_expeditions(p)
+        if not claimed:
+            return web.json_response({"ok": False, "error": "nothing"})
+        total = sum(amount for _, amount, _ in claimed)
+        repo.add_log(s, "player", p.id, f"🎒 забрал добычу бригад: {total} ед.")
+        await s.commit()
+        st = _tavern_state(p, p.tavern)
+    return web.json_response({"ok": True, "state": st, "claimed": total},
+                             headers={"Cache-Control": "no-store"})
+
+
+def _init_user(init_data: str) -> dict:
+    """Имя/username из (уже проверенного) initData — для создания игрока в онбординге."""
+    try:
+        pairs = dict(parse_qsl(init_data, keep_blank_values=True))
+        u = json.loads(pairs.get("user", "{}"))
+        return {"first_name": u.get("first_name"), "username": u.get("username")}
+    except (ValueError, TypeError):
+        return {}
+
+
+async def _api_onboard(request: web.Request) -> web.Response:
+    """Создать игрока (если нет) и таверну — порт cmd_start/cb_create_tavern:
+    слот на карте, стартовый сундук, активация зазыва. Идемпотентно."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import newbie
+    from bot.game.balance import REGIONS
+    name = str(body.get("name") or "").strip()
+    region = str(body.get("region") or "")
+    if not 2 <= len(name) <= 40:
+        return web.json_response({"ok": False, "error": "bad_name"})
+    if region not in REGIONS:
+        return web.json_response({"ok": False, "error": "bad_region"})
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None:
+            u = _init_user(body.get("initData") or "")
+            p = await repo.create_player(s, uid, u.get("username"), u.get("first_name") or "Хозяин")
+        if p.tavern is not None:                       # уже есть — отдаём состояние
+            return web.json_response({"ok": True, "state": _tavern_state(p, p.tavern)})
+        t = await repo.create_tavern(s, p, name, region)
+        await repo.assign_map_slot(s, t, region)
+        repo.add_log(s, "player", p.id, f"🏗 завёл таверну «{name}» в {REGIONS[region]}")
+        chest = newbie.grant_chest(p)                  # стартовый сундук новосёла
+        await repo.grant_referral_rewards(s, p)        # активировать зазыв (если был)
+        await s.commit()
+        st = _tavern_state(p, t)
+    return web.json_response({"ok": True, "state": st, "chest": chest},
                              headers={"Cache-Control": "no-store"})
 
 
@@ -578,6 +692,10 @@ def build_app() -> web.Application:
     app.router.add_post("/api/state", _api_state)        # снапшот Таверны (mini-app)
     app.router.add_post("/api/collect", _api_collect)    # собрать доход
     app.router.add_post("/api/upgrade", _api_upgrade)    # улучшить таверну
+    app.router.add_post("/api/bonus", _api_bonus)        # активировать бонус дня
+    app.router.add_post("/api/newbie", _api_newbie)      # забрать грамоту новосёла
+    app.router.add_post("/api/expedition", _api_expedition)  # забрать добычу бригад
+    app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
     app.router.add_get("/assets/boss/ork{n}_{anim}.png", _event_sprite)  # ивент-анимации
