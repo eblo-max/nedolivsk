@@ -77,7 +77,11 @@ GEAR_RES_MULT = 2.5
 # 269 и т.п., но стабилен). Ярус множит сверху (★ → ★★ ×3 → ★★★ ×8).
 GEAR_RES_FLOOR = 250
 GEAR_RES_FLOOR_MAX = 320
-_SCARCE = {"ingot", "hide", "fang", "sinew", "ring", "pelt", "tusk", "chitin"}
+_SCARCE = {"ingot", "hide", "fang", "sinew", "ring", "pelt", "tusk", "chitin", "orc_scrap"}
+
+# Орочий сет: полный комплект из 3 вещей даёт боевой бонус (см. combat_stats).
+ORC_SET = ("orc_helm", "orc_plate", "orc_axe")
+ORC_SET_BONUS = {"damage": 6, "armor": 6, "luck": 4}
 
 
 def parse_entry(entry: str) -> tuple[str, int]:
@@ -249,6 +253,27 @@ CATALOG: dict[str, Item] = {
             cost={"gold": 1200, "ingot": 2, "chitin": 4},
             craft_hours=4, armor=6, crit=4,
         ),
+        # ═══════ ОРОЧИЙ СЕТ (трофеи Орды): куётся ТОЛЬКО из 🗞 обрывков чертежа,
+        # которые редко падают с побеждённого нашествия. Собрал чертежи → скуёшь.
+        # Полный комплект из 3 вещей даёт сет-бонус (см. ORC_SET / combat_stats). ═══════
+        Item(
+            id="orc_helm", slot="head", name="Шлем орочьего вождя",
+            description="Рогатая черепушка с клыками. Постояльцы трезвеют от одного взгляда.",
+            cost={"gold": 800, "ingot": 8, "orc_scrap": 2},
+            craft_hours=6, armor=10, income_pct=3, sprite="orc_helm",
+        ),
+        Item(
+            id="orc_plate", slot="chest", name="Доспех орды",
+            description="Награблённые пластины на ремнях. Тяжёлый, вонючий, непробиваемый.",
+            cost={"gold": 1200, "ingot": 12, "orc_scrap": 3},
+            craft_hours=8, armor=22, sprite="orc_plate",
+        ),
+        Item(
+            id="orc_axe", slot="weapon", name="Секира орды",
+            description="Зазубренная сталь на древке в человеческий рост. Спор решает с одного маха.",
+            cost={"gold": 1500, "ingot": 10, "orc_scrap": 4},
+            craft_hours=8, damage=24, crit=8, sprite="orc_axe",
+        ),
         # ═══════ ЭКСКЛЮЗИВ РЕЙД-БОССОВ (craftable=False, только выбить) ═══════
         # Статы множатся на ярус; падают рандомным ярусом, ★★★ — редчайшее.
         # cost — прокси-стоимость для ВВП (не куётся, цена символическая).
@@ -355,14 +380,26 @@ def pay_multiplier(equipment: dict | None) -> float:
     return 1 - pct / 100
 
 
+def orc_set_complete(equipment: dict | None) -> bool:
+    """Надеты ли все 3 части орочьего сета (любого яруса)."""
+    if not equipment:
+        return False
+    worn = {parse_entry(e)[0] for e in equipment.values()}
+    return all(p in worn for p in ORC_SET)
+
+
 def combat_stats(equipment: dict | None) -> dict:
     pairs = equipped_items(equipment)
-    return {
+    stats = {
         "damage": sum(i.damage * t for i, t in pairs),
         "crit": sum(i.crit * t for i, t in pairs),
         "armor": sum(i.armor * t for i, t in pairs),
         "luck": sum(i.luck * t for i, t in pairs),
     }
+    if orc_set_complete(equipment):              # сет-бонус «ярость орды»
+        for k, v in ORC_SET_BONUS.items():
+            stats[k] += v
+    return stats
 
 
 def _base_value(item: Item) -> float:

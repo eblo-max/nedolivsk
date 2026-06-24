@@ -2542,6 +2542,10 @@ def character_screen(player, craft_line: str = "") -> str:
         bonuses.append(f"−{round((1-it.pay_multiplier(equipment))*100)}% плата работникам")
     if bonuses:
         parts += ["", *_branch("ХОЗЯЙСТВО", bonuses)]
+    if it.orc_set_complete(equipment):           # собран орочий сет — бонус «ярость орды»
+        b = it.ORC_SET_BONUS
+        parts += ["", f"🪓 <b>СЕТ ОРДЫ СОБРАН</b> — ярость орды: "
+                  f"+{b['damage']} урон · +{b['armor']} броня · +{b['luck']} удача"]
     parts += ["", "<i>Голый трактирщик — смешной трактирщик. Загляни в кузницу.</i>"]
     return "\n".join(parts)
 

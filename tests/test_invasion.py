@@ -274,3 +274,41 @@ def test_weak_turnout_attack_unchanged_floor():
     r1 = inv.simulate(weak, seed=7, escal=1.0)
     r2 = inv.simulate(weak, seed=7, escal=1.0)
     assert r1["dealt"] == r2["dealt"] and r1["won"] == r2["won"]
+
+
+# ── Орочий сет: обрывки чертежа с победы + крафт + сет-бонус ──────────────────
+def test_orc_scrap_drops_on_win_deterministic():
+    from bot.game import items as itm
+    reg = {str(i): {"name": f"p{i}", "might": 30, "role": "ratnik"} for i in range(1, 8)}
+    iv = _inv(reg)
+    sim = {"won": True, "dealt": {i: 100 for i in range(1, 8)}, "n": 7}
+    p1 = inv.settle(iv, sim, random.Random(42))
+    p2 = inv.settle(iv, sim, random.Random(42))
+    assert p1["res"] == p2["res"]                         # детерминизм
+    got = [pid for pid, r in p1["res"].items() if r.get("orc_scrap")]
+    assert got and all(p1["res"][pid]["orc_scrap"] == 1 for pid in got)  # кто-то получил по 1
+    # проигрыш — обрывков нет
+    lose = inv.settle(iv, {"won": False, "dealt": {}, "n": 7}, random.Random(42))
+    assert lose["res"] == {}
+
+
+def test_orc_set_craftable_needs_scrap():
+    from bot.game import items as itm
+    for iid in itm.ORC_SET:
+        item = itm.CATALOG[iid]
+        assert item.craftable                              # куётся (в отличие от боссовых)
+        assert item.cost.get("orc_scrap", 0) > 0           # но нужен обрывок чертежа
+        assert "orc_scrap" in itm.tier_cost(item, 1)       # обрывок в реальной цене
+
+
+def test_orc_set_bonus_only_when_complete():
+    from bot.game import items as itm
+    full = {"head": "orc_helm:1", "chest": "orc_plate:1", "weapon": "orc_axe:1"}
+    part = {"head": "orc_helm:1", "weapon": "orc_axe:1"}
+    assert itm.orc_set_complete(full) and not itm.orc_set_complete(part)
+    base = itm.combat_stats(part)
+    bonus = itm.combat_stats(full)
+    # полный сет добавляет ровно ORC_SET_BONUS поверх суммы предметов
+    assert bonus["armor"] == base["armor"] + itm.CATALOG["orc_plate"].armor + itm.ORC_SET_BONUS["armor"]
+    assert bonus["damage"] - (base["damage"]) == itm.ORC_SET_BONUS["damage"]
+    assert bonus["luck"] == itm.ORC_SET_BONUS["luck"]
