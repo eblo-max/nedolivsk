@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify, initData, pushBack, popBack } from '../telegram'
@@ -103,6 +103,7 @@ const YARD: Record<string, { cx: number; y: number }> = {
   smokehouse: { cx: 74, y: 330 }, bakery: { cx: 22, y: 350 },
   dairy: { cx: 48, y: 440 },
 }
+const STAGE_W = 360                                   // эталонная ширина сцены (масштабируется под экран)
 const YARD_H = 440 + 122                               // низ домика(74)+имя+статус(~46) с запасом
 // дорожки-тропинки сквозь центры домиков (y+36 — центр арта)
 const YARD_PATHS = ['M24 44 L63 66 L42 156 L78 186 L50 286 L74 366 L48 476',
@@ -165,6 +166,22 @@ export default function Buildings() {
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
+
+  // двор — единый масштаб: сцена 360px ужимается/растягивается под ширину экрана,
+  // чтобы раскладка была одинаковой на всех устройствах (320…480+). callback-ref:
+  // сработает ровно когда двор появится (а не на стадии loading), cleanup — React 19.
+  const fitYard = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return
+    const fit = () => {
+      const s = el.clientWidth / STAGE_W
+      el.style.setProperty('--ys', String(s))
+      el.style.height = `${Math.round(YARD_H * s)}px`
+    }
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // нативная «назад» из производства → к списку
   useEffect(() => {
@@ -318,26 +335,28 @@ export default function Buildings() {
         <div className="flavor" style={{ margin: '6px 14px 0', fontSize: 13.5 }}>«Каждая открывает своё производство. Деньги и сырьё — вперёд.»</div>
       </div>
 
-      <div className="yard" style={{ minHeight: YARD_H }}>
-        <svg className="yard-paths" viewBox={`0 0 100 ${YARD_H}`} preserveAspectRatio="none" aria-hidden="true">
-          {YARD_PATHS.map((dp, i) => <path key={i} d={dp} />)}
-        </svg>
-        {YARD_DECO.map((o, i) => (
-          <img key={i} className="yd" src={deco(o.src)} alt="" aria-hidden="true" loading="lazy"
-            style={{ left: `${o.cx}%`, top: o.y, width: o.w, zIndex: Math.round(o.y) - 1 }} />
-        ))}
-        {d.list.map((b) => {
-          const p = YARD[b.id]; const f = yardFlag(b)
-          return (
-            <button key={b.id} className={`yb ${b.status === 'locked' ? 'off' : ''}`}
-              style={{ left: `${p.cx}%`, top: p.y, zIndex: Math.round(p.y) }} onClick={() => openBuilding(b)}>
-              <img src={art(b.id)} alt="" loading="lazy"
-                onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
-              <span className="yb-name">{b.name}</span>
-              <span className={`yb-st ${f.cls}`}>{f.text}</span>
-            </button>
-          )
-        })}
+      <div className="yard" ref={fitYard}>
+        <div className="yard-stage" style={{ width: STAGE_W, height: YARD_H }}>
+          <svg className="yard-paths" viewBox={`0 0 100 ${YARD_H}`} preserveAspectRatio="none" aria-hidden="true">
+            {YARD_PATHS.map((dp, i) => <path key={i} d={dp} />)}
+          </svg>
+          {YARD_DECO.map((o, i) => (
+            <img key={i} className="yd" src={deco(o.src)} alt="" aria-hidden="true" loading="lazy"
+              style={{ left: `${o.cx}%`, top: o.y, width: o.w, zIndex: Math.round(o.y) - 1 }} />
+          ))}
+          {d.list.map((b) => {
+            const p = YARD[b.id]; const f = yardFlag(b)
+            return (
+              <button key={b.id} className={`yb ${b.status === 'locked' ? 'off' : ''}`}
+                style={{ left: `${p.cx}%`, top: p.y, zIndex: Math.round(p.y) }} onClick={() => openBuilding(b)}>
+                <img src={art(b.id)} alt="" loading="lazy"
+                  onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
+                <span className="yb-name">{b.name}</span>
+                <span className={`yb-st ${f.cls}`}>{f.text}</span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {detail && (

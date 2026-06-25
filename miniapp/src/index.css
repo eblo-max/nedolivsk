@@ -439,9 +439,11 @@ body {
 
 /* ── Пристройки: двор таверны (изометрическая россыпь) ── */
 .scr { display:flex; flex-direction:column; gap:10px; }
-.yard { position:relative; isolation:isolate; border-radius:16px; overflow:hidden;
+.yard { position:relative; isolation:isolate; border-radius:16px; overflow:hidden; width:100%;
   background:radial-gradient(120% 70% at 50% 30%, #31210e 0%, #1d1308 55%, #0b0603 100%);
   box-shadow:inset 0 0 70px #000a, inset 0 1px 0 #ffffff10; }
+/* сцена фикс. ширины 360 — масштабируется под экран (--ys из JS), раскладка едина везде */
+.yard-stage { position:absolute; top:0; left:0; transform-origin:top left; transform:scale(var(--ys, 1)); }
 .yard-paths { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
 .yard-paths path { fill:none; stroke:#6a4f24; stroke-width:2.4; stroke-dasharray:0.1 8;
   stroke-linecap:round; stroke-linejoin:round; opacity:.55; vector-effect:non-scaling-stroke; }
