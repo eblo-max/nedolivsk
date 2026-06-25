@@ -1026,11 +1026,12 @@ def _building_produces(bid: str) -> list:
         keys, good = list(prod.WINERY), True
     else:
         return []
+    brew_name = {"ale1": "Эль ★", "ale2": "Светлое ★★", "ale3": "Праздничное ★★★"}
     out = []
     for k in keys:
         g = prod.GOODS.get(k)
         out.append({"key": k, "good": good,
-                    "name": g.name if g else names.get(k, k),
+                    "name": brew_name.get(k) or (g.name if g else names.get(k, k)),
                     "emoji": g.emoji if g else emojis.get(k),
                     "price": g.price if g else None, "use": use.get(k)})
     return out
@@ -1115,11 +1116,13 @@ def _production_state(p, bid: str) -> dict:
     if bid == "brewery":
         phase, minutes = prod.brew_phase(t)
         tier = int(braw.get("tier", 0)) if phase != "empty" else 0
-        recipes = [{"key": f"ale{tt}", "tier": tt, "name": f"Эль {prod.ALE_STARS[tt]}",
+        bname = {1: "Эль", 2: "Светлое", 3: "Праздничное"}    # флейвор-имена ярусов (как кнопки бота)
+        anm = lambda tt: f"{bname[tt]} {prod.ALE_STARS[tt]}"
+        recipes = [{"key": f"ale{tt}", "tier": tt, "name": anm(tt),
                     "emoji": "🍺", "good": True, "out_qty": prod.brew_output(tt, L),
                     "time": f"{prod.brew_hours(tt)} ч",
                     "inputs": _cost_items(p, prod.brew_inputs(tt, L))} for tt in (1, 2, 3)]
-        stock = [{"key": f"ale{tt}", "name": f"Эль {prod.ALE_STARS[tt]}", "emoji": "🍺",
+        stock = [{"key": f"ale{tt}", "name": anm(tt), "emoji": "🍺",
                   "good": True, "qty": int((t.products or {}).get(f"ale{tt}", 0))}
                  for tt in (1, 2, 3)]
         bstate = ("active" if phase in ("fermenting", "aging")
@@ -1130,7 +1133,7 @@ def _production_state(p, bid: str) -> dict:
         base.update(kind="brewery", to="cellar", recipes=recipes, stock=stock,
                     batch={"state": bstate, "minutes": minutes, "ends_at": ends,
                            "total": prod.brew_hours(tier) * 60 if tier else 0,
-                           "out": ({"key": f"ale{tier}", "name": f"Эль {prod.ALE_STARS[tier]}",
+                           "out": ({"key": f"ale{tier}", "name": anm(tier),
                                     "emoji": "🍺", "good": True,
                                     "qty": int(braw.get("out_qty", 0))} if tier else None)},
                     brewery={"phase": phase, "minutes": minutes, "tier": tier,
