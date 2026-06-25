@@ -9,7 +9,7 @@ import Sheet from '../components/Sheet'
 type BStatus = 'built' | 'building' | 'locked' | 'available'
 interface BItem { id: string; emoji: string; name: string; status: BStatus; minutes: number; lock: string | null; producer: boolean }
 interface BuildSlot { state: string; minutes: number; id: string | null; name: string | null }
-interface BState { ok: boolean; level: number; gold: number; reputation: number; build: BuildSlot; list: BItem[] }
+interface BState { ok: boolean; level: number; gold: number; reputation: number; finished: string | null; build: BuildSlot; list: BItem[] }
 
 interface Cost { key: string; name: string; emoji?: string; need: number; have: number; ok: boolean }
 interface Detail {
@@ -24,7 +24,7 @@ interface Brewery { phase: string; minutes: number; tier: number; next_tier: num
 interface ProdState {
   ok: boolean; id: string; emoji: string; name: string; desc: string; image: string; level: number
   kind: 'grind' | 'recipe' | 'brewery'; to: 'inventory' | 'cellar'
-  recipes: Recipe[]; stock: OutItem[]; batch: Batch; brewery?: Brewery
+  recipes: Recipe[]; stock: OutItem[]; batch: Batch; brewery?: Brewery; flavor?: string | null
 }
 
 const art = (id: string) => `${import.meta.env.BASE_URL}buildings/${id}.webp`
@@ -49,7 +49,7 @@ function ProdBar({ minutes, total }: { minutes: number; total?: number }) {
 }
 
 const SAMPLE: BState = {
-  ok: true, level: 3, gold: 1840, reputation: 55,
+  ok: true, level: 3, gold: 1840, reputation: 55, finished: null,
   build: { state: 'active', minutes: 74, id: 'kitchen', name: 'Кухня' },
   list: [
     { id: 'mill', emoji: '🌾', name: 'Мельница', status: 'built', minutes: 0, lock: null, producer: true },
@@ -97,6 +97,15 @@ export default function Buildings() {
     return () => { clearInterval(iv); document.removeEventListener('visibilitychange', refresh) }
   }, [reload])
 
+  // достройка завершилась (ленивое finalize на сервере) — празднуем как бот
+  const shownFin = useRef<string | null>(null)
+  useEffect(() => {
+    const f = data?.finished
+    if (f && shownFin.current !== f) { shownFin.current = f; hapticNotify('success'); flash(`🏗 ${f} достроена!`) }
+    if (!f) shownFin.current = null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.finished])
+
   async function openBuilding(b: BItem) {
     if (b.status === 'building') { flash(`Строится — ещё ${hm(b.minutes)}`); return }
     haptic('light')
@@ -133,7 +142,9 @@ export default function Buildings() {
       if (prod.kind === 'brewery') body.tier = r.tier
       else body.recipe = r.key
       const res = await api<{ production: ProdState }>('prod_start', body)
-      setProd(res.production); hapticNotify('success'); flash('Закрутилось!')
+      setProd(res.production); hapticNotify('success')
+      flash({ mill: 'Закрутилось!', smelter: 'Закрутилось!', brewery: 'Заброжало!', meadery: 'Забулькало!',
+        kitchen: 'На огонь!', winery: 'Поставили бродить!' }[prod.id] || 'Готовится!')
     } catch (e) {
       hapticNotify('warning')
       const code = (e as { code?: string })?.code
@@ -264,6 +275,7 @@ function ProductionView({ prod, busy, onStart, onClaim, onAge, onBack }: {
   const idle = prod.kind === 'brewery' ? phase === 'empty' : prod.batch.state === 'none'
   const ready = prod.kind === 'brewery' ? ['ready', 'ripe', 'overripe'].includes(phase || '') : prod.batch.state === 'ready'
   const active = !idle && !ready
+  const warn = phase === 'ripe' || phase === 'overripe'        // выдержка перекисает — срочно
   const stockLabel = prod.to === 'inventory' ? 'На складе' : 'В погребе'
 
   // статусная строка
@@ -294,7 +306,7 @@ function ProductionView({ prod, busy, onStart, onClaim, onAge, onBack }: {
         <span key={s.key} className="ps-chip"><OutIcon it={s} />{fmt(s.qty)}</span>
       ))}</div>
 
-      <div className={`prod-status ${ready ? 'rd' : active ? 'ac' : ''}`}>{status}</div>
+      <div className={`prod-status ${warn ? 'wn' : ready ? 'rd' : active ? 'ac' : ''}`}>{status}</div>
 
       {active && (
         <div className="prod-batch">
@@ -327,6 +339,8 @@ function ProductionView({ prod, busy, onStart, onClaim, onAge, onBack }: {
           ))}
         </div>
       )}
+
+      {prod.flavor && <p className="prod-flavor">{prod.flavor}</p>}
     </>
   )
 }

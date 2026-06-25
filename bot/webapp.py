@@ -923,7 +923,7 @@ def _buildings_state(p) -> dict:
     """Список пристроек: статус каждой + текущий слот стройки (1 за раз)."""
     from bot.game import buildings as bld, production as prod
     t = p.tavern
-    bld.finalize_build(p, t)                      # ленивое достраивание при открытии
+    done = bld.finalize_build(p, t)               # ленивое достраивание при открытии
     bstate, bmin = bld.build_state(p)
     items = []
     for bid in bld.ORDER:
@@ -946,7 +946,7 @@ def _buildings_state(p) -> dict:
     bname = (bld.CATALOG[p.build_item].name
              if p.build_item and p.build_item in bld.CATALOG else None)
     return {"ok": True, "level": int(t.level), "gold": int(p.gold),
-            "reputation": int(t.reputation),
+            "reputation": int(t.reputation), "finished": done.name if done else None,
             "build": {"state": bstate, "minutes": bmin, "id": p.build_item, "name": bname},
             "list": items}
 
@@ -1121,7 +1121,10 @@ def _production_state(p, bid: str) -> dict:
     total = hours_of(rc_now) * 60 if rc_now and rc_now in rmap else 0
     stock = [{"key": rc, "name": gname(rc), "emoji": gemoji(rc), "good": True,
               "qty": int((t.products or {}).get(rc, 0))} for rc in rmap]
-    base.update(kind="recipe", to="cellar", recipes=recipes, stock=stock,
+    flavor = {"meadery": "Берут состоятельные — репутация решает.",
+              "kitchen": "Сытые гости платят за еду сверх выпивки.",
+              "winery": "Самый дорогой напиток — берут только богачи."}.get(bid)
+    base.update(kind="recipe", to="cellar", recipes=recipes, stock=stock, flavor=flavor,
                 batch={"state": state, "minutes": minutes, "total": total, "out": out})
     return base
 

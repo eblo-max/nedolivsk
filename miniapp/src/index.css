@@ -486,6 +486,9 @@ body {
   padding:9px 10px; border:1px solid var(--line); border-radius:9px; background:#170f07; }
 .prod-status.ac { color:var(--gold); border-color:#5a451f; }
 .prod-status.rd { color:var(--green); border-color:#4f6b40; background:#13180e; }
+.prod-status.wn { color:#e7975a; border-color:#7a4424; background:#1d1107; animation:wn-pulse 1.4s ease-in-out infinite; }
+@keyframes wn-pulse { 0%,100%{box-shadow:0 0 0 #0000} 50%{box-shadow:0 0 14px #cf4a3655} }
+.prod-flavor { font-family:var(--text); font-style:italic; font-size:13px; color:#9c8961; text-align:center; margin:4px 0 0; }
 
 .prod-batch { display:flex; align-items:center; gap:10px; }
 .prodbar { flex:1; height:12px; border-radius:7px; overflow:hidden; background:#140d06; border:1px solid var(--line); }
