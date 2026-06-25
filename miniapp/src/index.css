@@ -52,10 +52,11 @@ body {
 .app { position:relative; z-index:1; height:100%; display:flex; flex-direction:column; }
 .scroll {
   flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;
-  padding:calc(var(--hud-h) + var(--sa-top) + 10px) 12px calc(var(--nav-h) + 14px + var(--sa-bottom));
+  padding:calc(var(--sa-top) + 12px) 12px calc(var(--nav-h) + 14px + var(--sa-bottom));
   max-width:480px; margin:0 auto; width:100%;
   display:flex; flex-direction:column; gap:11px;
 }
+.scroll.with-ticker { padding-top:calc(var(--hud-h) + var(--sa-top) + 10px); }   /* под фикс. тикер на Таверне */
 .scroll > * { flex-shrink:0; }   /* не сжимать карточки под высоту экрана — иначе контент режется */
 .rise { opacity:0; transform:translateY(12px); animation:rise .42s cubic-bezier(.2,.7,.2,1) forwards; }
 @keyframes rise { to { opacity:1; transform:none; } }

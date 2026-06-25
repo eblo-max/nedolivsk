@@ -31,7 +31,8 @@ export default function App() {
       <div className="fx-vig" />
       {intro && <Splash onEnter={() => setIntro(false)} />}
       <div className="app">
-        <div className="scroll">
+        {/* место под фикс. тикер резервируем только на Таверне (он там и рендерится) */}
+        <div className={`scroll${['/buildings', '/character', '/sorties', '/market', '/map'].includes(loc.pathname) ? '' : ' with-ticker'}`}>
           <Routes>
             <Route path="/" element={<Tavern />} />
             <Route path="/buildings" element={<Buildings />} />
