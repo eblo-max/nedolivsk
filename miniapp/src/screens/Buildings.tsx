@@ -94,25 +94,29 @@ function statusOf(prod: ProdState, rem: string): string {
   return '😴 Простаивает — выбери, что готовить.'
 }
 
-// расстановка домиков во дворе (изометрическая россыпь): left% / top px / глубина
-const YARD: Record<string, { x: number; y: number; z: number }> = {
-  brewery: { x: 50, y: 4, z: 2 }, mill: { x: 4, y: 30, z: 3 },
-  meadery: { x: 27, y: 118, z: 4 }, winery: { x: 52, y: 150, z: 4 },
-  kitchen: { x: 2, y: 184, z: 5 }, smelter: { x: 28, y: 270, z: 6 },
-  smokehouse: { x: 53, y: 300, z: 6 }, bakery: { x: 3, y: 338, z: 7 },
-  dairy: { x: 29, y: 430, z: 8 },
+// расстановка домиков: изометрический ромб 1·2·3·2·1 (центр-X% / ряд)
+// cx — центр по ширине (через translateX(-50%)), row — изо-ряд (глубина = z)
+const ROW_Y = [6, 104, 202, 300, 398]                 // y по ряду (каждый домик в своём слое)
+const YARD: Record<string, { cx: number; row: number }> = {
+  mill: { cx: 50, row: 0 },
+  brewery: { cx: 30, row: 1 }, meadery: { cx: 70, row: 1 },
+  kitchen: { cx: 15, row: 2 }, winery: { cx: 50, row: 2 }, smelter: { cx: 85, row: 2 },
+  bakery: { cx: 30, row: 3 }, smokehouse: { cx: 70, row: 3 },
+  dairy: { cx: 50, row: 4 },
 }
-const YARD_H = 540
+const YARD_H = ROW_Y[4] + 92
 
-// парящий статус-флажок над домиком. Приоритет: готово к сбору
-function yardBadge(b: BItem): { cls: string; label: string; icon: string } | null {
-  if (b.status === 'building') return { cls: 'work', label: hm(b.minutes), icon: '⏳' }
-  if (b.status === 'locked') return { cls: 'lock', label: '', icon: '🔒' }
-  if (b.status === 'available') return { cls: 'avail', label: 'построить', icon: '' }
+const hmc = (m: number) => { const h = Math.floor(m / 60), mm = m % 60; return h ? `${h}ч${mm}м` : `${mm}м` }
+
+// короткий статус-значок над крышей. idle → без пилюли (точка-пип на углу). Приоритет: готово
+function yardFlag(b: BItem): { cls: string; text: string; pill: boolean; hot: boolean } {
+  if (b.status === 'building') return { cls: 'work', text: hmc(b.minutes), pill: true, hot: false }
+  if (b.status === 'locked') return { cls: 'lock', text: 'заперто', pill: true, hot: false }
+  if (b.status === 'available') return { cls: 'avail', text: 'построить', pill: true, hot: false }
   const ps = b.prod?.state
-  if (ps === 'ready') return { cls: 'rdy', label: 'готово', icon: '🔔' }
-  if (ps === 'active') return { cls: 'work', label: hm(b.prod!.minutes), icon: '⚙' }
-  return { cls: 'idle', label: 'свободна', icon: '' }
+  if (ps === 'ready') return { cls: 'rdy', text: 'готово', pill: true, hot: true }
+  if (ps === 'active') return { cls: 'work', text: hmc(b.prod!.minutes), pill: true, hot: false }
+  return { cls: 'idle', text: '', pill: false, hot: false }
 }
 
 // иконка выхода/склада: товар → GoodIcon, сырьё/полуфабрикат → ResIcon
@@ -293,17 +297,15 @@ export default function Buildings() {
       {toast && <div className="toast">{toast}</div>}
       <div className="yard-head"><h2>Двор</h2><span className="muted">тапни по постройке</span></div>
 
-      <div className="yard" style={{ minHeight: YARD_H + 70 }}>
-        <svg className="yard-paths" viewBox={`0 0 100 ${YARD_H}`} preserveAspectRatio="none" aria-hidden="true">
-          <path d="M17 78 L15 232 L41 318 L18 386 L42 478" />
-          <path d="M63 52 L40 166 L65 198 L66 348 L42 478" />
-        </svg>
+      <div className="yard" style={{ minHeight: YARD_H }}>
         {d.list.map((b) => {
-          const p = YARD[b.id]; const bd = yardBadge(b)
+          const p = YARD[b.id]; const f = yardFlag(b)
           return (
             <button key={b.id} className={`yb ${b.status === 'locked' ? 'off' : ''}`}
-              style={{ left: `${p.x}%`, top: p.y, zIndex: p.z }} onClick={() => openBuilding(b)}>
-              {bd && <span className={`yb-badge ${bd.cls}`}>{bd.icon && <i className="yb-i">{bd.icon}</i>}{bd.label}</span>}
+              style={{ left: `${p.cx}%`, top: ROW_Y[p.row], zIndex: p.row + 1 }} onClick={() => openBuilding(b)}>
+              {f.pill
+                ? <span className={`yb-pill ${f.cls} ${f.hot ? 'hot' : ''}`}>{f.text}</span>
+                : <i className="ypip idle" />}
               <img src={art(b.id)} alt="" loading="lazy"
                 onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
               <span className="yb-name">{b.name}</span>
