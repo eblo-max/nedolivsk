@@ -950,8 +950,18 @@ def _buildings_state(p) -> dict:
             lock = f"Репутация {b.req_reputation} · у тебя {int(t.reputation)}"
         else:
             status, mins = "available", 0
+        prodst = None                                 # состояние производства (для точки-статуса)
+        if status == "built" and bid in prod.PRODUCERS:
+            if bid == "brewery":
+                ph, pm = prod.brew_phase(t)
+                pstate = ("active" if ph in ("fermenting", "aging")
+                          else "ready" if ph in ("ready", "ripe", "overripe") else "none")
+            else:
+                pstate, pm = prod.state(t, bid)
+            prodst = {"state": pstate, "minutes": pm}
         items.append({"id": bid, "emoji": b.emoji, "name": b.name, "status": status,
-                      "minutes": mins, "lock": lock, "producer": bid in prod.PRODUCERS})
+                      "minutes": mins, "lock": lock, "producer": bid in prod.PRODUCERS,
+                      "prod": prodst})
     bname = (bld.CATALOG[p.build_item].name
              if p.build_item and p.build_item in bld.CATALOG else None)
     return {"ok": True, "level": int(t.level), "gold": int(p.gold),

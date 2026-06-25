@@ -7,7 +7,7 @@ import Sheet from '../components/Sheet'
 
 // ── типы (зеркало webapp _buildings_state/_building_detail/_production_state) ──
 type BStatus = 'built' | 'building' | 'locked' | 'available'
-interface BItem { id: string; emoji: string; name: string; status: BStatus; minutes: number; lock: string | null; producer: boolean }
+interface BItem { id: string; emoji: string; name: string; status: BStatus; minutes: number; lock: string | null; producer: boolean; prod: { state: string; minutes: number } | null }
 interface BuildSlot { state: string; minutes: number; id: string | null; name: string | null }
 interface BState { ok: boolean; level: number; gold: number; reputation: number; finished: string | null; build: BuildSlot; list: BItem[] }
 
@@ -94,7 +94,16 @@ function statusOf(prod: ProdState, rem: string): string {
   return '😴 Простаивает — выбери, что готовить.'
 }
 
-const ST_LABEL: Record<BStatus, string> = { built: '✓ работает', building: '🏗 строится', locked: '🔒', available: 'можно строить' }
+// статус строки списка → точка (цвет) + подпись. Приоритет: готово к сбору
+function rowStatus(b: BItem): { dot: string; label: string } {
+  if (b.status === 'building') return { dot: 'work', label: `строится · ${hm(b.minutes)}` }
+  if (b.status === 'locked') return { dot: 'lock', label: b.lock || 'заперто' }
+  if (b.status === 'available') return { dot: 'avail', label: 'можно построить' }
+  const ps = b.prod?.state
+  if (ps === 'ready') return { dot: 'rdy', label: 'готово к сбору' }
+  if (ps === 'active') return { dot: 'work', label: `идёт работа · ${hm(b.prod!.minutes)}` }
+  return { dot: 'idle', label: 'свободна' }
+}
 
 // иконка выхода/склада: товар → GoodIcon, сырьё/полуфабрикат → ResIcon
 function OutIcon({ it }: { it: { key: string; good: boolean; emoji?: string } }) {
@@ -112,15 +121,15 @@ const SAMPLE: BState = {
   ok: true, level: 3, gold: 1840, reputation: 55, finished: null,
   build: { state: 'active', minutes: 74, id: 'kitchen', name: 'Кухня' },
   list: [
-    { id: 'mill', emoji: '🌾', name: 'Мельница', status: 'built', minutes: 0, lock: null, producer: true },
-    { id: 'brewery', emoji: '🍺', name: 'Пивоварня', status: 'built', minutes: 0, lock: null, producer: true },
-    { id: 'meadery', emoji: '🍶', name: 'Медоварня', status: 'available', minutes: 0, lock: null, producer: true },
-    { id: 'kitchen', emoji: '🍖', name: 'Кухня', status: 'building', minutes: 74, lock: null, producer: true },
-    { id: 'winery', emoji: '🍷', name: 'Винокурня', status: 'locked', minutes: 0, lock: 'Репутация 80 · у тебя 55', producer: true },
-    { id: 'smelter', emoji: '🔩', name: 'Горн', status: 'built', minutes: 0, lock: null, producer: true },
-    { id: 'bakery', emoji: '🥖', name: 'Пекарня', status: 'available', minutes: 0, lock: null, producer: true },
-    { id: 'smokehouse', emoji: '💨', name: 'Коптильня', status: 'available', minutes: 0, lock: null, producer: true },
-    { id: 'dairy', emoji: '🧀', name: 'Сыроварня', status: 'locked', minutes: 0, lock: 'Репутация 50 · у тебя 55', producer: true },
+    { id: 'mill', emoji: '🌾', name: 'Мельница', status: 'built', minutes: 0, lock: null, producer: true, prod: { state: 'active', minutes: 22 } },
+    { id: 'brewery', emoji: '🍺', name: 'Пивоварня', status: 'built', minutes: 0, lock: null, producer: true, prod: { state: 'ready', minutes: 0 } },
+    { id: 'meadery', emoji: '🍶', name: 'Медоварня', status: 'available', minutes: 0, lock: null, producer: true, prod: null },
+    { id: 'kitchen', emoji: '🍖', name: 'Кухня', status: 'building', minutes: 74, lock: null, producer: true, prod: null },
+    { id: 'winery', emoji: '🍷', name: 'Винокурня', status: 'locked', minutes: 0, lock: 'Репутация 80 · у тебя 55', producer: true, prod: null },
+    { id: 'smelter', emoji: '🔩', name: 'Горн', status: 'built', minutes: 0, lock: null, producer: true, prod: { state: 'none', minutes: 0 } },
+    { id: 'bakery', emoji: '🥖', name: 'Пекарня', status: 'available', minutes: 0, lock: null, producer: true, prod: null },
+    { id: 'smokehouse', emoji: '💨', name: 'Коптильня', status: 'available', minutes: 0, lock: null, producer: true, prod: null },
+    { id: 'dairy', emoji: '🧀', name: 'Сыроварня', status: 'locked', minutes: 0, lock: 'Репутация 50 · у тебя 55', producer: true, prod: null },
   ],
 }
 
@@ -268,35 +277,24 @@ export default function Buildings() {
     </div>
   )
 
-  // ── Список пристроек ──────────────────────────────────────────────────
+  // ── Список пристроек (тихий список) ───────────────────────────────────
   return (
     <div className="scr">
       {toast && <div className="toast">{toast}</div>}
-      <div className="bld-head">
-        <h2>🏗 Пристройки</h2>
-        <p className="muted">Каждая открывает своё производство. Деньги и сырьё — вперёд.</p>
-      </div>
+      <div className="bld-head"><h2>Пристройки</h2></div>
 
-      {d.build.state !== 'none' && d.build.id && (
-        <div className="bld-banner">
-          <span className="bb-ic">🏗</span>
-          <div className="bb-txt">
-            <b>{d.build.name}</b>
-            <span className="muted">{d.build.state === 'ready' ? 'достроена — открой, чтобы пустить в дело' : `строится — ещё ${hm(d.build.minutes)}`}</span>
-          </div>
-        </div>
-      )}
-
-      <div className="bld-grid">
-        {d.list.map((b) => (
-          <button key={b.id} className={`bld-tile st-${b.status}`} onClick={() => openBuilding(b)}>
-            <img className="bt-art" src={art(b.id)} alt="" loading="lazy"
-              onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
-            <span className="bt-name">{b.emoji} {b.name}</span>
-            <span className="bt-st">{b.status === 'building' ? `🏗 ${hm(b.minutes)}` : ST_LABEL[b.status]}</span>
-            {b.status === 'locked' && b.lock && <span className="bt-lock">{b.lock}</span>}
-          </button>
-        ))}
+      <div className="bld-list">
+        {d.list.map((b) => {
+          const st = rowStatus(b)
+          return (
+            <button key={b.id} className={`bld-row ${b.status === 'locked' ? 'off' : ''}`} onClick={() => openBuilding(b)}>
+              <img className="br-art" src={art(b.id)} alt="" loading="lazy"
+                onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
+              <span className="br-name">{b.name}</span>
+              <span className="br-st"><i className={`dot ${st.dot}`} />{st.label}</span>
+            </button>
+          )
+        })}
       </div>
 
       {detail && (
@@ -318,48 +316,45 @@ function BuildDetail({ detail, busy, onBuild }: { detail: Detail; busy: boolean;
 
       {detail.produces.length > 0 && (
         <>
-          <div className="sheet-sub">🔓 ПРОИЗВОДИТ · масштаб ×{detail.level} (ур. таверны)</div>
-          <div className="sheet-list">
+          <div className="cap">производит · ×{detail.level} с уровнем</div>
+          <div className="chips">
             {detail.produces.map((p) => (
-              <div key={p.key} className="sheet-task">
-                <OutIcon it={p} /><span className="l">{p.name}</span>
-                <span className="r muted">
-                  {p.good
-                    ? <>{p.price}<ResIcon k="gold" size={13} />/шт</>
-                    : p.use}
-                </span>
-              </div>
+              <span key={p.key} className="chip-p">
+                <OutIcon it={p} />{p.name}
+                <em>{p.good ? <>{p.price}<ResIcon k="gold" size={12} /></> : p.use}</em>
+              </span>
             ))}
           </div>
         </>
       )}
-      {detail.requires.length > 0 && (
-        <div className="sheet-row"><span>🧱 На базе</span>
-          <b style={{ textAlign: 'right' }}>{detail.requires.map((r) => `${r.emoji} ${r.name}`).join(', ')}</b></div>
-      )}
-      {detail.req_reputation > 0 && (
-        <div className="sheet-row"><span>⭐ Нужна репутация</span><b>{detail.req_reputation}</b></div>
-      )}
+
+      <div className="kv-list">
+        <div className="kv"><span>Стройка</span><b>{detail.build_hours} ч</b></div>
+        {detail.requires.length > 0 && (
+          <div className="kv"><span>На базе</span><b>{detail.requires.map((r) => r.name).join(', ')}</b></div>
+        )}
+        {detail.req_reputation > 0 && (
+          <div className="kv"><span>Репутация</span><b>{detail.req_reputation}</b></div>
+        )}
+      </div>
 
       {detail.built ? (
-        <p className="muted" style={{ fontStyle: 'italic', marginTop: 12 }}>✓ Уже построено. Работает.</p>
+        <p className="bd-note">Уже построено. Работает.</p>
       ) : detail.lock ? (
         <p className="bd-lock">{detail.lock.kind === 'self' || detail.lock.kind === 'busy' ? '🏗' : '🔒'} {detail.lock.text}{detail.lock.minutes ? ` — ещё ${hm(detail.lock.minutes)}` : ''}.</p>
       ) : (
         <>
-          <div className="sheet-row"><span>⏱ Стройка</span><b>{detail.build_hours} ч</b></div>
-          <div className="sheet-sub" style={{ marginTop: 12 }}>СТОИМОСТЬ</div>
-          <div className="sheet-list">
+          <div className="cap">стоимость</div>
+          <div className="kv-list">
             {detail.cost.map((c, i) => (
-              <div key={i} className="sheet-task">
-                <ResIcon k={c.key} emoji={c.emoji} /><span className="l">{c.name}</span>
-                <span className="r" style={{ color: c.ok ? 'var(--green)' : 'var(--crimson)' }}>{fmt(c.have)} / {fmt(c.need)}</span>
+              <div key={i} className="kv">
+                <span><ResIcon k={c.key} emoji={c.emoji} size={17} />{c.name}</span>
+                <b style={{ color: c.ok ? 'var(--green)' : 'var(--crimson)' }}>{fmt(c.have)} / {fmt(c.need)}</b>
               </div>
             ))}
           </div>
-          {/* кнопка активна как в боте: жмёшь и узнаёшь — дефицит подсвечен красным выше */}
-          <button className="btn gold" style={{ marginTop: 14 }} disabled={busy || !detail.can_build} onClick={onBuild}>
-            🏗 Заложить · {detail.build_hours} ч
+          <button className="btn gold" style={{ marginTop: 16 }} disabled={busy || !detail.can_build} onClick={onBuild}>
+            Заложить · {detail.build_hours} ч
           </button>
         </>
       )}
@@ -394,15 +389,16 @@ function ProductionView({ prod, busy, onStart, onClaim, onAge, onExpire, onBack 
 
   return (
     <>
-      <button className="lnk-back" onClick={onBack}>← Пристройки</button>
+      <button className="lnk-back" onClick={onBack}>‹ Пристройки</button>
       <div className="prod-hero">
         <img src={art(prod.image)} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none' }} />
-        <div className="ph-cap"><b>{prod.emoji} {prod.name}</b><span className="muted">{prod.desc}</span></div>
+        <div className="ph-cap">
+          <b>{prod.name}</b>
+          <span className="ph-stock">{stockLabel} · {prod.stock.map((s, i) => (
+            <span key={s.key} className="ph-q">{i > 0 && <i className="ph-sep" />}<OutIcon it={s} />{fmt(s.qty)}</span>
+          ))}</span>
+        </div>
       </div>
-
-      <div className="prod-stock">{stockLabel}: {prod.stock.map((s) => (
-        <span key={s.key} className="ps-chip"><OutIcon it={s} />{fmt(s.qty)}</span>
-      ))}</div>
 
       <div className={`prod-status ${warn ? 'wn' : ready ? 'rd' : active ? 'ac' : ''}`}>{status}</div>
 
@@ -417,23 +413,23 @@ function ProductionView({ prod, busy, onStart, onClaim, onAge, onExpire, onBack 
         <div className="prod-claim">
           {prod.kind === 'brewery' ? (
             <>
-              <button className="btn green" disabled={busy} onClick={onClaim}>🍺 Разлить в погреб{prod.batch.out ? ` · ${prod.batch.out.qty}` : ''}</button>
+              <button className="btn green" disabled={busy} onClick={onClaim}>Разлить в погреб{prod.batch.out ? ` · ${prod.batch.out.qty}` : ''}</button>
               {bw!.can_age && (
-                <button className="btn danger" disabled={busy} onClick={onAge}>🛢 Выдержать — риск +ярус ({bw!.mature_chance}%)</button>
+                <button className="btn danger" disabled={busy} onClick={onAge}>Выдержать — риск +ярус ({bw!.mature_chance}%)</button>
               )}
             </>
           ) : (
             <button className="btn green" disabled={busy} onClick={onClaim}>
-              {prod.to === 'inventory' ? '📦 Забрать на склад' : '🍽 Забрать в погреб'}{prod.batch.out ? ` · ${prod.batch.out.qty}` : ''}
+              {prod.to === 'inventory' ? 'Забрать на склад' : 'Забрать в погреб'}{prod.batch.out ? ` · ${prod.batch.out.qty}` : ''}
             </button>
           )}
         </div>
       )}
 
       {idle && (
-        <div className="recipe-list">
+        <div className="rcp-list">
           {prod.recipes.map((r) => (
-            <RecipeCard key={r.key} r={r} busy={busy} onStart={() => onStart(r)} />
+            <RecipeRow key={r.key} r={r} busy={busy} onStart={() => onStart(r)} />
           ))}
         </div>
       )}
@@ -443,25 +439,20 @@ function ProductionView({ prod, busy, onStart, onClaim, onAge, onExpire, onBack 
   )
 }
 
-function RecipeCard({ r, busy, onStart }: { r: Recipe; busy: boolean; onStart: () => void }) {
+function RecipeRow({ r, busy, onStart }: { r: Recipe; busy: boolean; onStart: () => void }) {
   const afford = r.inputs.every((i) => i.ok)
   return (
-    <div className="recipe-card">
-      <div className="rc-head">
-        <OutIcon it={r} />
-        <span className="rc-name">{r.name}</span>
-        <span className="rc-meta">×{r.out_qty} · {r.time}</span>
-      </div>
-      <div className="rc-inputs">
-        {r.inputs.map((i, k) => (
-          <span key={k} className="rc-in" style={{ color: i.ok ? 'var(--dim)' : 'var(--crimson)' }}>
-            <ResIcon k={i.key} emoji={i.emoji} size={16} />{fmt(i.have)}/{fmt(i.need)}
+    <button className="rcp" disabled={busy || !afford} onClick={onStart}>
+      <OutIcon it={r} />
+      <div className="rcp-mid">
+        <span className="rcp-name">{r.name} <em>×{r.out_qty}</em></span>
+        <span className="rcp-in">{r.inputs.map((i, k) => (
+          <span key={k} style={{ color: i.ok ? 'var(--dim)' : 'var(--crimson)' }}>
+            {k > 0 && ' '}<ResIcon k={i.key} emoji={i.emoji} size={14} />{fmt(i.have)}/{fmt(i.need)}
           </span>
-        ))}
+        ))}</span>
       </div>
-      <button className="btn gold sm" disabled={busy || !afford} onClick={onStart}>
-        {afford ? 'Запустить' : 'Не хватает сырья'}
-      </button>
-    </div>
+      <span className="rcp-go">{afford ? <>{r.time}<i className="chev">›</i></> : 'мало'}</span>
+    </button>
   )
 }
