@@ -33,7 +33,7 @@
     transition-duration: .01ms !important; scroll-behavior: auto !important;
   }
 }
-html, body, #root { height:100%; }
+html, body, #root { height:var(--app-h, 100%); }
 body {
   font-family:var(--text); color:var(--parch); background:var(--ink); overflow:hidden;
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; user-select:none;
@@ -180,7 +180,7 @@ body {
 .btn:disabled::after { display:none; }
 
 /* нижняя навигация */
-.nav { position:fixed; left:0; right:0; bottom:0; z-index:5; display:flex;
+.nav { position:absolute; left:0; right:0; bottom:0; z-index:5; display:flex;
   height:calc(var(--nav-h) + var(--sa-bottom)); padding-bottom:var(--sa-bottom);
   max-width:480px; margin:0 auto;
   background:linear-gradient(0deg,#0b0703 72%,#0b070300); border-top:1px solid var(--line); backdrop-filter:blur(4px); }

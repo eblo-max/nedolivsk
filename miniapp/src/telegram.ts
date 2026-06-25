@@ -42,8 +42,17 @@ export const tg: TgWebApp | undefined = window.Telegram?.WebApp
 /** Безопасная проверка версии (старые клиенты — фичу не трогаем). */
 export const atLeast = (v: string) => !!tg?.isVersionAtLeast?.(v)
 
-/** Инициализация: вызвать один раз на старте. Тема/фон/safe-area/жесты. */
+/** Высота приложения = видимая область Telegram (а не layout-вьюпорт, который
+ * бывает выше из-за шапки → низ срезался без скролла). Адаптивно к устройству. */
+function applyViewport() {
+  const h = tg?.viewportStableHeight && tg.viewportStableHeight > 0 ? tg.viewportStableHeight : window.innerHeight
+  document.documentElement.style.setProperty('--app-h', `${Math.round(h)}px`)
+}
+
+/** Инициализация: вызвать один раз на старте. Высота/тема/фон/safe-area/жесты. */
 export function initTelegram() {
+  applyViewport()
+  window.addEventListener('resize', applyViewport)   // десктоп-превью / поворот
   if (!tg) return
   try {
     tg.ready()
@@ -54,6 +63,8 @@ export function initTelegram() {
       tg.setBackgroundColor('#0b0703')
     }
     if (atLeast('7.10')) tg.setBottomBarColor?.('#0b0703')
+    applyViewport()
+    tg.onEvent('viewportChanged', applyViewport)      // экспанд/клавиатура/поворот
     applySafeArea()
     tg.onEvent('safeAreaChanged', applySafeArea)
     tg.onEvent('contentSafeAreaChanged', applySafeArea)
