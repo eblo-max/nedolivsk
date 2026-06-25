@@ -103,7 +103,7 @@ const YARD: Record<string, { cx: number; y: number }> = {
   smokehouse: { cx: 74, y: 330 }, bakery: { cx: 22, y: 350 },
   dairy: { cx: 48, y: 440 },
 }
-const YARD_H = 440 + 88
+const YARD_H = 440 + 122                               // низ домика(74)+имя+статус(~46) с запасом
 // дорожки-тропинки сквозь центры домиков (y+36 — центр арта)
 const YARD_PATHS = ['M24 44 L63 66 L42 156 L78 186 L50 286 L74 366 L48 476',
                     'M42 156 L15 236 L22 386 L48 476']
