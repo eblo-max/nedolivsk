@@ -1296,6 +1296,112 @@ async def _api_prod_claim(request: web.Request) -> web.Response:
                              headers={"Cache-Control": "no-store"})
 
 
+# ===== Охота (порт bot/handlers/hunt.py + game/combat.py) =====
+
+def _drop_items(drops) -> list:
+    """Таблица добычи зверя: ресурсы (диапазон/шанс) и трофеи (res='')."""
+    from bot.game import balance as bal, production as prod
+    names = {**bal.RESOURCE_NAMES, **bal.GOODS_NAMES}
+    emojis = {**bal.RESOURCE_EMOJI, **bal.GOODS_EMOJI}
+    out = []
+    for d in drops:
+        if d.res:
+            g = prod.GOODS.get(d.res)
+            out.append({"key": d.res, "trophy": False, "lo": d.lo, "hi": d.hi,
+                        "chance": d.chance, "name": g.name if g else names.get(d.res, d.res),
+                        "emoji": g.emoji if g else emojis.get(d.res)})
+        else:
+            out.append({"trophy": True, "label": d.label, "chance": d.chance})
+    return out
+
+
+def _hunt_state(p) -> dict:
+    """Меню охоты: HP/реген/готовность, расклад игрока, бестиарий с прогнозом и
+    добычей, опции лечения. Прогноз — combat.forecast (все статы, мгновенно)."""
+    from bot.game import balance as bal, combat, production as prod
+    chp, mhp = combat.current_hp(p), combat.max_hp()
+    ready, mins = combat.hunt_ready(p)
+    stats = combat.player_stats(p)
+    beasts = []
+    for e in combat.huntable(getattr(p, "region", None)):
+        win, est = combat.forecast(stats, e, chp)
+        icon, label = combat.threat(win)
+        beasts.append({
+            "id": e.id, "emoji": e.emoji, "name": e.name, "hp": e.hp,
+            "attack": e.attack, "armor": e.armor, "gold": [e.gold[0], e.gold[1]],
+            "rep": e.rep, "blurb": e.blurb, "traits": list(e.traits),
+            "regional": bool(e.region), "win": win, "est_hp": est,
+            "threat": {"icon": icon, "label": label}, "drops": _drop_items(e.drops),
+        })
+    prods = (p.tavern.products if p.tavern else None) or {}
+    heal_opts = [{"key": k, "name": prod.GOODS[k].name, "emoji": prod.GOODS[k].emoji,
+                  "hp": bal.HEAL_VALUES[k], "qty": int(prods.get(k, 0))}
+                 for k in bal.HEAL_VALUES if k in prod.GOODS and int(prods.get(k, 0)) > 0]
+    return {
+        "ok": True,
+        "hp": {"cur": chp, "max": mhp, "regen": combat.regen_full_minutes(p)},
+        "ready": {"can": ready, "minutes": mins},
+        "stats": {"damage": bal.BASE_DAMAGE + stats.get("damage", 0),
+                  "crit": min(bal.HUNT_CRIT_CAP, stats.get("crit", 0)),
+                  "armor": stats.get("armor", 0), "luck": stats.get("luck", 0)},
+        "heal": {"can": chp < mhp, "full": chp >= mhp, "options": heal_opts},
+        "beasts": beasts,
+    }
+
+
+async def _api_hunt(request: web.Request) -> web.Response:
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        st = _hunt_state(p)
+    return web.json_response(st, headers={"Cache-Control": "no-store"})
+
+
+async def _api_hunt_fight(request: web.Request) -> web.Response:
+    """Бой (combat.hunt): гейт по HP, исход + лог раундов для анимации, добыча/раны."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import balance as bal, combat, production as prod
+    eid = str(body.get("id") or "")
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        chp0 = combat.current_hp(p)                  # HP на старте — для шкалы анимации
+        res = combat.hunt(p, eid)
+        if not res.ok:                               # unknown | lowhp
+            return web.json_response({"ok": False, "error": res.reason, "minutes": res.minutes_left})
+        if res.fight.win:
+            repo.add_log(s, "player", p.id, f"🏹 одолел: {res.enemy.name} (+{(res.loot or {}).get('gold', 0)} 🪙)")
+        else:
+            repo.add_log(s, "player", p.id, f"🩸 проиграл: {res.enemy.name} (−{res.gold_lost} 🪙)")
+        await s.commit()
+        names = {**bal.RESOURCE_NAMES, **bal.GOODS_NAMES}
+        emojis = {**bal.RESOURCE_EMOJI, **bal.GOODS_EMOJI}
+        loot_res = []
+        if res.fight.win and res.loot:
+            for k, q in res.loot["res"].items():
+                gd = prod.GOODS.get(k)
+                loot_res.append({"key": k, "qty": int(q),
+                                 "name": gd.name if gd else names.get(k, k),
+                                 "emoji": gd.emoji if gd else emojis.get(k)})
+        hunt = _hunt_state(p)
+    return web.json_response({
+        "ok": True, "win": res.fight.win, "elite": res.elite,
+        "enemy": {"name": res.enemy.name, "emoji": res.enemy.emoji, "hp": res.enemy.hp},
+        "player_hp0": chp0, "hp_max": combat.max_hp(), "rounds": res.fight.log,
+        "loot": {"gold": (res.loot or {}).get("gold", 0) if res.fight.win else 0, "res": loot_res,
+                 "trophies": (res.loot or {}).get("trophies", []) if res.fight.win else [],
+                 "rep": (res.loot or {}).get("rep", 0) if res.fight.win else 0},
+        "gold_lost": res.gold_lost, "hp_now": res.hp_now, "hunt": hunt,
+    }, headers={"Cache-Control": "no-store"})
+
+
 def _init_user(init_data: str) -> dict:
     """Имя/username из (уже проверенного) initData — для создания игрока в онбординге."""
     try:
@@ -1470,6 +1576,8 @@ def build_app() -> web.Application:
     app.router.add_post("/api/prod_start", _api_prod_start)   # запустить партию
     app.router.add_post("/api/brew_age", _api_brew_age)       # выдержка эля (риск)
     app.router.add_post("/api/prod_claim", _api_prod_claim)   # забрать партию
+    app.router.add_post("/api/hunt", _api_hunt)               # меню охоты (бестиарий+прогноз)
+    app.router.add_post("/api/hunt_fight", _api_hunt_fight)   # бой со зверем
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
