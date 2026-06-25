@@ -988,7 +988,42 @@ def _building_detail(p, bid: str) -> dict:
     return {"ok": True, "id": bid, "emoji": b.emoji, "name": b.name,
             "desc": b.description, "unlocks": b.unlocks, "image": bid, "built": built,
             "build_hours": b.build_hours, "cost": cost, "lock": lock,
+            "produces": _building_produces(bid), "level": int(t.level),
+            "requires": [{"id": r, "emoji": bld.CATALOG[r].emoji, "name": bld.CATALOG[r].name}
+                         for r in b.requires],
+            "req_reputation": int(b.req_reputation),
             "can_build": can_build, "afford": all(c["ok"] for c in cost)}
+
+
+def _building_produces(bid: str) -> list:
+    """Что здание производит — для превью перед стройкой: выход, цена/назначение."""
+    from bot.game import balance as bal, production as prod
+    names = {**bal.RESOURCE_NAMES, **bal.GOODS_NAMES}
+    emojis = {**bal.RESOURCE_EMOJI, **bal.GOODS_EMOJI}
+    use = {"malt": "сырьё для варки эля", "flour": "сырьё для выпечки",
+           "ingot": "сырьё для ковки снаряги"}
+    if bid in prod.GRIND:
+        keys, good = list(prod.GRIND[bid]), False
+    elif bid in prod.RECIPES:
+        keys, good = list(prod.RECIPES[bid]), True
+    elif bid == "brewery":
+        keys, good = ["ale1", "ale2", "ale3"], True
+    elif bid == "meadery":
+        keys, good = list(prod.MEADERY), True
+    elif bid == "kitchen":
+        keys, good = list(prod.KITCHEN), True
+    elif bid == "winery":
+        keys, good = list(prod.WINERY), True
+    else:
+        return []
+    out = []
+    for k in keys:
+        g = prod.GOODS.get(k)
+        out.append({"key": k, "good": good,
+                    "name": g.name if g else names.get(k, k),
+                    "emoji": g.emoji if g else emojis.get(k),
+                    "price": g.price if g else None, "use": use.get(k)})
+    return out
 
 
 async def _api_buildings(request: web.Request) -> web.Response:

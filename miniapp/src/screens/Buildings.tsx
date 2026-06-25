@@ -12,9 +12,11 @@ interface BuildSlot { state: string; minutes: number; id: string | null; name: s
 interface BState { ok: boolean; level: number; gold: number; reputation: number; finished: string | null; build: BuildSlot; list: BItem[] }
 
 interface Cost { key: string; name: string; emoji?: string; need: number; have: number; ok: boolean }
+interface Produce { key: string; good: boolean; name: string; emoji?: string; price: number | null; use: string | null }
 interface Detail {
   ok: boolean; id: string; emoji: string; name: string; desc: string; unlocks: string; image: string
-  built: boolean; build_hours: number; cost: Cost[]; can_build: boolean; afford: boolean
+  built: boolean; build_hours: number; cost: Cost[]; can_build: boolean; afford: boolean; level: number
+  produces: Produce[]; requires: { id: string; emoji: string; name: string }[]; req_reputation: number
   lock: { kind: string; text: string; minutes?: number } | null
 }
 interface OutItem { key: string; name: string; emoji?: string; good: boolean; qty: number }
@@ -313,7 +315,31 @@ function BuildDetail({ detail, busy, onBuild }: { detail: Detail; busy: boolean;
       <img className="bd-art" src={art(detail.image)} alt="" loading="lazy"
         onError={(e) => { e.currentTarget.style.display = 'none' }} />
       <p className="bd-desc">{detail.desc}</p>
-      {detail.unlocks && <div className="sheet-row"><span>🔓 Откроет</span><b style={{ textAlign: 'right' }}>{detail.unlocks}</b></div>}
+
+      {detail.produces.length > 0 && (
+        <>
+          <div className="sheet-sub">🔓 ПРОИЗВОДИТ · масштаб ×{detail.level} (ур. таверны)</div>
+          <div className="sheet-list">
+            {detail.produces.map((p) => (
+              <div key={p.key} className="sheet-task">
+                <OutIcon it={p} /><span className="l">{p.name}</span>
+                <span className="r muted">
+                  {p.good
+                    ? <>{p.price}<ResIcon k="gold" size={13} />/шт</>
+                    : p.use}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {detail.requires.length > 0 && (
+        <div className="sheet-row"><span>🧱 На базе</span>
+          <b style={{ textAlign: 'right' }}>{detail.requires.map((r) => `${r.emoji} ${r.name}`).join(', ')}</b></div>
+      )}
+      {detail.req_reputation > 0 && (
+        <div className="sheet-row"><span>⭐ Нужна репутация</span><b>{detail.req_reputation}</b></div>
+      )}
 
       {detail.built ? (
         <p className="muted" style={{ fontStyle: 'italic', marginTop: 12 }}>✓ Уже построено. Работает.</p>
