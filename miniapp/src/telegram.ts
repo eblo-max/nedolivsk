@@ -72,11 +72,13 @@ function applySafeArea() {
 export const initData = () => tg?.initData ?? ''
 export const tgUser = () => tg?.initDataUnsafe?.user
 
-/** Тактильный отклик (крафт/удар/переход). Молча игнорит, если не поддержано. */
+/** Тактильный отклик (крафт/удар/переход). Версионируем (6.1+), иначе клиент шлёт варнинг. */
 export function haptic(style: HapticStyle = 'light') {
+  if (!atLeast('6.1')) return
   try { tg?.HapticFeedback?.impactOccurred(style) } catch { /* */ }
 }
 export function hapticNotify(type: 'success' | 'warning' | 'error') {
+  if (!atLeast('6.1')) return
   try { tg?.HapticFeedback?.notificationOccurred(type) } catch { /* */ }
 }
 
@@ -87,7 +89,7 @@ const _backStack: (() => void)[] = []
 let _backCb: (() => void) | null = null
 function _applyBack() {
   const b = tg?.BackButton
-  if (!b) return
+  if (!b || !atLeast('6.1')) return   // BackButton с 6.1 — иначе клиент шлёт варнинг
   if (_backCb) { b.offClick(_backCb); _backCb = null }
   const top = _backStack[_backStack.length - 1]
   if (top) { _backCb = top; b.onClick(top); b.show() }

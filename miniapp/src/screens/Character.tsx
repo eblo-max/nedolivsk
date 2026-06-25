@@ -37,6 +37,25 @@ function ItemImg({ s, className, style }: { s?: string; className?: string; styl
     onError={(e) => { if (e.currentTarget.src !== NO_ART) e.currentTarget.src = NO_ART }} />
 }
 
+// анимированный герой: крутим APNG только когда он в кадре и апп активен,
+// иначе подменяем статичным кадром — экономия батареи/CPU на слабых
+function AnimHero() {
+  const ref = useRef<HTMLImageElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const base = import.meta.env.BASE_URL
+    const anim = `${base}character/hero.png`, still = `${base}character/hero_static.png`
+    let onScreen = true
+    const apply = () => { el.src = onScreen && document.visibilityState === 'visible' ? anim : still }
+    const io = new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; apply() }, { threshold: 0.05 })
+    io.observe(el)
+    document.addEventListener('visibilitychange', apply)
+    return () => { io.disconnect(); document.removeEventListener('visibilitychange', apply) }
+  }, [])
+  return <img ref={ref} className="doll-hero" src={`${import.meta.env.BASE_URL}character/hero.png`} alt="Хозяин" />
+}
+
 // раскладка слотов вокруг фигуры: левая колонка | герой | правая колонка, снизу — ряд
 const COL_L = ['head', 'chest', 'left_hand', 'belt']
 const COL_R = ['weapon', 'right_hand', 'amulet', 'talisman']
@@ -102,12 +121,12 @@ export default function Character() {
     try { const r = await api<ForgeState>('forge'); setForge(r) }
     catch { setForge(FORGE_SAMPLE) }
   }
-  // тап по надетой вещи на кукле → кузница с её деталью (посмотреть/перековать)
+  // тап по надетой вещи на кукле → деталь ПОВЕРХ Персонажа (закрытие вернёт на куклу)
   async function openItem(id: string) {
     haptic('light')
     let f = forge
     if (!f) { try { f = await api<ForgeState>('forge') } catch { f = FORGE_SAMPLE } setForge(f) }
-    setView('forge'); setPick(f.items.find((x) => x.id === id) ?? null)
+    setPick(f.items.find((x) => x.id === id) ?? null)
   }
   async function claim() {
     if (busy) return
@@ -209,7 +228,7 @@ export default function Character() {
       {/* кукла: герой (анимированный) парит в воздухе, слоты по бокам — без рамки */}
       <div className="doll rise">
         <div className="doll-col">{COL_L.map((k) => <SlotBox key={k} s={bySlot(c, k)} onTap={openItem} onEmpty={openForge} />)}</div>
-        <div className="doll-fig"><img className="doll-hero" src={`${import.meta.env.BASE_URL}character/hero.png`} alt="Хозяин" /></div>
+        <div className="doll-fig"><AnimHero /></div>
         <div className="doll-col">{COL_R.map((k) => <SlotBox key={k} s={bySlot(c, k)} onTap={openItem} onEmpty={openForge} />)}</div>
         <div className="doll-bottom">{ROW_B.map((k) => <SlotBox key={k} s={bySlot(c, k)} onTap={openItem} onEmpty={openForge} />)}</div>
       </div>
@@ -254,6 +273,7 @@ export default function Character() {
 
       <div className="flavor rise" style={{ margin: '8px 14px 4px', fontSize: 13.5, animationDelay: '.14s' }}>«Голый трактирщик — смешной трактирщик. Загляни в кузницу.»</div>
       <button className="btn gold rise" style={{ animationDelay: '.16s' }} onClick={openForge}>⚒ В кузницу</button>
+      {pick && <ItemSheet item={pick} busy={busy} craftState={c.craft.state} onMake={make} onClose={() => setPick(null)} />}
       {healOpen && <HealSheet full={c.heal.full} options={c.heal.options} busy={busy} onHeal={heal} onClose={() => setHealOpen(false)} />}
       {toast && <div className="toast">{toast}</div>}
     </>
