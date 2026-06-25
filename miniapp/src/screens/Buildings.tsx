@@ -300,15 +300,15 @@ export default function Buildings() {
   return (
     <div className="scr">
       {toast && <div className="toast">{toast}</div>}
-      <div className="hero rise">
+      <div className="hero rise" style={{ paddingBottom: 0 }}>
         <div className="nm">Двор таверны</div>
         <div className="meta">
-          <span className="lvl">★ УРОВЕНЬ {d.level}</span>
-          <span className="region">🏗 построено {built}/{d.list.length}</span>
-          {ready > 0 && <span className="region hot">🔔 {ready} к сбору</span>}
+          <span className="region">Уровень {d.level}</span>
+          <span className="region">построено {built}/{d.list.length}</span>
+          {ready > 0 && <span className="region">🔔 {ready} к сбору</span>}
           {onBuild && <span className="region">⏳ {d.build.name}: {hm(d.build.minutes)}</span>}
         </div>
-        <div className="flavor">«Каждая открывает своё производство. Деньги и сырьё — вперёд.»</div>
+        <div className="flavor" style={{ margin: '6px 14px 0', fontSize: 13.5 }}>«Каждая открывает своё производство. Деньги и сырьё — вперёд.»</div>
       </div>
 
       <div className="yard" style={{ minHeight: YARD_H }}>
