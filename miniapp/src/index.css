@@ -454,22 +454,19 @@ body {
   width:50px; height:12px; border-radius:50%; z-index:-1; pointer-events:none;
   background:radial-gradient(closest-side, #000a, transparent 72%); }
 
-/* имя под домиком + короткий статус-значок над крышей */
-.yb-name { font-family:var(--disp); font-size:10.5px; font-weight:700; letter-spacing:.2px; color:var(--parch);
-  text-shadow:0 1px 4px #000, 0 0 3px #000; margin-top:-2px; }
+/* имя домика + статус строкой под ним (ничего не налезает на арт) */
+.yb-name { font-family:var(--disp); font-size:11px; font-weight:700; letter-spacing:.2px; color:var(--parch);
+  text-shadow:0 1px 4px #000, 0 0 3px #000; margin-top:-2px; line-height:1.1; }
 .yb.off .yb-name { color:#9a855c; }
-
-.yb-pill { position:absolute; top:-3px; right:-4px; z-index:4; white-space:nowrap;
-  font-family:var(--disp); font-size:9px; font-weight:700; letter-spacing:.2px;
-  padding:2px 7px; border-radius:20px; box-shadow:0 2px 6px #000c; }
-.yb-pill.work { background:#2a2010; color:var(--gold); border:1px solid #6a5022; }
-.yb-pill.avail { background:#221a0c; color:#cdb68a; border:1px dashed #6a5226; }
-.yb-pill.lock { background:#1e160c; color:#9a7d4f; border:1px solid #4a3a22; }
-.yb-pill.rdy.hot { background:linear-gradient(var(--gold-2),#cf9a3c); color:#3a2600; border:1px solid #f6dd92;
-  animation:flag-glow 1.6s ease-in-out infinite; }
-@keyframes flag-glow { 0%,100%{box-shadow:0 2px 6px #000a} 50%{box-shadow:0 2px 6px #000a,0 0 12px 2px #e7bf63aa} }
-.ypip { position:absolute; top:3px; right:9px; z-index:4; width:9px; height:9px; border-radius:50%;
-  background:var(--green); box-shadow:0 0 0 2px #0b0603, 0 1px 3px #000; }
+.yb-st { font-family:var(--text); font-size:9.5px; font-weight:600; letter-spacing:.2px; line-height:1;
+  text-shadow:0 1px 3px #000; margin-top:1px; }
+.yb-st.work { color:var(--gold); }
+.yb-st.avail { color:#cdb68a; }
+.yb-st.lock { color:#9a7d4f; }
+.yb-st.idle { color:var(--green); }
+.yb-st.rdy { color:#ffd773; font-weight:700; text-shadow:0 0 7px #e7bf63aa, 0 1px 2px #000;
+  animation:st-glow 1.6s ease-in-out infinite; }
+@keyframes st-glow { 0%,100%{opacity:.85} 50%{opacity:1} }
 
 /* деталь — плоско, без коробок */
 .bd-art { width:128px; height:128px; object-fit:contain; display:block; margin:0 auto 10px;

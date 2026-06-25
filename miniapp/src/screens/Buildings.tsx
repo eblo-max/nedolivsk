@@ -120,15 +120,15 @@ const deco = (s: string) => `${import.meta.env.BASE_URL}yard/${s}.webp`
 
 const hmc = (m: number) => { const h = Math.floor(m / 60), mm = m % 60; return h ? `${h}ч${mm}м` : `${mm}м` }
 
-// короткий статус-значок над крышей. idle → без пилюли (точка-пип на углу). Приоритет: готово
-function yardFlag(b: BItem): { cls: string; text: string; pill: boolean; hot: boolean } {
-  if (b.status === 'building') return { cls: 'work', text: hmc(b.minutes), pill: true, hot: false }
-  if (b.status === 'locked') return { cls: 'lock', text: 'заперто', pill: true, hot: false }
-  if (b.status === 'available') return { cls: 'avail', text: 'построить', pill: true, hot: false }
+// статус строкой под именем домика (чисто, ничего не налезает на арт). Приоритет: готово
+function yardFlag(b: BItem): { cls: string; text: string } {
+  if (b.status === 'building') return { cls: 'work', text: `стройка · ${hmc(b.minutes)}` }
+  if (b.status === 'locked') return { cls: 'lock', text: 'заперто' }
+  if (b.status === 'available') return { cls: 'avail', text: 'построить' }
   const ps = b.prod?.state
-  if (ps === 'ready') return { cls: 'rdy', text: 'готово', pill: true, hot: true }
-  if (ps === 'active') return { cls: 'work', text: hmc(b.prod!.minutes), pill: true, hot: false }
-  return { cls: 'idle', text: '', pill: false, hot: false }
+  if (ps === 'ready') return { cls: 'rdy', text: 'готово к сбору' }
+  if (ps === 'active') return { cls: 'work', text: `ещё ${hmc(b.prod!.minutes)}` }
+  return { cls: 'idle', text: 'свободна' }
 }
 
 // иконка выхода/склада: товар → GoodIcon, сырьё/полуфабрикат → ResIcon
@@ -334,12 +334,10 @@ export default function Buildings() {
           return (
             <button key={b.id} className={`yb ${b.status === 'locked' ? 'off' : ''}`}
               style={{ left: `${p.cx}%`, top: p.y, zIndex: Math.round(p.y) }} onClick={() => openBuilding(b)}>
-              {f.pill
-                ? <span className={`yb-pill ${f.cls} ${f.hot ? 'hot' : ''}`}>{f.text}</span>
-                : <i className="ypip idle" />}
               <img src={art(b.id)} alt="" loading="lazy"
                 onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
               <span className="yb-name">{b.name}</span>
+              <span className={`yb-st ${f.cls}`}>{f.text}</span>
             </button>
           )
         })}
