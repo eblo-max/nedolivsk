@@ -36,7 +36,7 @@ export default function Sheet({ icon, title, onClose, children }: {
       <div className={`sheet${closing ? ' out' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="sheet-grab" />
         <div className="sheet-h">
-          {icon && <img className="sheet-ic" src={icon} alt="" />}
+          {icon && <img className="sheet-ic" src={icon} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />}
           <span>{title}</span>
           <button className="sheet-x" onClick={close} aria-label="Закрыть">✕</button>
         </div>

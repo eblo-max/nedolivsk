@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type CSSProperties } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify, initData } from '../telegram'
@@ -28,6 +28,14 @@ interface ForgeState { ok: boolean; pouch: Record<string, number>; items: ForgeI
 const stars = (t?: number) => '★'.repeat(t || 0)
 const TIER_NAME: Record<number, string> = { 1: 'обычный', 2: 'добротный', 3: 'мастерский' }
 const sprite = (s?: string) => `${import.meta.env.BASE_URL}items/${s}.png`
+
+// заглушка для предметов без арта (напр. орочий сет) — чтобы не было битых картинок
+const NO_ART = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect x="9" y="9" width="30" height="30" rx="6" fill="#2a1c0d" stroke="#9c7838" stroke-width="2"/><path d="M19 19l10 10M29 19l-10 10" stroke="#c2965a" stroke-width="2.4" stroke-linecap="round"/></svg>')
+function ItemImg({ s, className, style }: { s?: string; className?: string; style?: CSSProperties }) {
+  return <img className={className} style={style} src={s ? sprite(s) : NO_ART} alt="" loading="lazy"
+    onError={(e) => { if (e.currentTarget.src !== NO_ART) e.currentTarget.src = NO_ART }} />
+}
 
 // раскладка слотов вокруг фигуры: левая колонка | герой | правая колонка, снизу — ряд
 const COL_L = ['head', 'chest', 'left_hand', 'belt']
@@ -141,7 +149,7 @@ export default function Character() {
     )
     if (st.state === 'active') return (
       <div className="card rise"><div className="card-b" style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
-        {st.sprite && <img className="ti-img" style={{ width: 34, height: 34 }} src={sprite(st.sprite)} alt="" />}
+        {st.sprite && <ItemImg className="ti-img" style={{ width: 34, height: 34 }} s={st.sprite} />}
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: 'var(--disp)', fontSize: 13, color: 'var(--brass)', letterSpacing: 1 }}>⚒ МАСТЕР КУЁТ</div>
           <div className="muted" style={{ fontSize: 13 }}>{st.name} {stars(st.tier)} — ещё {Math.floor((st.minutes || 0) / 60)} ч {(st.minutes || 0) % 60} мин</div>
@@ -171,7 +179,7 @@ export default function Character() {
           <div className="card rise"><div className="card-b" style={{ gap: 8 }}>
             {f.items.map((it) => (
               <button key={it.id} className="forge-row" onClick={() => { haptic('light'); setPick(it) }}>
-                <img className="fr-img" src={sprite(it.sprite)} alt="" loading="lazy" />
+                <ItemImg className="fr-img" s={it.sprite} />
                 <span className="fr-txt">
                   <b>{it.trophy ? '🏆 ' : ''}{it.name} <span className="stars">{stars(it.cur)}</span></b>
                   <small>{it.slot_name}{it.gains_cur ? ` · ${it.gains_cur}` : ''}</small>
@@ -285,7 +293,7 @@ function ItemSheet({ item, busy, craftState, onMake, onClose }: {
   return (
     <Sheet icon={sprite(item.sprite)} title={item.name.toUpperCase()} onClose={onClose}>
       <div className="item-hero">
-        <img src={sprite(item.sprite)} alt="" />
+        <ItemImg s={item.sprite} />
         <div>
           <div className="ih-name">{item.name} <span className="stars">{stars(item.trophy || item.maxed ? item.cur : item.next)}</span></div>
           <div className="muted" style={{ fontSize: 13 }}>{item.slot_name}{item.cur > 0 && !item.maxed ? ` · перековка ${stars(item.cur)} → ${stars(item.next)} (${TIER_NAME[item.next]})` : !item.maxed ? ` · ${TIER_NAME[item.next]}` : ''}</div>
@@ -344,7 +352,7 @@ const bySlot = (c: CharState, k: string): Slot =>
 function SlotBox({ s, onTap, onEmpty }: { s: Slot; onTap: (id: string) => void; onEmpty: () => void }) {
   if (s.id) return (
     <button className={`slot t${s.tier || 1}`} aria-label={s.name} title={s.name} onClick={() => onTap(s.id!)}>
-      <img src={sprite(s.sprite)} alt="" loading="lazy" />
+      <ItemImg s={s.sprite} />
       {(s.tier || 1) > 1 && <span className="slot-t">{stars(s.tier)}</span>}
     </button>
   )
