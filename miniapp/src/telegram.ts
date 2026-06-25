@@ -49,10 +49,27 @@ function applyViewport() {
   document.documentElement.style.setProperty('--app-h', `${Math.round(h)}px`)
 }
 
+/** Анти-коллапс iOS-Telegram: если документ не прокручиваем или scrollTop=0,
+ * клиент трактует свайп-вниз как «свернуть/закрыть» и перехватывает тач.
+ * Держим хотя бы 1px прокрутки и не даём scrollTop опуститься до нуля. */
+function ensureScrollable() {
+  const el = document.scrollingElement || document.documentElement
+  if (el.scrollHeight <= window.innerHeight + 1) {
+    document.body.style.minHeight = `${window.innerHeight + 1}px`
+  }
+}
+function preventCollapse() {
+  const el = document.scrollingElement || document.documentElement
+  if (el.scrollTop <= 0) el.scrollTop = 1
+}
+
 /** Инициализация: вызвать один раз на старте. Высота/тема/фон/safe-area/жесты. */
 export function initTelegram() {
   applyViewport()
-  window.addEventListener('resize', applyViewport)   // десктоп-превью / поворот
+  ensureScrollable()
+  window.addEventListener('resize', () => { applyViewport(); ensureScrollable() })
+  window.addEventListener('load', ensureScrollable)
+  document.addEventListener('touchstart', preventCollapse, { passive: true })
   if (!tg) return
   try {
     tg.ready()
@@ -63,8 +80,8 @@ export function initTelegram() {
       tg.setBackgroundColor('#0b0703')
     }
     if (atLeast('7.10')) tg.setBottomBarColor?.('#0b0703')
-    applyViewport()
-    tg.onEvent('viewportChanged', applyViewport)      // экспанд/клавиатура/поворот
+    applyViewport(); ensureScrollable()
+    tg.onEvent('viewportChanged', () => { applyViewport(); ensureScrollable() })  // экспанд/клавиатура/поворот
     applySafeArea()
     tg.onEvent('safeAreaChanged', applySafeArea)
     tg.onEvent('contentSafeAreaChanged', applySafeArea)

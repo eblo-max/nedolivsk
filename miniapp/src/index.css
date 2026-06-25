@@ -33,11 +33,16 @@
     transition-duration: .01ms !important; scroll-behavior: auto !important;
   }
 }
-html, body, #root { height:var(--app-h, 100%); }
+html { height:100%; }
+/* скроллим ДОКУМЕНТ (body), а не вложенный див — иначе iOS-Telegram перехватывает
+   свайп как «свернуть» и контент не скроллится (best practice Telegram Mini Apps) */
+body, #root { min-height:var(--app-h, 100%); }
 body {
-  font-family:var(--text); color:var(--parch); background:var(--ink); overflow:hidden;
+  font-family:var(--text); color:var(--parch); background:var(--ink);
+  overflow-y:scroll; overflow-x:hidden; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain;
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; user-select:none;
   background-image:radial-gradient(120% 70% at 50% -8%,#3a2410 0%,#1a1207 46%,#0a0604 100%);
+  background-attachment:fixed;
 }
 
 /* фон-атмосфера: угли очага (тёплый дым, не золотой блеск) */
@@ -49,10 +54,10 @@ body {
 .fx-vig { background:radial-gradient(130% 92% at 50% 32%,transparent 50%,#000c 100%); }
 
 /* оболочка */
-.app { position:relative; z-index:1; height:100%; display:flex; flex-direction:column; }
+.app { position:relative; z-index:1; min-height:var(--app-h, 100%); display:flex; flex-direction:column; }
 .scroll {
-  flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;
-  padding:calc(var(--sa-top) + 12px) 12px calc(var(--nav-h) + 14px + var(--sa-bottom));
+  flex:1 0 auto;
+  padding:calc(var(--sa-top) + 12px) 12px calc(var(--nav-h) + 18px + var(--sa-bottom));
   max-width:480px; margin:0 auto; width:100%;
   display:flex; flex-direction:column; gap:11px;
 }
@@ -180,7 +185,7 @@ body {
 .btn:disabled::after { display:none; }
 
 /* нижняя навигация */
-.nav { position:absolute; left:0; right:0; bottom:0; z-index:5; display:flex;
+.nav { position:fixed; left:0; right:0; bottom:0; z-index:5; display:flex;
   height:calc(var(--nav-h) + var(--sa-bottom)); padding-bottom:var(--sa-bottom);
   max-width:480px; margin:0 auto;
   background:linear-gradient(0deg,#0b0703 72%,#0b070300); border-top:1px solid var(--line); backdrop-filter:blur(4px); }

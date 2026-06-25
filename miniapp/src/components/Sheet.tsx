@@ -18,15 +18,19 @@ export default function Sheet({ icon, title, onClose, children }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // блок прокрутки фона (скроллит body): iOS-устойчиво — фиксируем body со
+  // смещением на текущую позицию, на закрытии возвращаем. + прячем навбар.
   useEffect(() => {
-    const scroll = document.querySelector('.scroll') as HTMLElement | null
+    const body = document.body
     const nav = document.querySelector('.nav') as HTMLElement | null
-    const po = scroll?.style.overflowY
+    const y = window.scrollY
+    const prev = { overflow: body.style.overflow, position: body.style.position, top: body.style.top, width: body.style.width }
     const pn = nav?.style.display
-    if (scroll) scroll.style.overflowY = 'hidden'
+    body.style.overflow = 'hidden'; body.style.position = 'fixed'; body.style.top = `-${y}px`; body.style.width = '100%'
     if (nav) nav.style.display = 'none'
     return () => {
-      if (scroll) scroll.style.overflowY = po ?? ''
+      body.style.overflow = prev.overflow; body.style.position = prev.position; body.style.top = prev.top; body.style.width = prev.width
+      window.scrollTo(0, y)
       if (nav) nav.style.display = pn ?? ''
     }
   }, [])
