@@ -134,7 +134,7 @@ export default function Character() {
     haptic('medium'); setBusy(true)
     try {
       const r = await api<{ character: CharState; forge: ForgeState; item: string; tier: number }>('craft_claim')
-      set(r.character); setForge(r.forge); hapticNotify('success'); flash(`${r.item} ${stars(r.tier)} — твоё!`)
+      set(r.character); setForge(r.forge); hapticNotify('success'); flash(`${r.item} ${stars(r.tier)} — твоё!`); setView('doll')
     } catch { hapticNotify('warning'); flash('Ещё не готово') }
     finally { setBusy(false) }
   }
@@ -153,7 +153,7 @@ export default function Character() {
     try {
       const r = await api<{ character: CharState; forge: ForgeState; item: string; tier: number; hours: number }>('forge_make', { item_id: item.id })
       set(r.character); setForge(r.forge); hapticNotify('success')
-      flash(`Мастер взялся: ${r.item} ${stars(r.tier)} · ${r.hours} ч`); setPick(null)
+      flash(`Мастер взялся: ${r.item} ${stars(r.tier)} · ${r.hours} ч`); setPick(null); setView('doll')
     } catch (e) {
       hapticNotify('warning')
       const code = (e as { code?: string })?.code
