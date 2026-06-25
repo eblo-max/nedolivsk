@@ -46,8 +46,9 @@ function AnimHero() {
     if (!el) return
     const base = import.meta.env.BASE_URL
     const anim = `${base}character/hero.png`, still = `${base}character/hero_static.png`
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
     let onScreen = true
-    const apply = () => { el.src = onScreen && document.visibilityState === 'visible' ? anim : still }
+    const apply = () => { el.src = onScreen && document.visibilityState === 'visible' && !reduce ? anim : still }
     const io = new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; apply() }, { threshold: 0.05 })
     io.observe(el)
     document.addEventListener('visibilitychange', apply)
