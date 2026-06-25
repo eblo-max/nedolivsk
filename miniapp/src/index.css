@@ -439,6 +439,8 @@ body {
 .yard-paths { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
 .yard-paths path { fill:none; stroke:#6a4f24; stroke-width:2.4; stroke-dasharray:0.1 8;
   stroke-linecap:round; stroke-linejoin:round; opacity:.55; vector-effect:non-scaling-stroke; }
+.yd { position:absolute; transform:translateX(-50%); pointer-events:none;
+  filter:sepia(.32) saturate(.72) brightness(.86) drop-shadow(0 3px 3px #0009); opacity:.9; }
 
 .yb { position:absolute; width:78px; transform:translateX(-50%);
   display:flex; flex-direction:column; align-items:center; gap:4px;

@@ -107,6 +107,16 @@ const YARD_H = 440 + 88
 // дорожки-тропинки сквозь центры домиков (y+36 — центр арта)
 const YARD_PATHS = ['M24 44 L63 66 L42 156 L78 186 L50 286 L74 366 L48 476',
                     'M42 156 L15 236 L22 386 L48 476']
+// озеленение двора: природный декор по пустым местам (за домиками, тапы не ловит)
+const YARD_DECO: { src: string; cx: number; y: number; w: number }[] = [
+  { src: 'tree2', cx: 88, y: 2, w: 60 }, { src: 'wheat1', cx: 41, y: 30, w: 30 },
+  { src: 'scarecrow', cx: 9, y: 70, w: 38 }, { src: 'flow2', cx: 62, y: 128, w: 30 },
+  { src: 'bush1', cx: 90, y: 96, w: 40 }, { src: 'mush', cx: 33, y: 214, w: 24 },
+  { src: 'flow1', cx: 30, y: 286, w: 28 }, { src: 'bush2', cx: 90, y: 250, w: 30 },
+  { src: 'sunflower', cx: 9, y: 372, w: 36 }, { src: 'tree1', cx: 88, y: 392, w: 56 },
+  { src: 'wheat2', cx: 30, y: 470, w: 26 }, { src: 'bush1', cx: 66, y: 466, w: 34 },
+]
+const deco = (s: string) => `${import.meta.env.BASE_URL}yard/${s}.webp`
 
 const hmc = (m: number) => { const h = Math.floor(m / 60), mm = m % 60; return h ? `${h}ч${mm}м` : `${mm}м` }
 
@@ -315,6 +325,10 @@ export default function Buildings() {
         <svg className="yard-paths" viewBox={`0 0 100 ${YARD_H}`} preserveAspectRatio="none" aria-hidden="true">
           {YARD_PATHS.map((dp, i) => <path key={i} d={dp} />)}
         </svg>
+        {YARD_DECO.map((o, i) => (
+          <img key={i} className="yd" src={deco(o.src)} alt="" aria-hidden="true" loading="lazy"
+            style={{ left: `${o.cx}%`, top: o.y, width: o.w, zIndex: Math.round(o.y) - 1 }} />
+        ))}
         {d.list.map((b) => {
           const p = YARD[b.id]; const f = yardFlag(b)
           return (
