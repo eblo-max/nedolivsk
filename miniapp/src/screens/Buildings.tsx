@@ -94,17 +94,19 @@ function statusOf(prod: ProdState, rem: string): string {
   return '😴 Простаивает — выбери, что готовить.'
 }
 
-// расстановка домиков: изометрический ромб 1·2·3·2·1 (центр-X% / ряд)
-// cx — центр по ширине (через translateX(-50%)), row — изо-ряд (глубина = z)
-const ROW_Y = [6, 104, 202, 300, 398]                 // y по ряду (каждый домик в своём слое)
-const YARD: Record<string, { cx: number; row: number }> = {
-  mill: { cx: 50, row: 0 },
-  brewery: { cx: 30, row: 1 }, meadery: { cx: 70, row: 1 },
-  kitchen: { cx: 15, row: 2 }, winery: { cx: 50, row: 2 }, smelter: { cx: 85, row: 2 },
-  bakery: { cx: 30, row: 3 }, smokehouse: { cx: 70, row: 3 },
-  dairy: { cx: 50, row: 4 },
+// органичная россыпь домиков по двору (центр-X% / y px) — раскиданы свободно,
+// но с гарантированным зазором; глубина (z) = по y, дорожки вьются между ними
+const YARD: Record<string, { cx: number; y: number }> = {
+  mill: { cx: 24, y: 8 }, brewery: { cx: 63, y: 30 },
+  meadery: { cx: 42, y: 120 }, winery: { cx: 78, y: 150 },
+  kitchen: { cx: 15, y: 200 }, smelter: { cx: 50, y: 250 },
+  smokehouse: { cx: 74, y: 330 }, bakery: { cx: 22, y: 350 },
+  dairy: { cx: 48, y: 440 },
 }
-const YARD_H = ROW_Y[4] + 92
+const YARD_H = 440 + 88
+// дорожки-тропинки сквозь центры домиков (y+36 — центр арта)
+const YARD_PATHS = ['M24 44 L63 66 L42 156 L78 186 L50 286 L74 366 L48 476',
+                    'M42 156 L15 236 L22 386 L48 476']
 
 const hmc = (m: number) => { const h = Math.floor(m / 60), mm = m % 60; return h ? `${h}ч${mm}м` : `${mm}м` }
 
@@ -291,18 +293,36 @@ export default function Buildings() {
     </div>
   )
 
-  // ── Двор таверны (изометрическая россыпь домиков) ─────────────────────
+  // ── Двор таверны (органичная россыпь домиков + дорожки) ───────────────
+  const built = d.list.filter((b) => b.status === 'built').length
+  const ready = d.list.filter((b) => b.prod?.state === 'ready').length
+  const onBuild = d.build.state !== 'none' && d.build.name
   return (
     <div className="scr">
       {toast && <div className="toast">{toast}</div>}
-      <div className="yard-head"><h2>Двор</h2><span className="muted">тапни по постройке</span></div>
+      <div className="yard-head">
+        <h2>Двор таверны</h2>
+        <p className="yard-flavor">«Каждая открывает своё производство. Деньги и сырьё — вперёд.»</p>
+        <div className="yard-stats">
+          <span>ур. {d.level}</span>
+          <span className="s-sep" />
+          <span><ResIcon k="gold" size={15} />{fmt(d.gold)}</span>
+          <span className="s-sep" />
+          <span>построено {built}/{d.list.length}</span>
+          {ready > 0 && <span className="s-hot">🔔 {ready} к сбору</span>}
+          {onBuild && <span className="s-work">🏗 {d.build.name}: {hm(d.build.minutes)}</span>}
+        </div>
+      </div>
 
       <div className="yard" style={{ minHeight: YARD_H }}>
+        <svg className="yard-paths" viewBox={`0 0 100 ${YARD_H}`} preserveAspectRatio="none" aria-hidden="true">
+          {YARD_PATHS.map((dp, i) => <path key={i} d={dp} />)}
+        </svg>
         {d.list.map((b) => {
           const p = YARD[b.id]; const f = yardFlag(b)
           return (
             <button key={b.id} className={`yb ${b.status === 'locked' ? 'off' : ''}`}
-              style={{ left: `${p.cx}%`, top: ROW_Y[p.row], zIndex: p.row + 1 }} onClick={() => openBuilding(b)}>
+              style={{ left: `${p.cx}%`, top: p.y, zIndex: Math.round(p.y) }} onClick={() => openBuilding(b)}>
               {f.pill
                 ? <span className={`yb-pill ${f.cls} ${f.hot ? 'hot' : ''}`}>{f.text}</span>
                 : <i className="ypip idle" />}
