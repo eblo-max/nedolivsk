@@ -19,7 +19,7 @@ interface Detail {
 }
 interface OutItem { key: string; name: string; emoji?: string; good: boolean; qty: number }
 interface Recipe { key: string; tier?: number; name: string; emoji?: string; good: boolean; out_qty: number; time: string; inputs: Cost[] }
-interface Batch { state: string; minutes: number; total?: number; out: OutItem | null }
+interface Batch { state: string; minutes: number; total?: number; ends_at?: number | null; out: OutItem | null }
 interface Brewery { phase: string; minutes: number; tier: number; next_tier: number; can_age: boolean; mature_chance: number }
 interface ProdState {
   ok: boolean; id: string; emoji: string; name: string; desc: string; image: string; level: number
@@ -34,6 +34,63 @@ function hm(m: number): string {
   const h = Math.floor(m / 60), mm = m % 60
   return h ? `${h} ч ${mm ? mm + ' мин' : ''}`.trim() : `${mm} мин`
 }
+// живой отсчёт: секунды показываем только под часом (не «паникуем» на долгих)
+function live(secs: number): string {
+  if (secs <= 0) return 'вот-вот'
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60
+  if (h > 0) return `${h} ч ${m} мин`
+  if (m > 0) return `${m} мин ${String(s).padStart(2, '0')} с`
+  return `${s} с`
+}
+
+// тикающий остаток до ends_at (эпоха, сек). null — нет активного отсчёта.
+function useLiveSecs(endsAt?: number | null): number | null {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!endsAt) return
+    const tick = () => setNow(Date.now())
+    const iv = setInterval(tick, 1000)
+    const onVis = () => { if (document.visibilityState === 'visible') tick() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(iv); document.removeEventListener('visibilitychange', onVis) }
+  }, [endsAt])
+  if (!endsAt) return null
+  return Math.max(0, Math.ceil((endsAt * 1000 - now) / 1000))
+}
+
+// статус-строка 1:1 с production_screen бота (по зданию/фазе), время — живое
+function statusOf(prod: ProdState, rem: string): string {
+  const bw = prod.brewery, id = prod.id
+  if (prod.kind === 'brewery' && bw) {
+    const t = stars(bw.tier)
+    switch (bw.phase) {
+      case 'fermenting': return `⏳ Бродит ${t} — ещё ${rem}`
+      case 'ready': return `🍺 ${t} готов — разливай${bw.can_age ? ' или выдержи (риск +ярус)' : ''}!`
+      case 'aging': return `🛢 Выдержка ${t} → ${stars(bw.next_tier)} — ещё ${rem}`
+      case 'ripe': return `⏰ Выдержка дошла! Разлей за ${rem} — иначе перекиснет`
+      case 'overripe': return '⚠️ Перекисает! Разливай немедля — ярус упадёт'
+      default: return '😴 Чаны пусты — выбери, что варить'
+    }
+  }
+  if (prod.batch.state === 'active') {
+    if (id === 'kitchen') return `⏳ На вертеле — ещё ${rem}`
+    if (id === 'winery') return `⏳ Бродит — ещё ${rem}`
+    if (prod.kind === 'grind') return `⏳ Работает — ещё ${rem}`
+    return `⏳ Готовится${prod.batch.out ? ' ' + prod.batch.out.name : ''} — ещё ${rem}`
+  }
+  if (prod.batch.state === 'ready') {
+    if (prod.kind === 'grind') return '📦 Готово — забирай на склад!'
+    if (id === 'kitchen') return '🍖 Жаркое готово — в кладовую!'
+    if (id === 'winery') return '🍷 Вино готово — разливай в погреб!'
+    if (id === 'meadery') return '🍶 Готово — разливай в погреб!'
+    return '🍽 Готово — забирай в погреб!'
+  }
+  if (prod.kind === 'grind') return '😴 Простаивает — выбери, что молоть.'
+  if (id === 'kitchen') return '😴 Очаг остыл — поставь готовить.'
+  if (id === 'winery') return '😴 Бочки пусты — поставь вино.'
+  if (id === 'meadery') return '😴 Котлы остыли — выбери, что варить.'
+  return '😴 Простаивает — выбери, что готовить.'
+}
 
 const ST_LABEL: Record<BStatus, string> = { built: '✓ работает', building: '🏗 строится', locked: '🔒', available: 'можно строить' }
 
@@ -42,9 +99,10 @@ function OutIcon({ it }: { it: { key: string; good: boolean; emoji?: string } })
   return it.good ? <GoodIcon k={it.key} /> : <ResIcon k={it.key} emoji={it.emoji} />
 }
 
-// детерминированный прогресс партии (есть total из бэка)
-function ProdBar({ minutes, total }: { minutes: number; total?: number }) {
-  const pct = total && total > 0 ? Math.max(5, Math.min(100, Math.round(((total - minutes) / total) * 100))) : 60
+// детерминированный прогресс партии (живые секунды vs total-минуты из бэка)
+function ProdBar({ secs, totalMin }: { secs: number; totalMin?: number }) {
+  const tot = (totalMin || 0) * 60
+  const pct = tot > 0 ? Math.max(5, Math.min(100, Math.round(((tot - secs) / tot) * 100))) : 60
   return <div className="prodbar"><i style={{ width: `${pct}%` }} /></div>
 }
 
@@ -69,6 +127,7 @@ export default function Buildings() {
   const [view, setView] = useState<'list' | 'prod'>('list')
   const [prod, setProd] = useState<ProdState | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
+  const [ageOpen, setAgeOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
@@ -82,12 +141,12 @@ export default function Buildings() {
   }, [view])
 
   // реалтайм таймеров: тихо обновляем, пока ничего не открыто/не идёт действие
-  const guard = useRef({ busy, detail: !!detail, view, pid: prod?.id })
-  guard.current = { busy, detail: !!detail, view, pid: prod?.id }
+  const guard = useRef({ busy, modal: !!detail || ageOpen, view, pid: prod?.id })
+  guard.current = { busy, modal: !!detail || ageOpen, view, pid: prod?.id }
   useEffect(() => {
     const refresh = async () => {
       const g = guard.current
-      if (document.visibilityState !== 'visible' || g.busy || g.detail) return
+      if (document.visibilityState !== 'visible' || g.busy || g.modal) return
       if (g.view === 'prod' && g.pid) {
         try { setProd(await api<ProdState>('building', { id: g.pid })) } catch { /* */ }
       } else if (g.view === 'list') reload()
@@ -107,7 +166,6 @@ export default function Buildings() {
   }, [data?.finished])
 
   async function openBuilding(b: BItem) {
-    if (b.status === 'building') { flash(`Строится — ещё ${hm(b.minutes)}`); return }
     haptic('light')
     try {
       const r = await api<Detail | ProdState>('building', { id: b.id })
@@ -171,7 +229,13 @@ export default function Buildings() {
       const res = await api<{ production: ProdState }>('brew_age', {})
       setProd(res.production); hapticNotify('success'); flash('Поставили на выдержку — не зевай!')
     } catch { hapticNotify('warning'); flash('Выдержка сейчас невозможна') }
-    finally { setBusy(false) }
+    finally { setBusy(false); setAgeOpen(false) }
+  }
+
+  // живой таймер дотикал — подтянуть свежий стейт производства
+  async function refetchProd() {
+    if (!prod) return
+    try { setProd(await api<ProdState>('building', { id: prod.id })) } catch { /* */ }
   }
 
   if (loading && !data) return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
@@ -187,7 +251,18 @@ export default function Buildings() {
   if (view === 'prod' && prod) return (
     <div className="scr">
       {toast && <div className="toast">{toast}</div>}
-      <ProductionView prod={prod} busy={busy} onStart={startRecipe} onClaim={claim} onAge={age} onBack={() => setView('list')} />
+      <ProductionView prod={prod} busy={busy} onStart={startRecipe} onClaim={claim}
+        onAge={() => { haptic('medium'); setAgeOpen(true) }} onExpire={refetchProd} onBack={() => setView('list')} />
+      {ageOpen && prod.brewery && (
+        <Sheet title="🛢 Выдержка эля" onClose={() => setAgeOpen(false)}>
+          <p className="bd-desc">Поставить {stars(prod.brewery.tier)} на выдержку — азартная затея.</p>
+          <div className="sheet-row"><span>Шанс поднять ярус</span><b style={{ color: 'var(--green)' }}>{prod.brewery.mature_chance}% → {stars(prod.brewery.next_tier)}</b></div>
+          <div className="sheet-row"><span>Иначе</span><b style={{ color: 'var(--crimson)' }}>осядет на ярус ниже, может скиснуть</b></div>
+          <p className="muted" style={{ fontStyle: 'italic', margin: '10px 0 2px', textAlign: 'center' }}>Передержишь после созревания — бочка перекиснет вусмерть.</p>
+          <button className="btn danger" style={{ marginTop: 12 }} disabled={busy} onClick={age}>🛢 Рискнуть — на выдержку</button>
+          <button className="btn" style={{ marginTop: 9 }} disabled={busy} onClick={() => setAgeOpen(false)}>Передумал, разолью</button>
+        </Sheet>
+      )}
     </div>
   )
 
@@ -243,7 +318,7 @@ function BuildDetail({ detail, busy, onBuild }: { detail: Detail; busy: boolean;
       {detail.built ? (
         <p className="muted" style={{ fontStyle: 'italic', marginTop: 12 }}>✓ Уже построено. Работает.</p>
       ) : detail.lock ? (
-        <p className="bd-lock">🔒 {detail.lock.text}{detail.lock.minutes ? ` — ещё ${hm(detail.lock.minutes)}` : ''}.</p>
+        <p className="bd-lock">{detail.lock.kind === 'self' || detail.lock.kind === 'busy' ? '🏗' : '🔒'} {detail.lock.text}{detail.lock.minutes ? ` — ещё ${hm(detail.lock.minutes)}` : ''}.</p>
       ) : (
         <>
           <div className="sheet-row"><span>⏱ Стройка</span><b>{detail.build_hours} ч</b></div>
@@ -256,8 +331,9 @@ function BuildDetail({ detail, busy, onBuild }: { detail: Detail; busy: boolean;
               </div>
             ))}
           </div>
-          <button className="btn gold" style={{ marginTop: 14 }} disabled={busy || !detail.afford} onClick={onBuild}>
-            {detail.afford ? `🏗 Заложить · ${detail.build_hours} ч` : 'Не хватает на стройку'}
+          {/* кнопка активна как в боте: жмёшь и узнаёшь — дефицит подсвечен красным выше */}
+          <button className="btn gold" style={{ marginTop: 14 }} disabled={busy || !detail.can_build} onClick={onBuild}>
+            🏗 Заложить · {detail.build_hours} ч
           </button>
         </>
       )}
@@ -266,9 +342,9 @@ function BuildDetail({ detail, busy, onBuild }: { detail: Detail; busy: boolean;
 }
 
 // ── Экран производства ───────────────────────────────────────────────────
-function ProductionView({ prod, busy, onStart, onClaim, onAge, onBack }: {
+function ProductionView({ prod, busy, onStart, onClaim, onAge, onExpire, onBack }: {
   prod: ProdState; busy: boolean
-  onStart: (r: Recipe) => void; onClaim: () => void; onAge: () => void; onBack: () => void
+  onStart: (r: Recipe) => void; onClaim: () => void; onAge: () => void; onExpire: () => void; onBack: () => void
 }) {
   const bw = prod.brewery
   const phase = bw?.phase
@@ -278,21 +354,17 @@ function ProductionView({ prod, busy, onStart, onClaim, onAge, onBack }: {
   const warn = phase === 'ripe' || phase === 'overripe'        // выдержка перекисает — срочно
   const stockLabel = prod.to === 'inventory' ? 'На складе' : 'В погребе'
 
-  // статусная строка
-  let status = ''
-  if (prod.kind === 'brewery') {
-    const t = bw!.tier
-    status = phase === 'fermenting' ? `⏳ Бродит ${stars(t)} — ещё ${hm(bw!.minutes)}`
-      : phase === 'ready' ? `🍺 ${stars(t)} готов — разливай${bw!.can_age ? ' или рискни выдержать' : ''}!`
-      : phase === 'aging' ? `🛢 Выдержка ${stars(t)} → ${stars(bw!.next_tier)} — ещё ${hm(bw!.minutes)}`
-      : phase === 'ripe' ? `⏰ Выдержка дошла! Разлей за ${hm(bw!.minutes)} — иначе перекиснет`
-      : phase === 'overripe' ? '⚠️ Перекисает! Разливай немедля — ярус упадёт'
-      : '😴 Чаны пусты — выбери, что варить'
-  } else {
-    status = active ? `⏳ Готовится${prod.batch.out ? ' ' + prod.batch.out.name : ''} — ещё ${hm(prod.batch.minutes)}`
-      : ready ? '📦 Готово — забирай!'
-      : '😴 Простаивает — выбери, что делать'
-  }
+  const endsAt = prod.batch.ends_at ?? null
+  const liveSecs = useLiveSecs(endsAt)
+  const rem = liveSecs != null ? live(liveSecs) : hm(prod.kind === 'brewery' ? bw?.minutes ?? 0 : prod.batch.minutes)
+  const status = statusOf(prod, rem)
+
+  // дотикал до нуля — один раз подтянуть свежий стейт (active→ready, ripe→overripe)
+  const fired = useRef(false)
+  useEffect(() => {
+    if (liveSecs === 0 && endsAt && !fired.current) { fired.current = true; onExpire() }
+    if (liveSecs && liveSecs > 0) fired.current = false
+  }, [liveSecs, endsAt, onExpire])
 
   return (
     <>
@@ -310,7 +382,7 @@ function ProductionView({ prod, busy, onStart, onClaim, onAge, onBack }: {
 
       {active && (
         <div className="prod-batch">
-          <ProdBar minutes={prod.kind === 'brewery' ? bw!.minutes : prod.batch.minutes} total={prod.batch.total} />
+          <ProdBar secs={liveSecs ?? (prod.kind === 'brewery' ? (bw?.minutes ?? 0) : prod.batch.minutes) * 60} totalMin={prod.batch.total} />
           {prod.batch.out && <div className="pb-out"><OutIcon it={prod.batch.out} />×{prod.batch.out.qty}</div>}
         </div>
       )}

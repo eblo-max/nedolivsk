@@ -919,6 +919,15 @@ def _cost_items(p, cost: dict) -> list:
     return out
 
 
+def _ends_epoch(ready_iso, extra_min: int = 0):
+    """Эпоха (сек) готовности партии — для живого отсчёта на клиенте. None — нет."""
+    from datetime import datetime, timedelta
+    try:
+        return (datetime.fromisoformat(ready_iso) + timedelta(minutes=extra_min)).timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
 def _buildings_state(p) -> dict:
     """Список пристроек: статус каждой + текущий слот стройки (1 за раз)."""
     from bot.game import buildings as bld, production as prod
@@ -963,7 +972,9 @@ def _building_detail(p, bid: str) -> dict:
     bstate, bmin = bld.build_state(p)
     lock = None
     if not built:
-        if miss:
+        if p.build_item == bid:                       # это здание сейчас и возводится
+            lock = {"kind": "self", "minutes": bmin, "text": "Возводится"}
+        elif miss:
             lock = {"kind": "requires",
                     "text": "Сначала построй: " + ", ".join(r.name for r in miss)}
         elif bld.rep_locked(t, b):
@@ -1068,8 +1079,11 @@ def _production_state(p, bid: str) -> dict:
                  for tt in (1, 2, 3)]
         bstate = ("active" if phase in ("fermenting", "aging")
                   else "ready" if phase in ("ready", "ripe", "overripe") else "none")
+        ends = (_ends_epoch(braw.get("ready_at")) if phase in ("fermenting", "aging")
+                else _ends_epoch(braw.get("ready_at"), prod._brew_grace_minutes(tier)) if phase == "ripe"
+                else None)
         base.update(kind="brewery", to="cellar", recipes=recipes, stock=stock,
-                    batch={"state": bstate, "minutes": minutes,
+                    batch={"state": bstate, "minutes": minutes, "ends_at": ends,
                            "total": prod.brew_hours(tier) * 60 if tier else 0,
                            "out": ({"key": f"ale{tier}", "name": f"Эль {prod.ALE_STARS[tier]}",
                                     "emoji": "🍺", "good": True,
@@ -1092,8 +1106,9 @@ def _production_state(p, bid: str) -> dict:
         out = ({"key": out_res, "name": gname(out_res), "emoji": gemoji(out_res),
                 "good": False, "qty": int(braw.get("out_qty", 0))} if state != "none" else None)
         total = prod.grind_minutes(bid, out_res) if out_res in prod.GRIND[bid] else 0
+        ends = _ends_epoch(braw.get("ready_at")) if state == "active" else None
         base.update(kind="grind", to="inventory", recipes=recipes, stock=stock,
-                    batch={"state": state, "minutes": minutes, "total": total, "out": out})
+                    batch={"state": state, "minutes": minutes, "total": total, "ends_at": ends, "out": out})
         return base
 
     # ── Рецептурные/одиночные (вход → товар в погреб) ─────────────────────
@@ -1124,8 +1139,9 @@ def _production_state(p, bid: str) -> dict:
     flavor = {"meadery": "Берут состоятельные — репутация решает.",
               "kitchen": "Сытые гости платят за еду сверх выпивки.",
               "winery": "Самый дорогой напиток — берут только богачи."}.get(bid)
+    ends = _ends_epoch(braw.get("ready_at")) if state == "active" else None
     base.update(kind="recipe", to="cellar", recipes=recipes, stock=stock, flavor=flavor,
-                batch={"state": state, "minutes": minutes, "total": total, "out": out})
+                batch={"state": state, "minutes": minutes, "total": total, "ends_at": ends, "out": out})
     return base
 
 
