@@ -6,6 +6,8 @@ export const fmt = (n: number) => (n >= 10000 ? `${(n / 1000).toFixed(1)}к` : `
 const RES_HAS = new Set([
   'gold', 'ingot', 'wood', 'grain', 'hops', 'stone', 'ore', 'clay',
   'honey', 'milk', 'berries', 'fish', 'game', 'herbs', 'salt', 'water',
+  // крафт-компоненты (охота/горн): свои PNG, иначе сыпались в эмодзи-фолбэк
+  'hide', 'fang', 'sinew', 'ring', 'pelt', 'tusk', 'chitin', 'orc_scrap', 'malt', 'flour',
 ])
 export function ResIcon({ k, emoji, size }: { k: string; emoji?: string; size?: number }) {
   if (RES_HAS.has(k)) {

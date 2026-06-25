@@ -17,7 +17,7 @@ interface CharState {
   craft: Craft
   heal: { can: boolean; full: boolean; options: HealOpt[] }
 }
-interface ForgeCost { key: string; name: string; need: number; have: number; ok: boolean }
+interface ForgeCost { key: string; name: string; emoji?: string; need: number; have: number; ok: boolean }
 interface ForgeItem {
   id: string; name: string; slot_name: string; sprite: string; desc: string
   cur: number; next: number; maxed: boolean; trophy: boolean
@@ -332,7 +332,7 @@ function ItemSheet({ item, busy, craftState, onMake, onClose }: {
           <div className="sheet-list">
             {item.cost.map((c, i) => (
               <div key={i} className="sheet-task">
-                <ResIcon k={c.key} /><span className="l">{c.name}</span>
+                <ResIcon k={c.key} emoji={c.emoji} /><span className="l">{c.name}</span>
                 <span className="r" style={{ color: c.ok ? 'var(--green)' : 'var(--crimson)' }}>{fmt(c.have)} / {fmt(c.need)}</span>
               </div>
             ))}

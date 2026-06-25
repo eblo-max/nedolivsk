@@ -511,7 +511,7 @@ def _panel_data(p, t, kind: str) -> dict:
         cost = bal.upgrade_cost(t.level)
         ns = bal.stats_for_level(t.level + 1)
         inv = p.inventory or {}
-        names = {"gold": "Золото", **bal.RESOURCE_NAMES}
+        names = {"gold": "Золото", **bal.RESOURCE_NAMES, **bal.GOODS_NAMES}
         items = []
         for k, v in cost.items():
             have = int(p.gold) if k == "gold" else int(inv.get(k, 0))
@@ -776,7 +776,8 @@ def _forge_state(p) -> dict:
 
     eq = p.equipment or {}
     inv = p.inventory or {}
-    names = {"gold": "Золото", **bal.RESOURCE_NAMES}
+    names = {"gold": "Золото", **bal.RESOURCE_NAMES, **bal.GOODS_NAMES}
+    emojis = {"gold": "🪙", **bal.RESOURCE_EMOJI, **bal.GOODS_EMOJI}
     state, minutes = logic.craft_state(p)
 
     def mk(item, trophy):
@@ -789,7 +790,8 @@ def _forge_state(p) -> dict:
                 if not v:
                     continue
                 have = int(p.gold) if k == "gold" else int(inv.get(k, 0))
-                cost.append({"key": k, "name": names.get(k, k), "need": int(v), "have": have, "ok": have >= int(v)})
+                cost.append({"key": k, "name": names.get(k, k), "emoji": emojis.get(k),
+                             "need": int(v), "have": have, "ok": have >= int(v)})
         return {
             "id": item.id, "name": item.name, "slot_name": it.SLOTS[item.slot],
             "sprite": item.sprite or item.id, "desc": item.description,
