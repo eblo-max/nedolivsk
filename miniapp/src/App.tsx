@@ -8,6 +8,7 @@ import Character from './screens/Character'
 import Sorties from './screens/Sorties'
 import Market from './screens/Market'
 import MapScreen from './screens/MapScreen'
+import Buildings from './screens/Buildings'
 
 export default function App() {
   const [intro, setIntro] = useState(true)
@@ -33,6 +34,7 @@ export default function App() {
         <div className="scroll">
           <Routes>
             <Route path="/" element={<Tavern />} />
+            <Route path="/buildings" element={<Buildings />} />
             <Route path="/character" element={<Character />} />
             <Route path="/sorties" element={<Sorties />} />
             <Route path="/market" element={<Market />} />

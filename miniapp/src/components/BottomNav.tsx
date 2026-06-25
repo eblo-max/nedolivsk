@@ -3,6 +3,7 @@ import { haptic } from '../telegram'
 
 const TABS = [
   { to: '/', icon: '🏠', label: 'Таверна' },
+  { to: '/buildings', icon: '🏗', label: 'Стройка' },
   { to: '/character', icon: '🧍', label: 'Персонаж' },
   { to: '/sorties', icon: '⚔️', label: 'Вылазки' },
   { to: '/market', icon: '💰', label: 'Торг' },

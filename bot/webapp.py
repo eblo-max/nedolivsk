@@ -900,6 +900,335 @@ async def _api_craft_claim(request: web.Request) -> web.Response:
                              headers={"Cache-Control": "no-store"})
 
 
+# ===== Пристройки + Производство (порт bot/handlers/buildings.py) =====
+
+def _cost_items(p, cost: dict) -> list:
+    """Стоимость в виде [{key,name,emoji,need,have,ok}] — для стройки и рецептов.
+    Единый лукап имён/эмодзи (как в кузнице): gold + RESOURCE_* + GOODS_*."""
+    from bot.game import balance as bal
+    names = {"gold": "Золото", **bal.RESOURCE_NAMES, **bal.GOODS_NAMES}
+    emojis = {"gold": "🪙", **bal.RESOURCE_EMOJI, **bal.GOODS_EMOJI}
+    inv = p.inventory or {}
+    out = []
+    for k, v in cost.items():
+        if not v:
+            continue
+        have = int(p.gold) if k == "gold" else int(inv.get(k, 0))
+        out.append({"key": k, "name": names.get(k, k), "emoji": emojis.get(k),
+                    "need": int(v), "have": have, "ok": have >= int(v)})
+    return out
+
+
+def _buildings_state(p) -> dict:
+    """Список пристроек: статус каждой + текущий слот стройки (1 за раз)."""
+    from bot.game import buildings as bld, production as prod
+    t = p.tavern
+    bld.finalize_build(p, t)                      # ленивое достраивание при открытии
+    bstate, bmin = bld.build_state(p)
+    items = []
+    for bid in bld.ORDER:
+        b = bld.CATALOG[bid]
+        lock = None
+        if bld.is_built(t, bid):
+            status, mins = "built", 0
+        elif p.build_item == bid:
+            status, mins = "building", bld.build_state(p)[1]
+        elif bld.missing_requirements(t, b):
+            status, mins = "locked", 0
+            lock = "Нужна: " + ", ".join(r.name for r in bld.missing_requirements(t, b))
+        elif bld.rep_locked(t, b):
+            status, mins = "locked", 0
+            lock = f"Репутация {b.req_reputation} · у тебя {int(t.reputation)}"
+        else:
+            status, mins = "available", 0
+        items.append({"id": bid, "emoji": b.emoji, "name": b.name, "status": status,
+                      "minutes": mins, "lock": lock, "producer": bid in prod.PRODUCERS})
+    bname = (bld.CATALOG[p.build_item].name
+             if p.build_item and p.build_item in bld.CATALOG else None)
+    return {"ok": True, "level": int(t.level), "gold": int(p.gold),
+            "reputation": int(t.reputation),
+            "build": {"state": bstate, "minutes": bmin, "id": p.build_item, "name": bname},
+            "list": items}
+
+
+def _building_detail(p, bid: str) -> dict:
+    """Деталь непостроенного здания: цена/время/гейты + can_build/afford."""
+    from bot.game import buildings as bld
+    b = bld.CATALOG.get(bid)
+    if b is None:
+        return {"ok": False, "error": "unknown"}
+    t = p.tavern
+    built = bld.is_built(t, bid)
+    miss = bld.missing_requirements(t, b)
+    bstate, bmin = bld.build_state(p)
+    lock = None
+    if not built:
+        if miss:
+            lock = {"kind": "requires",
+                    "text": "Сначала построй: " + ", ".join(r.name for r in miss)}
+        elif bld.rep_locked(t, b):
+            lock = {"kind": "reputation",
+                    "text": f"Нужна репутация {b.req_reputation} · у тебя {int(t.reputation)}"}
+        elif bstate != "none":
+            lock = {"kind": "busy", "minutes": bmin,
+                    "text": "Идёт другая стройка — артель одна"}
+    cost = _cost_items(p, bld.cost_of(b))
+    can_build = not built and bstate == "none" and bld.buildable(t, b)
+    return {"ok": True, "id": bid, "emoji": b.emoji, "name": b.name,
+            "desc": b.description, "unlocks": b.unlocks, "image": bid, "built": built,
+            "build_hours": b.build_hours, "cost": cost, "lock": lock,
+            "can_build": can_build, "afford": all(c["ok"] for c in cost)}
+
+
+async def _api_buildings(request: web.Request) -> web.Response:
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        st = _buildings_state(p)
+        await s.commit()                          # finalize_build мог достроить
+    return web.json_response(st, headers={"Cache-Control": "no-store"})
+
+
+async def _api_building(request: web.Request) -> web.Response:
+    """Деталь здания: производство, если построено и оно производитель; иначе — стройка."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import buildings as bld, production as prod
+    bid = str(body.get("id") or "")
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if bld.is_built(p.tavern, bid) and bid in prod.PRODUCERS:
+            st = _production_state(p, bid)
+        else:
+            st = _building_detail(p, bid)
+    return web.json_response(st, headers={"Cache-Control": "no-store"})
+
+
+async def _api_build_start(request: web.Request) -> web.Response:
+    """Заложить пристройку (buildings.start_build, оплата вперёд, один слот за раз)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import buildings as bld
+    bid = str(body.get("id") or "")
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        bld.finalize_build(p, p.tavern)           # вдруг прошлая уже готова
+        r = bld.start_build(p, p.tavern, bid)
+        if not r.ok:                              # unknown|built|busy|requires|reputation|not_enough
+            return web.json_response({"ok": False, "error": r.reason})
+        repo.add_log(s, "player", p.id, f"🏗 заложил постройку: {r.building.name}")
+        await s.commit()
+        st = _buildings_state(p)
+    return web.json_response({"ok": True, "name": r.building.name, "hours": r.hours,
+                              "buildings": st}, headers={"Cache-Control": "no-store"})
+
+
+def _production_state(p, bid: str) -> dict:
+    """Экран производства построенного здания: рецепты, текущая партия, склад."""
+    from bot.game import balance as bal, buildings as bld, inventory, production as prod
+    t = p.tavern
+    b = bld.CATALOG[bid]
+    L = int(t.level)
+    names = {**bal.RESOURCE_NAMES, **bal.GOODS_NAMES}
+    emojis = {**bal.RESOURCE_EMOJI, **bal.GOODS_EMOJI}
+
+    def gname(k):
+        g = prod.GOODS.get(k)
+        return g.name if g else names.get(k, k)
+
+    def gemoji(k):
+        g = prod.GOODS.get(k)
+        return g.emoji if g else emojis.get(k)
+
+    is_good = lambda k: k in prod.GOODS                       # товар (GoodIcon) vs сырьё (ResIcon)
+    base = {"ok": True, "id": bid, "emoji": b.emoji, "name": b.name,
+            "desc": b.description, "image": bid, "level": L}
+    braw = (t.production or {}).get(bid) or {}
+
+    # ── Пивоварня (фазы + выдержка) ───────────────────────────────────────
+    if bid == "brewery":
+        phase, minutes = prod.brew_phase(t)
+        tier = int(braw.get("tier", 0)) if phase != "empty" else 0
+        recipes = [{"key": f"ale{tt}", "tier": tt, "name": f"Эль {prod.ALE_STARS[tt]}",
+                    "emoji": "🍺", "good": True, "out_qty": prod.brew_output(tt, L),
+                    "time": f"{prod.brew_hours(tt)} ч",
+                    "inputs": _cost_items(p, prod.brew_inputs(tt, L))} for tt in (1, 2, 3)]
+        stock = [{"key": f"ale{tt}", "name": f"Эль {prod.ALE_STARS[tt]}", "emoji": "🍺",
+                  "good": True, "qty": int((t.products or {}).get(f"ale{tt}", 0))}
+                 for tt in (1, 2, 3)]
+        bstate = ("active" if phase in ("fermenting", "aging")
+                  else "ready" if phase in ("ready", "ripe", "overripe") else "none")
+        base.update(kind="brewery", to="cellar", recipes=recipes, stock=stock,
+                    batch={"state": bstate, "minutes": minutes,
+                           "total": prod.brew_hours(tier) * 60 if tier else 0,
+                           "out": ({"key": f"ale{tier}", "name": f"Эль {prod.ALE_STARS[tier]}",
+                                    "emoji": "🍺", "good": True,
+                                    "qty": int(braw.get("out_qty", 0))} if tier else None)},
+                    brewery={"phase": phase, "minutes": minutes, "tier": tier,
+                             "next_tier": min(3, tier + 1), "can_age": phase == "ready" and tier < 3,
+                             "mature_chance": prod.MATURE_CHANCE})
+        return base
+
+    # ── Грайнд (мельница/горн): сырьё → полуфабрикат в инвентарь ───────────
+    if bid in prod.GRIND:
+        state, minutes = prod.state(t, bid)
+        recipes = [{"key": rc, "name": gname(rc), "emoji": gemoji(rc), "good": False,
+                    "out_qty": prod.grind_output(bid, rc, L), "time": f"{mins} мин",
+                    "inputs": _cost_items(p, prod.grind_inputs(bid, rc, L))}
+                   for rc, (_i, mins, _o) in prod.GRIND[bid].items()]
+        stock = [{"key": rc, "name": gname(rc), "emoji": gemoji(rc), "good": False,
+                  "qty": int(inventory.get(p, rc))} for rc in prod.GRIND[bid]]
+        out_res = braw.get("out_res")
+        out = ({"key": out_res, "name": gname(out_res), "emoji": gemoji(out_res),
+                "good": False, "qty": int(braw.get("out_qty", 0))} if state != "none" else None)
+        total = prod.grind_minutes(bid, out_res) if out_res in prod.GRIND[bid] else 0
+        base.update(kind="grind", to="inventory", recipes=recipes, stock=stock,
+                    batch={"state": state, "minutes": minutes, "total": total, "out": out})
+        return base
+
+    # ── Рецептурные/одиночные (вход → товар в погреб) ─────────────────────
+    if bid in prod.RECIPES:                                   # пекарня/коптильня/сыроварня
+        rmap = list(prod.RECIPES[bid].keys())
+        hours_of = lambda rc: prod.recipe_hours(bid, rc)      # noqa: E731
+        recipes = [{"key": rc, "name": gname(rc), "emoji": gemoji(rc), "good": True,
+                    "out_qty": prod.recipe_output(bid, rc, L),
+                    "time": f"{prod.recipe_hours(bid, rc)} ч",
+                    "inputs": _cost_items(p, prod.recipe_inputs(bid, rc, L))} for rc in rmap]
+    else:                                                     # кухня/винокурня/медоварня
+        single = {"kitchen": (prod.KITCHEN, prod.kitchen_inputs, prod.kitchen_hours, prod.kitchen_output),
+                  "winery": (prod.WINERY, prod.winery_inputs, prod.winery_hours, prod.winery_output),
+                  "meadery": (prod.MEADERY, prod.meadery_inputs, prod.meadery_hours, prod.meadery_output)}[bid]
+        cat, f_in, f_hr, f_out = single
+        rmap = list(cat.keys())
+        hours_of = f_hr
+        recipes = [{"key": rc, "name": gname(rc), "emoji": gemoji(rc), "good": True,
+                    "out_qty": f_out(rc, L), "time": f"{f_hr(rc)} ч",
+                    "inputs": _cost_items(p, f_in(rc, L))} for rc in rmap]
+    state, minutes = prod.state(t, bid)
+    rc_now = braw.get("recipe")
+    out = ({"key": rc_now, "name": gname(rc_now), "emoji": gemoji(rc_now), "good": True,
+            "qty": int(braw.get("out_qty", 0))} if state != "none" and rc_now else None)
+    total = hours_of(rc_now) * 60 if rc_now and rc_now in rmap else 0
+    stock = [{"key": rc, "name": gname(rc), "emoji": gemoji(rc), "good": True,
+              "qty": int((t.products or {}).get(rc, 0))} for rc in rmap]
+    base.update(kind="recipe", to="cellar", recipes=recipes, stock=stock,
+                batch={"state": state, "minutes": minutes, "total": total, "out": out})
+    return base
+
+
+async def _api_prod_start(request: web.Request) -> web.Response:
+    """Запустить партию (диспатч по зданию). Оплата вперёд, один слот на здание."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import production as prod
+    building = str(body.get("building") or "")
+    recipe = str(body.get("recipe") or "")
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        t = p.tavern
+        if building in prod.GRIND:
+            ok, reason, _cin = prod.start_grind(p, t, building, recipe)
+        elif building in prod.RECIPES:
+            ok, reason, _cin = prod.start_recipe(p, t, building, recipe)
+        elif building == "meadery":
+            ok, reason, _cin = prod.start_meadery(p, t, recipe)
+        elif building == "kitchen":
+            ok, reason, _cin = prod.start_kitchen(p, t, recipe)
+        elif building == "winery":
+            ok, reason, _cin = prod.start_winery(p, t, recipe)
+        elif building == "brewery":
+            try:
+                ok, reason, _cin = prod.start_brew(p, t, int(body.get("tier") or 0))
+            except (ValueError, TypeError):
+                ok, reason = False, "unknown"
+        else:
+            ok, reason = False, "unknown"
+        if not ok:                                            # unknown|busy|not_enough
+            return web.json_response({"ok": False, "error": reason})
+        repo.add_log(s, "player", p.id, f"⚙ запустил производство: {building}/{recipe}")
+        await s.commit()
+        st = _production_state(p, building)
+    return web.json_response({"ok": True, "production": st},
+                             headers={"Cache-Control": "no-store"})
+
+
+async def _api_brew_age(request: web.Request) -> web.Response:
+    """Поставить готовый эль на выдержку (риск +ярус)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import production as prod
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not prod.start_age(p, p.tavern):
+            return web.json_response({"ok": False, "error": "cant"})
+        await s.commit()
+        st = _production_state(p, "brewery")
+    return web.json_response({"ok": True, "production": st},
+                             headers={"Cache-Control": "no-store"})
+
+
+async def _api_prod_claim(request: web.Request) -> web.Response:
+    """Забрать готовую партию (диспатч по зданию). Возвращает тост + новый стейт."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import balance as bal, newbie, production as prod, texts
+    building = str(body.get("building") or "")
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        t = p.tavern
+        toast = None
+        if building in prod.GRIND:
+            res = prod.claim_grind(p, t, building)
+            if res is None:
+                return web.json_response({"ok": False, "error": "not_ready"})
+            r, qty = res
+            toast = f"{bal.GOODS_EMOJI.get(r, '📦')} +{qty} {bal.GOODS_NAMES.get(r, r)}"
+        elif building in prod.RECIPES or building in ("meadery", "kitchen", "winery"):
+            claim = {"meadery": prod.claim_meadery, "kitchen": prod.claim_kitchen,
+                     "winery": prod.claim_winery}.get(building)
+            res = claim(p, t) if claim else prod.claim_recipe(p, t, building)
+            if res is None:
+                return web.json_response({"ok": False, "error": "not_ready"})
+            rc, qty = res
+            g = prod.GOODS[rc]
+            newbie.mark(p, "nb_craft")
+            toast = f"{g.emoji} +{qty} {g.name}"
+        elif building == "brewery":
+            res = prod.claim_brew(p, t)
+            if res is None:
+                return web.json_response({"ok": False, "error": "not_ready"})
+            outcome, tier, qty = res
+            if qty > 0:
+                newbie.mark(p, "nb_craft")
+            toast = texts.brew_claimed(outcome, tier, qty)
+        else:
+            return web.json_response({"ok": False, "error": "unknown"})
+        repo.add_log(s, "player", p.id, f"📦 забрал производство: {building}")
+        await s.commit()
+        st = _production_state(p, building)
+    return web.json_response({"ok": True, "production": st, "toast": toast},
+                             headers={"Cache-Control": "no-store"})
+
+
 def _init_user(init_data: str) -> dict:
     """Имя/username из (уже проверенного) initData — для создания игрока в онбординге."""
     try:
@@ -1068,6 +1397,12 @@ def build_app() -> web.Application:
     app.router.add_post("/api/forge_make", _api_forge_make)  # заказать ковку
     app.router.add_post("/api/craft_claim", _api_craft_claim)  # забрать готовую вещь
     app.router.add_post("/api/heal", _api_heal)          # подлечиться (еда из погреба)
+    app.router.add_post("/api/buildings", _api_buildings)    # список пристроек
+    app.router.add_post("/api/building", _api_building)       # деталь/производство здания
+    app.router.add_post("/api/build_start", _api_build_start)  # заложить пристройку
+    app.router.add_post("/api/prod_start", _api_prod_start)   # запустить партию
+    app.router.add_post("/api/brew_age", _api_brew_age)       # выдержка эля (риск)
+    app.router.add_post("/api/prod_claim", _api_prod_claim)   # забрать партию
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
