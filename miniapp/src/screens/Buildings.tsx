@@ -94,15 +94,25 @@ function statusOf(prod: ProdState, rem: string): string {
   return '😴 Простаивает — выбери, что готовить.'
 }
 
-// статус строки списка → точка (цвет) + подпись. Приоритет: готово к сбору
-function rowStatus(b: BItem): { dot: string; label: string } {
-  if (b.status === 'building') return { dot: 'work', label: `строится · ${hm(b.minutes)}` }
-  if (b.status === 'locked') return { dot: 'lock', label: b.lock || 'заперто' }
-  if (b.status === 'available') return { dot: 'avail', label: 'можно построить' }
+// расстановка домиков во дворе (изометрическая россыпь): left% / top px / глубина
+const YARD: Record<string, { x: number; y: number; z: number }> = {
+  brewery: { x: 50, y: 4, z: 2 }, mill: { x: 4, y: 30, z: 3 },
+  meadery: { x: 27, y: 118, z: 4 }, winery: { x: 52, y: 150, z: 4 },
+  kitchen: { x: 2, y: 184, z: 5 }, smelter: { x: 28, y: 270, z: 6 },
+  smokehouse: { x: 53, y: 300, z: 6 }, bakery: { x: 3, y: 338, z: 7 },
+  dairy: { x: 29, y: 430, z: 8 },
+}
+const YARD_H = 540
+
+// парящий статус-флажок над домиком. Приоритет: готово к сбору
+function yardBadge(b: BItem): { cls: string; label: string; icon: string } | null {
+  if (b.status === 'building') return { cls: 'work', label: hm(b.minutes), icon: '⏳' }
+  if (b.status === 'locked') return { cls: 'lock', label: '', icon: '🔒' }
+  if (b.status === 'available') return { cls: 'avail', label: 'построить', icon: '' }
   const ps = b.prod?.state
-  if (ps === 'ready') return { dot: 'rdy', label: 'готово к сбору' }
-  if (ps === 'active') return { dot: 'work', label: `идёт работа · ${hm(b.prod!.minutes)}` }
-  return { dot: 'idle', label: 'свободна' }
+  if (ps === 'ready') return { cls: 'rdy', label: 'готово', icon: '🔔' }
+  if (ps === 'active') return { cls: 'work', label: hm(b.prod!.minutes), icon: '⚙' }
+  return { cls: 'idle', label: 'свободна', icon: '' }
 }
 
 // иконка выхода/склада: товар → GoodIcon, сырьё/полуфабрикат → ResIcon
@@ -277,21 +287,26 @@ export default function Buildings() {
     </div>
   )
 
-  // ── Список пристроек (тихий список) ───────────────────────────────────
+  // ── Двор таверны (изометрическая россыпь домиков) ─────────────────────
   return (
     <div className="scr">
       {toast && <div className="toast">{toast}</div>}
-      <div className="bld-head"><h2>Пристройки</h2></div>
+      <div className="yard-head"><h2>Двор</h2><span className="muted">тапни по постройке</span></div>
 
-      <div className="bld-list">
+      <div className="yard" style={{ minHeight: YARD_H + 70 }}>
+        <svg className="yard-paths" viewBox={`0 0 100 ${YARD_H}`} preserveAspectRatio="none" aria-hidden="true">
+          <path d="M17 78 L15 232 L41 318 L18 386 L42 478" />
+          <path d="M63 52 L40 166 L65 198 L66 348 L42 478" />
+        </svg>
         {d.list.map((b) => {
-          const st = rowStatus(b)
+          const p = YARD[b.id]; const bd = yardBadge(b)
           return (
-            <button key={b.id} className={`bld-row ${b.status === 'locked' ? 'off' : ''}`} onClick={() => openBuilding(b)}>
-              <img className="br-art" src={art(b.id)} alt="" loading="lazy"
+            <button key={b.id} className={`yb ${b.status === 'locked' ? 'off' : ''}`}
+              style={{ left: `${p.x}%`, top: p.y, zIndex: p.z }} onClick={() => openBuilding(b)}>
+              {bd && <span className={`yb-badge ${bd.cls}`}>{bd.icon && <i className="yb-i">{bd.icon}</i>}{bd.label}</span>}
+              <img src={art(b.id)} alt="" loading="lazy"
                 onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} />
-              <span className="br-name">{b.name}</span>
-              <span className="br-st"><i className={`dot ${st.dot}`} />{st.label}</span>
+              <span className="yb-name">{b.name}</span>
             </button>
           )
         })}
