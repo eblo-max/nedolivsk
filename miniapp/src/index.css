@@ -550,7 +550,7 @@ body {
 
 /* ── Вылазки: охота ── */
 /* доска розыска (деревянная доска объявлений) */
-.board { position:relative; border-radius:14px; padding:13px 11px 22px;
+.board { position:relative; isolation:isolate; border-radius:14px; padding:13px 11px 22px;
   background:repeating-linear-gradient(91deg, #20140a 0 44px, #190f06 44px 47px), linear-gradient(#241809,#150c04);
   border:1px solid #4a3014; box-shadow:0 6px 22px #0009, inset 0 0 0 2px #3a2814, inset 0 0 60px #0009; }
 .board-head { position:relative; display:flex; align-items:center; gap:12px; padding:10px 12px; margin-bottom:15px;
