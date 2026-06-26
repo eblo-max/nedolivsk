@@ -1255,7 +1255,8 @@ async def _api_prod_claim(request: web.Request) -> web.Response:
     uid, body = await _auth(request)
     if uid is None:
         return body
-    from bot.game import balance as bal, newbie, production as prod, texts
+    from bot.game import balance as bal, newbie, production as prod
+    from bot import texts
     building = str(body.get("building") or "")
     async with session_factory() as s:
         p = await repo.get_player(s, uid, for_update=True)
