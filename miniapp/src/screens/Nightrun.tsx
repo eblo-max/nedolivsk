@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify, initData } from '../telegram'
@@ -67,6 +67,7 @@ export default function Nightrun() {
 
   const d = data ?? SAMPLE
   const run = d.run
+  const nrbg = { '--nr-bg': `url(${import.meta.env.BASE_URL}nightrun/bg.webp)` } as CSSProperties
 
   async function call<T = NState>(path: string, body: Record<string, unknown> = {}): Promise<T | null> {
     try { return await api<T>(path, body) } catch (e) {
@@ -152,7 +153,7 @@ export default function Nightrun() {
 
   // ── финал (бюст / банк) ──
   if (end) return (
-    <div className="nr">
+    <div className="nr" style={nrbg}>
       {toast && <div className="toast">{toast}</div>}
       <NrEnd end={end} onClose={() => { setEnd(null); setOut(null); if (off) set(offState(null, end.kind === 'bank' ? 4 * 3600 : 4 * 3600)); else reload() }} />
     </div>
@@ -160,14 +161,14 @@ export default function Nightrun() {
 
   // ── резолв-оверлей (анимация исхода испытания) ──
   if (out && run && run.state === 'crossroad') return (
-    <div className="nr">
+    <div className="nr" style={nrbg}>
       {toast && <div className="toast">{toast}</div>}
       <NrResolve out={out} onNext={() => setOut(null)} />
     </div>
   )
 
   return (
-    <div className="nr">
+    <div className="nr" style={nrbg}>
       {toast && <div className="toast">{toast}</div>}
       {!d.active && <NrIntro d={d} busy={busy} onStart={start} />}
       {run && run.state === 'fork' && <NrFork d={d} run={run} busy={busy} onPick={pick} />}
