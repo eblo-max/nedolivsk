@@ -231,8 +231,10 @@ def forecast(stats: dict, enemy: Enemy, start_hp: int | None = None,
     победе). Гоняем тот же resolve N раз → показанный шанс СОВПАДАЕТ с реальным
     боем (никакого «театра»: что в прогнозе — то и в бою)."""
     hp = balance.BASE_HP if start_hp is None else start_hp
-    samples = max(300, n)                   # стабильная оценка процента
-    rng = rng or random
+    samples = max(400, n)                   # стабильная оценка процента
+    # фикс. сид → один и тот же расклад всегда показывает один % (без дрожания в
+    # меню). Сам бой (hunt→resolve) использует НАСТОЯЩИЙ random, исход случайный.
+    rng = rng or random.Random(0)
     wins = 0
     hp_sum = 0
     for _ in range(samples):
