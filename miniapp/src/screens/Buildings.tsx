@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApi } from '../hooks'
-import { api } from '../api'
+import { api, errText } from '../api'
 import { haptic, hapticNotify, initData, pushBack, popBack } from '../telegram'
 import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
@@ -239,7 +239,7 @@ export default function Buildings() {
         : code === 'busy' ? 'Артель занята другой стройкой'
         : code === 'requires' ? 'Сначала построй, что требуется'
         : code === 'reputation' ? 'Репутация низковата'
-        : code === 'built' ? 'Уже построено' : 'Не вышло')
+        : code === 'built' ? 'Уже построено' : errText(e))
     } finally { setBusy(false) }
   }
 
@@ -256,8 +256,7 @@ export default function Buildings() {
         kitchen: 'На огонь!', winery: 'Поставили бродить!' }[prod.id] || 'Готовится!')
     } catch (e) {
       hapticNotify('warning')
-      const code = (e as { code?: string })?.code
-      flash(code === 'not_enough' ? 'Не хватает сырья' : code === 'busy' ? 'Уже работает — дождись' : 'Не вышло')
+      flash(errText(e))
     } finally { setBusy(false) }
   }
 
@@ -269,7 +268,7 @@ export default function Buildings() {
       setProd(res.production); hapticNotify('success'); if (res.toast) flash(res.toast)
     } catch (e) {
       hapticNotify('warning')
-      flash((e as { code?: string })?.code === 'not_ready' ? 'Ещё не готово' : 'Не вышло')
+      flash(errText(e))
     } finally { setBusy(false) }
   }
 
