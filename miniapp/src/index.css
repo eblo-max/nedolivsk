@@ -776,6 +776,31 @@ body {
 @keyframes nr-loot { 0%{opacity:0; transform:translateY(12px) scale(.5)} 100%{opacity:1; transform:translateY(0) scale(1)} }
 .nr-final-val { font-family:var(--num); font-weight:700; font-size:15px; color:var(--gold); }
 
+/* нарратив: повествование исхода (печатная машинка) */
+.nr-story { margin:10px 0 2px; font-family:var(--text); font-size:14px; line-height:1.5; color:#d9d2c4; letter-spacing:.1px; text-shadow:0 1px 6px #000a; max-width:340px; }
+.nr-story i, .nr-story em { color:#f0e6cf; font-style:italic; }
+.nr-caret { display:inline-block; width:2px; height:1.05em; margin-left:1px; vertical-align:-2px; background:var(--gold); animation:nr-blink 1s step-end infinite; }
+@keyframes nr-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* журнал-летопись на распутье (последние беды пути) */
+.nr-journal { width:100%; max-width:360px; margin:0 auto 12px; padding:10px 12px; border-radius:14px;
+  background:linear-gradient(180deg,#1a1612cc,#100d0acc); border:1px solid #ffffff12; backdrop-filter:blur(8px);
+  box-shadow:0 8px 26px #000a, inset 0 1px 0 #ffffff0c; }
+.nr-journal-h { font-family:var(--text); font-size:10px; letter-spacing:1.6px; text-transform:uppercase; color:#8a7f6a; margin-bottom:6px; }
+.nr-journal-l { font-family:var(--text); font-size:12.5px; line-height:1.45; color:#c7bda8; margin:3px 0; opacity:0; animation:nr-jin .5s ease forwards; }
+.nr-journal-l:last-child { color:#ece2cb; }
+.nr-journal-l i { color:var(--gold); font-style:normal; font-family:var(--num); opacity:.7; margin-right:3px; }
+@keyframes nr-jin { from{opacity:0; transform:translateX(-6px)} to{opacity:1; transform:translateX(0)} }
+
+/* полная хроника ночи в финале */
+.nr-chron { width:100%; max-width:360px; margin:14px auto 4px; padding:12px 14px; border-radius:16px; text-align:left;
+  background:linear-gradient(180deg,#17130ecc,#0c0a07e6); border:1px solid #ffffff10; backdrop-filter:blur(10px);
+  box-shadow:0 12px 32px #000b, inset 0 1px 0 #ffffff0a; }
+.nr-chron-h { font-family:var(--text); font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#a8946a; margin-bottom:8px; text-align:center; }
+.nr-chron-body { max-height:190px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.nr-chron-l { font-family:var(--text); font-size:13px; line-height:1.5; color:#cabfa9; margin:5px 0; padding-left:2px; opacity:0; animation:nr-jin .5s ease forwards; }
+.nr-chron-l i { color:var(--gold); font-style:normal; font-family:var(--num); opacity:.65; margin-right:4px; }
+
 /* кубик Лихо */
 .nr-die { display:flex; flex-direction:column; align-items:center; gap:6px; }
 .nr-die-v { font-size:88px; line-height:1; color:var(--parch); text-shadow:0 4px 14px #000; transition:.05s; }

@@ -1,4 +1,4 @@
-import { useState, useEffect, type CSSProperties } from 'react'
+import { useState, useEffect, useRef, type CSSProperties } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify, initData } from '../telegram'
@@ -17,7 +17,7 @@ interface NState { ok: boolean; cooldown: number; active: boolean; max_legs: num
 interface NOut {
   kind: string; busted: boolean; loot: NItem[]; hp_cost: number; healed: number; roll?: number | null
   lose_faces?: number | null; collapsed: boolean; lost?: NItem[]; correct?: boolean
-  factions?: { faction: string; delta: number }[]; npc?: string
+  factions?: { faction: string; delta: number }[]; npc?: string; story?: string
 }
 
 const SITUATION: Record<string, { t: string; cls: string }> = {
@@ -38,6 +38,52 @@ const SCENES = [
 ]
 const sceneFor = (leg: number) => SCENES[Math.min(Math.max(leg, 1), SCENES.length) - 1]
 const STAT_LABEL: Record<string, string> = { armor: '🛡 решает броня', luck: '🍀 решает удача' }
+
+// ── Лор зон + движок повествования (живая хроника ночи) ──
+const ZONE_LORE: Record<string, string> = {
+  town: 'Город спит мёртвым сном. Ты выскальзываешь за околицу — туда, где правит иной закон.',
+  forest: 'Опушка встречает шорохом. Лес смыкается за спиной — назад дороги уже не разобрать.',
+  forest2: 'Туман глотает звуки и тропы. Где-то ухает сыч. Каждый шаг — как по тонкому льду.',
+  ruins: 'Старый погост дышит холодом. Здесь хоронили тех, кого не отпели. Камни помнят дурное.',
+  ruins2: 'В самом сердце руин ворочается мрак. Самое жирное добро — и самая лютая цена.',
+}
+const _pick = (a: string[]) => a[Math.floor(Math.random() * a.length)]
+function narrate(out: NOut): string {
+  if (out.busted) {
+    if (out.collapsed) return _pick(['Ты одолел врага — да рухнул без сил. Очнулся: котомка пуста, тьма хохочет.', 'Победа далась дорого — свет померк, а пробудился уже обчищенным дочиста.'])
+    if (out.kind === 'gamble') return _pick(['Кости легли худо. Картавый осклабился и выгреб всё подчистую.', 'Не свезло на костях — и вот ты с пустыми руками среди ночи.'])
+    return _pick(['На тёмной тропе тебя подстерегли. Очнулся — ни котомки, ни обидчиков.', 'Беда вынырнула из мрака внезапно. Унесли всё, что нажил за ночь.'])
+  }
+  switch (out.kind) {
+    case 'fight': return _pick(['Из тьмы метнулись тени — но твоя сталь была быстрее. Добыча твоя, да рёбрам досталось.', 'Засада! Короткая злая схватка — и тракт снова твой. Кровь чужая, синяки свои.'])
+    case 'sneak': return _pick(['Ты вжался в тень у плетня и пропустил беду мимо. Тихо, как тать.', 'Ни ветка не хрустнула. Проскользнул мимо опасности — и подобрал, что плохо лежало.'])
+    case 'gamble': return _pick(['Кости стукнули о камень и легли в твою пользу. Картавый нехотя отсыпал долю.', 'Фортуна нынче на твоей стороне — бросок вышел знатный.'])
+    case 'find': return _pick(['Под корягой блеснуло — кто-то припрятал, да не вернулся. Теперь твоё.', 'Старый схрон у приметного камня. Немного, да на дороге не валяется.'])
+    case 'rest': return _pick(['Ты развёл огонёк в укрытии и перевёл дух. Раны затянулись, на душе полегчало.', 'Короткий привал у костра вернул силы. Ночь подождёт.'])
+    case 'meet': return _pick([`На тракте — ${out.npc || 'некто'}. Слово за слово, и сделка слажена. Город запомнит твой выбор.`, `Встреча в ночи свела тебя с ${out.npc || 'прохожим'}. Ты решил по-своему.`])
+    case 'quiz': return out.correct ? _pick(['Ведьма щерилась, да загадка тебе по зубам. За верный ответ — щедрый куш.', 'Ты разгадал хитрость старухи — и она, шипя, отсыпала обещанное.']) : _pick(['Ведьма расхохоталась: «Мимо!» Но хоть без потерь.', 'Ответ вышел кривой. Старуха лишь погрозила клюкой.'])
+  }
+  return 'Ночь идёт своим чередом.'
+}
+
+// плавный счётчик (модерн-полировка)
+function useCounter(target: number, ms = 600): number {
+  const [v, setV] = useState(target)
+  const from = useRef(target)
+  useEffect(() => {
+    const a = from.current, t0 = performance.now(); let raf = 0
+    const step = (t: number) => { const k = Math.min(1, (t - t0) / ms); setV(Math.round(a + (target - a) * (1 - (1 - k) * (1 - k)))); if (k < 1) raf = requestAnimationFrame(step); else from.current = target }
+    raf = requestAnimationFrame(step); return () => cancelAnimationFrame(raf)
+  }, [target, ms])
+  return v
+}
+
+// печатная машинка (живой рассказ)
+function Typewriter({ text, speed = 20 }: { text: string; speed?: number }) {
+  const [n, setN] = useState(0)
+  useEffect(() => { setN(0); let i = 0; const id = setInterval(() => { i += 1; setN(i); if (i >= text.length) clearInterval(id) }, speed); return () => clearInterval(id) }, [text, speed])
+  return <span>{text.slice(0, n)}{n < text.length && <span className="nr-caret" />}</span>
+}
 
 const SAMPLE: NState = {
   ok: true, cooldown: 0, active: false, max_legs: 6, stats: { armor: 12, luck: 4 }, run: null,
@@ -73,12 +119,28 @@ export default function Nightrun() {
   const [toast, setToast] = useState('')
   const [out, setOut] = useState<NOut | null>(null)   // резолв-оверлей (анимация исхода)
   const [end, setEnd] = useState<{ kind: 'bust' | 'bank'; out?: NOut; banked?: NItem[]; value?: number } | null>(null)
+  const [chron, setChron] = useState<string[]>([])    // хроника ночи (летопись забега)
+  const beat = (s: string) => setChron((c) => [...c, s])
+  const narr = (o: NOut) => { o.story = narrate(o); beat(o.story); return o }
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
   const off = !initData()
 
   // живой кулдаун-таймер
   const [, tick] = useState(0)
   useEffect(() => { const i = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(i) }, [])
+
+  // лор: вошёл в новую зону — добавить строку в хронику
+  const prevZone = useRef<string | null>(null)
+  useEffect(() => {
+    const r = data?.run
+    if (!r) { prevZone.current = null; return }
+    const z = sceneFor(r.leg).bg
+    if (z !== prevZone.current) {
+      if (prevZone.current !== null) beat(ZONE_LORE[z])
+      prevZone.current = z
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.run?.leg])
 
   const d = data ?? SAMPLE
   const run = d.run
@@ -93,32 +155,33 @@ export default function Nightrun() {
   }
 
   async function start() {
-    if (busy) return; setBusy(true); haptic('medium')
+    if (busy) return; setBusy(true); haptic('medium'); setChron([ZONE_LORE.town])
     if (off) { set(offState(offStart())); setBusy(false); return }
     const r = await call<NState>('nightrun/start'); if (r) set(r); setBusy(false)
+  }
+  function resolveOut(o: NOut, ns: NState) {
+    setOut(narr(o)); set(ns)
+    if (o.busted) setEnd({ kind: 'bust', out: o })
   }
   async function pick(f: NFork) {
     if (busy || !run) return; setBusy(true); haptic('medium')
     if (off) { offPick(f); setBusy(false); return }
     const r = await call<{ out: NOut; nightrun: NState }>('nightrun/pick', { kind: f.kind })
-    if (r) {
-      if (f.kind === 'meet' || f.kind === 'quiz') { set(r.nightrun) }   // под-экран, без оверлея
-      else { setOut(r.out); set(r.nightrun); if (r.out.busted) setEnd({ kind: 'bust', out: r.out }) }
-    }
+    if (r) { (f.kind === 'meet' || f.kind === 'quiz') ? set(r.nightrun) : resolveOut(r.out, r.nightrun) }
     setBusy(false)
   }
   async function meet(optId: string) {
     if (busy) return; setBusy(true); haptic('medium')
     if (off) { offMeet(optId); setBusy(false); return }
     const r = await call<{ out: NOut; nightrun: NState }>('nightrun/meet', { opt: optId })
-    if (r) { setOut(r.out); set(r.nightrun) }
+    if (r) resolveOut(r.out, r.nightrun)
     setBusy(false)
   }
   async function quiz(ans: number) {
     if (busy) return; setBusy(true); haptic('medium')
     if (off) { offQuiz(ans); setBusy(false); return }
     const r = await call<{ out: NOut; nightrun: NState }>('nightrun/quiz', { answer: ans })
-    if (r) { setOut(r.out); set(r.nightrun) }
+    if (r) resolveOut(r.out, r.nightrun)
     setBusy(false)
   }
   async function push() {
@@ -149,15 +212,15 @@ export default function Nightrun() {
     if (f.kind === 'meet') { set(offState({ ...run, state: 'meet', meet: { npc: '🥷 Контрабандист Тихушкин', scene: 'из темноты шипят: «Эй, хозяин… товар не нужен? Дёшево, мимо застав».', options: [{ id: 'buy', label: '🤝 Взять товар' }, { id: 'turn', label: '🛡 Сдать страже' }] } })); return }
     if (f.kind === 'quiz') { set(offState({ ...run, state: 'quiz', quiz: { q: '🔮 Ведьма щерится: «Что в кабаке льётся рекой, а наутро аукается башкой?»', options: ['Вода', 'Эль', 'Дождь', 'Слёзы должника'] } })); return }
     const ok = Math.random() * 100 < f.success
-    if (f.risky && !ok) { const o: NOut = { kind: f.kind, busted: true, loot: [], hp_cost: 0, healed: 0, collapsed: false, lost: run.satchel, roll: f.kind === 'gamble' ? Math.ceil(Math.random() * 2) : null, lose_faces: 2 }; setOut(o); setEnd({ kind: 'bust', out: o }); return }
-    if (f.kind === 'rest') { const heal = Math.min(run.rest_heal, run.hp_max - run.hp); const o: NOut = { kind: 'rest', busted: false, loot: [], hp_cost: 0, healed: heal, collapsed: false }; setOut(o); offCross({ hp: run.hp + heal }, []); return }
+    if (f.risky && !ok) { const o: NOut = { kind: f.kind, busted: true, loot: [], hp_cost: 0, healed: 0, collapsed: false, lost: run.satchel, roll: f.kind === 'gamble' ? Math.ceil(Math.random() * 2) : null, lose_faces: 2 }; setOut(narr(o)); setEnd({ kind: 'bust', out: o }); return }
+    if (f.kind === 'rest') { const heal = Math.min(run.rest_heal, run.hp_max - run.hp); const o: NOut = { kind: 'rest', busted: false, loot: [], hp_cost: 0, healed: heal, collapsed: false }; setOut(narr(o)); offCross({ hp: run.hp + heal }, []); return }
     const loot = offLoot(f.kind === 'find' ? 0.6 : f.kind === 'gamble' ? 1.4 : 1)
     let hp = run.hp; const cost = f.kind === 'fight' ? 4 + run.leg + Math.floor(Math.random() * 6) : 0; hp -= cost
     const o: NOut = { kind: f.kind, busted: false, loot, hp_cost: cost, healed: 0, collapsed: false, roll: f.kind === 'gamble' ? 3 + Math.floor(Math.random() * 3) : null, lose_faces: f.kind === 'gamble' ? 2 : null }
-    setOut(o); offCross({ hp }, loot)
+    setOut(narr(o)); offCross({ hp }, loot)
   }
-  function offMeet(optId: string) { const mult = optId === 'buy' ? 1.6 : 1.0; const loot = offLoot(mult); const o: NOut = { kind: 'meet', busted: false, loot, hp_cost: 0, healed: 0, collapsed: false, npc: '🥷 Контрабандист', factions: [{ faction: 'thieves', delta: optId === 'buy' ? 4 : -4 }] }; setOut(o); if (run) offCross({}, loot) }
-  function offQuiz(ans: number) { const correct = ans === 1; const loot = correct ? offLoot(1.5) : []; const o: NOut = { kind: 'quiz', busted: false, loot, hp_cost: 0, healed: 0, collapsed: false, correct }; setOut(o); if (run) offCross({}, loot) }
+  function offMeet(optId: string) { const mult = optId === 'buy' ? 1.6 : 1.0; const loot = offLoot(mult); const o: NOut = { kind: 'meet', busted: false, loot, hp_cost: 0, healed: 0, collapsed: false, npc: '🥷 Контрабандист', factions: [{ faction: 'thieves', delta: optId === 'buy' ? 4 : -4 }] }; setOut(narr(o)); if (run) offCross({}, loot) }
+  function offQuiz(ans: number) { const correct = ans === 1; const loot = correct ? offLoot(1.5) : []; const o: NOut = { kind: 'quiz', busted: false, loot, hp_cost: 0, healed: 0, collapsed: false, correct }; setOut(narr(o)); if (run) offCross({}, loot) }
 
   if (loading && !data) return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
   if (error && error !== 'no_tavern' && initData()) return (
@@ -172,7 +235,7 @@ export default function Nightrun() {
     <div className="nr" style={nrbg}>
       <div className="nr-bgfix" key={bgName} aria-hidden="true" />
       {toast && <div className="toast">{toast}</div>}
-      <NrEnd end={end} onClose={() => { setEnd(null); setOut(null); if (off) set(offState(null, end.kind === 'bank' ? 4 * 3600 : 4 * 3600)); else reload() }} />
+      <NrEnd end={end} chron={chron} onClose={() => { setEnd(null); setOut(null); setChron([]); if (off) set(offState(null, end.kind === 'bank' ? 4 * 3600 : 4 * 3600)); else reload() }} />
     </div>
   )
 
@@ -193,7 +256,7 @@ export default function Nightrun() {
       {run && run.state === 'fork' && <NrFork d={d} run={run} busy={busy} onPick={pick} />}
       {run && run.state === 'meet' && <NrMeet run={run} busy={busy} onPick={meet} />}
       {run && run.state === 'quiz' && <NrQuiz run={run} busy={busy} onAnswer={quiz} />}
-      {run && run.state === 'crossroad' && !out && <NrCross run={run} busy={busy} onPush={push} onBank={bank} />}
+      {run && run.state === 'crossroad' && !out && <NrCross run={run} chron={chron} busy={busy} onPush={push} onBank={bank} />}
     </div>
   )
 }
@@ -202,6 +265,7 @@ export default function Nightrun() {
 function NrHud({ run, max }: { run: NRun; max: number }) {
   const hpPct = Math.max(0, Math.min(100, (run.hp / run.hp_max) * 100))
   const sc = sceneFor(run.leg)
+  const sat = useCounter(run.satchel_value)
   return (
     <div className="nr-hud">
       <div className="nr-rail">
@@ -217,7 +281,7 @@ function NrHud({ run, max }: { run: NRun; max: number }) {
       <div className="nr-place"><span className="nr-place-nm">{sc.icon} {sc.name}</span><span className="nr-place-leg">этап {run.leg}/{max}</span></div>
       <div className="nr-hud-row">
         <span className="nr-hp"><span className="nr-bar"><i style={{ width: `${hpPct}%` }} /></span><b>{run.hp}</b><small>/{run.hp_max}❤</small></span>
-        <span className="nr-sat">🎒 <b>{fmt(run.satchel_value)}</b><small>🪙-экв{run.satchel.length ? ` · ${run.satchel.length} вид.` : ''}</small></span>
+        <span className="nr-sat">🎒 <b>{fmt(sat)}</b><small>🪙-экв{run.satchel.length ? ` · ${run.satchel.length} вид.` : ''}</small></span>
       </div>
     </div>
   )
@@ -299,13 +363,20 @@ function NrQuiz({ run, busy, onAnswer }: { run: NRun; busy: boolean; onAnswer: (
 }
 
 // ── перекрёсток ──
-function NrCross({ run, busy, onPush, onBank }: { run: NRun; busy: boolean; onPush: () => void; onBank: () => void }) {
+function NrCross({ run, chron, busy, onPush, onBank }: { run: NRun; chron: string[]; busy: boolean; onPush: () => void; onBank: () => void }) {
+  const sat = useCounter(run.satchel_value)
   return (
     <div className="nr-scene rise">
       <div className="nr-fog" />
       <div className="nr-cross-h">⟔ распутье ⟔</div>
+      {chron.length > 0 && (
+        <div className="nr-journal">
+          <div className="nr-journal-h">📜 хроника ночи</div>
+          {chron.slice(-3).map((s, i) => <p key={chron.length - 3 + i} className="nr-journal-l">{s}</p>)}
+        </div>
+      )}
       <div className="nr-satchel">
-        <div className="nr-satchel-h">🎒 Котомка · <b>{fmt(run.satchel_value)}</b> 🪙-экв{run.satchel.length ? ` · ${run.satchel.length} вид.` : ''}</div>
+        <div className="nr-satchel-h">🎒 Котомка · <b>{fmt(sat)}</b> 🪙-экв{run.satchel.length ? ` · ${run.satchel.length} вид.` : ''}</div>
         <div className="nr-loot">
           {run.satchel.length ? run.satchel.map((it) => (
             <span key={it.key} className="nr-loot-i"><ResIcon k={it.key} emoji={it.emoji} size={18} />{fmt(it.qty)}</span>
@@ -338,6 +409,7 @@ function NrResolve({ out, onNext }: { out: NOut; onNext: () => void }) {
       <div className="nr-fog" />
       {dice ? <Die value={out.roll!} loseFaces={out.lose_faces || 0} /> : <div className="nr-res-emo">{RES_EMO[out.kind] || '🌙'}</div>}
       <div className="nr-res-h">{RES_TITLE(out)}</div>
+      {out.story && <p className="nr-story"><Typewriter text={out.story} /></p>}
       {out.healed > 0 && <div className="nr-res-heal">+{out.healed} ❤</div>}
       {out.hp_cost > 0 && <div className="nr-res-cost">−{out.hp_cost} ❤ за победу</div>}
       {out.factions && out.factions.length > 0 && (
@@ -371,7 +443,7 @@ function Die({ value, loseFaces }: { value: number; loseFaces: number }) {
 }
 
 // ── финал ──
-function NrEnd({ end, onClose }: { end: { kind: 'bust' | 'bank'; out?: NOut; banked?: NItem[]; value?: number }; onClose: () => void }) {
+function NrEnd({ end, chron, onClose }: { end: { kind: 'bust' | 'bank'; out?: NOut; banked?: NItem[]; value?: number }; chron: string[]; onClose: () => void }) {
   const bust = end.kind === 'bust'
   return (
     <div className={`nr-scene final ${bust ? 'bust' : 'bank'}`}>
@@ -393,6 +465,14 @@ function NrEnd({ end, onClose }: { end: { kind: 'bust' | 'bank'; out?: NOut; ban
             : <p className="muted" style={{ fontStyle: 'italic' }}>Пустым вернулся — да хоть цел.</p>}
           {!!end.value && <div className="nr-final-val">≈ {fmt(end.value)} 🪙-эквивалента</div>}
         </>
+      )}
+      {chron.length > 0 && (
+        <div className="nr-chron">
+          <div className="nr-chron-h">📜 Хроника ночи</div>
+          <div className="nr-chron-body">
+            {chron.map((s, i) => <p key={i} className="nr-chron-l" style={{ animationDelay: `${Math.min(i * 0.12, 1.4)}s` }}><i>{i + 1}.</i> {s}</p>)}
+          </div>
+        </div>
       )}
       <button className="btn gold nr-next" onClick={onClose}>← К вылазкам</button>
     </div>
