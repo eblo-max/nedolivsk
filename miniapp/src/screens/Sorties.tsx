@@ -41,12 +41,6 @@ const SAMPLE: HuntState = {
   ],
 }
 
-// HP-шкала (плавная)
-function Bar({ cur, max, kind }: { cur: number; max: number; kind: 'p' | 'e' }) {
-  const pct = max > 0 ? Math.max(0, Math.min(100, (cur / max) * 100)) : 0
-  return <div className={`hb hb-${kind}`}><i style={{ width: `${pct}%` }} /></div>
-}
-
 export default function Sorties() {
   const { data, loading, error, set, reload } = useApi<HuntState>('hunt', SAMPLE)
   const [pick, setPick] = useState<Beast | null>(null)
@@ -126,28 +120,30 @@ export default function Sorties() {
       {toast && <div className="toast">{toast}</div>}
       <div className="hero rise" style={{ paddingBottom: 0 }}>
         <div className="nm">Вылазки</div>
-        <div className="meta">
-          <span className="region">⚔ урон {d.stats.damage}</span>
-          <span className="region">💥 {d.stats.crit}%</span>
-          <span className="region">🛡 {d.stats.armor}</span>
-          <span className="region">🍀 {d.stats.luck}</span>
-        </div>
         <div className="flavor" style={{ margin: '6px 14px 0', fontSize: 13.5 }}>«Снаряга при тебе — иди возьми с тракта своё.»</div>
       </div>
 
-      <div className="hp-card">
-        <div className="hp-row"><span>❤ Здоровье</span><b>{d.hp.cur} / {d.hp.max}{d.hp.regen > 0 ? ` · ${hm(d.hp.regen)}` : ''}</b></div>
-        <Bar cur={d.hp.cur} max={d.hp.max} kind="p" />
-        {d.heal.can && <button className="btn green sm" style={{ marginTop: 9 }} disabled={busy || !d.heal.options.length} onClick={() => setHealOpen(true)}>🍖 Подлечиться</button>}
-        {!d.ready.can && <div className="hp-warn">Слишком ранен — в строй через {hm(d.ready.minutes)}</div>}
+      <div className="hunter">
+        <div className="hunter-aura" />
+        <img className="hunter-hero" src={`${import.meta.env.BASE_URL}character/hero_static.png`} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+        <div className="hunter-body">
+          <div className="hunter-top">
+            <span className="hunter-hp"><b>{d.hp.cur}</b><small>/{d.hp.max} ❤</small></span>
+            <span className="hunter-regen">{d.hp.regen > 0 ? `восстановление ${hm(d.hp.regen)}` : 'полон сил'}</span>
+          </div>
+          <div className="ep-bar p hunter-bar"><i style={{ width: `${Math.max(0, Math.min(100, (d.hp.cur / d.hp.max) * 100))}%` }} /></div>
+          <div className="hunter-stats"><i>⚔ {d.stats.damage}</i><i>💥 {d.stats.crit}%</i><i>🛡 {d.stats.armor}</i><i>🍀 {d.stats.luck}</i></div>
+        </div>
+        {d.heal.can && <button className="hunter-heal" disabled={busy || !d.heal.options.length} onClick={() => setHealOpen(true)} aria-label="Подлечиться">🍖</button>}
       </div>
+      {!d.ready.can && <div className="hp-warn">Слишком ранен — в строй через {hm(d.ready.minutes)}</div>}
 
       <div className="cap">бестиарий · цель охоты</div>
       <div className="hunt-grid">
         {d.beasts.map((b) => (
           <button key={b.id} className={`hunt-card th-${threatCls(b.win)}`} onClick={() => { haptic('light'); setPick(b) }}>
             <span className="hc-glow" />
-            <span className="hc-emo">{b.emoji}</span>
+            <div className="hc-portrait"><span className="hc-emo">{b.emoji}</span></div>
             <div className="hc-top">
               <span className="hc-name">{b.name}{b.regional && <em className="hc-reg">КРАЙ</em>}</span>
               <div className="hc-traits">{b.traits.map((t) => <span key={t} className="hc-tr">{TRAIT[t] || t}</span>)}</div>

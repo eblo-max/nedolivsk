@@ -549,10 +549,29 @@ body {
 .btn.danger { color:#2a0d08; border-color:#cf8a68; background:#bb5436; box-shadow:none; }
 
 /* ── Вылазки: охота ── */
-.hp-card { border:1px solid var(--line); border-radius:12px; padding:11px 13px; background:#170f07; }
-.hp-row { display:flex; justify-content:space-between; font-family:var(--text); font-size:14px; color:#c3ad84; margin-bottom:7px; }
-.hp-row b { font-family:var(--num); color:var(--parch); }
-.hp-warn { font-family:var(--text); font-size:12.5px; color:var(--crimson); margin-top:8px; text-align:center; }
+/* панель охотника (герой + HP + статы + лечение) */
+.hunter { position:relative; overflow:hidden; display:flex; align-items:center; gap:12px; padding:11px 13px;
+  border:1px solid var(--line2); border-radius:14px;
+  background:radial-gradient(120% 130% at 0% 50%, #2e1c0c 0%, #1a1006 60%, #120b05 100%);
+  box-shadow:0 5px 16px #0008, inset 0 1px 0 #ffffff0d; }
+.hunter-aura { position:absolute; left:-10%; top:-30%; width:46%; height:160%; border-radius:50%;
+  background:radial-gradient(circle, #e7975a33, transparent 70%); pointer-events:none; }
+.hunter-hero { width:72px; height:auto; flex:0 0 auto; z-index:1; filter:drop-shadow(0 4px 7px #000b); }
+.hunter-body { flex:1; min-width:0; z-index:1; }
+.hunter-top { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:5px; }
+.hunter-hp { font-family:var(--num); color:var(--parch); }
+.hunter-hp b { font-size:21px; }
+.hunter-hp small { font-size:12px; color:var(--dim); }
+.hunter-regen { font-family:var(--text); font-size:11.5px; color:var(--dim); font-style:italic; }
+.hunter-bar { height:10px; }
+.hunter-stats { display:flex; flex-wrap:wrap; gap:11px; margin-top:7px; font-family:var(--num); font-size:13px; color:#c3ad84; }
+.hunter-stats i { font-style:normal; }
+.hunter-heal { flex:0 0 auto; z-index:1; width:44px; height:44px; border-radius:12px; font-size:20px; cursor:pointer;
+  background:linear-gradient(#1d2912,#141d0b); border:1px solid #3f5a2c; color:var(--parch);
+  box-shadow:0 2px 7px #0007; transition:transform .1s; }
+.hunter-heal:active { transform:scale(.94); }
+.hunter-heal:disabled { filter:grayscale(.6) brightness(.7); }
+.hp-warn { font-family:var(--text); font-size:12.5px; color:var(--crimson); text-align:center; }
 
 .hb { height:9px; border-radius:6px; overflow:hidden; background:#140d06; border:1px solid var(--line); }
 .hb i { display:block; height:100%; border-radius:6px; transition:width .5s ease; }
@@ -569,8 +588,11 @@ body {
 .hunt-card:active { transform:scale(.985); }
 .hc-glow { position:absolute; top:-40%; left:-10%; width:60%; height:130%; border-radius:50%;
   background:radial-gradient(circle, var(--thg, #5fa85f44) 0%, transparent 70%); pointer-events:none; }
-.hc-emo { grid-row:1 / span 3; align-self:center; font-size:46px; width:60px; text-align:center; z-index:1;
-  filter:drop-shadow(0 3px 5px #000a); animation:beast-float 3.4s ease-in-out infinite; }
+.hc-portrait { grid-row:1 / span 3; align-self:center; z-index:1; width:58px; height:58px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+  background:radial-gradient(circle, var(--thg, #5fa85f33) 0%, #160d05 74%);
+  border:2px solid var(--thc, var(--green)); box-shadow:0 0 15px var(--thg, #5fa85f55), inset 0 0 12px #000b; }
+.hc-emo { font-size:32px; line-height:1; filter:drop-shadow(0 2px 3px #000a); animation:beast-float 3.4s ease-in-out infinite; }
 .hc-top { grid-column:2; display:flex; flex-direction:column; gap:2px; min-width:0; z-index:1; }
 .hc-name { font-family:var(--disp); font-weight:700; font-size:16.5px; letter-spacing:.3px; }
 .hc-reg { font-style:normal; font-family:var(--disp); font-size:9px; letter-spacing:1px; color:#caa24e;
