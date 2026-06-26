@@ -4,13 +4,14 @@ import { api } from '../api'
 import { haptic, hapticNotify, initData } from '../telegram'
 import { ResIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
+import { MONSTERS, MON_FLIP, HERO, RANGED, type MonMeta, type AnimName } from '../monsters'
 
 // ── типы (зеркало webapp _hunt_state / _api_hunt_fight) ──
 interface Drop { key?: string; trophy: boolean; lo?: number; hi?: number; chance: number; name?: string; emoji?: string; label?: string }
 interface Beast {
   id: string; emoji: string; name: string; hp: number; attack: number; armor: number
   gold: [number, number]; rep: number; blurb: string; traits: string[]; regional: boolean
-  win: number; est_hp: number; threat: { icon: string; label: string }; drops: Drop[]
+  win: number; est_hp: number; threat: { icon: string; label: string }; drops: Drop[]; sprite?: string
 }
 interface HealOpt { key: string; name: string; emoji: string; hp: number; qty: number }
 interface HuntState {
@@ -20,7 +21,7 @@ interface HuntState {
 }
 interface Round { pd: number; crit: boolean; miss: boolean; ed: number; php: number; ehp: number }
 interface FightRes {
-  ok: boolean; win: boolean; elite: boolean; enemy: { name: string; emoji: string; hp: number }
+  ok: boolean; win: boolean; elite: boolean; enemy: { name: string; emoji: string; hp: number; sprite?: string }
   player_hp0: number; hp_max: number; rounds: Round[]; rounds_n: number; crits: number; overwhelmed: boolean
   loot: { gold: number; res: { key: string; name: string; emoji: string; qty: number }[]; trophies: string[]; rep: number }
   gold_lost: number; hp_now: number; hunt: HuntState
@@ -40,9 +41,9 @@ const SAMPLE: HuntState = {
   stats: { damage: 33, crit: 7, armor: 16, luck: 4 },
   heal: { can: true, full: false, options: [{ key: 'roast', name: 'Жаркое', emoji: '🍖', hp: 12, qty: 3 }] },
   beasts: [
-    { id: 'zayac', emoji: '🐰', name: 'Заяц', hp: 8, attack: 2, armor: 0, gold: [3, 12], rep: 0, blurb: 'Можно и голыми руками.', traits: [], regional: false, win: 100, est_hp: 34, threat: { icon: '🟢', label: 'лёгкая добыча' }, drops: [{ key: 'game', trophy: false, lo: 2, hi: 4, chance: 100, name: 'Дичь', emoji: '🥩' }] },
-    { id: 'volk', emoji: '🐺', name: 'Волк', hp: 40, attack: 7, armor: 2, gold: [16, 32], rep: 0, blurb: 'Кусается и юлит — нужен урон.', traits: ['evasive'], regional: false, win: 82, est_hp: 18, threat: { icon: '🟢', label: 'уверенно' }, drops: [{ key: 'game', trophy: false, lo: 4, hi: 7, chance: 100, name: 'Дичь', emoji: '🥩' }, { key: 'fang', trophy: false, lo: 1, hi: 2, chance: 30, name: 'Клык', emoji: '🦷' }] },
-    { id: 'ataman', emoji: '👹', name: 'Атаман', hp: 215, attack: 30, armor: 13, gold: [190, 360], rep: 4, blurb: 'Гроза тракта. С него — перстень.', traits: [], regional: false, win: 22, est_hp: 6, threat: { icon: '🟠', label: 'опасно' }, drops: [{ key: 'ore', trophy: false, lo: 8, hi: 14, chance: 100, name: 'Руда', emoji: '⛏️' }, { key: 'ring', trophy: false, lo: 1, hi: 1, chance: 25, name: 'Перстень', emoji: '💍' }] },
+    { id: 'zayac', emoji: '👁', name: 'Летучий Глаз', hp: 8, attack: 2, armor: 0, gold: [3, 12], rep: 0, blurb: 'Можно и голыми руками.', traits: [], regional: false, win: 100, est_hp: 34, threat: { icon: '🟢', label: 'лёгкая добыча' }, sprite: 'flying_eye', drops: [{ key: 'game', trophy: false, lo: 2, hi: 4, chance: 100, name: 'Дичь', emoji: '🥩' }] },
+    { id: 'volk', emoji: '🐺', name: 'Цербер', hp: 40, attack: 7, armor: 2, gold: [16, 32], rep: 0, blurb: 'Кусается и юлит — нужен урон.', traits: ['evasive'], regional: false, win: 82, est_hp: 18, threat: { icon: '🟢', label: 'уверенно' }, sprite: 'cerberus', drops: [{ key: 'game', trophy: false, lo: 4, hi: 7, chance: 100, name: 'Дичь', emoji: '🥩' }, { key: 'fang', trophy: false, lo: 1, hi: 2, chance: 30, name: 'Клык', emoji: '🦷' }] },
+    { id: 'ataman', emoji: '🐉', name: 'Дракон', hp: 215, attack: 30, armor: 13, gold: [190, 360], rep: 4, blurb: 'Гроза тракта. С него — перстень.', traits: [], regional: false, win: 22, est_hp: 6, threat: { icon: '🟠', label: 'опасно' }, sprite: 'dragon', drops: [{ key: 'ore', trophy: false, lo: 8, hi: 14, chance: 100, name: 'Руда', emoji: '⛏️' }, { key: 'ring', trophy: false, lo: 1, hi: 1, chance: 25, name: 'Перстень', emoji: '💍' }] },
   ],
 }
 
@@ -61,16 +62,20 @@ export default function Sorties() {
     if (!fight) return
     setStep(-1)
     const n = fight.rounds.length
-    const iv = Math.max(360, Math.min(800, Math.round(3200 / Math.max(1, n))))
+    // пауза раунда с запасом под обмен ударами (фаза A+B ≈ 720 мс); длинные бои чуть быстрее
+    const iv = Math.max(620, Math.min(900, Math.round(6400 / Math.max(1, n))))
     let i = -1
     let t: ReturnType<typeof setTimeout>
     const tick = () => {
       i += 1; setStep(i)
       haptic(fight.rounds[i]?.crit ? 'heavy' : 'light')
-      if (i < n - 1) t = setTimeout(tick, iv)
-      else setTimeout(() => hapticNotify(fight.win ? 'success' : 'error'), 220)
+      if (i < n - 1) {
+        // слоу-мо: после крита держим кадр дольше (кинематографичность)
+        const wait = fight.rounds[i]?.crit ? Math.round(iv * 1.55) : iv
+        t = setTimeout(tick, wait)
+      } else setTimeout(() => hapticNotify(fight.win ? 'success' : 'error'), 220)
     }
-    t = setTimeout(tick, 420)
+    t = setTimeout(tick, 1150)   // 1-я пауза = интро-вспышка «VS»
     return () => clearTimeout(t)
   }, [fight])
 
@@ -91,6 +96,7 @@ export default function Sorties() {
       const r = await api<FightRes>('hunt_fight', { id: b.id })
       set(r.hunt); setFight(r)
     } catch (e) {
+      if (!initData()) { setFight(synthFight(b, d)); return }   // офлайн-превью: показываем демо-бой
       const code = (e as { code?: string })?.code
       flash(code === 'lowhp' ? 'Слишком ранен — отлёживайся' : 'Не вышло'); hapticNotify('warning')
     } finally { setBusy(false) }
@@ -148,7 +154,10 @@ export default function Sorties() {
               <div className="poster-paper">
                 <div className="poster-head">— РАЗЫСКИВАЕТСЯ —{b.regional && <em> · здешний</em>}</div>
                 <div className="poster-row">
-                  <span className="poster-emo">{b.emoji}</span>
+                  {b.sprite && MONSTERS[b.sprite]
+                    ? <div className="poster-mug"><Sprite path={`monsters/${b.sprite}`} meta={MONSTERS[b.sprite]} anim="idle" token={0}
+                        height={Math.min(58, Math.round(78 * MONSTERS[b.sprite].fh / MONSTERS[b.sprite].fw))} flip={!!MON_FLIP[b.sprite]} /></div>
+                    : <span className="poster-emo">{b.emoji}</span>}
                   <div className="poster-id">
                     <span className="poster-name">{b.name}</span>
                     <span className="poster-danger">угроза: {b.threat.label} · сила ❤{b.hp}{b.traits.length ? ` · ${b.traits.map((t) => TRAIT[t] || t).join(', ')}` : ''}</span>
@@ -231,6 +240,87 @@ function BeastBrief({ b, hp, ready, busy, onHunt }: { b: Beast; hp: { cur: numbe
   )
 }
 
+// демо-бой для офлайн-превью (вне Telegram): грубая симуляция ради анимации
+function synthFight(b: Beast, d: HuntState): FightRes {
+  const hpMax = d.hp.max; let php = d.hp.cur; let ehp = b.hp
+  const win = b.win >= 50
+  const pdmg = Math.max(3, d.stats.damage - b.armor)
+  const edmg = Math.max(1, b.attack - d.stats.armor)
+  const rounds: Round[] = []; let crits = 0
+  for (let i = 0; i < 14 && php > 0 && ehp > 0; i++) {
+    const crit = (i % 4 === 2); if (crit) crits++
+    const miss = b.traits.includes('evasive') && i % 3 === 1
+    const pd = miss ? 0 : Math.round(pdmg * (crit ? 1.8 : 1) * (win ? 1.2 : 0.7))
+    ehp = Math.max(0, ehp - pd)
+    const ed = ehp > 0 ? Math.round(edmg * (win ? 0.7 : 1.3)) : 0
+    php = Math.max(win ? 1 : 0, php - ed)
+    rounds.push({ pd, crit, miss, ed, php, ehp })
+    if (ehp <= 0 || php <= 0) break
+  }
+  return {
+    ok: true, win, elite: false, enemy: { name: b.name, emoji: b.emoji, hp: b.hp, sprite: b.sprite },
+    player_hp0: d.hp.cur, hp_max: hpMax, rounds, rounds_n: rounds.length, crits, overwhelmed: !win,
+    loot: { gold: win ? Math.round((b.gold[0] + b.gold[1]) / 2) : 0, res: win ? b.drops.filter((x) => !x.trophy).map((x) => ({ key: x.key!, name: x.name!, emoji: x.emoji!, qty: x.lo || 1 })) : [], trophies: [], rep: win ? b.rep : 0 },
+    gold_lost: win ? 0 : 8, hp_now: php, hunt: d,
+  }
+}
+
+// ── Анимированный спрайт (лента кадров fw×fh, шаги по кадрам) ──────────────
+function Sprite({ path, meta, anim, token, height, flip }: {
+  path: string; meta: MonMeta; anim: AnimName; token: number; height: number; flip: boolean
+}) {
+  const [frame, setFrame] = useState(0)
+  const n = meta[anim] || 1
+  useEffect(() => {
+    setFrame(0)
+    if (n <= 1) return
+    const loop = anim === 'idle' || anim === 'run'
+    // фиксированная длительность клипа (мс) → кадр = длительность/кадры:
+    // любой клип успевает доиграть внутри раунда вне зависимости от числа кадров
+    const DUR: Record<AnimName, number> = { idle: 1000, attack: 320, hurt: 230, death: 600, run: 620 }
+    // лупам (idle/run) — пол кадра 90мс: на доске розыска до ~11 спрайтов разом,
+    // не частим ререндерами; в фоне (hidden) кадр не двигаем (батарея/джанк)
+    const interval = Math.max(loop ? 90 : 16, DUR[anim] / n)
+    let f = 0
+    const id = setInterval(() => {
+      if (loop && document.hidden) return
+      f += 1
+      if (f >= n) {
+        if (loop) { f = 0 } else { clearInterval(id); setFrame(n - 1); return }
+      }
+      setFrame(f)
+    }, interval)
+    return () => clearInterval(id)
+    // token заставляет переиграть даже ту же анимацию (hurt 2 раунда подряд)
+  }, [anim, token, n])
+  const scale = height / meta.fh
+  return (
+    <div className="ep-sprite" style={{
+      width: meta.fw * scale, height,
+      backgroundImage: `url(${import.meta.env.BASE_URL}${path}/${anim}.webp)`,
+      backgroundSize: `${n * 100}% 100%`,
+      backgroundPosition: n > 1 ? `${(frame / (n - 1)) * 100}% 0` : '0 0',
+      transform: flip ? 'scaleX(-1)' : undefined,
+    }} />
+  )
+}
+
+// ── Вспышка попадания (лист hit.webp = 3 кадра 16×16), одноразовая ─────────
+function Burst({ token, x, y }: { token: number; x: string; y: string }) {
+  const [f, setF] = useState(0)
+  useEffect(() => {
+    if (!token) return
+    setF(0); let i = 0
+    const id = setInterval(() => { i += 1; if (i >= 3) { clearInterval(id); setF(2); return } setF(i) }, 65)
+    return () => clearInterval(id)
+  }, [token])
+  if (!token) return null
+  return <div className="ep-burst" key={token} style={{
+    left: x, top: y, backgroundImage: `url(${import.meta.env.BASE_URL}fx/hit.webp)`,
+    backgroundPosition: `${(f / 2) * 100}% 0`,
+  }} />
+}
+
 // ── Бой: кинематографичная арена (герой против зверя) ─────────────────────
 function FightView({ fight, step, onClose }: { fight: FightRes; step: number; onClose: () => void }) {
   const r = step >= 0 ? fight.rounds[Math.min(step, fight.rounds.length - 1)] : null
@@ -239,52 +329,119 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
   const phpPct = Math.max(0, Math.min(100, (php / fight.hp_max) * 100))
   const ehpPct = Math.max(0, Math.min(100, (ehp / fight.enemy.hp) * 100))
   const done = step >= fight.rounds.length - 1
-  const hero = `${import.meta.env.BASE_URL}character/hero_static.png`
   const arenaRef = useRef<HTMLDivElement>(null)
 
-  // тряска экрана на удар (сильнее на крите); уважаем prefers-reduced-motion
+  const skey = fight.enemy.sprite
+  const meta = skey ? MONSTERS[skey] : undefined
+  const projAsset = skey ? RANGED[skey] : undefined   // дальнобойный? → ассет снаряда
+
+  // хореография раунда: монстр бьёт (снаряд/ближний → вспышка на герое) →
+  // герой отвечает (вспышка на монстре); победа → death, поражение → побег героя
+  const [monAnim, setMonAnim] = useState<AnimName>('idle')
+  const [heroAnim, setHeroAnim] = useState<AnimName>('idle')
+  const [proj, setProj] = useState(0)        // токен снаряда в полёте
+  const [sparkHero, setSparkHero] = useState(0)
+  const [sparkFoe, setSparkFoe] = useState(0)
+  const [flee, setFlee] = useState(false)
+  useEffect(() => {
+    if (step < 0 || !r) { setMonAnim('idle'); setHeroAnim('idle'); setProj(0); return }
+    const mHits = r.ed > 0, hHits = r.pd > 0, ranged = !!projAsset
+    const t: ReturnType<typeof setTimeout>[] = []
+    setProj(0)
+    // фаза A — монстр бьёт
+    if (mHits) {
+      setMonAnim('attack'); setHeroAnim('idle')
+      if (ranged) {
+        t.push(setTimeout(() => setProj(step + 1), 150))                                  // пуск снаряда
+        t.push(setTimeout(() => { setHeroAnim('hurt'); setSparkHero(step + 1) }, 440))    // прилёт
+      } else {
+        t.push(setTimeout(() => { setHeroAnim('hurt'); setSparkHero(step + 1) }, 180))    // ближний контакт
+      }
+    } else { setMonAnim('idle'); setHeroAnim('idle') }
+    // фаза B — ответ героя
+    const dB = mHits ? (projAsset ? 560 : 380) : 100
+    t.push(setTimeout(() => {
+      if (done && !fight.win) { setHeroAnim('run'); setFlee(true); setMonAnim('attack') }  // побег
+      else {
+        setHeroAnim('attack')
+        if (done && fight.win) setMonAnim('death')
+        else setMonAnim(hHits ? 'hurt' : 'idle')
+      }
+    }, dB))
+    if ((done && fight.win) || hHits) t.push(setTimeout(() => setSparkFoe(step + 1), dB + 170))  // удар героя достиг
+    if (!done) t.push(setTimeout(() => { setMonAnim('idle'); setHeroAnim('idle') }, dB + 380))
+    return () => t.forEach(clearTimeout)
+    // только на смену раунда; done/win/projAsset/r стабильны в пределах боя
+  }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // тряска + крит-зум (сильнее на крите и добивающем ударе); уважаем reduce-motion
   useEffect(() => {
     if (step < 0 || !r || !arenaRef.current) return
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const a = r.crit ? 11 : (r.pd > 0 || r.ed > 0) ? 5 : 0
-    if (!a) return
-    arenaRef.current.animate(
-      [{ transform: 'translate(0,0)' }, { transform: `translate(${a}px,${-a}px)` }, { transform: `translate(${-a}px,${a / 2}px)` }, { transform: 'translate(0,0)' }],
-      { duration: r.crit ? 340 : 200, easing: 'ease-out' })
-  }, [step, r])
+    const big = r.crit || (done && fight.win)
+    const a = big ? 11 : (r.pd > 0 || r.ed > 0) ? 5 : 0
+    if (!a && !big) return
+    const sc = big ? 1.06 : 1
+    arenaRef.current.animate([
+      { transform: 'translate(0,0) scale(1)' },
+      { transform: `translate(${a}px,${-a}px) scale(${sc})`, offset: 0.25 },
+      { transform: `translate(${-a}px,${a / 2}px) scale(${sc * 0.99})`, offset: 0.6 },
+      { transform: 'translate(0,0) scale(1)' },
+    ], { duration: big ? 460 : 200, easing: 'ease-out' })
+  }, [step, r, done, fight.win])
 
   return (
     <div className="ep">
       <button className="lnk-back" onClick={onClose}>‹ Назад</button>
-      <div className="ep-arena" ref={arenaRef}>
+      <div className={`ep-arena ${fight.elite ? 'elite' : ''}`} ref={arenaRef}>
         <div className="ep-embers" aria-hidden="true">
           {Array.from({ length: 9 }).map((_, i) => <i key={i} style={{ left: `${7 + i * 10.5}%`, animationDelay: `${i * 0.5}s`, animationDuration: `${4 + (i % 3)}s` }} />)}
         </div>
 
         <div className="ep-hp foe">
-          <span className="ep-hp-nm">{fight.elite ? '✨ ' : ''}{fight.enemy.name}</span>
-          <div className="ep-bar e"><i style={{ width: `${ehpPct}%` }} /></div>
+          <span className="ep-hp-nm">{fight.enemy.name}</span>
+          <div className="ep-bar e"><i className="gh" style={{ width: `${ehpPct}%` }} /><i className="fl" style={{ width: `${ehpPct}%` }} /></div>
         </div>
 
-        <div className="ep-foe">
-          <div className={`ep-foe-emo ${r ? (r.crit ? 'k-crit' : r.pd > 0 ? 'k-hit' : '') : ''}`} key={'f' + step}>{fight.enemy.emoji}</div>
+        {/* монстр — СЛЕВА, лицом к герою */}
+        <div className={`ep-foe ${fight.elite ? 'elite' : ''} ${monAnim === 'death' ? 'dead' : monAnim === 'attack' ? 'atk' : ''}`}>
+          {meta && skey
+            ? <Sprite path={`monsters/${skey}`} meta={meta} anim={monAnim} token={step} height={132} flip={!!MON_FLIP[skey]} />
+            : <div className={`ep-foe-emo ${r ? (r.crit ? 'k-crit' : r.pd > 0 ? 'k-hit' : '') : ''}`} key={'f' + step}>{fight.enemy.emoji}</div>}
           {r && r.pd > 0 && <div className={`ep-slash ${r.crit ? 'crit' : ''}`} key={'s' + step} />}
           {r && (r.pd > 0
             ? <div className={`ep-dmg foe ${r.crit ? 'crit' : ''}`} key={'d' + step}>−{r.pd}{r.crit && <b>КРИТ!</b>}</div>
             : <div className="ep-dmg miss" key={'d' + step}>мимо</div>)}
         </div>
 
+        {/* летящий снаряд дальнобойного зверя (слева → направо, к герою) */}
+        {proj === step + 1 && projAsset && (
+          <div className="ep-proj" key={'p' + step} style={{ backgroundImage: `url(${import.meta.env.BASE_URL}fx/${projAsset}.webp)` }} />
+        )}
+        <Burst token={sparkFoe} x="22%" y="54%" />
+        <Burst token={sparkHero} x="76%" y="52%" />
+
         <div className="ep-mid">{done ? (fight.win ? '🏆' : '💀') : `РАУНД ${step + 1}`}</div>
 
-        <div className="ep-hero" key={'h' + step}>
-          <img src={hero} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+        {/* герой — СПРАВА, лицом к монстру (зеркалим: спрайт смотрит вправо) */}
+        <div className={`ep-hero ${flee ? 'flee' : ''}`}>
+          <Sprite path="character/hero" meta={HERO} anim={heroAnim} token={step} height={156} flip />
           {r && r.ed > 0 && <div className="ep-dmg me" key={'e' + step}>−{r.ed}</div>}
         </div>
 
         <div className="ep-hp me">
-          <div className="ep-bar p"><i style={{ width: `${phpPct}%` }} /></div>
+          <div className="ep-bar p"><i className="gh" style={{ width: `${phpPct}%` }} /><i className="fl" style={{ width: `${phpPct}%` }} /></div>
           <span className="ep-hp-nm">Ты · {php}/{fight.hp_max}</span>
         </div>
+
+        {/* интро-вспышка «VS» перед первым раундом */}
+        {step < 0 && (
+          <div className="ep-intro" key="intro">
+            <div className="ep-intro-vs">⚔ VS ⚔</div>
+            <div className="ep-intro-nm">{fight.enemy.name}</div>
+            {fight.elite && <div className="ep-intro-el">РЕДКИЙ ПРОТИВНИК</div>}
+          </div>
+        )}
 
         {done && <div className={`ep-flash ${fight.win ? 'win' : 'lose'}`} />}
       </div>

@@ -1298,6 +1298,16 @@ async def _api_prod_claim(request: web.Request) -> web.Response:
 
 # ===== Охота (порт bot/handlers/hunt.py + game/combat.py) =====
 
+# enemy.id → ключ пака анимированных спрайтов (miniapp/public/monsters/<key>/)
+ENEMY_SPRITE = {
+    "zayac": "flying_eye", "lisa": "gargoyle", "gadyuka": "medusa",
+    "olen": "centaur", "volk": "cerberus", "kaban": "minotaur",
+    "vozhak": "skeleton", "medved": "golem", "razboy": "goblin",
+    "ataman": "dragon", "lynx": "harpy", "tusker": "satyr", "scorpion": "witch",
+    "olen_gold": "centaur", "volk_white": "cerberus", "kaban_rabid": "minotaur",
+}
+
+
 def _drop_items(drops) -> list:
     """Таблица добычи зверя: ресурсы (диапазон/шанс) и трофеи (res='')."""
     from bot.game import balance as bal, production as prod
@@ -1328,6 +1338,7 @@ def _hunt_state(p) -> dict:
         icon, label = combat.threat(win)
         beasts.append({
             "id": e.id, "emoji": e.emoji, "name": e.name, "hp": e.hp,
+            "sprite": ENEMY_SPRITE.get(e.id),
             "attack": e.attack, "armor": e.armor, "gold": [e.gold[0], e.gold[1]],
             "rep": e.rep, "blurb": e.blurb, "traits": list(e.traits),
             "regional": bool(e.region), "win": win, "est_hp": est,
@@ -1393,7 +1404,8 @@ async def _api_hunt_fight(request: web.Request) -> web.Response:
         hunt = _hunt_state(p)
     return web.json_response({
         "ok": True, "win": res.fight.win, "elite": res.elite,
-        "enemy": {"name": res.enemy.name, "emoji": res.enemy.emoji, "hp": res.enemy.hp},
+        "enemy": {"name": res.enemy.name, "emoji": res.enemy.emoji, "hp": res.enemy.hp,
+                  "sprite": ENEMY_SPRITE.get(res.enemy.id)},
         "player_hp0": chp0, "hp_max": combat.max_hp(), "rounds": res.fight.log,
         "rounds_n": res.fight.rounds, "crits": res.fight.crits, "overwhelmed": res.fight.overwhelmed,
         "loot": {"gold": (res.loot or {}).get("gold", 0) if res.fight.win else 0, "res": loot_res,

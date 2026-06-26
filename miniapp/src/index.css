@@ -583,6 +583,10 @@ body {
 .poster-head em { font-style:normal; color:#9a3a1a; }
 .poster-row { display:flex; align-items:center; gap:12px; padding-right:40px; }
 .poster-emo { font-size:44px; flex:0 0 auto; filter:sepia(.5) contrast(1.05) brightness(.84) drop-shadow(0 1px 1px #0004); }
+/* живой спрайт зверя на постере — как печатная гравюра (сепия) */
+.poster-mug { flex:0 0 auto; width:74px; height:60px; display:flex; align-items:flex-end; justify-content:center;
+  filter:sepia(.46) contrast(1.06) brightness(.92) drop-shadow(0 1px 1px #0005); }
+.poster-mug .ep-sprite { image-rendering:pixelated; }
 .poster-id { min-width:0; }
 .poster-name { display:block; font-family:var(--disp); font-weight:900; font-size:22px; letter-spacing:.5px; color:#281a09; line-height:1.04; }
 .poster-danger { font-size:12px; color:#6b4f28; font-style:italic; }
@@ -613,26 +617,40 @@ body {
 
 /* ── Бой: кинематографичная арена ── */
 .ep { display:flex; flex-direction:column; gap:12px; }
-.ep-arena { position:relative; overflow:hidden; border-radius:16px; min-height:440px;
-  display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:16px 14px 18px;
+.ep-arena { position:relative; overflow:hidden; border-radius:16px; min-height:370px;
   background:radial-gradient(120% 80% at 50% 0%, #3a1d0c 0%, #1a0f06 45%, #070402 100%);
   box-shadow:inset 0 0 90px #000c, inset 0 0 0 1px #ffffff0a; }
-.ep-arena::after { content:""; position:absolute; inset:0; pointer-events:none;
+/* земля под бойцами */
+.ep-arena::before { content:""; position:absolute; left:0; right:0; bottom:0; height:90px; z-index:1; pointer-events:none;
+  background:linear-gradient(#0000, #1a0c04 70%, #0a0502); box-shadow:inset 0 8px 22px #000a; }
+.ep-arena::after { content:""; position:absolute; inset:0; pointer-events:none; z-index:1;
   background:radial-gradient(130% 92% at 50% 42%, transparent 50%, #000c 100%); }
 .ep-embers { position:absolute; inset:0; pointer-events:none; z-index:0; }
 .ep-embers i { position:absolute; bottom:-8px; width:3px; height:3px; border-radius:50%;
   background:#e7975a; box-shadow:0 0 6px #e7975a; opacity:0; animation:ember linear infinite; }
 @keyframes ember { 0%{transform:translateY(0) scale(1); opacity:0} 12%{opacity:.85} 88%{opacity:.5} 100%{transform:translateY(-400px) scale(.3); opacity:0} }
 
-.ep-hp { width:100%; max-width:320px; z-index:2; }
-.ep-hp-nm { font-family:var(--disp); font-weight:700; font-size:13px; color:var(--parch); text-shadow:0 1px 3px #000; display:block; margin-bottom:4px; }
+.ep-hp { position:absolute; top:14px; width:43%; max-width:166px; z-index:4; }
+.ep-hp.foe { left:13px; }
+.ep-hp.me { right:13px; }
+.ep-hp-nm { font-family:var(--disp); font-weight:700; font-size:12.5px; color:var(--parch); text-shadow:0 1px 3px #000; display:block; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ep-hp.me .ep-hp-nm { text-align:right; margin:4px 0 0; }
-.ep-bar { height:12px; border-radius:7px; overflow:hidden; background:#000a; border:1px solid #ffffff16; box-shadow:inset 0 1px 2px #000; }
-.ep-bar i { display:block; height:100%; border-radius:7px; transition:width .55s cubic-bezier(.3,.8,.3,1); }
-.ep-bar.e i { background:linear-gradient(90deg,#7a1f12,#e24b4a); box-shadow:0 0 10px #cf4a3666; }
-.ep-bar.p i { background:linear-gradient(90deg,#3b6d11,#86c98a); box-shadow:0 0 10px #86c98a55; }
+.ep-bar { position:relative; height:12px; border-radius:7px; overflow:hidden; background:#000a; border:1px solid #ffffff16; box-shadow:inset 0 1px 2px #000; }
+.ep-bar i { position:absolute; left:0; top:0; height:100%; border-radius:7px; transition:width .32s cubic-bezier(.3,.8,.3,1); }
+/* призрак-трейл: бледный слой ОТСТАЁТ при потере HP — видно «откушенный» кусок */
+.ep-bar .gh { background:#f4e9d0 !important; opacity:.5; z-index:1; transition:width 1.1s ease .2s; box-shadow:none !important; }
+.ep-bar .fl { z-index:2; }
+.ep-bar.e i, .ep-bar.e .fl { background:linear-gradient(90deg,#7a1f12,#e24b4a); box-shadow:0 0 10px #cf4a3666; }
+.ep-bar.p i, .ep-bar.p .fl { background:linear-gradient(90deg,#3b6d11,#86c98a); box-shadow:0 0 10px #86c98a55; }
 
-.ep-foe { position:relative; z-index:2; margin-top:4px; }
+.ep-foe { position:absolute; left:8px; bottom:34px; z-index:3; }
+.ep-foe::after { content:""; position:absolute; left:50%; bottom:-12px; width:78%; height:16px; transform:translateX(-50%);
+  background:radial-gradient(50% 50% at 50% 50%, #000a, transparent 72%); z-index:-1; }
+.ep-sprite { background-repeat:no-repeat; image-rendering:pixelated; filter:drop-shadow(0 6px 10px #000a); will-change:background-position; }
+.ep-foe.atk { animation:foe-lunge .42s ease; }
+@keyframes foe-lunge { 0%{transform:translateX(0)} 38%{transform:translateX(26px)} 100%{transform:translateX(0)} }
+.ep-foe.dead { animation:foe-die 1.1s ease forwards; }
+@keyframes foe-die { to{opacity:.9; filter:saturate(.45) brightness(.78)} }
 .ep-foe-emo { font-size:94px; line-height:1; filter:drop-shadow(0 8px 14px #000) drop-shadow(0 0 24px #cf4a3633); animation:foe-idle 3s ease-in-out infinite; }
 @keyframes foe-idle { 0%,100%{transform:translateY(0) rotate(-1deg)} 50%{transform:translateY(-6px) rotate(1deg)} }
 .ep-foe-emo.k-hit { animation:k-hit .42s ease; }
@@ -648,16 +666,53 @@ body {
 
 .ep-dmg { position:absolute; top:4%; left:50%; transform:translateX(-50%); z-index:4; pointer-events:none; white-space:nowrap;
   font-family:var(--disp); font-weight:900; font-size:34px; color:#ffd773; text-shadow:0 2px 0 #000,0 0 14px #e7bf63; animation:dmgpop .85s ease-out forwards; }
-.ep-dmg.crit { font-size:44px; color:#ffb454; }
-.ep-dmg.crit b { display:block; font-size:17px; color:#fff; letter-spacing:2px; }
+.ep-dmg.crit { font-size:44px; color:#ff3b30; text-shadow:0 2px 0 #000,0 0 16px #ff3b30,0 0 30px #cf1f16; }
+.ep-dmg.crit b { display:block; font-size:17px; color:#ff6a52; letter-spacing:2px; text-shadow:0 1px 0 #000,0 0 12px #ff3b30; }
 .ep-dmg.miss { color:var(--dim); font-size:21px; text-shadow:0 1px 3px #000; }
 .ep-dmg.me { top:auto; bottom:6%; color:#ff6a52; font-size:30px; text-shadow:0 2px 0 #000,0 0 12px #cf4a36; }
 @keyframes dmgpop { 0%{opacity:0; transform:translateX(-50%) translateY(12px) scale(.5)} 22%{opacity:1; transform:translateX(-50%) translateY(0) scale(1.18)} 100%{opacity:0; transform:translateX(-50%) translateY(-38px) scale(1)} }
 
-.ep-mid { z-index:2; font-family:var(--disp); font-weight:700; font-size:12px; letter-spacing:3px; color:var(--brass); }
-.ep-hero { position:relative; z-index:2; }
-.ep-hero img { width:124px; height:auto; filter:drop-shadow(0 6px 12px #000b); animation:hero-lunge .5s ease; }
-@keyframes hero-lunge { 0%{transform:translateY(0)} 30%{transform:translateY(-20px) scale(1.04)} 56%{transform:translateY(-5px)} 100%{transform:translateY(0)} }
+.ep-mid { position:absolute; top:50px; left:50%; transform:translateX(-50%); z-index:3;
+  font-family:var(--disp); font-weight:700; font-size:12px; letter-spacing:3px; color:var(--brass); text-shadow:0 1px 3px #000; }
+.ep-hero { position:absolute; right:6px; bottom:30px; z-index:3; }
+.ep-hero::after { content:""; position:absolute; left:50%; bottom:-10px; width:74%; height:15px; transform:translateX(-50%);
+  background:radial-gradient(50% 50% at 50% 50%, #000a, transparent 72%); z-index:-1; }
+/* герой — анимир. спрайт; зеркалится в Sprite (flip), лицом ВЛЕВО к монстру */
+.ep-hero .ep-sprite { filter:drop-shadow(0 6px 12px #000b); }
+/* поражение — герой убегает вправо за край */
+.ep-hero.flee { animation:hero-flee 1.1s cubic-bezier(.4,0,.7,1) .15s forwards; }
+@keyframes hero-flee { to { transform:translateX(160px); opacity:0; } }
+
+/* летящий снаряд дальнобойного зверя (слева → к герою справа) */
+.ep-proj { position:absolute; left:16%; top:56%; width:34px; height:30px; z-index:4; pointer-events:none;
+  background-size:contain; background-repeat:no-repeat; background-position:center; image-rendering:pixelated;
+  filter:drop-shadow(0 0 6px #ffcaa0); animation:proj-fly .29s linear forwards; }
+@keyframes proj-fly { 0%{left:16%; opacity:0} 12%{opacity:1} 92%{opacity:1} 100%{left:72%; opacity:0} }
+
+/* вспышка попадания (лист 3 кадра 16×16) */
+.ep-burst { position:absolute; width:46px; height:46px; z-index:6; pointer-events:none; transform:translate(-50%,-50%);
+  background-size:300% 100%; background-repeat:no-repeat; image-rendering:pixelated;
+  filter:drop-shadow(0 0 8px #ffd9a0); animation:burstfade .26s ease forwards; }
+@keyframes burstfade { 0%{opacity:.4; transform:translate(-50%,-50%) scale(.7)} 30%{opacity:1; transform:translate(-50%,-50%) scale(1.15)} 100%{opacity:0; transform:translate(-50%,-50%) scale(1.3)} }
+
+/* элитка/босс — золотая аура и рамка арены */
+.ep-arena.elite { box-shadow:inset 0 0 90px #000c, inset 0 0 0 1px #e7bf6355, 0 0 0 1px #caa24e44; }
+.ep-foe.elite::before { content:""; position:absolute; left:50%; top:48%; width:150%; height:150%; transform:translate(-50%,-50%); z-index:-1;
+  background:radial-gradient(50% 50% at 50% 50%, #e7bf6340, transparent 66%); animation:elite-pulse 2.4s ease-in-out infinite; }
+@keyframes elite-pulse { 0%,100%{opacity:.6; transform:translate(-50%,-50%) scale(.95)} 50%{opacity:1; transform:translate(-50%,-50%) scale(1.08)} }
+
+/* интро-вспышка «VS» перед боем */
+.ep-intro { position:absolute; inset:0; z-index:7; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  pointer-events:none; background:radial-gradient(circle at 50% 50%, #0007, #000c); animation:introfade 1.1s ease forwards; }
+.ep-intro-vs { font-family:var(--disp); font-weight:900; font-size:22px; letter-spacing:5px; color:var(--brass); text-shadow:0 2px 6px #000;
+  animation:intro-vs .5s cubic-bezier(.2,1.5,.4,1) both; }
+.ep-intro-nm { font-family:var(--disp); font-weight:900; font-size:30px; letter-spacing:1px; color:var(--parch); text-shadow:0 2px 8px #000,0 0 22px #cf4a3666;
+  animation:intro-nm .55s cubic-bezier(.2,1.4,.4,1) .08s both; }
+.ep-intro-el { font-family:var(--disp); font-weight:700; font-size:11px; letter-spacing:3px; color:var(--gold); text-shadow:0 0 14px #e7bf6366;
+  animation:intro-nm .55s ease .16s both; }
+@keyframes introfade { 0%,72%{opacity:1} 100%{opacity:0} }
+@keyframes intro-vs { 0%{opacity:0; transform:scale(.4)} 100%{opacity:1; transform:scale(1)} }
+@keyframes intro-nm { 0%{opacity:0; transform:translateY(14px) scale(.85)} 100%{opacity:1; transform:translateY(0) scale(1)} }
 
 .ep-flash { position:absolute; inset:0; z-index:5; pointer-events:none; animation:epflash .65s ease forwards; }
 .ep-flash.win { background:radial-gradient(circle at 50% 45%, #ffe9b0cc, transparent 60%); }
