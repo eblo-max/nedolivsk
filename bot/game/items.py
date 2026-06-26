@@ -239,20 +239,20 @@ CATALOG: dict[str, Item] = {
         # СТАТЫ ИДЕНТИЧНЫ во всех регионах (паритет by-design) — отличается лишь
         # компонент и название. Слот пояса (раньше только слабый «поясок»). ═══════
         Item(
-            id="lynx_belt", slot="belt", name="Пояс рысьего меха",
-            description="Северная выделка: мягкий мех, крепкая сыромять.",
+            id="lynx_belt", slot="belt", name="Пояс гарпьего пуха",
+            description="Северная выделка: тугой гарпий пух да крепкая сыромять — лёгок и цепок.",
             cost={"gold": 1200, "ingot": 2, "pelt": 4},
             craft_hours=4, armor=6, crit=4,
         ),
         Item(
-            id="tusk_belt", slot="belt", name="Пояс с клыками",
-            description="Долинная работа: секачьи клыки по ремню — и грозно, и крепко.",
+            id="tusk_belt", slot="belt", name="Пояс с рогами",
+            description="Долинная работа: витые рога сатира по ремню — и грозно, и крепко.",
             cost={"gold": 1200, "ingot": 2, "tusk": 4},
             craft_hours=4, armor=6, crit=4,
         ),
         Item(
-            id="chitin_belt", slot="belt", name="Хитиновый пояс",
-            description="Пустошная ковка: пластины скорпионьего панциря внахлёст.",
+            id="chitin_belt", slot="belt", name="Чешуйчатый пояс",
+            description="Пустошная ковка: змеиная чешуя внахлёст — гибко и прочно.",
             cost={"gold": 1200, "ingot": 2, "chitin": 4},
             craft_hours=4, armor=6, crit=4,
         ),
