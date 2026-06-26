@@ -21,12 +21,17 @@ interface HuntState {
 interface Round { pd: number; crit: boolean; miss: boolean; ed: number; php: number; ehp: number }
 interface FightRes {
   ok: boolean; win: boolean; elite: boolean; enemy: { name: string; emoji: string; hp: number }
-  player_hp0: number; hp_max: number; rounds: Round[]
+  player_hp0: number; hp_max: number; rounds: Round[]; rounds_n: number; crits: number; overwhelmed: boolean
   loot: { gold: number; res: { key: string; name: string; emoji: string; qty: number }[]; trophies: string[]; rep: number }
   gold_lost: number; hp_now: number; hunt: HuntState
 }
 
 const TRAIT: Record<string, string> = { venom: '☠ ядовит', evasive: '💨 увёртлив' }
+// полные тактические подсказки (как _TRAIT_HINT бота)
+const TRAIT_HINT: Record<string, string> = {
+  venom: '☠ Ядовит — бьёт сквозь броню (она бесполезна). Спасает уворот (удача) или быстрый занос уроном/критом.',
+  evasive: '💨 Увёртлив — уводит часть твоих ударов. Броня не добьёт его: нужен высокий урон/крит.',
+}
 const threatCls = (w: number) => (w >= 70 ? 'g' : w >= 40 ? 'y' : w >= 10 ? 'o' : 'r')
 const hm = (m: number) => { const h = Math.floor(m / 60), mm = m % 60; return h ? `${h} ч ${mm} мин` : `${mm} мин` }
 
@@ -146,7 +151,7 @@ export default function Sorties() {
                   <span className="poster-emo">{b.emoji}</span>
                   <div className="poster-id">
                     <span className="poster-name">{b.name}</span>
-                    <span className="poster-danger">угроза: {b.threat.label}{b.traits.length ? ` · ${b.traits.map((t) => TRAIT[t] || t).join(', ')}` : ''}</span>
+                    <span className="poster-danger">угроза: {b.threat.label} · сила ❤{b.hp}{b.traits.length ? ` · ${b.traits.map((t) => TRAIT[t] || t).join(', ')}` : ''}</span>
                   </div>
                 </div>
                 <div className="poster-foot">
@@ -164,7 +169,7 @@ export default function Sorties() {
 
       {pick && (
         <Sheet title={`${pick.emoji} ${pick.name}`} onClose={() => setPick(null)}>
-          <BeastBrief b={pick} ready={d.ready} busy={busy} onHunt={() => hunt(pick)} />
+          <BeastBrief b={pick} hp={d.hp} ready={d.ready} busy={busy} onHunt={() => hunt(pick)} />
         </Sheet>
       )}
       {healOpen && (
@@ -185,17 +190,26 @@ export default function Sorties() {
 }
 
 // ── Бриф зверя ───────────────────────────────────────────────────────────
-function BeastBrief({ b, ready, busy, onHunt }: { b: Beast; ready: { can: boolean; minutes: number }; busy: boolean; onHunt: () => void }) {
+function BeastBrief({ b, hp, ready, busy, onHunt }: { b: Beast; hp: { cur: number; max: number }; ready: { can: boolean; minutes: number }; busy: boolean; onHunt: () => void }) {
   return (
     <>
       <div className="brief-emo">{b.emoji}</div>
       <p className="bd-desc">{b.blurb}</p>
+      <div className="cap">зверь</div>
       <div className="kv-list">
-        <div className="kv"><span>Здоровье зверя</span><b>{b.hp}</b></div>
-        <div className="kv"><span>Атака · броня</span><b>{b.attack} · {b.armor}</b></div>
-        <div className="kv"><span>Твой шанс</span><b className={`win-${threatCls(b.win)}`}>{b.threat.icon} {b.win}% · {b.threat.label}</b></div>
-        <div className="kv"><span>Останется HP при победе</span><b>≈ {b.est_hp}</b></div>
-        {b.traits.length > 0 && <div className="kv"><span>Особенность</span><b>{b.traits.map((t) => TRAIT[t] || t).join(', ')}</b></div>}
+        <div className="kv"><span>Здоровье</span><b>❤ {b.hp}</b></div>
+        <div className="kv"><span>Атака · броня</span><b>⚔ {b.attack} · 🛡 {b.armor}</b></div>
+      </div>
+
+      {b.traits.map((t) => TRAIT_HINT[t] && (
+        <p key={t} className="trait-hint">{TRAIT_HINT[t]}</p>
+      ))}
+
+      <div className="cap">твой расклад</div>
+      <div className="kv-list">
+        <div className="kv"><span>Шанс победы</span><b className={`win-${threatCls(b.win)}`}>{b.threat.icon} {b.win}% · {b.threat.label}</b></div>
+        <div className="kv"><span>При здоровье</span><b>❤ {hp.cur}/{hp.max}</b></div>
+        {b.win > 0 && <div className="kv"><span>Останется при победе</span><b>≈ {b.est_hp}/{hp.max}</b></div>}
       </div>
 
       <div className="cap">добыча</div>
@@ -280,14 +294,20 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
           {fight.win && <div className="ep-rays" aria-hidden="true" />}
           <div className="ep-res-h">{fight.win ? (fight.elite ? '✨ РЕДКАЯ ДОБЫЧА' : 'ПОБЕДА') : 'ПОРАЖЕНИЕ'}</div>
           {fight.win ? (
-            <div className="ep-loot">
-              {fight.loot.gold > 0 && <span className="ep-loot-i" style={{ animationDelay: '0s' }}><ResIcon k="gold" size={22} />+{fmt(fight.loot.gold)}</span>}
-              {fight.loot.res.map((x, i) => <span key={x.key} className="ep-loot-i" style={{ animationDelay: `${(i + 1) * 0.09}s` }}><ResIcon k={x.key} emoji={x.emoji} size={22} />+{x.qty}</span>)}
-              {fight.loot.rep > 0 && <span className="ep-loot-i">⭐ +{fight.loot.rep}</span>}
-              {fight.loot.trophies.map((t, i) => <span key={i} className="ep-loot-i">🏆 {t}</span>)}
-            </div>
+            <>
+              <div className="ep-tally">🗡 Уложил за {fight.rounds_n} р.{fight.crits > 0 ? ` · ${fight.crits} крит.` : ''} · осталось ❤{fight.hp_now}/{fight.hp_max}</div>
+              <div className="ep-loot">
+                {fight.loot.gold > 0 && <span className="ep-loot-i" style={{ animationDelay: '0s' }}><ResIcon k="gold" size={22} />+{fmt(fight.loot.gold)}</span>}
+                {fight.loot.res.map((x, i) => <span key={x.key} className="ep-loot-i" style={{ animationDelay: `${(i + 1) * 0.09}s` }}><ResIcon k={x.key} emoji={x.emoji} size={22} />+{x.qty}</span>)}
+                {fight.loot.rep > 0 && <span className="ep-loot-i">⭐ +{fight.loot.rep}</span>}
+                {fight.loot.trophies.map((t, i) => <span key={i} className="ep-loot-i">🏆 {t}</span>)}
+              </div>
+            </>
           ) : (
-            <div className="muted" style={{ textAlign: 'center' }}>Потеряно {fmt(fight.gold_lost)} 🪙. Раны затянутся — отлежись и подлечись.</div>
+            <div className="ep-lose-body">
+              <p className="ep-tally">«{fight.overwhelmed ? `${fight.enemy.name} оказался не по зубам — еле уволок ноги.` : `${fight.enemy.name} подмял тебя на ${fight.rounds_n}-м раунде.`}»</p>
+              <div className="muted" style={{ textAlign: 'center' }}>🩸 Еле выполз — ❤{fight.hp_now}/{fight.hp_max}{fight.gold_lost > 0 ? ` · обронил −${fmt(fight.gold_lost)} 🪙` : ''}. Отлёживайся, здоровье вернётся.</div>
+            </div>
           )}
           <button className="btn gold" onClick={onClose}>← К бестиарию</button>
         </div>
