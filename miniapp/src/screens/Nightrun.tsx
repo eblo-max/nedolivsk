@@ -6,10 +6,10 @@ import { ResIcon, fmt } from '../components/icons'
 
 // ── типы (зеркало webapp _nightrun_state / _nr_out) ──
 interface NItem { key: string; name: string; emoji: string; qty: number }
-interface NFork { kind: string; emoji: string; name: string; risky: boolean; hint: string; success: number }
+interface NFork { kind: string; emoji: string; name: string; risky: boolean; hint: string; success: number; risk: number; reward: number; stat: string | null }
 interface NRun {
   leg: number; state: string; hp: number; hp_max: number; satchel: NItem[]; satchel_value: number
-  situation: string | null; can_push: boolean; rest_heal: number
+  situation: string | null; can_push: boolean; rest_heal: number; next_value: number; growth: number
   fork?: NFork[]; meet?: { npc: string; scene: string; options: { id: string; label: string }[] }
   quiz?: { q: string; options: string[] }
 }
@@ -29,14 +29,15 @@ const hms = (s: number) => { const h = Math.floor(s / 3600), m = Math.floor((s %
 
 // СВОЙ фон и место на КАЖДЫЙ этап — чем дальше в ночь, тем мрачнее (лор)
 const SCENES = [
-  { bg: 'town', name: 'Окраина' },
-  { bg: 'forest', name: 'Опушка леса' },
-  { bg: 'forest2', name: 'Глухая чаща' },
-  { bg: 'ruins', name: 'Старый погост' },
-  { bg: 'ruins2', name: 'Сердце руин' },
-  { bg: 'ruins2', name: 'Сердце руин' },
+  { bg: 'town', name: 'Окраина', icon: '🏘' },
+  { bg: 'forest', name: 'Опушка леса', icon: '🌲' },
+  { bg: 'forest2', name: 'Глухая чаща', icon: '🌫' },
+  { bg: 'ruins', name: 'Старый погост', icon: '🪦' },
+  { bg: 'ruins2', name: 'Сердце руин', icon: '🏚' },
+  { bg: 'ruins2', name: 'Бездна', icon: '🔥' },
 ]
 const sceneFor = (leg: number) => SCENES[Math.min(Math.max(leg, 1), SCENES.length) - 1]
+const STAT_LABEL: Record<string, string> = { armor: '🛡 решает броня', luck: '🍀 решает удача' }
 
 const SAMPLE: NState = {
   ok: true, cooldown: 0, active: false, max_legs: 6, stats: { armor: 12, luck: 4 }, run: null,
@@ -47,17 +48,20 @@ function offState(run: NRun | null, cooldown = 0): NState {
   return { ...SAMPLE, cooldown, active: !!run, run }
 }
 function offStart(): NRun {
-  return { leg: 1, state: 'fork', hp: 35, hp_max: 35, satchel: [], satchel_value: 0, situation: 'merchant_boom', can_push: true, rest_heal: 14, fork: offFork(1) }
+  return { leg: 1, state: 'fork', hp: 35, hp_max: 35, satchel: [], satchel_value: 0, situation: 'merchant_boom', can_push: true, rest_heal: 14, next_value: Math.round(25 * 1.45), growth: 1.45, fork: offFork(1) }
 }
 function offFork(leg: number): NFork[] {
+  const base = Math.round(25 * Math.pow(1.45, leg - 1))
+  const mk = (kind: string, emoji: string, name: string, risky: boolean, hint: string, success: number, mult: number, stat: string | null): NFork =>
+    ({ kind, emoji, name, risky, hint, success, risk: risky ? 100 - success : 0, reward: Math.round(base * mult), stat })
   const all: NFork[] = [
-    { kind: 'fight', emoji: '⚔️', name: 'Засада', risky: true, hint: 'Сила и броня решают. Победа стоит здоровья.', success: Math.max(45, 90 - leg * 6) },
-    { kind: 'gamble', emoji: '🎲', name: 'Лихо', risky: true, hint: 'Бросок костей: куш или обчистят.', success: Math.max(40, 82 - leg * 6) },
-    { kind: 'sneak', emoji: '🌒', name: 'Тишком', risky: true, hint: 'Удача — проскользнуть мимо беды.', success: Math.max(45, 88 - leg * 6) },
-    { kind: 'meet', emoji: '🗣', name: 'Встреча', risky: false, hint: 'Выбор и сдвиг сил города. Без бюста.', success: 100 },
-    { kind: 'quiz', emoji: '❓', name: 'Загадка', risky: false, hint: 'Угадал — куш. Без бюста.', success: 100 },
-    { kind: 'rest', emoji: '🔥', name: 'Привал', risky: false, hint: 'Лечит. Добычи нет.', success: 100 },
-    { kind: 'find', emoji: '💰', name: 'Схрон', risky: false, hint: 'Малая добыча. Безопасно.', success: 100 },
+    mk('fight', '⚔️', 'Засада', true, 'Сила и броня решают. Победа стоит здоровья.', Math.max(45, 90 - leg * 6), 1, 'armor'),
+    mk('gamble', '🎲', 'Лихо', true, 'Бросок костей: куш или обчистят.', Math.max(40, 82 - leg * 6), 1.4, null),
+    mk('sneak', '🌒', 'Тишком', true, 'Удача — проскользнуть мимо беды.', Math.max(45, 88 - leg * 6), 1, 'luck'),
+    mk('meet', '🗣', 'Встреча', false, 'Выбор и сдвиг сил города. Без бюста.', 100, 1, null),
+    mk('quiz', '❓', 'Загадка', false, 'Угадал — куш. Без бюста.', 100, 1.5, null),
+    mk('rest', '🔥', 'Привал', false, 'Лечит. Добычи нет.', 100, 0, null),
+    mk('find', '💰', 'Схрон', false, 'Малая добыча. Безопасно.', 100, 0.6, null),
   ]
   const pick = [all[(leg * 2) % all.length], all[(leg * 2 + 3) % all.length]]
   return pick[0].kind === pick[1].kind ? [pick[0], all[(leg + 1) % all.length]] : pick
@@ -138,7 +142,7 @@ export default function Nightrun() {
   function offCross(extra: Partial<NRun>, loot: NItem[]) {
     if (!run) return
     const sat = [...run.satchel]; loot.forEach((l) => { const e = sat.find((x) => x.key === l.key); if (e) e.qty += l.qty; else sat.push({ ...l }) })
-    set(offState({ ...run, ...extra, state: 'crossroad', satchel: sat, satchel_value: sat.reduce((a, x) => a + (x.key === 'gold' ? x.qty : x.qty * 3), 0) }))
+    set(offState({ ...run, ...extra, state: 'crossroad', satchel: sat, next_value: Math.round(25 * Math.pow(1.45, run.leg)), satchel_value: sat.reduce((a, x) => a + (x.key === 'gold' ? x.qty : x.qty * 3), 0) }))
   }
   function offPick(f: NFork) {
     if (!run) return
@@ -194,15 +198,26 @@ export default function Nightrun() {
   )
 }
 
-// ── шапка забега (этап, HP, котомка) ──
+// ── шапка забега: журнал-путь (стэпер зон) + место + статы ──
 function NrHud({ run, max }: { run: NRun; max: number }) {
   const hpPct = Math.max(0, Math.min(100, (run.hp / run.hp_max) * 100))
+  const sc = sceneFor(run.leg)
   return (
     <div className="nr-hud">
-      <div className="nr-legs">{Array.from({ length: max }).map((_, i) => <i key={i} className={i < run.leg ? 'on' : ''} />)}<span className="nr-leg-n">{sceneFor(run.leg).name}</span></div>
+      <div className="nr-rail">
+        {SCENES.slice(0, max).map((s, i) => {
+          const n = i + 1
+          return (
+            <div key={i} className={`nr-stop ${n < run.leg ? 'done' : n === run.leg ? 'now' : 'soon'}`}>
+              <span className="nr-stop-dot">{n <= run.leg ? s.icon : ''}</span>
+            </div>
+          )
+        })}
+      </div>
+      <div className="nr-place"><span className="nr-place-nm">{sc.icon} {sc.name}</span><span className="nr-place-leg">этап {run.leg}/{max}</span></div>
       <div className="nr-hud-row">
-        <span className="nr-hp"><span className="nr-bar"><i style={{ width: `${hpPct}%` }} /></span><b>{run.hp}</b><small>/{run.hp_max} ❤</small></span>
-        <span className="nr-sat">🎒 <b>{fmt(run.satchel_value)}</b><small>🪙-экв</small></span>
+        <span className="nr-hp"><span className="nr-bar"><i style={{ width: `${hpPct}%` }} /></span><b>{run.hp}</b><small>/{run.hp_max}❤</small></span>
+        <span className="nr-sat">🎒 <b>{fmt(run.satchel_value)}</b><small>🪙-экв{run.satchel.length ? ` · ${run.satchel.length} вид.` : ''}</small></span>
       </div>
     </div>
   )
@@ -238,7 +253,9 @@ function NrFork({ d, run, busy, onPick }: { d: NState; run: NRun; busy: boolean;
           <button key={f.kind} className={`nr-path ${f.risky ? 'risky' : 'safe'}`} disabled={busy} onClick={() => { haptic('light'); onPick(f) }}>
             <span className="nr-path-emo">{f.emoji}</span>
             <span className="nr-path-nm">{f.name}</span>
-            <span className={`nr-path-tag ${f.risky ? 'risk' : 'safe'}`}>{f.risky ? `${f.success}%` : 'без риска'}</span>
+            <span className={`nr-path-tag ${f.risky ? 'risk' : 'safe'}`}>{f.risky ? `шанс ${f.success}%` : 'без риска'}</span>
+            {f.reward > 0 && <span className="nr-path-rew">≈ +{fmt(f.reward)} <small>🪙-экв</small></span>}
+            {f.stat && <span className="nr-path-stat">{STAT_LABEL[f.stat]}</span>}
             <span className="nr-path-hint">{f.hint}</span>
           </button>
         ))}
@@ -286,20 +303,28 @@ function NrCross({ run, busy, onPush, onBank }: { run: NRun; busy: boolean; onPu
   return (
     <div className="nr-scene rise">
       <div className="nr-fog" />
-      <div className="nr-cross-h">Распутье</div>
+      <div className="nr-cross-h">⟔ распутье ⟔</div>
       <div className="nr-satchel">
-        <div className="nr-satchel-h">🎒 Котомка · <b>{fmt(run.satchel_value)}</b> 🪙-экв</div>
+        <div className="nr-satchel-h">🎒 Котомка · <b>{fmt(run.satchel_value)}</b> 🪙-экв{run.satchel.length ? ` · ${run.satchel.length} вид.` : ''}</div>
         <div className="nr-loot">
           {run.satchel.length ? run.satchel.map((it) => (
             <span key={it.key} className="nr-loot-i"><ResIcon k={it.key} emoji={it.emoji} size={18} />{fmt(it.qty)}</span>
           )) : <span className="muted" style={{ fontStyle: 'italic' }}>пусто — пока нечего нести</span>}
         </div>
       </div>
-      <div className="nr-cross-btns">
-        {run.can_push
-          ? <button className="btn danger nr-deeper" disabled={busy} onClick={onPush}>⬇️ Глубже в ночь<small>риск растёт, добыча жирнеет</small></button>
-          : <div className="nr-dawn">🌅 Впереди рассвет — дальше тракт не ведёт</div>}
-        <button className="btn green nr-home" disabled={busy} onClick={onBank}>🏠 Свернуть в таверну<small>забрать {fmt(run.satchel_value)} 🪙-экв</small></button>
+      <div className="nr-choices">
+        {run.can_push ? (
+          <button className="nr-choice deeper" disabled={busy} onClick={onPush}>
+            <span className="nr-choice-ic">⬇</span>
+            <span className="nr-choice-body"><b>Глубже в ночь</b><small>добыча ×{run.growth} → ≈ +{fmt(run.next_value)} 🪙-экв · но риск потерять котомку</small></span>
+            <span className="nr-choice-go">›</span>
+          </button>
+        ) : <div className="nr-dawn">🌅 Впереди рассвет — дальше тракт не ведёт</div>}
+        <button className="nr-choice home" disabled={busy} onClick={onBank}>
+          <span className="nr-choice-ic">🏠</span>
+          <span className="nr-choice-body"><b>Свернуть в таверну</b><small>забрать {fmt(run.satchel_value)} 🪙-экв · гарантированно, без риска</small></span>
+          <span className="nr-choice-go">›</span>
+        </button>
       </div>
     </div>
   )

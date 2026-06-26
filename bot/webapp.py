@@ -1472,12 +1472,21 @@ def _nightrun_state(p) -> dict:
          "satchel": _nr_items(run.get("satchel")),
          "satchel_value": nr.satchel_value(run.get("satchel")),
          "situation": run.get("situation"), "can_push": nr.can_push(run),
-         "rest_heal": bal.NIGHTRUN_REST_HEAL}
+         "rest_heal": bal.NIGHTRUN_REST_HEAL,
+         "next_value": round(nr.leg_value(run["leg"] + 1)) if nr.can_push(run) else 0,
+         "growth": round(bal.NIGHTRUN_REWARD_GROWTH, 2)}
     if st == "fork":
-        r["fork"] = [{"kind": k, "emoji": _NR_KIND[k][0], "name": _NR_KIND[k][1],
-                      "risky": _NR_KIND[k][2], "hint": _NR_HINT[k],
-                      "success": round(nr.success_p(run, p, k) * 100)}
-                     for k in nr.fork(run)]
+        _stat = {"fight": "armor", "sneak": "luck"}
+        _mult = {"find": 0.6, "quiz": 1.5}
+
+        def _fk(k):
+            sp = nr.success_p(run, p, k)
+            return {"kind": k, "emoji": _NR_KIND[k][0], "name": _NR_KIND[k][1],
+                    "risky": _NR_KIND[k][2], "hint": _NR_HINT[k],
+                    "success": round(sp * 100), "risk": round((1 - sp) * 100) if _NR_KIND[k][2] else 0,
+                    "reward": round(nr.leg_value(run["leg"]) * _mult.get(k, 1.0)),
+                    "stat": _stat.get(k)}
+        r["fork"] = [_fk(k) for k in nr.fork(run)]
     elif st == "meet":
         enc = nr.MEET_ENCOUNTERS[run["meet"]]
         r["meet"] = {"npc": enc["npc"], "scene": enc["scene"],
