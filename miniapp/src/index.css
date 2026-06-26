@@ -658,7 +658,8 @@ body {
 /* фон на ВЕСЬ экран — фикс. слой за контентом (escape из паддингов скролла) */
 .nr-bgfix { position:fixed; inset:0; z-index:0; pointer-events:none; background-color:#06080e; image-rendering:pixelated;
   background-image:linear-gradient(180deg,#06080ee6 0%,#06080e3a 22%,#06080e1a 48%,#06080e8a 78%,#06080ef0 100%), var(--nr-bg, none);
-  background-size:cover; background-position:center; background-repeat:no-repeat; }
+  background-size:cover; background-position:center; background-repeat:no-repeat; animation:nr-bgfade .65s ease both; }
+@keyframes nr-bgfade { from { opacity:0; transform:scale(1.04); } to { opacity:1; transform:scale(1); } }
 .nr > *:not(.nr-bgfix) { position:relative; z-index:1; }
 .nr-scene { flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:10px 2px 14px; }
 .nr-fog { display:none; }
@@ -673,9 +674,9 @@ body {
 .nr-cd { font-family:system-ui,sans-serif; font-size:14px; color:#e2e7ee; padding:12px 18px; border-radius:14px;
   background:rgba(18,20,28,.52); border:1px solid rgba(255,255,255,.1); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); }
 .nr-cd b { color:#ffcf7a; }
-.btn.nr-go, .btn.nr-next { font-family:system-ui,-apple-system,sans-serif; font-weight:800; font-size:16.5px; letter-spacing:.2px;
-  background:linear-gradient(135deg,#f3b85a,#dd8e34); color:#1e1407; border:none; border-radius:16px; padding:15px 20px; width:100%; max-width:300px;
-  box-shadow:0 14px 34px #dd8e3444, inset 0 0 0 1px #ffffff33, inset 0 1px 0 #ffffff55; margin-top:2px; }
+.btn.nr-go, .btn.nr-next { font-family:system-ui,-apple-system,sans-serif; font-weight:700; font-size:14.5px; letter-spacing:.2px;
+  background:linear-gradient(135deg,#f3b85a,#dd8e34); color:#1e1407; border:none; border-radius:999px; padding:11px 26px; width:auto;
+  box-shadow:0 8px 22px #dd8e3440, inset 0 0 0 1px #ffffff33; margin-top:2px; }
 .btn.nr-go:active, .btn.nr-next:active { transform:translateY(1px); }
 
 /* HUD забега — стеклянная плашка */
@@ -730,11 +731,11 @@ body {
 .nr-loot { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
 .nr-loot-i { display:inline-flex; align-items:center; gap:5px; font-family:system-ui,sans-serif; font-weight:700; font-size:15px; color:#f0ead8;
   background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:6px 11px; }
-.nr-cross-btns { display:flex; flex-direction:column; gap:11px; width:100%; max-width:360px; }
-.nr-deeper, .nr-home { display:flex; flex-direction:column; gap:2px; padding:15px; font-size:16.5px; line-height:1.2; border-radius:16px; font-family:system-ui,sans-serif; font-weight:800; }
-.nr-deeper small, .nr-home small { font-size:11.5px; font-weight:400; opacity:.9; }
-.btn.nr-deeper { background:linear-gradient(135deg,#e0533e,#a8331f); color:#fff; border:none; box-shadow:0 12px 30px #c0331f44, inset 0 0 0 1px #ffffff22; }
-.btn.nr-home { background:linear-gradient(135deg,#3ec27a,#2a9258); color:#08210f; border:none; box-shadow:0 12px 30px #2a925844, inset 0 0 0 1px #ffffff22; }
+.nr-cross-btns { display:flex; flex-direction:row; gap:9px; width:100%; max-width:360px; }
+.nr-deeper, .nr-home { flex:1; display:flex; flex-direction:column; align-items:center; gap:1px; padding:11px 8px; font-size:14px; line-height:1.2; border-radius:14px; font-family:system-ui,sans-serif; font-weight:700; }
+.nr-deeper small, .nr-home small { font-size:10px; font-weight:400; opacity:.88; }
+.btn.nr-deeper { background:linear-gradient(160deg,#d24a36,#9a2e1c); color:#fff; border:none; box-shadow:0 8px 22px #c0331f33, inset 0 0 0 1px #ffffff1e; }
+.btn.nr-home { background:linear-gradient(160deg,#37b06e,#258050); color:#06210e; border:none; box-shadow:0 8px 22px #2a925833, inset 0 0 0 1px #ffffff1e; }
 .nr-dawn { font-family:system-ui,sans-serif; font-size:13px; color:#c0c6d0; padding:8px; opacity:.85; }
 
 /* резолв / финал */

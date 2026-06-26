@@ -27,6 +27,14 @@ const SITUATION: Record<string, { t: string; cls: string }> = {
 }
 const hms = (s: number) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h} ч ${m} мин` : `${m} мин ${s % 60} с` }
 
+// зоны глубины: чем дальше в ночь — тем мрачнее место (лор + смена фона)
+const ZONES = [
+  { upto: 2, bg: 'town', name: 'Окраина', flavor: 'околица спящего города' },
+  { upto: 4, bg: 'forest', name: 'Глухая чаща', flavor: 'лес смыкается вокруг' },
+  { upto: 6, bg: 'ruins', name: 'Старые руины', flavor: 'мёртвые камни на отшибе' },
+]
+const zoneFor = (leg: number) => ZONES.find((z) => leg <= z.upto) || ZONES[ZONES.length - 1]
+
 const SAMPLE: NState = {
   ok: true, cooldown: 0, active: false, max_legs: 6, stats: { armor: 12, luck: 4 }, run: null,
 }
@@ -67,7 +75,8 @@ export default function Nightrun() {
 
   const d = data ?? SAMPLE
   const run = d.run
-  const nrbg = { '--nr-bg': `url(${import.meta.env.BASE_URL}nightrun/bg.webp)` } as CSSProperties
+  const bgName = run ? zoneFor(run.leg).bg : 'city'   // фон меняется с глубиной (интро — город)
+  const nrbg = { '--nr-bg': `url(${import.meta.env.BASE_URL}nightrun/${bgName}.webp)` } as CSSProperties
 
   async function call<T = NState>(path: string, body: Record<string, unknown> = {}): Promise<T | null> {
     try { return await api<T>(path, body) } catch (e) {
@@ -154,7 +163,7 @@ export default function Nightrun() {
   // ── финал (бюст / банк) ──
   if (end) return (
     <div className="nr" style={nrbg}>
-      <div className="nr-bgfix" aria-hidden="true" />
+      <div className="nr-bgfix" key={bgName} aria-hidden="true" />
       {toast && <div className="toast">{toast}</div>}
       <NrEnd end={end} onClose={() => { setEnd(null); setOut(null); if (off) set(offState(null, end.kind === 'bank' ? 4 * 3600 : 4 * 3600)); else reload() }} />
     </div>
@@ -163,7 +172,7 @@ export default function Nightrun() {
   // ── резолв-оверлей (анимация исхода испытания) ──
   if (out && run && run.state === 'crossroad') return (
     <div className="nr" style={nrbg}>
-      <div className="nr-bgfix" aria-hidden="true" />
+      <div className="nr-bgfix" key={bgName} aria-hidden="true" />
       {toast && <div className="toast">{toast}</div>}
       <NrResolve out={out} onNext={() => setOut(null)} />
     </div>
@@ -171,7 +180,7 @@ export default function Nightrun() {
 
   return (
     <div className="nr" style={nrbg}>
-      <div className="nr-bgfix" aria-hidden="true" />
+      <div className="nr-bgfix" key={bgName} aria-hidden="true" />
       {toast && <div className="toast">{toast}</div>}
       {!d.active && <NrIntro d={d} busy={busy} onStart={start} />}
       {run && run.state === 'fork' && <NrFork d={d} run={run} busy={busy} onPick={pick} />}
@@ -187,7 +196,7 @@ function NrHud({ run, max }: { run: NRun; max: number }) {
   const hpPct = Math.max(0, Math.min(100, (run.hp / run.hp_max) * 100))
   return (
     <div className="nr-hud">
-      <div className="nr-legs">{Array.from({ length: max }).map((_, i) => <i key={i} className={i < run.leg ? 'on' : ''} />)}<span className="nr-leg-n">этап {run.leg}/{max}</span></div>
+      <div className="nr-legs">{Array.from({ length: max }).map((_, i) => <i key={i} className={i < run.leg ? 'on' : ''} />)}<span className="nr-leg-n">{zoneFor(run.leg).name}</span></div>
       <div className="nr-hud-row">
         <span className="nr-hp"><span className="nr-bar"><i style={{ width: `${hpPct}%` }} /></span><b>{run.hp}</b><small>/{run.hp_max} ❤</small></span>
         <span className="nr-sat">🎒 <b>{fmt(run.satchel_value)}</b><small>🪙-экв</small></span>
