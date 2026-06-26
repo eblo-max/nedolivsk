@@ -20,6 +20,9 @@ from bot.keyboards import inline as kb
 
 router = Router()
 
+# Временно закрыто: охота на доработке (перенос в мини-апп / анимир. бой).
+_HUNT_WIP = "🏹 Охота сейчас на доработке — скоро откроем! Загляни позже."
+
 
 async def _player(
     callback: CallbackQuery, session: AsyncSession, *, lock: bool = False
@@ -67,16 +70,15 @@ async def _render(callback: CallbackQuery, caption: str, markup,
 
 @router.callback_query(F.data == "hunt")
 async def cb_hunt(callback: CallbackQuery, session: AsyncSession) -> None:
-    player = await _player(callback, session)
-    if player is None:
-        return
-    await _render(callback, texts.hunt_menu(player), kb.hunt_menu_kb(player))
-    await callback.answer()
+    # ВРЕМЕННО ЗАКРЫТО — охота на доработке.
+    await callback.answer(_HUNT_WIP, show_alert=True)
 
 
 @router.callback_query(F.data.startswith("hbeast:"))
 async def cb_hunt_beast(callback: CallbackQuery, session: AsyncSession) -> None:
     """Бриф зверя: HP, расклад по статам, таблица добычи (+ видео, если есть)."""
+    await callback.answer(_HUNT_WIP, show_alert=True)   # ВРЕМЕННО ЗАКРЫТО
+    return
     player = await _player(callback, session)
     if player is None:
         return
@@ -124,6 +126,8 @@ async def _set_caption(msg, text: str, markup) -> None:
 
 @router.callback_query(F.data.startswith("hfight:"))
 async def cb_hunt_fight(callback: CallbackQuery, session: AsyncSession) -> None:
+    await callback.answer(_HUNT_WIP, show_alert=True)   # ВРЕМЕННО ЗАКРЫТО
+    return
     player = await _player(callback, session, lock=True)
     if player is None:
         return
