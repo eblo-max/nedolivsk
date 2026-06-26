@@ -222,54 +222,81 @@ function BeastBrief({ b, ready, busy, onHunt }: { b: Beast; ready: { can: boolea
   )
 }
 
-// ── Бой (анимация раундов → итог) ─────────────────────────────────────────
+// ── Бой: кинематографичная арена (герой против зверя) ─────────────────────
 function FightView({ fight, step, onClose }: { fight: FightRes; step: number; onClose: () => void }) {
   const r = step >= 0 ? fight.rounds[Math.min(step, fight.rounds.length - 1)] : null
   const php = r ? r.php : fight.player_hp0
   const ehp = r ? r.ehp : fight.enemy.hp
+  const phpPct = Math.max(0, Math.min(100, (php / fight.hp_max) * 100))
+  const ehpPct = Math.max(0, Math.min(100, (ehp / fight.enemy.hp) * 100))
   const done = step >= fight.rounds.length - 1
+  const hero = `${import.meta.env.BASE_URL}character/hero_static.png`
+  const arenaRef = useRef<HTMLDivElement>(null)
+
+  // тряска экрана на удар (сильнее на крите); уважаем prefers-reduced-motion
+  useEffect(() => {
+    if (step < 0 || !r || !arenaRef.current) return
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const a = r.crit ? 11 : (r.pd > 0 || r.ed > 0) ? 5 : 0
+    if (!a) return
+    arenaRef.current.animate(
+      [{ transform: 'translate(0,0)' }, { transform: `translate(${a}px,${-a}px)` }, { transform: `translate(${-a}px,${a / 2}px)` }, { transform: 'translate(0,0)' }],
+      { duration: r.crit ? 340 : 200, easing: 'ease-out' })
+  }, [step, r])
+
   return (
-    <>
-      <button className="lnk-back" onClick={onClose}>‹ Бестиарий</button>
-      <div className="arena">
-        {r && r.crit && <div className="crit-flash" key={'cf' + step} />}
-        <div className="ar-foe">
-          <span className={`ar-emo ${r ? (r.crit ? 'hit-crit' : r.pd > 0 ? 'hit-n' : '') : ''}`} key={step}>{fight.elite ? '✨' : ''}{fight.enemy.emoji}</span>
-          <span className="ar-nm">{fight.enemy.name}</span>
-          <Bar cur={ehp} max={fight.enemy.hp} kind="e" />
+    <div className="ep">
+      <button className="lnk-back" onClick={onClose}>‹ Назад</button>
+      <div className="ep-arena" ref={arenaRef}>
+        <div className="ep-embers" aria-hidden="true">
+          {Array.from({ length: 9 }).map((_, i) => <i key={i} style={{ left: `${7 + i * 10.5}%`, animationDelay: `${i * 0.5}s`, animationDuration: `${4 + (i % 3)}s` }} />)}
+        </div>
+
+        <div className="ep-hp foe">
+          <span className="ep-hp-nm">{fight.elite ? '✨ ' : ''}{fight.enemy.name}</span>
+          <div className="ep-bar e"><i style={{ width: `${ehpPct}%` }} /></div>
+        </div>
+
+        <div className="ep-foe">
+          <div className={`ep-foe-emo ${r ? (r.crit ? 'k-crit' : r.pd > 0 ? 'k-hit' : '') : ''}`} key={'f' + step}>{fight.enemy.emoji}</div>
+          {r && r.pd > 0 && <div className={`ep-slash ${r.crit ? 'crit' : ''}`} key={'s' + step} />}
           {r && (r.pd > 0
-            ? <span className={`hit foe ${r.crit ? 'crit' : ''}`} key={'f' + step}>−{r.pd}{r.crit ? ' КРИТ!' : ''}</span>
-            : <span className="hit foe miss" key={'f' + step}>мимо</span>)}
+            ? <div className={`ep-dmg foe ${r.crit ? 'crit' : ''}`} key={'d' + step}>−{r.pd}{r.crit && <b>КРИТ!</b>}</div>
+            : <div className="ep-dmg miss" key={'d' + step}>мимо</div>)}
         </div>
-        <div className="ar-vs">{done ? (fight.win ? '🏆' : '💀') : '⚔'}</div>
-        <div className="ar-me">
-          <Bar cur={php} max={fight.hp_max} kind="p" />
-          <span className="ar-nm">Ты · {php}/{fight.hp_max}</span>
-          {r && r.ed > 0 && <span className="hit me" key={'m' + step}>−{r.ed}</span>}
+
+        <div className="ep-mid">{done ? (fight.win ? '🏆' : '💀') : `РАУНД ${step + 1}`}</div>
+
+        <div className="ep-hero" key={'h' + step}>
+          <img src={hero} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+          {r && r.ed > 0 && <div className="ep-dmg me" key={'e' + step}>−{r.ed}</div>}
         </div>
+
+        <div className="ep-hp me">
+          <div className="ep-bar p"><i style={{ width: `${phpPct}%` }} /></div>
+          <span className="ep-hp-nm">Ты · {php}/{fight.hp_max}</span>
+        </div>
+
+        {done && <div className={`ep-flash ${fight.win ? 'win' : 'lose'}`} />}
       </div>
 
       {done && (
-        <div className={`result ${fight.win ? 'win' : 'lose'} rise`}>
+        <div className={`ep-result ${fight.win ? 'win' : 'lose'}`}>
+          {fight.win && <div className="ep-rays" aria-hidden="true" />}
+          <div className="ep-res-h">{fight.win ? (fight.elite ? '✨ РЕДКАЯ ДОБЫЧА' : 'ПОБЕДА') : 'ПОРАЖЕНИЕ'}</div>
           {fight.win ? (
-            <>
-              <div className="res-h">{fight.elite ? '✨ Редкая добыча!' : 'Победа!'}</div>
-              <div className="loot">
-                {fight.loot.gold > 0 && <span className="loot-i"><ResIcon k="gold" size={20} />+{fmt(fight.loot.gold)}</span>}
-                {fight.loot.res.map((x) => <span key={x.key} className="loot-i"><ResIcon k={x.key} emoji={x.emoji} size={20} />+{x.qty}</span>)}
-                {fight.loot.rep > 0 && <span className="loot-i">⭐ +{fight.loot.rep}</span>}
-                {fight.loot.trophies.map((t, i) => <span key={i} className="loot-i">🏆 {t}</span>)}
-              </div>
-            </>
+            <div className="ep-loot">
+              {fight.loot.gold > 0 && <span className="ep-loot-i" style={{ animationDelay: '0s' }}><ResIcon k="gold" size={22} />+{fmt(fight.loot.gold)}</span>}
+              {fight.loot.res.map((x, i) => <span key={x.key} className="ep-loot-i" style={{ animationDelay: `${(i + 1) * 0.09}s` }}><ResIcon k={x.key} emoji={x.emoji} size={22} />+{x.qty}</span>)}
+              {fight.loot.rep > 0 && <span className="ep-loot-i">⭐ +{fight.loot.rep}</span>}
+              {fight.loot.trophies.map((t, i) => <span key={i} className="ep-loot-i">🏆 {t}</span>)}
+            </div>
           ) : (
-            <>
-              <div className="res-h">Поражение…</div>
-              <div className="muted" style={{ textAlign: 'center' }}>Потеряно {fmt(fight.gold_lost)} 🪙. Раны затянутся — отлежись и подлечись.</div>
-            </>
+            <div className="muted" style={{ textAlign: 'center' }}>Потеряно {fmt(fight.gold_lost)} 🪙. Раны затянутся — отлежись и подлечись.</div>
           )}
-          <button className="btn gold" style={{ marginTop: 14 }} onClick={onClose}>← К бестиарию</button>
+          <button className="btn gold" onClick={onClose}>← К бестиарию</button>
         </div>
       )}
-    </>
+    </div>
   )
 }
