@@ -1559,8 +1559,26 @@ async def _spa(request: web.Request) -> web.Response:
     return web.FileResponse(MINIAPP_DIST / "index.html", headers={"Cache-Control": "no-store"})
 
 
+@web.middleware
+async def _api_errors(request: web.Request, handler):
+    """Никаких немых 500 на /api: логируем трейсбек и возвращаем суть ошибки,
+    чтобы клиент показал её (а не общее «Не вышло»)."""
+    try:
+        return await handler(request)
+    except web.HTTPException:
+        raise
+    except Exception as e:
+        import logging, traceback
+        logging.error("API ERROR %s\n%s", request.path, traceback.format_exc())
+        if request.path.startswith("/api/"):
+            return web.json_response(
+                {"ok": False, "error": f"x:{type(e).__name__}:{str(e)[:140]}"},
+                headers={"Cache-Control": "no-store"})
+        raise
+
+
 def build_app() -> web.Application:
-    app = web.Application()
+    app = web.Application(middlewares=[_api_errors])
     app.router.add_get("/", lambda r: web.Response(text="ok"))
     app.router.add_get("/map", _map_page)
     app.router.add_get("/app", _spa)                  # React-мини-апп (каркас игры)
