@@ -1457,7 +1457,8 @@ def _nightrun_state(p) -> dict:
     """Состояние ночной ходки: кулдаун / активный забег (этап, HP, котомка, текущий
     под-экран развилки/встречи/загадки). Прогноз успеха — nightrun.success_p."""
     from bot.game import balance as bal, combat, nightrun as nr
-    cd = nr.cooldown_left(p)
+    from bot.config import settings
+    cd = 0 if p.id == settings.admin_id else nr.cooldown_left(p)   # админ — без кулдауна (тест)
     run = p.night_run or {}
     s = combat.player_stats(p)
     base = {"ok": True, "cooldown": cd, "active": nr.is_active(run),
@@ -1507,13 +1508,14 @@ async def _api_nightrun_start(request: web.Request) -> web.Response:
         return body
     from datetime import datetime, timezone
     from bot.game import city as citymod, nightrun as nr
+    from bot.config import settings
     async with session_factory() as s:
         p = await repo.get_player(s, uid, for_update=True)
         if p is None or not p.tavern:
             return web.json_response({"ok": False, "error": "no_tavern"})
         if nr.is_active(p.night_run or {}):
             return web.json_response(_nightrun_state(p), headers={"Cache-Control": "no-store"})
-        if nr.cooldown_left(p) > 0:
+        if nr.cooldown_left(p) > 0 and p.id != settings.admin_id:   # админ — без кулдауна
             return web.json_response({"ok": False, "error": "cooldown"})
         situation = None
         if getattr(p, "chat_id", None) is not None:

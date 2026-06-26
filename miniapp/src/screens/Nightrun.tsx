@@ -197,8 +197,7 @@ function NrIntro({ d, busy, onStart }: { d: NState; busy: boolean; onStart: () =
   const cd = d.cooldown
   return (
     <div className="nr-scene intro rise">
-      <div className="nr-moon" /><div className="nr-fog" />
-      <div className="nr-lantern">🏮</div>
+      <div className="nr-fog" />
       <h2 className="nr-title">Ночная ходка</h2>
       <p className="nr-flavor">«Когда город спит, тракт оживает. Иди во тьму — но знай меру: зарвёшься, и обчистят дочиста.»</p>
       <div className="nr-stats"><i>🛡 {d.stats.armor}</i><i>🍀 {d.stats.luck}</i></div>
