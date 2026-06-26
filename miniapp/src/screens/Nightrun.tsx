@@ -27,13 +27,16 @@ const SITUATION: Record<string, { t: string; cls: string }> = {
 }
 const hms = (s: number) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h} ч ${m} мин` : `${m} мин ${s % 60} с` }
 
-// зоны глубины: чем дальше в ночь — тем мрачнее место (лор + смена фона)
-const ZONES = [
-  { upto: 2, bg: 'town', name: 'Окраина', flavor: 'околица спящего города' },
-  { upto: 4, bg: 'forest', name: 'Глухая чаща', flavor: 'лес смыкается вокруг' },
-  { upto: 6, bg: 'ruins', name: 'Старые руины', flavor: 'мёртвые камни на отшибе' },
+// СВОЙ фон и место на КАЖДЫЙ этап — чем дальше в ночь, тем мрачнее (лор)
+const SCENES = [
+  { bg: 'town', name: 'Окраина' },
+  { bg: 'forest', name: 'Опушка леса' },
+  { bg: 'forest2', name: 'Глухая чаща' },
+  { bg: 'ruins', name: 'Старый погост' },
+  { bg: 'ruins2', name: 'Сердце руин' },
+  { bg: 'ruins2', name: 'Сердце руин' },
 ]
-const zoneFor = (leg: number) => ZONES.find((z) => leg <= z.upto) || ZONES[ZONES.length - 1]
+const sceneFor = (leg: number) => SCENES[Math.min(Math.max(leg, 1), SCENES.length) - 1]
 
 const SAMPLE: NState = {
   ok: true, cooldown: 0, active: false, max_legs: 6, stats: { armor: 12, luck: 4 }, run: null,
@@ -75,7 +78,7 @@ export default function Nightrun() {
 
   const d = data ?? SAMPLE
   const run = d.run
-  const bgName = run ? zoneFor(run.leg).bg : 'city'   // фон меняется с глубиной (интро — город)
+  const bgName = run ? sceneFor(run.leg).bg : 'city'   // свой фон на этап (интро — город)
   const nrbg = { '--nr-bg': `url(${import.meta.env.BASE_URL}nightrun/${bgName}.webp)` } as CSSProperties
 
   async function call<T = NState>(path: string, body: Record<string, unknown> = {}): Promise<T | null> {
@@ -196,7 +199,7 @@ function NrHud({ run, max }: { run: NRun; max: number }) {
   const hpPct = Math.max(0, Math.min(100, (run.hp / run.hp_max) * 100))
   return (
     <div className="nr-hud">
-      <div className="nr-legs">{Array.from({ length: max }).map((_, i) => <i key={i} className={i < run.leg ? 'on' : ''} />)}<span className="nr-leg-n">{zoneFor(run.leg).name}</span></div>
+      <div className="nr-legs">{Array.from({ length: max }).map((_, i) => <i key={i} className={i < run.leg ? 'on' : ''} />)}<span className="nr-leg-n">{sceneFor(run.leg).name}</span></div>
       <div className="nr-hud-row">
         <span className="nr-hp"><span className="nr-bar"><i style={{ width: `${hpPct}%` }} /></span><b>{run.hp}</b><small>/{run.hp_max} ❤</small></span>
         <span className="nr-sat">🎒 <b>{fmt(run.satchel_value)}</b><small>🪙-экв</small></span>
@@ -229,14 +232,14 @@ function NrFork({ d, run, busy, onPick }: { d: NState; run: NRun; busy: boolean;
       <div className="nr-fog" />
       <NrHud run={run} max={d.max_legs} />
       {sit && <div className={`nr-sit ${sit.cls}`}>{sit.t}</div>}
-      <div className="nr-fork-h">Развилка — выбирай тропу</div>
-      <div className="nr-cards">
+      <div className="nr-fork-h">⟔ развилка ⟔</div>
+      <div className="nr-fork2">
         {(run.fork || []).map((f) => (
-          <button key={f.kind} className={`nr-card ${f.risky ? 'risky' : 'safe'}`} disabled={busy} onClick={() => { haptic('light'); onPick(f) }}>
-            <span className="nr-card-emo">{f.emoji}</span>
-            <span className="nr-card-nm">{f.name}</span>
-            {f.risky ? <span className="nr-card-p">шанс {f.success}%</span> : <span className="nr-card-safe">без риска</span>}
-            <span className="nr-card-hint">{f.hint}</span>
+          <button key={f.kind} className={`nr-path ${f.risky ? 'risky' : 'safe'}`} disabled={busy} onClick={() => { haptic('light'); onPick(f) }}>
+            <span className="nr-path-emo">{f.emoji}</span>
+            <span className="nr-path-nm">{f.name}</span>
+            <span className={`nr-path-tag ${f.risky ? 'risk' : 'safe'}`}>{f.risky ? `${f.success}%` : 'без риска'}</span>
+            <span className="nr-path-hint">{f.hint}</span>
           </button>
         ))}
       </div>

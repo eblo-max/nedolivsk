@@ -699,18 +699,18 @@ body {
 
 /* развилка — стеклянные карты */
 .nr-fork-h, .nr-cross-h { font-family:system-ui,sans-serif; font-weight:700; font-size:12px; letter-spacing:2px; color:#b0b8c6; text-transform:uppercase; opacity:.85; }
-.nr-cards { display:flex; flex-direction:column; gap:13px; width:100%; max-width:360px; }
-.nr-card { display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:16px 18px 15px 22px; border-radius:20px; cursor:pointer; text-align:left; position:relative; overflow:hidden;
-  background:rgba(17,19,27,.5); border:1px solid rgba(255,255,255,.1); -webkit-backdrop-filter:blur(16px) saturate(1.2); backdrop-filter:blur(16px) saturate(1.2); box-shadow:0 16px 44px rgba(0,0,0,.5); transition:transform .14s; }
-.nr-card:active { transform:scale(.985); }
-.nr-card::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; }
-.nr-card.risky::before { background:linear-gradient(#ff8a6a,#cf4a36); }
-.nr-card.safe::before { background:linear-gradient(#86e8a8,#3aa86a); }
-.nr-card-emo { font-size:32px; line-height:1; filter:drop-shadow(0 2px 6px #000a); }
-.nr-card-nm { font-family:system-ui,-apple-system,sans-serif; font-weight:800; font-size:21px; letter-spacing:-.3px; color:#fff; }
-.nr-card-p { position:absolute; top:16px; right:18px; font-family:system-ui,sans-serif; font-weight:800; font-size:14px; color:#ffb29c; }
-.nr-card-safe { position:absolute; top:17px; right:18px; font-size:11px; color:#8ce8aa; font-family:system-ui,sans-serif; font-weight:600; }
-.nr-card-hint { font-family:system-ui,sans-serif; font-size:12.5px; color:#aab2c0; line-height:1.4; }
+.nr-fork2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%; max-width:360px; }
+.nr-path { display:flex; flex-direction:column; align-items:center; text-align:center; gap:7px; padding:17px 11px 15px; border-radius:18px; cursor:pointer; position:relative; overflow:hidden;
+  background:rgba(16,18,27,.5); border:1px solid rgba(255,255,255,.1); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); box-shadow:0 12px 30px rgba(0,0,0,.4); transition:transform .14s, border-color .14s; }
+.nr-path:active { transform:translateY(2px) scale(.975); }
+.nr-path.risky { border-top:2px solid #e8966a55; }
+.nr-path.safe { border-top:2px solid #6ad08a55; }
+.nr-path-emo { font-size:36px; line-height:1; filter:drop-shadow(0 3px 8px #000b); }
+.nr-path-nm { font-family:system-ui,-apple-system,sans-serif; font-weight:700; font-size:16px; letter-spacing:-.2px; color:#fff; }
+.nr-path-tag { font-family:system-ui,sans-serif; font-weight:600; font-size:11px; padding:2px 10px; border-radius:999px; }
+.nr-path-tag.risk { color:#ffceb0; background:rgba(220,120,70,.16); border:1px solid #e8966a3a; }
+.nr-path-tag.safe { color:#aceabc; background:rgba(70,180,120,.15); border:1px solid #6ad08a3a; }
+.nr-path-hint { font-family:system-ui,sans-serif; font-size:10.5px; color:#9aa2b0; line-height:1.32; }
 
 /* НПС / загадка */
 .nr-npc { font-family:system-ui,-apple-system,sans-serif; font-weight:800; font-size:23px; color:#fff; text-shadow:0 2px 12px #000; }
