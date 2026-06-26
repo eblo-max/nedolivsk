@@ -610,6 +610,10 @@ body {
 .win-g { color:var(--green) !important; } .win-y { color:#e6c050 !important; } .win-o { color:#e7975a !important; } .win-r { color:var(--crimson) !important; }
 
 .brief-emo { font-size:56px; text-align:center; margin:2px 0 6px; filter:drop-shadow(0 3px 6px #000a); }
+/* анимир. спрайт зверя в модалке-брифе (по центру, на «земле») */
+.brief-sprite { display:flex; align-items:flex-end; justify-content:center; height:116px; margin:2px 0 8px;
+  filter:drop-shadow(0 4px 8px #000a); }
+.brief-sprite .ep-sprite { image-rendering:pixelated; }
 .heal-opt { display:flex; justify-content:space-between; align-items:center; width:100%; padding:11px 12px; margin-bottom:8px; cursor:pointer;
   background:linear-gradient(#1d2912,#141d0b); border:1px solid #3f5a2c; border-radius:10px; color:var(--parch); font-family:var(--text); font-size:14px; }
 .heal-opt b { font-family:var(--num); color:var(--green); }
@@ -727,8 +731,10 @@ body {
   background:conic-gradient(from 0deg, transparent 0 9deg, #e7bf6322 9deg 12deg, transparent 12deg 22deg, #e7bf6318 22deg 25deg, transparent 25deg 42deg);
   animation:rays 20s linear infinite; }
 @keyframes rays { to{transform:rotate(360deg)} }
-.ep-res-h { z-index:1; font-family:var(--disp); font-weight:900; font-size:30px; letter-spacing:5px; color:var(--gold);
+.ep-res-h { z-index:1; width:100%; text-align:center; line-height:1.08; font-family:var(--disp); font-weight:900; font-size:30px; letter-spacing:5px; color:var(--gold);
   text-shadow:0 2px 0 #000,0 0 18px #e7bf6355; animation:res-in .5s cubic-bezier(.2,1.4,.4,1) both; }
+/* «✨ РЕДКАЯ ДОБЫЧА» длиннее — ужимаем, чтобы села по центру в одну строку */
+.ep-res-h.rare { font-size:23px; letter-spacing:2.5px; }
 .ep-result.lose .ep-res-h { color:#e7975a; text-shadow:0 2px 0 #000; }
 @keyframes res-in { 0%{opacity:0; transform:scale(.4)} 100%{opacity:1; transform:scale(1)} }
 .ep-loot { z-index:1; display:flex; flex-wrap:wrap; justify-content:center; gap:9px; }

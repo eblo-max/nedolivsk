@@ -20,7 +20,7 @@ export const MONSTERS: Record<string, MonMeta> = {
 }
 
 // Спрайты, смотрящие ВЛЕВО по умолчанию — их зеркалим, чтобы смотрели на героя (вправо).
-export const MON_FLIP: Record<string, boolean> = { medusa: true, dragon: true, harpy: true }
+export const MON_FLIP: Record<string, boolean> = { medusa: true, dragon: true, harpy: true, skeleton: true }
 
 // Герой-гном (тот же персонаж, что hero_static.png) — анимир. спрайт-листы character/hero/<anim>.webp.
 // Смотрит вправо по умолчанию → в бою зеркалим (он справа, лицом к монстру слева).

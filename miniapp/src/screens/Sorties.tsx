@@ -202,7 +202,9 @@ export default function Sorties() {
 function BeastBrief({ b, hp, ready, busy, onHunt }: { b: Beast; hp: { cur: number; max: number }; ready: { can: boolean; minutes: number }; busy: boolean; onHunt: () => void }) {
   return (
     <>
-      <div className="brief-emo">{b.emoji}</div>
+      {b.sprite && MONSTERS[b.sprite]
+        ? <div className="brief-sprite"><Sprite path={`monsters/${b.sprite}`} meta={MONSTERS[b.sprite]} anim="idle" token={0} height={104} flip={!!MON_FLIP[b.sprite]} /></div>
+        : <div className="brief-emo">{b.emoji}</div>}
       <p className="bd-desc">{b.blurb}</p>
       <div className="cap">зверь</div>
       <div className="kv-list">
@@ -449,7 +451,7 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
       {done && (
         <div className={`ep-result ${fight.win ? 'win' : 'lose'}`}>
           {fight.win && <div className="ep-rays" aria-hidden="true" />}
-          <div className="ep-res-h">{fight.win ? (fight.elite ? '✨ РЕДКАЯ ДОБЫЧА' : 'ПОБЕДА') : 'ПОРАЖЕНИЕ'}</div>
+          <div className={`ep-res-h${fight.win && fight.elite ? ' rare' : ''}`}>{fight.win ? (fight.elite ? '✨ РЕДКАЯ ДОБЫЧА' : 'ПОБЕДА') : 'ПОРАЖЕНИЕ'}</div>
           {fight.win ? (
             <>
               <div className="ep-tally">🗡 Уложил за {fight.rounds_n} р.{fight.crits > 0 ? ` · ${fight.crits} крит.` : ''} · осталось ❤{fight.hp_now}/{fight.hp_max}</div>
