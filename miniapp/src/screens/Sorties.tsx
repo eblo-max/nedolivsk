@@ -5,6 +5,17 @@ import { haptic, hapticNotify, initData } from '../telegram'
 import { ResIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
 import { MONSTERS, MON_FLIP, HERO, RANGED, type MonMeta, type AnimName } from '../monsters'
+import Nightrun from './Nightrun'
+
+// переключатель режимов вылазки (Охота ↔ Ночная ходка)
+function VyTabs({ mode, setMode }: { mode: 'hunt' | 'night'; setMode: (m: 'hunt' | 'night') => void }) {
+  return (
+    <div className="vy-tabs">
+      <button className={mode === 'hunt' ? 'on' : ''} onClick={() => setMode('hunt')}>🏹 Охота</button>
+      <button className={mode === 'night' ? 'on' : ''} onClick={() => setMode('night')}>🌙 Ночная ходка</button>
+    </div>
+  )
+}
 
 // ── типы (зеркало webapp _hunt_state / _api_hunt_fight) ──
 interface Drop { key?: string; trophy: boolean; lo?: number; hi?: number; chance: number; name?: string; emoji?: string; label?: string }
@@ -55,6 +66,7 @@ export default function Sorties() {
   const [healOpen, setHealOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
+  const [mode, setMode] = useState<'hunt' | 'night'>('hunt')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
 
   // анимация боя: прокручиваем раунды, последний → итог
@@ -119,6 +131,13 @@ export default function Sorties() {
   )
   const d = data ?? SAMPLE
 
+  if (mode === 'night') return (
+    <div className="scr">
+      <VyTabs mode={mode} setMode={setMode} />
+      <Nightrun />
+    </div>
+  )
+
   if (fight) return (
     <div className="scr">
       {toast && <div className="toast">{toast}</div>}
@@ -129,6 +148,7 @@ export default function Sorties() {
   return (
     <div className="scr">
       {toast && <div className="toast">{toast}</div>}
+      <VyTabs mode={mode} setMode={setMode} />
       <div className="hero rise" style={{ paddingBottom: 0 }}>
         <div className="nm">Доска розыска</div>
         <div className="flavor" style={{ margin: '6px 14px 0', fontSize: 13.5 }}>«Гляди, кого нынче ищут на тракте. Возьми голову — возьми и награду.»</div>
