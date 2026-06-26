@@ -311,16 +311,18 @@ function NrFork({ d, run, busy, onPick }: { d: NState; run: NRun; busy: boolean;
       <div className="nr-fog" />
       <NrHud run={run} max={d.max_legs} />
       {sit && <div className={`nr-sit ${sit.cls}`}>{sit.t}</div>}
-      <div className="nr-fork-h">⟔ развилка ⟔</div>
+      <div className="nr-fork-h"><span>развилка</span></div>
       <div className="nr-fork2">
         {(run.fork || []).map((f) => (
           <button key={f.kind} className={`nr-path ${f.risky ? 'risky' : 'safe'}`} disabled={busy} onClick={() => { haptic('light'); onPick(f) }}>
-            <span className="nr-path-emo">{f.emoji}</span>
+            <span className="nr-path-top">
+              <span className="nr-path-emo">{f.emoji}</span>
+              <span className={`nr-path-tag ${f.risky ? 'risk' : 'safe'}`}>{f.risky ? `${f.success}%` : '✓ верно'}</span>
+            </span>
             <span className="nr-path-nm">{f.name}</span>
-            <span className={`nr-path-tag ${f.risky ? 'risk' : 'safe'}`}>{f.risky ? `шанс ${f.success}%` : 'без риска'}</span>
-            {f.reward > 0 && <span className="nr-path-rew">≈ +{fmt(f.reward)} <small>🪙-экв</small></span>}
-            {f.stat && <span className="nr-path-stat">{STAT_LABEL[f.stat]}</span>}
+            {f.reward > 0 && <span className="nr-path-rew">+{fmt(f.reward)} <small>🪙-экв</small></span>}
             <span className="nr-path-hint">{f.hint}</span>
+            {f.stat && <span className="nr-path-stat">{STAT_LABEL[f.stat]}</span>}
           </button>
         ))}
       </div>
@@ -426,18 +428,48 @@ function NrResolve({ out, onNext }: { out: NOut; onNext: () => void }) {
   )
 }
 
-// ── анимированный кубик ──
+// ── телеграм-style 3D кубик: настоящий тумблинг-куб, грань ставится по серверному значению ──
+const DICE_PIPS: Record<number, number[]> = {
+  1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9],
+}
+// финальный поворот куба (с двумя оборотами) — выводит нужную грань к зрителю
+const DICE_REST: Record<number, string> = {
+  1: 'rotateX(-720deg) rotateY(-720deg)',
+  2: 'rotateX(-630deg) rotateY(-720deg)',
+  3: 'rotateX(-720deg) rotateY(-810deg)',
+  4: 'rotateX(-720deg) rotateY(-630deg)',
+  5: 'rotateX(-810deg) rotateY(-720deg)',
+  6: 'rotateX(-720deg) rotateY(-540deg)',
+}
+function DieFace({ v, cls }: { v: number; cls: string }) {
+  return (
+    <div className={`tgd-face ${cls}`}>
+      {Array.from({ length: 9 }, (_, i) => <span key={i} className={`tgd-pip ${DICE_PIPS[v].includes(i + 1) ? 'on' : ''}`} />)}
+    </div>
+  )
+}
 function Die({ value, loseFaces }: { value: number; loseFaces: number }) {
-  const [face, setFace] = useState(1)
+  const [tf, setTf] = useState('rotateX(-12deg) rotateY(8deg)')
+  const [done, setDone] = useState(false)
   const lost = value <= loseFaces
   useEffect(() => {
-    let n = 0; const id = setInterval(() => { n++; setFace(1 + Math.floor(Math.random() * 6)); if (n > 12) { clearInterval(id); setFace(value); hapticNotify(lost ? 'error' : 'success') } }, 90)
-    return () => clearInterval(id)
+    const r = requestAnimationFrame(() => setTf(DICE_REST[value]))
+    const t = setTimeout(() => { setDone(true); hapticNotify(lost ? 'error' : 'success') }, 1180)
+    return () => { cancelAnimationFrame(r); clearTimeout(t) }
   }, [value, lost])
   return (
-    <div className={`nr-die ${face === value ? (lost ? 'final-lose' : 'final-win') : ''}`}>
-      <span className="nr-die-v">{['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][face]}</span>
-      <span className="nr-die-faces">{loseFaces > 0 ? `проигрыш: 1–${loseFaces}` : ''}</span>
+    <div className="tgd-wrap">
+      <div className="tgd-stage">
+        <div className={`tgd ${done ? (lost ? 'lose' : 'win') : 'rolling'}`}>
+          <div className="tgd-cube" style={{ transform: tf }}>
+            <DieFace v={1} cls="f-front" /><DieFace v={6} cls="f-back" />
+            <DieFace v={3} cls="f-right" /><DieFace v={4} cls="f-left" />
+            <DieFace v={5} cls="f-top" /><DieFace v={2} cls="f-bot" />
+          </div>
+        </div>
+        <div className="tgd-shadow" />
+      </div>
+      <span className="tgd-cap">{done ? <>выпало <b>{value}</b>{loseFaces > 0 ? ` · проигрыш 1–${loseFaces}` : ''}</> : 'бросок…'}</span>
     </div>
   )
 }
