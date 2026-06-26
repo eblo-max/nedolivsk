@@ -271,27 +271,54 @@ export default function Nightrun() {
   )
 }
 
-// ── шапка забега: журнал-путь (стэпер зон) + место + статы ──
-function NrHud({ run, max }: { run: NRun; max: number }) {
+// ── плавающий HUD ходки: без коробки, текст поверх сцены (язык «раскол сцены») ──
+function NrTopHud({ run, max }: { run: NRun; max: number }) {
   const hpPct = Math.max(0, Math.min(100, (run.hp / run.hp_max) * 100))
   const sc = sceneFor(run.leg)
   const sat = useCounter(run.satchel_value)
   return (
-    <div className="nr-hud">
-      <div className="nr-hud-top">
-        <span className="nr-zone">{sc.icon} {sc.name}</span>
-        <span className="nr-leg">этап {run.leg}<i> / {max}</i></span>
-      </div>
-      <div className="nr-prog">
+    <div className="nr-top">
+      <div className="nr-top-zone">{sc.icon} {sc.name} <i>· этап {run.leg}/{max}</i></div>
+      <div className="nr-top-prog">
         {Array.from({ length: max }, (_, i) => (
           <span key={i} className={`nr-seg ${i + 1 < run.leg ? 'done' : i + 1 === run.leg ? 'now' : ''}`} />
         ))}
       </div>
-      <div className="nr-hud-row">
-        <span className="nr-hp"><span className="nr-bar"><i style={{ width: `${hpPct}%` }} /></span><b>{run.hp}</b><small>/{run.hp_max}❤</small></span>
-        <span className="nr-sat">🎒 <b>{fmt(sat)}</b><small>🪙-экв{run.satchel.length ? ` · ${run.satchel.length} вид.` : ''}</small></span>
+      <div className="nr-top-stats">
+        <span className="nr-hp"><span className="nr-bar"><i style={{ width: `${hpPct}%` }} /></span><b>{run.hp}</b><small>/{run.hp_max}</small></span>
+        <span className="nr-dot">·</span>
+        <span className="nr-sat">🎒 <b>{fmt(sat)}</b><small>🪙-экв</small></span>
       </div>
     </div>
+  )
+}
+
+// ── РАСКОЛ СЦЕНЫ: две тапающиеся половины мира (fork / встреча / перекрёсток) ──
+interface SplitSide { key: string; emoji: string; name: string; sub?: string; note?: string; tag?: string; reward?: number; tone: 'risk' | 'safe' | 'gold' | 'cool'; onPick: () => void }
+function NrSplit({ left, right, busy, note }: { left: SplitSide; right: SplitSide; busy: boolean; note?: string }) {
+  return (
+    <div className="nr-split">
+      <button className={`nr-half L ${left.tone}`} disabled={busy} onClick={() => { haptic('medium'); left.onPick() }}>
+        <span className="nr-half-in"><HalfBody s={left} /></span>
+      </button>
+      <button className={`nr-half R ${right.tone}`} disabled={busy} onClick={() => { haptic('medium'); right.onPick() }}>
+        <span className="nr-half-in"><HalfBody s={right} /></span>
+      </button>
+      <div className="nr-seam" aria-hidden="true" />
+      {note && <div className="nr-split-note">{note}</div>}
+    </div>
+  )
+}
+function HalfBody({ s }: { s: SplitSide }) {
+  return (
+    <>
+      <span className="nr-half-emo">{s.emoji}</span>
+      <span className="nr-half-nm">{s.name}</span>
+      {s.sub && <span className="nr-half-sub">{s.sub}</span>}
+      {s.tag && <span className={`nr-half-tag ${s.tone}`}>{s.tag}</span>}
+      {!!s.reward && s.reward > 0 && <span className="nr-half-rew">+{fmt(s.reward)} <small>🪙</small></span>}
+      {s.note && <span className="nr-half-note">{s.note}</span>}
+    </>
   )
 }
 
@@ -322,103 +349,87 @@ function NrIntro({ d, busy, onStart }: { d: NState; busy: boolean; onStart: () =
   )
 }
 
-// ── развилка ──
+// ── развилка → раскол сцены ──
 function NrFork({ d, run, busy, onPick }: { d: NState; run: NRun; busy: boolean; onPick: (f: NFork) => void }) {
   const sit = run.situation ? SITUATION[run.situation] : null
+  const f = run.fork || []
+  const side = (ff: NFork): SplitSide => ({
+    key: ff.kind, emoji: ff.emoji, name: ff.name, sub: ff.hint,
+    tag: ff.risky ? `риск · ${ff.success}%` : 'верно', reward: ff.reward,
+    note: ff.stat ? STAT_LABEL[ff.stat] : undefined,
+    tone: ff.risky ? 'risk' : 'safe', onPick: () => onPick(ff),
+  })
   return (
-    <div className="nr-scene rise">
-      <div className="nr-fog" />
-      <NrHud run={run} max={d.max_legs} />
-      {sit && <div className={`nr-sit ${sit.cls}`}>{sit.t}</div>}
-      <div className="nr-fork-h"><span>развилка</span></div>
-      <div className="nr-fork2">
-        {(run.fork || []).map((f) => (
-          <button key={f.kind} className={`nr-path ${f.risky ? 'risky' : 'safe'}`} disabled={busy} onClick={() => { haptic('light'); onPick(f) }}>
-            <span className="nr-path-top">
-              <span className="nr-path-emo">{f.emoji}</span>
-              <span className={`nr-path-tag ${f.risky ? 'risk' : 'safe'}`}>{f.risky ? `${f.success}%` : '✓ верно'}</span>
-            </span>
-            <span className="nr-path-nm">{f.name}</span>
-            {f.reward > 0 && <span className="nr-path-rew">+{fmt(f.reward)} <small>🪙-экв</small></span>}
-            <span className="nr-path-hint">{f.hint}</span>
-            {f.stat && <span className="nr-path-stat">{STAT_LABEL[f.stat]}</span>}
-          </button>
-        ))}
-      </div>
-    </div>
+    <>
+      <NrTopHud run={run} max={d.max_legs} />
+      {f.length >= 2 && <NrSplit left={side(f[0])} right={side(f[1])} busy={busy} note={sit ? sit.t : '⟔ выбери тропу ⟔'} />}
+    </>
   )
 }
 
-// ── встреча с НПС ──
+// ── встреча с НПС → раскол сцены (диалог сверху, два ответа половинами) ──
 function NrMeet({ run, busy, onPick }: { run: NRun; busy: boolean; onPick: (id: string) => void }) {
   const m = run.meet!
+  const o = m.options
+  const side = (op: { id: string; label: string }, tone: 'gold' | 'cool'): SplitSide => {
+    const parts = op.label.trim().split(' ')
+    const emoji = /\p{Emoji}/u.test(parts[0]) ? parts.shift()! : '🗣'
+    return { key: op.id, emoji, name: parts.join(' '), tone, onPick: () => onPick(op.id) }
+  }
   return (
-    <div className="nr-scene rise">
-      <div className="nr-fog" />
-      <div className="nr-npc">{m.npc}</div>
-      <p className="nr-scene-txt">«{m.scene}»</p>
-      <div className="nr-opts">
-        {m.options.map((o) => (
-          <button key={o.id} className="btn nr-opt" disabled={busy} onClick={() => { haptic('light'); onPick(o.id) }}>{o.label}</button>
-        ))}
+    <>
+      <div className="nr-meet-hd">
+        <div className="nr-meet-npc">{m.npc}</div>
+        <p className="nr-meet-scene">«{m.scene}»</p>
       </div>
-    </div>
+      {o.length >= 2 && <NrSplit left={side(o[0], 'gold')} right={side(o[1], 'cool')} busy={busy} />}
+    </>
   )
 }
 
-// ── загадка Ведьмы ──
+// ── загадка Ведьмы → кинематографичные строки-ответы (без коробок) ──
 function NrQuiz({ run, busy, onAnswer }: { run: NRun; busy: boolean; onAnswer: (i: number) => void }) {
   const q = run.quiz!
   return (
-    <div className="nr-scene rise">
-      <div className="nr-fog" />
+    <div className="nr-cine">
       <div className="nr-witch">🔮</div>
       <p className="nr-riddle">{q.q}</p>
-      <div className="nr-quiz-opts">
+      <div className="nr-qlist">
         {q.options.map((o, i) => (
-          <button key={i} className="btn nr-quiz-opt" disabled={busy} onClick={() => { haptic('light'); onAnswer(i) }}>{o}</button>
+          <button key={i} className="nr-qrow" disabled={busy} onClick={() => { haptic('light'); onAnswer(i) }}>
+            <span className="nr-qk">{'АБВГ'[i]}</span><span className="nr-qt">{o}</span><span className="nr-qchev">›</span>
+          </button>
         ))}
       </div>
     </div>
   )
 }
 
-// ── перекрёсток ──
+// ── перекрёсток → раскол сцены (глубже / свернуть) ──
 function NrCross({ run, chron, busy, onPush, onBank }: { run: NRun; chron: string[]; busy: boolean; onPush: () => void; onBank: () => void }) {
-  const sat = useCounter(run.satchel_value)
+  const last = chron.length ? chron[chron.length - 1] : null
+  const deeper: SplitSide = {
+    key: 'push', emoji: '🌒', name: 'Глубже в ночь', sub: `×${run.growth} → +${fmt(run.next_value)} 🪙`,
+    tag: 'риск', note: 'можно потерять котомку', tone: 'risk', onPick: onPush,
+  }
+  const home: SplitSide = {
+    key: 'bank', emoji: '🏠', name: 'Свернуть', sub: `забрать ${fmt(run.satchel_value)} 🪙`,
+    tag: 'верно', note: 'без риска', tone: 'safe', onPick: onBank,
+  }
   return (
-    <div className="nr-scene rise">
-      <div className="nr-fog" />
-      <div className="nr-cross-h">⟔ распутье ⟔</div>
-      {chron.length > 0 && (
-        <div className="nr-journal">
-          <div className="nr-journal-h">📜 хроника ночи</div>
-          {chron.slice(-3).map((s, i) => <p key={chron.length - 3 + i} className="nr-journal-l">{s}</p>)}
-        </div>
-      )}
-      <div className="nr-satchel">
-        <div className="nr-satchel-h">🎒 Котомка · <b>{fmt(sat)}</b> 🪙-экв{run.satchel.length ? ` · ${run.satchel.length} вид.` : ''}</div>
-        <div className="nr-loot">
-          {run.satchel.length ? run.satchel.map((it) => (
-            <span key={it.key} className="nr-loot-i"><ResIcon k={it.key} emoji={it.emoji} size={18} />{fmt(it.qty)}</span>
-          )) : <span className="muted" style={{ fontStyle: 'italic' }}>пусто — пока нечего нести</span>}
-        </div>
-      </div>
-      <div className="nr-choices">
-        {run.can_push ? (
-          <button className="nr-choice deeper" disabled={busy} onClick={onPush}>
-            <span className="nr-choice-ic">⬇</span>
-            <span className="nr-choice-body"><b>Глубже в ночь</b><small>добыча ×{run.growth} → ≈ +{fmt(run.next_value)} 🪙-экв · но риск потерять котомку</small></span>
-            <span className="nr-choice-go">›</span>
-          </button>
-        ) : <div className="nr-dawn">🌅 Впереди рассвет — дальше тракт не ведёт</div>}
-        <button className="nr-choice home" disabled={busy} onClick={onBank}>
-          <span className="nr-choice-ic">🏠</span>
-          <span className="nr-choice-body"><b>Свернуть в таверну</b><small>забрать {fmt(run.satchel_value)} 🪙-экв · гарантированно, без риска</small></span>
-          <span className="nr-choice-go">›</span>
-        </button>
-      </div>
-    </div>
+    <>
+      <NrTopHud run={run} max={6} />
+      {last && <div className="nr-cross-narr">{last}</div>}
+      {run.can_push
+        ? <NrSplit left={deeper} right={home} busy={busy} note="⟔ распутье ⟔" />
+        : (
+          <div className="nr-cine onlybank">
+            <div className="nr-dawn-emo">🌅</div>
+            <p className="nr-dawn-txt">Впереди рассвет — дальше тракт не ведёт. Пора домой с добычей.</p>
+            <button className="btn nr-go" disabled={busy} onClick={onBank}>🏠 Свернуть в таверну · {fmt(run.satchel_value)} 🪙</button>
+          </div>
+        )}
+    </>
   )
 }
 
@@ -426,8 +437,7 @@ function NrCross({ run, chron, busy, onPush, onBank }: { run: NRun; chron: strin
 function NrResolve({ out, onNext }: { out: NOut; onNext: () => void }) {
   const dice = out.kind === 'gamble' && out.roll
   return (
-    <div className="nr-scene resolve">
-      <div className="nr-fog" />
+    <div className="nr-cine resolve">
       {dice ? <TgDice value={out.roll!} loseFaces={out.lose_faces || 0} /> : <div className="nr-res-emo">{RES_EMO[out.kind] || '🌙'}</div>}
       <div className="nr-res-h">{RES_TITLE(out)}</div>
       {out.story && <p className="nr-story"><Typewriter text={out.story} /></p>}
