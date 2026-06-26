@@ -21,7 +21,7 @@ interface HuntState {
 }
 interface Round { pd: number; crit: boolean; miss: boolean; ed: number; php: number; ehp: number }
 interface FightRes {
-  ok: boolean; win: boolean; elite: boolean; enemy: { name: string; emoji: string; hp: number; sprite?: string }
+  ok: boolean; win: boolean; elite: boolean; enemy: { name: string; emoji: string; hp: number; sprite?: string; traits?: string[] }
   player_hp0: number; hp_max: number; rounds: Round[]; rounds_n: number; crits: number; overwhelmed: boolean
   loot: { gold: number; res: { key: string; name: string; emoji: string; qty: number }[]; trophies: string[]; rep: number }
   gold_lost: number; hp_now: number; hunt: HuntState
@@ -260,7 +260,7 @@ function synthFight(b: Beast, d: HuntState): FightRes {
     if (ehp <= 0 || php <= 0) break
   }
   return {
-    ok: true, win, elite: false, enemy: { name: b.name, emoji: b.emoji, hp: b.hp, sprite: b.sprite },
+    ok: true, win, elite: false, enemy: { name: b.name, emoji: b.emoji, hp: b.hp, sprite: b.sprite, traits: b.traits },
     player_hp0: d.hp.cur, hp_max: hpMax, rounds, rounds_n: rounds.length, crits, overwhelmed: !win,
     loot: { gold: win ? Math.round((b.gold[0] + b.gold[1]) / 2) : 0, res: win ? b.drops.filter((x) => !x.trophy).map((x) => ({ key: x.key!, name: x.name!, emoji: x.emoji!, qty: x.lo || 1 })) : [], trophies: [], rep: win ? b.rep : 0 },
     gold_lost: win ? 0 : 8, hp_now: php, hunt: d,
@@ -336,6 +336,9 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
   const skey = fight.enemy.sprite
   const meta = skey ? MONSTERS[skey] : undefined
   const projAsset = skey ? RANGED[skey] : undefined   // дальнобойный? → ассет снаряда
+  const foeTraits = fight.enemy.traits || []          // черты зверя (☠ ядовит / 💨 увёртлив)
+  const venom = foeTraits.includes('venom')
+  const evasive = foeTraits.includes('evasive')
 
   // хореография раунда: монстр бьёт (снаряд/ближний → вспышка на герое) →
   // герой отвечает (вспышка на монстре); победа → death, поражение → побег героя
@@ -402,6 +405,11 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
 
         <div className="ep-hp foe">
           <span className="ep-hp-nm">{fight.enemy.name}</span>
+          {foeTraits.length > 0 && (
+            <span className="ep-traits">{foeTraits.map((t) => (
+              <em key={t} className={`ep-trait ${t}`}>{TRAIT[t] || t}</em>
+            ))}</span>
+          )}
           <div className="ep-bar e"><i className="gh" style={{ width: `${ehpPct}%` }} /><i className="fl" style={{ width: `${ehpPct}%` }} /></div>
         </div>
 
@@ -413,7 +421,7 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
           {r && r.pd > 0 && <div className={`ep-slash ${r.crit ? 'crit' : ''}`} key={'s' + step} />}
           {r && (r.pd > 0
             ? <div className={`ep-dmg foe ${r.crit ? 'crit' : ''}`} key={'d' + step}>−{r.pd}{r.crit && <b>КРИТ!</b>}</div>
-            : <div className="ep-dmg miss" key={'d' + step}>мимо</div>)}
+            : <div className="ep-dmg miss" key={'d' + step}>{evasive ? '💨 увернулся' : 'мимо'}</div>)}
         </div>
 
         {/* летящий снаряд дальнобойного зверя (слева → направо, к герою) */}
@@ -428,7 +436,7 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
         {/* герой — СПРАВА, лицом к монстру (зеркалим: спрайт смотрит вправо) */}
         <div className={`ep-hero ${flee ? 'flee' : ''}`}>
           <Sprite path="character/hero" meta={HERO} anim={heroAnim} token={step} height={156} flip />
-          {r && r.ed > 0 && <div className="ep-dmg me" key={'e' + step}>−{r.ed}</div>}
+          {r && r.ed > 0 && <div className={`ep-dmg me ${venom ? 'venom' : ''}`} key={'e' + step}>−{r.ed}{venom && <b>☠</b>}</div>}
         </div>
 
         <div className="ep-hp me">

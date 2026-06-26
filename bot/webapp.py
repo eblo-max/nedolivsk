@@ -1406,7 +1406,7 @@ async def _api_hunt_fight(request: web.Request) -> web.Response:
     return web.json_response({
         "ok": True, "win": res.fight.win, "elite": res.elite,
         "enemy": {"name": res.enemy.name, "emoji": res.enemy.emoji, "hp": res.enemy.hp,
-                  "sprite": ENEMY_SPRITE.get(res.enemy.id)},
+                  "sprite": ENEMY_SPRITE.get(res.enemy.id), "traits": list(res.enemy.traits)},
         "player_hp0": chp0, "hp_max": combat.max_hp(), "rounds": res.fight.log,
         "rounds_n": res.fight.rounds, "crits": res.fight.crits, "overwhelmed": res.fight.overwhelmed,
         "loot": {"gold": (res.loot or {}).get("gold", 0) if res.fight.win else 0, "res": loot_res,

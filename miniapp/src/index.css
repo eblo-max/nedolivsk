@@ -639,6 +639,14 @@ body {
 .ep-hp.me { right:13px; }
 .ep-hp-nm { font-family:var(--disp); font-weight:700; font-size:12.5px; color:var(--parch); text-shadow:0 1px 3px #000; display:block; margin-bottom:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .ep-hp.me .ep-hp-nm { text-align:right; margin:4px 0 0; }
+/* черты зверя в бою (бейджи у его HP) + подсветка срабатывания */
+.ep-traits { display:flex; gap:5px; margin:1px 0 5px; flex-wrap:wrap; }
+.ep-trait { font-family:var(--text); font-style:normal; font-size:10.5px; font-weight:700;
+  padding:1px 7px; border-radius:8px; line-height:1.5; text-shadow:0 1px 2px #000; }
+.ep-trait.venom { color:#bfe88a; background:#1f3a14cc; border:1px solid #4f7a2e; }
+.ep-trait.evasive { color:#8fd0e8; background:#16323acc; border:1px solid #2e6a7a; }
+.ep-dmg.me.venom { color:#9fe06a; text-shadow:0 2px 0 #000,0 0 14px #5fae2e; }
+.ep-dmg.me.venom b { display:block; font-size:15px; line-height:1; }
 .ep-bar { position:relative; height:12px; border-radius:7px; overflow:hidden; background:#000a; border:1px solid #ffffff16; box-shadow:inset 0 1px 2px #000; }
 .ep-bar i { position:absolute; left:0; top:0; height:100%; border-radius:7px; transition:width .32s cubic-bezier(.3,.8,.3,1); }
 /* призрак-трейл: бледный слой ОТСТАЁТ при потере HP — видно «откушенный» кусок */
