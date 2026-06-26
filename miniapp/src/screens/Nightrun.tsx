@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type CSSProperties } from 'react'
 import lottie from 'lottie-web/build/player/lottie_light'
 import { useApi } from '../hooks'
 import { api } from '../api'
-import { haptic, hapticNotify, initData } from '../telegram'
+import { haptic, hapticNotify, initData, tg, atLeast } from '../telegram'
 import { ResIcon, fmt } from '../components/icons'
 
 // ── типы (зеркало webapp _nightrun_state / _nr_out) ──
@@ -278,17 +278,15 @@ function NrHud({ run, max }: { run: NRun; max: number }) {
   const sat = useCounter(run.satchel_value)
   return (
     <div className="nr-hud">
-      <div className="nr-rail">
-        {SCENES.slice(0, max).map((s, i) => {
-          const n = i + 1
-          return (
-            <div key={i} className={`nr-stop ${n < run.leg ? 'done' : n === run.leg ? 'now' : 'soon'}`}>
-              <span className="nr-stop-dot">{n <= run.leg ? s.icon : ''}</span>
-            </div>
-          )
-        })}
+      <div className="nr-hud-top">
+        <span className="nr-zone">{sc.icon} {sc.name}</span>
+        <span className="nr-leg">этап {run.leg}<i> / {max}</i></span>
       </div>
-      <div className="nr-place"><span className="nr-place-nm">{sc.icon} {sc.name}</span><span className="nr-place-leg">этап {run.leg}/{max}</span></div>
+      <div className="nr-prog">
+        {Array.from({ length: max }, (_, i) => (
+          <span key={i} className={`nr-seg ${i + 1 < run.leg ? 'done' : i + 1 === run.leg ? 'now' : ''}`} />
+        ))}
+      </div>
       <div className="nr-hud-row">
         <span className="nr-hp"><span className="nr-bar"><i style={{ width: `${hpPct}%` }} /></span><b>{run.hp}</b><small>/{run.hp_max}❤</small></span>
         <span className="nr-sat">🎒 <b>{fmt(sat)}</b><small>🪙-экв{run.satchel.length ? ` · ${run.satchel.length} вид.` : ''}</small></span>
@@ -300,6 +298,17 @@ function NrHud({ run, max }: { run: NRun; max: number }) {
 // ── интро ──
 function NrIntro({ d, busy, onStart }: { d: NState; busy: boolean; onStart: () => void }) {
   const cd = d.cooldown
+  // нативная MainButton Telegram как основной CTA (узнаваемая нижняя кнопка). В превью/старых
+  // клиентах — аккуратный inline-fallback ниже.
+  const useMB = !!tg?.MainButton && atLeast('6.1') && cd === 0
+  useEffect(() => {
+    const mb = tg?.MainButton
+    if (!useMB || !mb) return
+    mb.setParams({ text: 'Выйти на тракт', color: '#e0922c', text_color: '#241405', is_visible: true, is_active: !busy })
+    const cb = () => { if (!busy) onStart() }
+    mb.onClick(cb)
+    return () => { mb.offClick(cb); mb.hide() }
+  }, [useMB, busy, onStart])
   return (
     <div className="nr-scene intro rise">
       <div className="nr-fog" />
@@ -308,7 +317,7 @@ function NrIntro({ d, busy, onStart }: { d: NState; busy: boolean; onStart: () =
       <div className="nr-stats"><i>🛡 {d.stats.armor}</i><i>🍀 {d.stats.luck}</i></div>
       {cd > 0
         ? <div className="nr-cd">🌅 Ноги ещё гудят — в путь через <b>{hms(cd)}</b></div>
-        : <button className="btn nr-go" disabled={busy} onClick={onStart}>🌙 Выйти на тракт</button>}
+        : !useMB && <button className="btn nr-go" disabled={busy} onClick={onStart}>🌙 Выйти на тракт</button>}
     </div>
   )
 }

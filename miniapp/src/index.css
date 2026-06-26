@@ -674,31 +674,25 @@ body {
 .nr-cd { font-family:system-ui,sans-serif; font-size:14px; color:#e2e7ee; padding:12px 18px; border-radius:14px;
   background:rgba(18,20,28,.52); border:1px solid rgba(255,255,255,.1); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); }
 .nr-cd b { color:#ffcf7a; }
-.btn.nr-go, .btn.nr-next { position:relative; overflow:hidden; font-family:system-ui,-apple-system,sans-serif; font-weight:800; font-size:15px; letter-spacing:.2px;
-  background:linear-gradient(135deg,#ffce6e 0%,#f0a93f 48%,#e08a2c 100%); color:#231505; border:none; border-radius:16px; padding:14px 30px; width:auto;
-  box-shadow:0 10px 26px rgba(224,138,44,.42), inset 0 1px 0 #fff6, inset 0 -2px 6px #b9701c66; margin-top:2px;
-  transition:transform .15s cubic-bezier(.2,.8,.3,1.4), box-shadow .15s; }
-.btn.nr-go::after, .btn.nr-next::after { content:""; position:absolute; inset:0; background:linear-gradient(100deg,transparent 30%,#ffffff55 48%,transparent 66%); transform:translateX(-120%); animation:nr-shine 3.4s ease-in-out 1s infinite; }
-@keyframes nr-shine { 0%,72%{transform:translateX(-120%)} 86%,100%{transform:translateX(120%)} }
-.btn.nr-go:active, .btn.nr-next:active { transform:scale(.96); box-shadow:0 5px 14px rgba(224,138,44,.36), inset 0 1px 0 #fff6; }
+/* кнопки — плоские, нативные (как родная Telegram-кнопка): сплошная заливка, без бликов */
+.btn.nr-go, .btn.nr-next { font-family:system-ui,-apple-system,sans-serif; font-weight:700; font-size:15.5px; letter-spacing:.1px;
+  background:#e89a32; color:#241405; border:none; border-radius:13px; padding:15px 32px; width:auto;
+  box-shadow:0 4px 16px rgba(224,138,44,.3); transition:transform .14s ease, filter .14s ease; }
+.btn.nr-go:active, .btn.nr-next:active { transform:scale(.975); filter:brightness(.93); }
 
-/* HUD забега — стеклянная плашка */
-.nr-hud { width:100%; max-width:360px; display:flex; flex-direction:column; gap:9px; padding:12px 15px; border-radius:18px;
-  background:rgba(13,15,23,.46); border:1px solid rgba(255,255,255,.09); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); box-shadow:0 10px 30px rgba(0,0,0,.4); }
-/* журнал-путь: стэпер зон с пройденным/текущим/будущим */
-.nr-rail { display:flex; align-items:center; }
-.nr-stop { flex:1; display:flex; align-items:center; justify-content:center; position:relative; }
-.nr-stop::before { content:""; position:absolute; left:-50%; right:50%; top:50%; height:2px; background:rgba(255,255,255,.12); }
-.nr-stop:first-child::before { display:none; }
-.nr-stop.done::before, .nr-stop.now::before { background:linear-gradient(90deg,#c97a2a,#f3b85a); }
-.nr-stop-dot { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; z-index:1;
-  background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.16); transition:.2s; }
-.nr-stop.done .nr-stop-dot { background:linear-gradient(135deg,#c97a2a,#e8a23a); border-color:#f3b85a; }
-.nr-stop.now .nr-stop-dot { width:31px; height:31px; font-size:17px; background:linear-gradient(135deg,#f3b85a,#ffd98a); border-color:#fff; box-shadow:0 0 14px #f3b85a99,0 0 0 3px #f3b85a22; }
-.nr-stop.soon .nr-stop-dot { opacity:.45; }
-.nr-place { display:flex; justify-content:space-between; align-items:baseline; }
-.nr-place-nm { font-family:system-ui,sans-serif; font-weight:700; font-size:15px; color:#fff; }
-.nr-place-leg { font-family:system-ui,sans-serif; font-size:11px; color:#9aa2b0; }
+/* HUD забега — нативная плашка */
+.nr-hud { width:100%; max-width:360px; display:flex; flex-direction:column; gap:10px; padding:13px 16px; border-radius:16px;
+  background:rgba(16,18,26,.62); border:1px solid rgba(255,255,255,.07); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); box-shadow:0 8px 26px rgba(0,0,0,.42); }
+.nr-hud-top { display:flex; justify-content:space-between; align-items:baseline; }
+.nr-zone { font-family:system-ui,-apple-system,sans-serif; font-weight:700; font-size:15.5px; letter-spacing:-.2px; color:#fff; }
+.nr-leg { font-family:system-ui,sans-serif; font-weight:600; font-size:12px; color:#aeb4c0; }
+.nr-leg i { font-style:normal; color:#6b7280; }
+/* сегментный прогресс пути — тонкий, чистый, нативный */
+.nr-prog { display:flex; gap:4px; }
+.nr-seg { flex:1; height:4px; border-radius:99px; background:rgba(255,255,255,.1); transition:background .3s, box-shadow .3s; }
+.nr-seg.done { background:linear-gradient(90deg,#d98a2c,#f3b85a); }
+.nr-seg.now { background:#ffd98a; box-shadow:0 0 8px rgba(255,217,138,.6); animation:nr-segpulse 1.7s ease-in-out infinite; }
+@keyframes nr-segpulse { 0%,100%{opacity:1} 50%{opacity:.5} }
 .nr-hud-row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
 .nr-hp { display:inline-flex; align-items:center; gap:7px; font-family:system-ui,sans-serif; font-weight:600; font-size:14px; color:#f0c4c4; }
 .nr-hp b { color:#fff; } .nr-hp small { color:#9aa0aa; }
