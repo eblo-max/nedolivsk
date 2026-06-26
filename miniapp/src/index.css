@@ -816,7 +816,12 @@ body {
 .nr-chron-l { font-family:var(--text); font-size:13px; line-height:1.5; color:#cabfa9; margin:5px 0; padding-left:2px; opacity:0; animation:nr-jin .5s ease forwards; }
 .nr-chron-l i { color:var(--gold); font-style:normal; font-family:var(--num); opacity:.65; margin-right:4px; }
 
-/* телеграм-style 3D кубик */
+/* нативный кубик Telegram (Lottie) */
+.tgd-lottie { width:132px; height:132px; transition:filter .45s ease; }
+.tgd-lottie.win { filter:drop-shadow(0 0 22px #7ae89a); }
+.tgd-lottie.lose { filter:drop-shadow(0 0 22px #ff7060); }
+
+/* телеграм-style 3D кубик (фолбэк) */
 .tgd-wrap { display:flex; flex-direction:column; align-items:center; gap:16px; }
 .tgd-stage { position:relative; width:120px; height:120px; display:flex; align-items:center; justify-content:center; perspective:560px; }
 .tgd { width:84px; height:84px; transform-style:preserve-3d; transition:filter .45s ease; animation:tgd-toss 1.18s cubic-bezier(.32,.66,.3,1) both; }

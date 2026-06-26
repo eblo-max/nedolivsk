@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react'
+import lottie from 'lottie-web/build/player/lottie_light'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify, initData } from '../telegram'
@@ -230,6 +231,15 @@ export default function Nightrun() {
     </div>
   )
 
+  // ── проигрышный БРОСОК: даём нативному кубику докатиться до проигрышной грани, затем финал (по «Дальше») ──
+  if (out && out.kind === 'gamble' && out.busted) return (
+    <div className="nr" style={nrbg}>
+      <div className="nr-bgfix" key={bgName} aria-hidden="true" />
+      {toast && <div className="toast">{toast}</div>}
+      <NrResolve out={out} onNext={() => setOut(null)} />
+    </div>
+  )
+
   // ── финал (бюст / банк) ──
   if (end) return (
     <div className="nr" style={nrbg}>
@@ -409,7 +419,7 @@ function NrResolve({ out, onNext }: { out: NOut; onNext: () => void }) {
   return (
     <div className="nr-scene resolve">
       <div className="nr-fog" />
-      {dice ? <Die value={out.roll!} loseFaces={out.lose_faces || 0} /> : <div className="nr-res-emo">{RES_EMO[out.kind] || '🌙'}</div>}
+      {dice ? <TgDice value={out.roll!} loseFaces={out.lose_faces || 0} /> : <div className="nr-res-emo">{RES_EMO[out.kind] || '🌙'}</div>}
       <div className="nr-res-h">{RES_TITLE(out)}</div>
       {out.story && <p className="nr-story"><Typewriter text={out.story} /></p>}
       {out.healed > 0 && <div className="nr-res-heal">+{out.healed} ❤</div>}
@@ -428,7 +438,38 @@ function NrResolve({ out, onNext }: { out: NOut; onNext: () => void }) {
   )
 }
 
-// ── телеграм-style 3D кубик: настоящий тумблинг-куб, грань ставится по серверному значению ──
+// ── НАТИВНЫЙ кубик Telegram: официальная Lottie-анимация грани (value=1..6), играется один раз ──
+// Файлы — извлечённый стикерсет inputStickerSetDice('🎲'), индекс=грань (см. core.telegram.org/api/dice).
+function TgDice({ value, loseFaces }: { value: number; loseFaces: number }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [fail, setFail] = useState(false)
+  const [done, setDone] = useState(false)
+  const lost = value <= loseFaces
+  useEffect(() => {
+    let anim: ReturnType<typeof lottie.loadAnimation> | null = null
+    let cancelled = false
+    // .tgs = gzip(Lottie JSON), ~64 КБ; распаковываем нативным DecompressionStream (без pako)
+    fetch(`${import.meta.env.BASE_URL}nightrun/dice/${value}.tgs`)
+      .then((r) => { if (!r.ok) throw new Error('no dice asset'); return r.body!.pipeThrough(new DecompressionStream('gzip')) })
+      .then((stream) => new Response(stream).json())
+      .then((data) => {
+        if (cancelled || !ref.current) return
+        anim = lottie.loadAnimation({ container: ref.current, renderer: 'svg', loop: false, autoplay: true, animationData: data })
+        anim.addEventListener('complete', () => { setDone(true); hapticNotify(lost ? 'error' : 'success') })
+      })
+      .catch(() => setFail(true))  // нет ассета / старый webview без DecompressionStream → запасной 3D-куб
+    return () => { cancelled = true; anim?.destroy() }
+  }, [value, lost])
+  if (fail) return <Die value={value} loseFaces={loseFaces} />  // запасной 3D-куб, если ассет недоступен
+  return (
+    <div className="tgd-wrap">
+      <div className={`tgd-lottie ${done ? (lost ? 'lose' : 'win') : ''}`} ref={ref} />
+      <span className="tgd-cap">{done ? <>выпало <b>{value}</b>{loseFaces > 0 ? ` · проигрыш 1–${loseFaces}` : ''}</> : 'бросок…'}</span>
+    </div>
+  )
+}
+
+// ── запасной 3D-куб (CSS): на случай, если нативная Lottie-анимация недоступна ──
 const DICE_PIPS: Record<number, number[]> = {
   1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9],
 }
