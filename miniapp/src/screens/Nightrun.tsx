@@ -154,6 +154,7 @@ export default function Nightrun() {
   // ── финал (бюст / банк) ──
   if (end) return (
     <div className="nr" style={nrbg}>
+      <div className="nr-bgfix" aria-hidden="true" />
       {toast && <div className="toast">{toast}</div>}
       <NrEnd end={end} onClose={() => { setEnd(null); setOut(null); if (off) set(offState(null, end.kind === 'bank' ? 4 * 3600 : 4 * 3600)); else reload() }} />
     </div>
@@ -162,6 +163,7 @@ export default function Nightrun() {
   // ── резолв-оверлей (анимация исхода испытания) ──
   if (out && run && run.state === 'crossroad') return (
     <div className="nr" style={nrbg}>
+      <div className="nr-bgfix" aria-hidden="true" />
       {toast && <div className="toast">{toast}</div>}
       <NrResolve out={out} onNext={() => setOut(null)} />
     </div>
@@ -169,6 +171,7 @@ export default function Nightrun() {
 
   return (
     <div className="nr" style={nrbg}>
+      <div className="nr-bgfix" aria-hidden="true" />
       {toast && <div className="toast">{toast}</div>}
       {!d.active && <NrIntro d={d} busy={busy} onStart={start} />}
       {run && run.state === 'fork' && <NrFork d={d} run={run} busy={busy} onPick={pick} />}
