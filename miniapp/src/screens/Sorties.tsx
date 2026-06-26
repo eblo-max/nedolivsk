@@ -142,16 +142,27 @@ export default function Sorties() {
         {!d.ready.can && <div className="hp-warn">Слишком ранен — в строй через {hm(d.ready.minutes)}</div>}
       </div>
 
-      <div className="cap">бестиарий</div>
-      <div className="beast-list">
+      <div className="cap">бестиарий · цель охоты</div>
+      <div className="hunt-grid">
         {d.beasts.map((b) => (
-          <button key={b.id} className={`beast th-${threatCls(b.win)}`} onClick={() => { haptic('light'); setPick(b) }}>
-            <span className="be-emo">{b.emoji}</span>
-            <div className="be-mid">
-              <span className="be-name">{b.name}{b.regional && <em className="be-reg">край</em>}</span>
-              <span className="be-sub">❤{b.hp} · ⚔{b.attack} · 🛡{b.armor}{b.traits.map((t) => <i key={t} className="be-tr">{TRAIT[t] || t}</i>)}</span>
+          <button key={b.id} className={`hunt-card th-${threatCls(b.win)}`} onClick={() => { haptic('light'); setPick(b) }}>
+            <span className="hc-glow" />
+            <span className="hc-emo">{b.emoji}</span>
+            <div className="hc-top">
+              <span className="hc-name">{b.name}{b.regional && <em className="hc-reg">КРАЙ</em>}</span>
+              <div className="hc-traits">{b.traits.map((t) => <span key={t} className="hc-tr">{TRAIT[t] || t}</span>)}</div>
             </div>
-            <span className="be-win"><b>{b.win}%</b><i>{b.threat.icon}</i></span>
+            <div className="hc-win"><b>{b.win}<small>%</small></b><i>{b.threat.label}</i></div>
+            <div className="hc-bar"><i style={{ width: `${b.win}%` }} /></div>
+            <div className="hc-bot">
+              <span className="hc-stats"><i>❤ {b.hp}</i><i>⚔ {b.attack}</i><i>🛡 {b.armor}</i></span>
+              <span className="hc-loot">
+                <ResIcon k="gold" size={14} />
+                {b.drops.slice(0, 3).map((dr, i) => dr.trophy
+                  ? <span key={i} className="hc-tro">🏆</span>
+                  : <ResIcon key={i} k={dr.key!} emoji={dr.emoji} size={14} />)}
+              </span>
+            </div>
           </button>
         ))}
       </div>
@@ -221,8 +232,9 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
     <>
       <button className="lnk-back" onClick={onClose}>‹ Бестиарий</button>
       <div className="arena">
+        {r && r.crit && <div className="crit-flash" key={'cf' + step} />}
         <div className="ar-foe">
-          <span className="ar-emo">{fight.elite ? '✨' : ''}{fight.enemy.emoji}</span>
+          <span className={`ar-emo ${r ? (r.crit ? 'hit-crit' : r.pd > 0 ? 'hit-n' : '') : ''}`} key={step}>{fight.elite ? '✨' : ''}{fight.enemy.emoji}</span>
           <span className="ar-nm">{fight.enemy.name}</span>
           <Bar cur={ehp} max={fight.enemy.hp} kind="e" />
           {r && (r.pd > 0

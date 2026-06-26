@@ -559,24 +559,41 @@ body {
 .hb-p i { background:linear-gradient(90deg,#5fa85f,#86c98a); }
 .hb-e i { background:linear-gradient(90deg,#a23c22,#cf4a36); }
 
-.beast-list { display:flex; flex-direction:column; }
-.beast { display:flex; align-items:center; gap:12px; width:100%; padding:11px 4px 11px 9px; cursor:pointer;
-  background:none; border:none; border-bottom:1px solid #3a2c1455; border-left:3px solid transparent; color:var(--parch); text-align:left; }
-.beast:first-child { border-top:1px solid #3a2c1455; }
-.beast:active { background:#ffffff08; }
-.be-emo { font-size:30px; flex:0 0 auto; width:34px; text-align:center; filter:drop-shadow(0 1px 2px #000); }
-.be-mid { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
-.be-name { font-family:var(--disp); font-weight:700; font-size:15px; color:var(--parch); }
-.be-reg { font-style:normal; font-family:var(--text); font-size:10px; color:#9a7d4f; border:1px solid #5a4324; border-radius:6px; padding:0 5px; margin-left:6px; }
-.be-sub { font-family:var(--text); font-size:11.5px; color:var(--dim); display:flex; flex-wrap:wrap; gap:6px; }
-.be-tr { font-style:normal; color:#cf8a5a; }
-.be-win { display:flex; flex-direction:column; align-items:center; flex:0 0 auto; font-family:var(--num); min-width:40px; }
-.be-win b { font-size:16px; line-height:1; }
-.be-win i { font-style:normal; font-size:11px; }
-.th-g { border-left-color:#5fa85f; } .th-g .be-win b { color:var(--green); }
-.th-y { border-left-color:#caa24e; } .th-y .be-win b { color:#e6c050; }
-.th-o { border-left-color:#cf8a5a; } .th-o .be-win b { color:#e7975a; }
-.th-r { border-left-color:#a23c22; } .th-r .be-win b { color:var(--crimson); }
+/* карточки-цели охоты (тёмный фэнтези-хант-борд) */
+.hunt-grid { display:flex; flex-direction:column; gap:11px; }
+.hunt-card { position:relative; overflow:hidden; width:100%; text-align:left; cursor:pointer;
+  display:grid; grid-template-columns:auto 1fr auto; grid-template-rows:auto auto auto; gap:3px 13px;
+  padding:13px 14px; border-radius:14px; border:1px solid var(--th, #4a3719); color:var(--parch);
+  background:linear-gradient(150deg,#241809,#160d05); box-shadow:0 5px 16px #0008, inset 0 1px 0 #ffffff0d;
+  transition:transform .1s; }
+.hunt-card:active { transform:scale(.985); }
+.hc-glow { position:absolute; top:-40%; left:-10%; width:60%; height:130%; border-radius:50%;
+  background:radial-gradient(circle, var(--thg, #5fa85f44) 0%, transparent 70%); pointer-events:none; }
+.hc-emo { grid-row:1 / span 3; align-self:center; font-size:46px; width:60px; text-align:center; z-index:1;
+  filter:drop-shadow(0 3px 5px #000a); animation:beast-float 3.4s ease-in-out infinite; }
+.hc-top { grid-column:2; display:flex; flex-direction:column; gap:2px; min-width:0; z-index:1; }
+.hc-name { font-family:var(--disp); font-weight:700; font-size:16.5px; letter-spacing:.3px; }
+.hc-reg { font-style:normal; font-family:var(--disp); font-size:9px; letter-spacing:1px; color:#caa24e;
+  border:1px solid #6a5022; border-radius:5px; padding:1px 5px; margin-left:7px; vertical-align:2px; }
+.hc-traits { display:flex; flex-wrap:wrap; gap:5px; }
+.hc-tr { font-family:var(--text); font-size:11px; color:#cf8a5a; }
+.hc-win { grid-column:3; grid-row:1 / span 2; align-self:center; text-align:right; z-index:1; }
+.hc-win b { font-family:var(--num); font-weight:700; font-size:27px; line-height:.9; color:var(--thc, var(--green)); }
+.hc-win b small { font-size:14px; }
+.hc-win i { display:block; font-style:normal; font-family:var(--text); font-size:10.5px; color:var(--dim); margin-top:1px; }
+.hc-bar { grid-column:2 / span 2; height:5px; border-radius:3px; overflow:hidden; background:#120b05; margin-top:4px; z-index:1; }
+.hc-bar i { display:block; height:100%; border-radius:3px; background:var(--thc, var(--green)); box-shadow:0 0 7px var(--thg, #5fa85f66); transition:width .5s ease; }
+.hc-bot { grid-column:2 / span 2; display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:5px; z-index:1; }
+.hc-stats { display:flex; gap:10px; font-family:var(--num); font-size:12.5px; color:#c3ad84; }
+.hc-stats i { font-style:normal; }
+.hc-loot { display:flex; align-items:center; gap:3px; }
+.hc-loot .ric { width:15px; height:15px; }
+.hc-tro { font-size:13px; }
+@keyframes beast-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+.th-g { --th:#3f6b3a88; --thc:var(--green); --thg:#5fa85f55; }
+.th-y { --th:#6a5022; --thc:#e6c050; --thg:#caa24e55; }
+.th-o { --th:#7a4a26; --thc:#e7975a; --thg:#cf6a3a55; }
+.th-r { --th:#7a2e1c; --thc:var(--crimson); --thg:#cf4a3666; }
 .win-g { color:var(--green) !important; } .win-y { color:#e6c050 !important; } .win-o { color:#e7975a !important; } .win-r { color:var(--crimson) !important; }
 
 .brief-emo { font-size:56px; text-align:center; margin:2px 0 6px; filter:drop-shadow(0 3px 6px #000a); }
@@ -585,9 +602,16 @@ body {
 .heal-opt b { font-family:var(--num); color:var(--green); }
 .heal-opt:active { transform:translateY(1px); }
 
-.arena { display:flex; flex-direction:column; gap:14px; align-items:center; padding:22px 6px; }
+.arena { position:relative; display:flex; flex-direction:column; gap:14px; align-items:center; padding:22px 6px; overflow:hidden; }
 .ar-foe, .ar-me { width:100%; max-width:300px; display:flex; flex-direction:column; align-items:center; gap:7px; position:relative; }
 .ar-emo { font-size:64px; filter:drop-shadow(0 4px 8px #000a); }
+.ar-emo.hit-n { animation:foe-shake .4s ease; }
+.ar-emo.hit-crit { animation:foe-crit .5s ease; }
+@keyframes foe-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-7px) rotate(-3deg)} 60%{transform:translateX(5px) rotate(2deg)} }
+@keyframes foe-crit { 0%{transform:scale(1)} 20%{transform:scale(1.18) rotate(-5deg)} 45%{transform:translateX(8px) rotate(4deg)} 70%{transform:translateX(-5px)} 100%{transform:scale(1)} }
+.crit-flash { position:absolute; inset:0; pointer-events:none; z-index:0;
+  background:radial-gradient(circle at 50% 38%, #ffd77344, transparent 62%); animation:critflash .45s ease forwards; }
+@keyframes critflash { 0%{opacity:0} 30%{opacity:1} 100%{opacity:0} }
 .ar-nm { font-family:var(--disp); font-weight:700; font-size:14px; color:var(--parch); }
 .ar-foe .hb, .ar-me .hb { width:100%; height:11px; }
 .ar-vs { font-size:26px; }
