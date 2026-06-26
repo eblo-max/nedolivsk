@@ -549,73 +549,60 @@ body {
 .btn.danger { color:#2a0d08; border-color:#cf8a68; background:#bb5436; box-shadow:none; }
 
 /* ── Вылазки: охота ── */
-/* панель охотника (герой + HP + статы + лечение) */
-.hunter { position:relative; overflow:hidden; display:flex; align-items:center; gap:12px; padding:11px 13px;
-  border:1px solid var(--line2); border-radius:14px;
-  background:radial-gradient(120% 130% at 0% 50%, #2e1c0c 0%, #1a1006 60%, #120b05 100%);
-  box-shadow:0 5px 16px #0008, inset 0 1px 0 #ffffff0d; }
-.hunter-aura { position:absolute; left:-10%; top:-30%; width:46%; height:160%; border-radius:50%;
-  background:radial-gradient(circle, #e7975a33, transparent 70%); pointer-events:none; }
-.hunter-hero { width:72px; height:auto; flex:0 0 auto; z-index:1; filter:drop-shadow(0 4px 7px #000b); }
-.hunter-body { flex:1; min-width:0; z-index:1; }
-.hunter-top { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:5px; }
-.hunter-hp { font-family:var(--num); color:var(--parch); }
-.hunter-hp b { font-size:21px; }
-.hunter-hp small { font-size:12px; color:var(--dim); }
-.hunter-regen { font-family:var(--text); font-size:11.5px; color:var(--dim); font-style:italic; }
-.hunter-bar { height:10px; }
-.hunter-stats { display:flex; flex-wrap:wrap; gap:11px; margin-top:7px; font-family:var(--num); font-size:13px; color:#c3ad84; }
-.hunter-stats i { font-style:normal; }
-.hunter-heal { flex:0 0 auto; z-index:1; width:44px; height:44px; border-radius:12px; font-size:20px; cursor:pointer;
-  background:linear-gradient(#1d2912,#141d0b); border:1px solid #3f5a2c; color:var(--parch);
-  box-shadow:0 2px 7px #0007; transition:transform .1s; }
-.hunter-heal:active { transform:scale(.94); }
-.hunter-heal:disabled { filter:grayscale(.6) brightness(.7); }
-.hp-warn { font-family:var(--text); font-size:12.5px; color:var(--crimson); text-align:center; }
+/* доска розыска (деревянная доска объявлений) */
+.board { position:relative; border-radius:14px; padding:13px 11px 22px;
+  background:repeating-linear-gradient(91deg, #20140a 0 44px, #190f06 44px 47px), linear-gradient(#241809,#150c04);
+  border:1px solid #4a3014; box-shadow:0 6px 22px #0009, inset 0 0 0 2px #3a2814, inset 0 0 60px #0009; }
+.board-head { position:relative; display:flex; align-items:center; gap:12px; padding:10px 12px; margin-bottom:15px;
+  background:linear-gradient(#2c1d0d,#1a1006); border:1px solid #5a4324; border-radius:10px; box-shadow:0 3px 11px #0009, inset 0 1px 0 #ffffff0d; }
+.board-hero { width:62px; height:auto; flex:0 0 auto; filter:drop-shadow(0 4px 6px #000b); }
+.board-hunter { flex:1; min-width:0; }
+.bh-top { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:4px; }
+.bh-hp { font-family:var(--num); color:var(--parch); } .bh-hp b { font-size:20px; } .bh-hp small { font-size:11.5px; color:var(--dim); }
+.bh-rg { font-family:var(--text); font-size:11px; font-style:italic; color:var(--dim); }
+.bh-bar { height:9px; }
+.bh-stats { display:flex; flex-wrap:wrap; gap:10px; margin-top:6px; font-family:var(--num); font-size:12.5px; color:#c3ad84; }
+.bh-stats i { font-style:normal; }
+.bh-warn { font-family:var(--text); font-size:12.5px; color:#e0903c; text-align:center; margin:-7px 0 11px; }
+.hunter-heal { flex:0 0 auto; width:42px; height:42px; border-radius:11px; font-size:19px; cursor:pointer;
+  background:linear-gradient(#1d2912,#141d0b); border:1px solid #3f5a2c; color:var(--parch); box-shadow:0 2px 7px #0007; transition:transform .1s; }
+.hunter-heal:active { transform:scale(.94); } .hunter-heal:disabled { filter:grayscale(.6) brightness(.7); }
 
-.hb { height:9px; border-radius:6px; overflow:hidden; background:#140d06; border:1px solid var(--line); }
-.hb i { display:block; height:100%; border-radius:6px; transition:width .5s ease; }
-.hb-p i { background:linear-gradient(90deg,#5fa85f,#86c98a); }
-.hb-e i { background:linear-gradient(90deg,#a23c22,#cf4a36); }
+/* пергаментные клочки-розыски */
+.posters { display:flex; flex-direction:column; gap:15px; padding:4px 5px 0; }
+.poster { position:relative; width:100%; text-align:left; cursor:pointer; background:none; border:none; padding:0;
+  filter:drop-shadow(0 6px 7px #000a); transition:transform .12s; }
+.poster:active { transform:scale(.98) rotate(0deg) !important; }
+.poster-paper { color:#3a2a14; padding:9px 14px 12px; font-family:var(--text);
+  background:linear-gradient(150deg,#ecdcb6,#ddc795 58%,#cdb27c);
+  background-blend-mode:multiply;
+  clip-path:polygon(1% 7%, 10% 2%, 23% 7%, 36% 2%, 50% 6%, 64% 1%, 79% 6%, 92% 2%, 99% 8%, 97% 25%, 99% 45%, 97% 63%, 99% 81%, 96% 96%, 84% 99%, 68% 95%, 52% 99%, 38% 96%, 23% 99%, 10% 96%, 2% 93%, 4% 73%, 1% 53%, 3% 33%, 1% 19%); }
+.nail { position:absolute; top:3px; left:50%; transform:translateX(-50%); width:11px; height:11px; border-radius:50%; z-index:3;
+  background:radial-gradient(circle at 38% 30%, #c3bcad, #5a544a 55%, #2a2620); box-shadow:0 2px 4px #000b; }
+.poster-head { text-align:center; font-family:var(--disp); font-weight:700; font-size:10px; letter-spacing:2.5px; color:#7a541f; margin:7px 0 6px; }
+.poster-head em { font-style:normal; color:#9a3a1a; }
+.poster-row { display:flex; align-items:center; gap:12px; padding-right:40px; }
+.poster-emo { font-size:44px; flex:0 0 auto; filter:sepia(.5) contrast(1.05) brightness(.84) drop-shadow(0 1px 1px #0004); }
+.poster-id { min-width:0; }
+.poster-name { display:block; font-family:var(--disp); font-weight:900; font-size:22px; letter-spacing:.5px; color:#281a09; line-height:1.04; }
+.poster-danger { font-size:12px; color:#6b4f28; font-style:italic; }
+.poster-foot { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; padding-top:7px; border-top:1px dashed #8a6a3a99; }
+.poster-reward { display:inline-flex; align-items:center; gap:5px; font-family:var(--num); font-weight:700; font-size:14.5px; color:#6a4a1e; }
+.poster-drops { display:inline-flex; align-items:center; gap:5px; }
+.poster-drops .ric { width:15px; height:15px; filter:sepia(.35) brightness(.95); }
+/* сургучная печать угрозы с шансом */
+.seal { position:absolute; top:-8px; right:6px; z-index:4; width:52px; height:52px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; transform:rotate(-10deg);
+  background:radial-gradient(circle at 36% 30%, var(--seal2,#e06a4a), var(--seal,#a23320) 72%);
+  box-shadow:0 3px 7px #000a, inset 0 -3px 6px #00000055, inset 0 2px 5px #ffffff25; border:1px solid #00000040; }
+.seal::after { content:""; position:absolute; inset:5px; border-radius:50%; border:1px dashed #ffffff33; }
+.seal b { font-family:var(--disp); font-weight:900; font-size:18px; color:#fff; text-shadow:0 1px 2px #0009; line-height:1; z-index:1; }
+.seal b small { font-size:9px; }
+.poster.th-g .seal { --seal:#3b6d11; --seal2:#84b84a; }
+.poster.th-y .seal { --seal:#8a6510; --seal2:#e2b440; }
+.poster.th-o .seal { --seal:#9a4d12; --seal2:#e2913c; }
+.poster.th-r .seal { --seal:#8a2418; --seal2:#e0503a; }
 
-/* карточки-цели охоты (тёмный фэнтези-хант-борд) */
-.hunt-grid { display:flex; flex-direction:column; gap:11px; }
-.hunt-card { position:relative; overflow:hidden; width:100%; text-align:left; cursor:pointer;
-  display:grid; grid-template-columns:auto 1fr auto; grid-template-rows:auto auto auto; gap:3px 13px;
-  padding:13px 14px; border-radius:14px; border:1px solid var(--th, #4a3719); color:var(--parch);
-  background:linear-gradient(150deg,#241809,#160d05); box-shadow:0 5px 16px #0008, inset 0 1px 0 #ffffff0d;
-  transition:transform .1s; }
-.hunt-card:active { transform:scale(.985); }
-.hc-glow { position:absolute; top:-40%; left:-10%; width:60%; height:130%; border-radius:50%;
-  background:radial-gradient(circle, var(--thg, #5fa85f44) 0%, transparent 70%); pointer-events:none; }
-.hc-portrait { grid-row:1 / span 3; align-self:center; z-index:1; width:58px; height:58px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center; flex:0 0 auto;
-  background:radial-gradient(circle, var(--thg, #5fa85f33) 0%, #160d05 74%);
-  border:2px solid var(--thc, var(--green)); box-shadow:0 0 15px var(--thg, #5fa85f55), inset 0 0 12px #000b; }
-.hc-emo { font-size:32px; line-height:1; filter:drop-shadow(0 2px 3px #000a); animation:beast-float 3.4s ease-in-out infinite; }
-.hc-top { grid-column:2; display:flex; flex-direction:column; gap:2px; min-width:0; z-index:1; }
-.hc-name { font-family:var(--disp); font-weight:700; font-size:16.5px; letter-spacing:.3px; }
-.hc-reg { font-style:normal; font-family:var(--disp); font-size:9px; letter-spacing:1px; color:#caa24e;
-  border:1px solid #6a5022; border-radius:5px; padding:1px 5px; margin-left:7px; vertical-align:2px; }
-.hc-traits { display:flex; flex-wrap:wrap; gap:5px; }
-.hc-tr { font-family:var(--text); font-size:11px; color:#cf8a5a; }
-.hc-win { grid-column:3; grid-row:1 / span 2; align-self:center; text-align:right; z-index:1; }
-.hc-win b { font-family:var(--num); font-weight:700; font-size:27px; line-height:.9; color:var(--thc, var(--green)); }
-.hc-win b small { font-size:14px; }
-.hc-win i { display:block; font-style:normal; font-family:var(--text); font-size:10.5px; color:var(--dim); margin-top:1px; }
-.hc-bar { grid-column:2 / span 2; height:5px; border-radius:3px; overflow:hidden; background:#120b05; margin-top:4px; z-index:1; }
-.hc-bar i { display:block; height:100%; border-radius:3px; background:var(--thc, var(--green)); box-shadow:0 0 7px var(--thg, #5fa85f66); transition:width .5s ease; }
-.hc-bot { grid-column:2 / span 2; display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:5px; z-index:1; }
-.hc-stats { display:flex; gap:10px; font-family:var(--num); font-size:12.5px; color:#c3ad84; }
-.hc-stats i { font-style:normal; }
-.hc-loot { display:flex; align-items:center; gap:3px; }
-.hc-loot .ric { width:15px; height:15px; }
-.hc-tro { font-size:13px; }
-@keyframes beast-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
-.th-g { --th:#3f6b3a88; --thc:var(--green); --thg:#5fa85f55; }
-.th-y { --th:#6a5022; --thc:#e6c050; --thg:#caa24e55; }
-.th-o { --th:#7a4a26; --thc:#e7975a; --thg:#cf6a3a55; }
-.th-r { --th:#7a2e1c; --thc:var(--crimson); --thg:#cf4a3666; }
 .win-g { color:var(--green) !important; } .win-y { color:#e6c050 !important; } .win-o { color:#e7975a !important; } .win-r { color:var(--crimson) !important; }
 
 .brief-emo { font-size:56px; text-align:center; margin:2px 0 6px; filter:drop-shadow(0 3px 6px #000a); }

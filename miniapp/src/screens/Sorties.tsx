@@ -119,48 +119,47 @@ export default function Sorties() {
     <div className="scr">
       {toast && <div className="toast">{toast}</div>}
       <div className="hero rise" style={{ paddingBottom: 0 }}>
-        <div className="nm">Вылазки</div>
-        <div className="flavor" style={{ margin: '6px 14px 0', fontSize: 13.5 }}>«Снаряга при тебе — иди возьми с тракта своё.»</div>
+        <div className="nm">Доска розыска</div>
+        <div className="flavor" style={{ margin: '6px 14px 0', fontSize: 13.5 }}>«Гляди, кого нынче ищут на тракте. Возьми голову — возьми и награду.»</div>
       </div>
 
-      <div className="hunter">
-        <div className="hunter-aura" />
-        <img className="hunter-hero" src={`${import.meta.env.BASE_URL}character/hero_static.png`} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
-        <div className="hunter-body">
-          <div className="hunter-top">
-            <span className="hunter-hp"><b>{d.hp.cur}</b><small>/{d.hp.max} ❤</small></span>
-            <span className="hunter-regen">{d.hp.regen > 0 ? `восстановление ${hm(d.hp.regen)}` : 'полон сил'}</span>
+      <div className="board">
+        <div className="board-head">
+          <img className="board-hero" src={`${import.meta.env.BASE_URL}character/hero_static.png`} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+          <div className="board-hunter">
+            <div className="bh-top"><span className="bh-hp"><b>{d.hp.cur}</b><small>/{d.hp.max} ❤</small></span><span className="bh-rg">{d.hp.regen > 0 ? hm(d.hp.regen) : 'в строю'}</span></div>
+            <div className="ep-bar p bh-bar"><i style={{ width: `${Math.max(0, Math.min(100, (d.hp.cur / d.hp.max) * 100))}%` }} /></div>
+            <div className="bh-stats"><i>⚔ {d.stats.damage}</i><i>💥 {d.stats.crit}%</i><i>🛡 {d.stats.armor}</i><i>🍀 {d.stats.luck}</i></div>
           </div>
-          <div className="ep-bar p hunter-bar"><i style={{ width: `${Math.max(0, Math.min(100, (d.hp.cur / d.hp.max) * 100))}%` }} /></div>
-          <div className="hunter-stats"><i>⚔ {d.stats.damage}</i><i>💥 {d.stats.crit}%</i><i>🛡 {d.stats.armor}</i><i>🍀 {d.stats.luck}</i></div>
+          {d.heal.can && <button className="hunter-heal" disabled={busy || !d.heal.options.length} onClick={() => setHealOpen(true)} aria-label="Подлечиться">🍖</button>}
         </div>
-        {d.heal.can && <button className="hunter-heal" disabled={busy || !d.heal.options.length} onClick={() => setHealOpen(true)} aria-label="Подлечиться">🍖</button>}
-      </div>
-      {!d.ready.can && <div className="hp-warn">Слишком ранен — в строй через {hm(d.ready.minutes)}</div>}
+        {!d.ready.can && <div className="bh-warn">⚠ Ранен — в строй через {hm(d.ready.minutes)}</div>}
 
-      <div className="cap">бестиарий · цель охоты</div>
-      <div className="hunt-grid">
-        {d.beasts.map((b) => (
-          <button key={b.id} className={`hunt-card th-${threatCls(b.win)}`} onClick={() => { haptic('light'); setPick(b) }}>
-            <span className="hc-glow" />
-            <div className="hc-portrait"><span className="hc-emo">{b.emoji}</span></div>
-            <div className="hc-top">
-              <span className="hc-name">{b.name}{b.regional && <em className="hc-reg">КРАЙ</em>}</span>
-              <div className="hc-traits">{b.traits.map((t) => <span key={t} className="hc-tr">{TRAIT[t] || t}</span>)}</div>
-            </div>
-            <div className="hc-win"><b>{b.win}<small>%</small></b><i>{b.threat.label}</i></div>
-            <div className="hc-bar"><i style={{ width: `${b.win}%` }} /></div>
-            <div className="hc-bot">
-              <span className="hc-stats"><i>❤ {b.hp}</i><i>⚔ {b.attack}</i><i>🛡 {b.armor}</i></span>
-              <span className="hc-loot">
-                <ResIcon k="gold" size={14} />
-                {b.drops.slice(0, 3).map((dr, i) => dr.trophy
-                  ? <span key={i} className="hc-tro">🏆</span>
-                  : <ResIcon key={i} k={dr.key!} emoji={dr.emoji} size={14} />)}
-              </span>
-            </div>
-          </button>
-        ))}
+        <div className="posters">
+          {d.beasts.map((b, i) => (
+            <button key={b.id} className={`poster th-${threatCls(b.win)}`}
+              style={{ transform: `rotate(${(i % 2 ? 1 : -1) * (0.7 + (i % 3) * 0.5)}deg)`, marginLeft: i % 2 ? 10 : 0, marginRight: i % 2 ? 0 : 10, zIndex: 10 + i }}
+              onClick={() => { haptic('light'); setPick(b) }}>
+              <div className="poster-paper">
+                <div className="poster-head">— РАЗЫСКИВАЕТСЯ —{b.regional && <em> · здешний</em>}</div>
+                <div className="poster-row">
+                  <span className="poster-emo">{b.emoji}</span>
+                  <div className="poster-id">
+                    <span className="poster-name">{b.name}</span>
+                    <span className="poster-danger">угроза: {b.threat.label}{b.traits.length ? ` · ${b.traits.map((t) => TRAIT[t] || t).join(', ')}` : ''}</span>
+                  </div>
+                </div>
+                <div className="poster-foot">
+                  <span className="poster-reward"><ResIcon k="gold" size={15} />{b.gold[0]}–{b.gold[1]}</span>
+                  <span className="poster-drops">{b.drops.slice(0, 3).map((dr, k) => dr.trophy
+                    ? <span key={k}>🏆</span> : <ResIcon key={k} k={dr.key!} emoji={dr.emoji} size={14} />)}</span>
+                </div>
+              </div>
+              <span className="nail" />
+              <span className="seal"><b>{b.win}<small>%</small></b></span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {pick && (
