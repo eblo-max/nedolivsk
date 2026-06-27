@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
-import { haptic, hapticNotify, initData } from '../telegram'
+import { haptic, hapticNotify } from '../telegram'
 import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
 import ReputationSheet from './ReputationSheet'
@@ -110,8 +110,8 @@ export default function Character() {
   }, [reload])
 
   if (loading && !data) return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
-  // в реальном Telegram сбой загрузки — честная ошибка, а не подмена заглушкой
-  if (error && error !== 'no_tavern' && initData()) return (
+  // в проде сбой загрузки — честная ошибка, а не подмена заглушкой
+  if (error && error !== 'no_tavern' && !import.meta.env.DEV) return (
     <div className="center" style={{ flex: 1, flexDirection: 'column', gap: 14, padding: 26, textAlign: 'center' }}>
       <div className="muted" style={{ fontStyle: 'italic' }}>Не удалось загрузить персонажа.</div>
       <button className="btn gold" style={{ maxWidth: 220 }} onClick={() => reload()}>Повторить</button>

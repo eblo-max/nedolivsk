@@ -108,7 +108,7 @@ export default function Sorties() {
       const r = await api<FightRes>('hunt_fight', { id: b.id })
       set(r.hunt); setFight(r)
     } catch (e) {
-      if (!initData()) { setFight(synthFight(b, d)); return }   // офлайн-превью: показываем демо-бой
+      if (import.meta.env.DEV && !initData()) { setFight(synthFight(b, d)); return }   // dev-превью: демо-бой
       const code = (e as { code?: string })?.code
       flash(code === 'lowhp' ? 'Слишком ранен — отлёживайся' : 'Не вышло'); hapticNotify('warning')
     } finally { setBusy(false) }
@@ -123,7 +123,7 @@ export default function Sorties() {
   }
 
   if (loading && !data) return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
-  if (error && error !== 'no_tavern' && initData()) return (
+  if (error && error !== 'no_tavern' && !import.meta.env.DEV) return (
     <div className="center" style={{ flex: 1, flexDirection: 'column', gap: 14, padding: 26, textAlign: 'center' }}>
       <div className="muted" style={{ fontStyle: 'italic' }}>Не удалось загрузить охоту.</div>
       <button className="btn gold" style={{ maxWidth: 220 }} onClick={() => reload()}>Повторить</button>

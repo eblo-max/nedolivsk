@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApi } from '../hooks'
 import { api, errText } from '../api'
-import { haptic, hapticNotify, initData, pushBack, popBack } from '../telegram'
+import { haptic, hapticNotify, pushBack, popBack } from '../telegram'
 import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
 
@@ -289,7 +289,7 @@ export default function Buildings() {
   }
 
   if (loading && !data) return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
-  if (error && error !== 'no_tavern' && initData()) return (
+  if (error && error !== 'no_tavern' && !import.meta.env.DEV) return (
     <div className="center" style={{ flex: 1, flexDirection: 'column', gap: 14, padding: 26, textAlign: 'center' }}>
       <div className="muted" style={{ fontStyle: 'italic' }}>Не удалось загрузить пристройки.</div>
       <button className="btn gold" style={{ maxWidth: 220 }} onClick={() => reload()}>Повторить</button>

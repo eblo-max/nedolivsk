@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
-import { haptic, hapticNotify, initData } from '../telegram'
+import { haptic, hapticNotify } from '../telegram'
 import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Onboarding from './Onboarding'
 import ActionSheet from './ActionSheet'
@@ -93,9 +93,9 @@ export default function Tavern() {
   if (error === 'no_tavern' && !created)
     return <Onboarding onCreated={(st) => { set(st as TavernState); setCreated(true) }} />
   if (loading && !data) return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
-  // в реальном Telegram сбой загрузки (auth/timeout/сеть) — честная ошибка, НЕ показываем
-  // демо-таверну: иначе игрок видел бы чужую «Кривую Кружку» вместо своей.
-  if (error && error !== 'no_tavern' && initData()) return (
+  // в проде сбой загрузки (auth/timeout/сеть/пустой initData) — честная ошибка, НЕ
+  // показываем демо-таверну: иначе игрок видел бы чужую «Кривую Кружку» вместо своей.
+  if (error && error !== 'no_tavern' && !import.meta.env.DEV) return (
     <div className="center" style={{ flex: 1, flexDirection: 'column', gap: 14, padding: 26, textAlign: 'center' }}>
       <div className="muted" style={{ fontStyle: 'italic' }}>
         {error === 'auth' ? 'Сессия устарела — закрой и открой приложение заново.' : 'Не удалось загрузить таверну.'}
