@@ -706,13 +706,14 @@ body {
 /* ── РАСКОЛ СЦЕНЫ: две тапающиеся половины мира ── */
 .nr-split { inset:0; display:flex; }
 .nr-half { position:relative; flex:1; border:none; cursor:pointer; padding:0; display:flex; align-items:flex-end; justify-content:center;
-  background:transparent; overflow:hidden; -webkit-tap-highlight-color:transparent; transition:filter .18s; }
-/* тон — мягкое свечение снизу (откуда текст), тает к верху и краям: без прямоугольных границ, сцена просвечивает */
-.nr-half::before { content:""; position:absolute; inset:0; pointer-events:none; transition:opacity .2s; }
-.nr-half.risk::before { background:radial-gradient(85% 55% at 50% 116%, rgba(168,46,30,.5), rgba(110,28,18,0) 72%); }
-.nr-half.safe::before { background:radial-gradient(85% 55% at 50% 116%, rgba(28,128,76,.46), rgba(16,86,52,0) 72%); }
-.nr-half.gold::before { background:radial-gradient(85% 55% at 50% 116%, rgba(168,120,44,.46), rgba(90,64,18,0) 72%); }
-.nr-half.cool::before { background:radial-gradient(85% 55% at 50% 116%, rgba(48,96,140,.46), rgba(26,52,84,0) 72%); }
+  background:transparent; -webkit-tap-highlight-color:transparent; transition:filter .18s; }
+/* тон — мягкое свечение снизу (откуда текст), тает к верху и краям: без прямоугольных границ, сцена просвечивает.
+   ::before продлён ВНИЗ под навбар (bottom отрицательный) — чтобы при скролле не было кромки тонировки */
+.nr-half::before { content:""; position:absolute; top:0; left:0; right:0; bottom:calc(-1 * (var(--nav-h) + 40px + var(--sa-bottom))); pointer-events:none; transition:opacity .2s; }
+.nr-half.risk::before { background:radial-gradient(135% 46% at 50% 100%, rgba(168,46,30,.5), rgba(110,28,18,0) 74%); }
+.nr-half.safe::before { background:radial-gradient(135% 46% at 50% 100%, rgba(28,128,76,.46), rgba(16,86,52,0) 74%); }
+.nr-half.gold::before { background:radial-gradient(135% 46% at 50% 100%, rgba(168,120,44,.46), rgba(90,64,18,0) 74%); }
+.nr-half.cool::before { background:radial-gradient(135% 46% at 50% 100%, rgba(48,96,140,.46), rgba(26,52,84,0) 74%); }
 .nr-half:active { filter:brightness(1.18); }
 .nr-half:active::before { opacity:.72; }
 /* фикс. высота контента → эмодзи/имя/строки совпадают по высоте в обеих половинах (верх блока выровнен) */
