@@ -23,8 +23,8 @@ interface NOut {
 
 const SITUATION: Record<string, { t: string; cls: string }> = {
   curfew: { t: '🚨 Облава! Стража злее голодной собаки', cls: 'bad' },
-  thieves_rampant: { t: '🗡 Ворьё гуляет — держи кошель, ротозей', cls: 'bad' },
-  merchant_boom: { t: '💰 Обозы жирные — хапай, пока дают', cls: 'good' },
+  thieves_rampant: { t: '🗡 Ворьё гуляет, держи кошель крепче', cls: 'bad' },
+  merchant_boom: { t: '💰 Обозы жирные, хапай пока дают', cls: 'good' },
 }
 const hms = (s: number) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h} ч ${m} мин` : `${m} мин ${s % 60} с` }
 
