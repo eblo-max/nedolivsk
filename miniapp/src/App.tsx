@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { pushBack, popBack } from './telegram'
 import BottomNav from './components/BottomNav'
-import MusicToggle from './components/MusicToggle'
+import { music } from './music'
 import Splash from './screens/Splash'
 import Tavern from './screens/Tavern'
 import Character from './screens/Character'
@@ -25,6 +25,20 @@ export default function App() {
     return () => popBack(cb)
   }, [loc.pathname, intro, nav])
 
+  // фоновая музыка: старт по первому жесту (вебвью запрещает автоплей), пауза при сворачивании
+  useEffect(() => {
+    const kick = () => music.start()
+    window.addEventListener('pointerdown', kick, { once: true })
+    window.addEventListener('keydown', kick, { once: true })
+    const vis = () => music.setHidden(document.hidden)
+    document.addEventListener('visibilitychange', vis)
+    return () => {
+      window.removeEventListener('pointerdown', kick)
+      window.removeEventListener('keydown', kick)
+      document.removeEventListener('visibilitychange', vis)
+    }
+  }, [])
+
   return (
     <>
       <div className="fx-glow" />
@@ -45,7 +59,6 @@ export default function App() {
           </Routes>
         </div>
         <BottomNav />
-        <MusicToggle />
       </div>
     </>
   )

@@ -5,6 +5,7 @@ import { haptic, hapticNotify } from '../telegram'
 import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Onboarding from './Onboarding'
 import ActionSheet from './ActionSheet'
+import MusicToggle from '../components/MusicToggle'
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
@@ -92,6 +93,7 @@ export default function Tavern() {
       <Ticker items={t.world} />
 
       <div className="hero rise">
+        <MusicToggle />
         <div className="nm">{t.name}</div>
         <div className="meta">
           <span className="lvl">★ УРОВЕНЬ {t.level}</span>
