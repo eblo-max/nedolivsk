@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type CSSProperties } from 'react'
 import lottie from 'lottie-web/build/player/lottie_light'
 import { useApi } from '../hooks'
 import { api } from '../api'
-import { haptic, hapticNotify, initData, tg, atLeast } from '../telegram'
+import { haptic, hapticNotify, initData } from '../telegram'
 import { ResIcon, fmt } from '../components/icons'
 
 // ── типы (зеркало webapp _nightrun_state / _nr_out) ──
@@ -325,17 +325,6 @@ function HalfBody({ s }: { s: SplitSide }) {
 // ── интро ──
 function NrIntro({ d, busy, onStart }: { d: NState; busy: boolean; onStart: () => void }) {
   const cd = d.cooldown
-  // нативная MainButton Telegram как основной CTA (узнаваемая нижняя кнопка). В превью/старых
-  // клиентах — аккуратный inline-fallback ниже.
-  const useMB = !!tg?.MainButton && atLeast('6.1') && cd === 0
-  useEffect(() => {
-    const mb = tg?.MainButton
-    if (!useMB || !mb) return
-    mb.setParams({ text: 'Выйти на тракт', color: '#e0922c', text_color: '#241405', is_visible: true, is_active: !busy })
-    const cb = () => { if (!busy) onStart() }
-    mb.onClick(cb)
-    return () => { mb.offClick(cb); mb.hide() }
-  }, [useMB, busy, onStart])
   return (
     <div className="nr-scene intro rise">
       <div className="nr-fog" />
@@ -344,7 +333,7 @@ function NrIntro({ d, busy, onStart }: { d: NState; busy: boolean; onStart: () =
       <div className="nr-stats"><i>🛡 {d.stats.armor}</i><i>🍀 {d.stats.luck}</i></div>
       {cd > 0
         ? <div className="nr-cd">🌅 Ноги ещё гудят — в путь через <b>{hms(cd)}</b></div>
-        : !useMB && <button className="btn nr-go" disabled={busy} onClick={onStart}>🌙 Выйти на тракт</button>}
+        : <button className="btn nr-go" disabled={busy} onClick={() => { haptic('medium'); onStart() }}>🌙 Выйти на тракт</button>}
     </div>
   )
 }
