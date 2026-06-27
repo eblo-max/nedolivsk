@@ -258,8 +258,30 @@ def upgrade_confirm_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def _app_btn(kb, text: str, path: str = "", style: str | None = "success") -> bool:
+    """Кнопка, открывающая МИНИ-АПП (WebApp в ЛС). path — под-маршрут (buildings/sorties/
+    character). Если домен не задан — кнопку не добавляем (фолбэк на бот-кнопки рядом)."""
+    from bot.webapp import base_url
+    b = base_url()
+    if not b:
+        return False
+    url = f"{b}/app" + (f"/{path}" if path else "")
+    kb.button(text=text, web_app=WebAppInfo(url=url), **({"style": style} if style else {}))
+    return True
+
+
+def story_push_kb() -> InlineKeyboardMarkup:
+    """Ретеншн-пуш «у стойки гость» — открыть таверну в мини-аппе."""
+    kb = InlineKeyboardBuilder()
+    if not _app_btn(kb, "🍺 Загляни в таверну"):
+        kb.button(text="🍺 К таверне", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def claim_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    _app_btn(kb, "🎒 Забрать — в приложении")          # → мини-апп (Таверна)
     kb.button(text="🎒 Забрать добычу", callback_data="exp_claim", style="success")
     kb.button(text="🏠 К таверне", callback_data="tavern")
     kb.adjust(1)
@@ -365,7 +387,9 @@ def upgrade_short_kb() -> InlineKeyboardMarkup:
 def bonus_push_kb() -> InlineKeyboardMarkup:
     """Кнопка из утреннего пуша — сразу к экрану бонуса дня."""
     kb = InlineKeyboardBuilder()
+    _app_btn(kb, "🎁 Забрать — в приложении")
     kb.button(text="🎁 Забрать опохмел", callback_data="bonus", style="success")
+    kb.adjust(1)
     return kb.as_markup()
 
 
@@ -460,6 +484,7 @@ def hunt_detail_kb(enemy_id: str) -> InlineKeyboardMarkup:
 
 def hunt_cta_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    _app_btn(kb, "🏹 На охоту — в приложении", "sorties")
     kb.button(text="🏹 На охоту", callback_data="hunt")
     kb.button(text="🏠 К таверне", callback_data="tavern_new")
     kb.adjust(1)
@@ -727,6 +752,7 @@ def forge_item_kb(item_id: str, maxed: bool = False,
 
 def craft_claim_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    _app_btn(kb, "🎁 Забрать — в приложении", "character")
     kb.button(text="🎁 Забрать вещь", callback_data="craft_claim", style="success")
     kb.button(text="🧍 Персонаж", callback_data="character")
     kb.adjust(1)
@@ -781,6 +807,7 @@ def buildings_back_kb() -> InlineKeyboardMarkup:
 
 def buildings_notify_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
+    _app_btn(kb, "🏗 Пристройки — в приложении", "buildings")
     kb.button(text="🏗 Пристройки", callback_data="buildings")
     kb.button(text="🏠 К таверне", callback_data="tavern")
     kb.adjust(1)

@@ -30,7 +30,7 @@ from bot.game import world as wld
 from bot.keyboards.inline import (
     bonus_push_kb, buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb,
     idle_nudge_kb, invasion_announce_kb, loot_kb, onboard_nudge_kb,
-    raid_gather_kb, raid_kb,
+    raid_gather_kb, raid_kb, story_push_kb,
 )
 
 CHECK_INTERVAL_SECONDS = 60
@@ -90,11 +90,21 @@ async def _apply_invasion(session, inv, plan: dict) -> None:
                               texts.invasion_reward_dm(False, int(dgold), drep))
 
 
+def _has_webapp(markup) -> bool:
+    """Есть ли в клавиатуре web_app-кнопка (она работает ТОЛЬКО в личке, не в группе)."""
+    for row in getattr(markup, "inline_keyboard", []) or []:
+        for b in row:
+            if getattr(b, "web_app", None):
+                return True
+    return False
+
+
 async def _notify(bot: Bot, player: Player, text: str, markup) -> None:
     """Уведомление игроку. Если известен «домашний» чат (заходил через «гг») —
     постим туда с упоминанием и регистрируем сообщение как панель игрока, чтобы
-    к кнопке пускало только владельца (PanelGuard). Иначе или при сбое — в личку."""
-    if player.chat_id is not None:
+    к кнопке пускало только владельца (PanelGuard). Иначе или при сбое — в личку.
+    Если в клавиатуре есть web_app-кнопка (мини-апп) — сразу в личку (в группе нельзя)."""
+    if player.chat_id is not None and not _has_webapp(markup):
         name = html.escape(player.first_name or "Хозяин")
         body = f'<a href="tg://user?id={player.id}">{name}</a>!\n{text}'
         msg = await deliver(
@@ -178,8 +188,8 @@ async def _notify_returned(bot: Bot) -> None:
             if s is None:
                 continue
             story_state.set_pending(player, s.id, s.npc)
-            text, markup = story_engine.present(s, player)
-            outbox.append((player, text, markup))
+            who = npc.label(s.npc) if s.npc else "Гость"
+            outbox.append((player, f"🚪 {who} ждёт тебя у стойки — загляни в таверну.", story_push_kb()))
 
         result = await session.execute(
             select(Player)
