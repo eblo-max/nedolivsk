@@ -346,6 +346,24 @@ async def _auth(request: web.Request):
     return uid, body
 
 
+def _story_state(p, city=None) -> dict | None:
+    """Висящий визитёр-сторилет для мини-аппа: NPC (эмодзи/имя/характер), завязка и
+    ДОСТУПНЫЕ выборы (индексы — по полному списку choices, как ждёт story_engine.resolve)."""
+    from bot.game import story_engine as se, npc as npcmod
+    from bot.game.story_defs import Ctx
+    s = se.pending_storylet(p)
+    if s is None:
+        return None
+    ctx = Ctx(player=p, city=city)
+    cz = npcmod.CATALOG.get(s.npc) if s.npc else None
+    npcd = ({"emoji": cz.emoji, "name": cz.name, "blurb": cz.blurb, "traits": list(cz.traits)}
+            if cz else ({"emoji": "🚪", "name": s.npc, "blurb": "", "traits": []} if s.npc else None))
+    choices = [{"index": i, "label": c.label}
+               for i, c in enumerate(s.choices)
+               if all(pr.check(ctx) for pr in c.requires)]
+    return {"id": s.id, "title": s.title, "text": s.text, "npc": npcd, "choices": choices}
+
+
 def _tavern_state(p, t) -> dict:
     """Состояние Таверны для мини-аппа — собрано из ТЕХ ЖЕ функций, что и текстовый
     экран бота (texts/logic/balance), но структурировано в JSON. Чистое чтение."""
@@ -398,6 +416,12 @@ def _tavern_state(p, t) -> dict:
         now.append({"icon": "🏗", "text": bl.replace("🏗 ", "", 1)})
     # перестройку не дублируем в «Сейчас» — она отдельной карточкой ниже
 
+    story = _story_state(p)                       # внезапный визитёр-горожанин (story-движок)
+    if story:
+        _np = story.get("npc") or {}
+        now.insert(0, {"icon": _np.get("emoji", "🚪"), "text": f"{_np.get('name', 'Гость')} у стойки",
+                       "sub": "ждёт твоего слова", "badge": "ready", "action": "story"})
+
     inv = p.inventory or {}
     storage = [{"key": r, "name": bal.RESOURCE_NAMES.get(r, r), "amount": int(inv.get(r, 0))}
                for r in bal.RESOURCES if int(inv.get(r, 0)) > 0]
@@ -416,21 +440,82 @@ def _tavern_state(p, t) -> dict:
         "now": now, "storage": storage, "cellar": cellar,
         "world": texts._world_lines(chat_id, seasonmod, citymod),
         "next_upgrade": (None if maxed else bal.upgrade_cost(t.level)),
-        "upgrade_pct": pct, "maxed": maxed,
+        "upgrade_pct": pct, "maxed": maxed, "story": story,
     }
 
 
 async def _api_state(request: web.Request) -> web.Response:
-    """Снапшот Таверны (read-only)."""
+    """Снапшот Таверны. При открытии — шанс на внезапного визитёра (story-движок),
+    как в текстовом боте при заходе в таверну."""
     uid, body = await _auth(request)
     if uid is None:
         return body
+    from datetime import datetime, timezone
+    from bot.game import story_engine as se
     async with session_factory() as s:
-        p = await repo.get_player(s, uid)
+        p = await repo.get_player(s, uid, for_update=True)
         if p is None or not p.tavern:
             return web.json_response({"ok": False, "error": "no_tavern"})
+        now = datetime.now(timezone.utc)
+        city = await repo.get_or_create_city(s, p.chat_id, lock=True) if p.chat_id else None
+        spawned = se.maybe_spawn(p, city, now)       # кулдаун+шанс → pending
+        if spawned is not None:
+            repo.add_log(s, "player", p.id, "🚪 у стойки объявился гость")
+            await s.commit()
         out = _tavern_state(p, p.tavern)
+        out["story"] = _story_state(p, city)         # с городом — корректная доступность выборов
     return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+async def _api_story_choice(request: web.Request) -> web.Response:
+    """Резолв выбора у визитёра (story_engine.resolve): применить эффекты, записать
+    летопись, эхо в общий чат (через очередь нотифаера), вернуть исход + дельты."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from datetime import datetime, timezone
+    from bot.game import story_engine as se, story_state as ss, balance as bal, production as prod
+    idx = int(body.get("index", -1))
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        st = se.pending_storylet(p)
+        if st is None:
+            if ss.get_pending(p):
+                ss.clear_pending(p); await s.commit()
+            return web.json_response({"ok": False, "error": "gone"})
+        now = datetime.now(timezone.utc)
+        city = await repo.get_or_create_city(s, p.chat_id, lock=True) if p.chat_id else None
+        shielded = ss.is_shielded(p, now)
+        g0, r0 = int(p.gold), int(p.reputation or 0)
+        inv0 = dict(p.inventory or {}); cel0 = dict((p.tavern.products or {}))
+        outcome, ctx = se.resolve(p, city, st, idx, now, shielded=shielded)
+        if outcome is None:
+            return web.json_response({"ok": False, "error": "unavailable"})
+        if p.chat_id is not None:
+            for line in ctx.chronicle:
+                await repo.add_chronicle(s, p.chat_id, line)
+            for line in ctx.chat_echo:               # эхо в группу — через очередь нотифаера
+                repo.queue_notify(s, p.chat_id, line)
+        repo.add_log(s, "player", p.id, f"🚪 {st.title}")
+        await s.commit()
+        # дельты для красивого исхода
+        names = {**bal.RESOURCE_NAMES, **bal.GOODS_NAMES}
+        emojis = {**bal.RESOURCE_EMOJI, **bal.GOODS_EMOJI}
+        res = []
+        for src0, src1 in ((inv0, dict(p.inventory or {})), (cel0, dict(p.tavern.products or {}))):
+            for k in set(src0) | set(src1):
+                d = src1.get(k, 0) - src0.get(k, 0)
+                if d:
+                    gd = prod.GOODS.get(k)
+                    res.append({"key": k, "qty": int(d),
+                                "name": gd.name if gd else names.get(k, k),
+                                "emoji": gd.emoji if gd else emojis.get(k)})
+        out = _tavern_state(p, p.tavern)
+    return web.json_response({"ok": True, "title": st.title, "text": outcome.text,
+                              "gold": int(p.gold) - g0, "rep": int(p.reputation or 0) - r0,
+                              "res": res, "state": out}, headers={"Cache-Control": "no-store"})
 
 
 async def _api_collect(request: web.Request) -> web.Response:
@@ -1878,6 +1963,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/nightrun/quiz", _api_nightrun_quiz)    # ответ на загадку
     app.router.add_post("/api/nightrun/push", _api_nightrun_push)    # глубже
     app.router.add_post("/api/nightrun/bank", _api_nightrun_bank)    # свернуть (банк)
+    app.router.add_post("/api/story_choice", _api_story_choice)  # резолв выбора у визитёра
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы

@@ -6,6 +6,7 @@ import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Onboarding from './Onboarding'
 import ActionSheet from './ActionSheet'
 import MusicToggle from '../components/MusicToggle'
+import StoryVisitor, { type StoryData } from './StoryVisitor'
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
@@ -19,6 +20,7 @@ interface TavernState {
   storage: ResLine[]; cellar: CellarLine[]
   world: string[]
   next_upgrade?: Record<string, number> | null; upgrade_pct?: number | null; maxed?: boolean
+  story?: StoryData | null
 }
 
 // образец для оффлайн-превью (форма 1:1 как у /api/state)
@@ -52,6 +54,8 @@ export default function Tavern() {
   const [busy, setBusy] = useState(false)
   const [created, setCreated] = useState(false)
   const [sheet, setSheet] = useState<string | null>(null)
+  const [storyOpen, setStoryOpen] = useState(false)
+  const storySeen = useRef<string | null>(null)        // авто-показ визитёра один раз на его id
   const panelCache = useRef<Record<string, unknown>>({})
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const flash = (m: string) => {
@@ -65,6 +69,12 @@ export default function Tavern() {
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [reload, sheet])
+
+  // внезапный визитёр объявился — авто-показ один раз (повторно — через карточку «Сейчас»)
+  useEffect(() => {
+    const sid = data?.story?.id
+    if (sid && storySeen.current !== sid) { storySeen.current = sid; setStoryOpen(true) }
+  }, [data?.story?.id])
 
   // ещё нет таверны — стартовый экран (создание игрока + таверны)
   if (error === 'no_tavern' && !created)
@@ -85,7 +95,9 @@ export default function Tavern() {
   }
   function openSheet(a: Activity) {
     if (!a.action) return
-    haptic('light'); setSheet(a.action)
+    haptic('light')
+    if (a.action === 'story') { setStoryOpen(true); return }
+    setSheet(a.action)
   }
 
   return (
@@ -176,6 +188,11 @@ export default function Tavern() {
       {sheet && <ActionSheet kind={sheet} initial={panelCache.current[sheet]}
         onCache={(k, d) => { panelCache.current[k] = d }}
         onState={(s) => set(s as TavernState)} onClose={() => setSheet(null)} flash={flash} />}
+      {storyOpen && t.story && (
+        <StoryVisitor story={t.story}
+          onResolved={(s) => { if (s) set(s as TavernState); setStoryOpen(false); reload() }}
+          onClose={() => setStoryOpen(false)} />
+      )}
       {toast && <div className="toast">{toast}</div>}
     </>
   )
