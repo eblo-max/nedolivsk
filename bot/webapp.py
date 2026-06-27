@@ -391,6 +391,49 @@ def _story_state(p, city=None) -> dict | None:
     return {"id": s.id, "title": s.title, "text": s.text, "npc": npcd, "choices": choices}
 
 
+def _world_event_state() -> dict | None:
+    """Активное мировое событие (погода/экономика) для баннера на Таверне: имя, завязка,
+    человекочитаемые эффекты и модный товар (если спрос-событие)."""
+    from bot.game import worldevent as we, balance as bal, production as prod
+    e = we.active()
+    if e is None:
+        return None
+    good = we.fashion_good()
+    gname = None
+    if good:
+        g = prod.GOODS.get(good)
+        gname = g.name if g else {**bal.RESOURCE_NAMES, **bal.GOODS_NAMES}.get(good, good)
+    effs: list[dict] = []
+    def chan(m, label):                       # обычный канал: >1 — выгода
+        if m != 1.0:
+            effs.append({"text": f"{label} {'+' if m > 1 else '−'}{round(abs(m - 1) * 100)}%", "good": m > 1})
+    def spd(m, label):                        # скорость: <1 — быстрее (выгода)
+        if m != 1.0:
+            effs.append({"text": f"{label} {'быстрее' if m < 1 else 'медленнее'} на {round(abs(m - 1) * 100)}%", "good": m < 1})
+    chan(e.income, "касса"); chan(e.harvest, "добыча"); chan(e.sale, "сбыт")
+    spd(e.exp_speed, "бригады"); spd(e.prod_speed, "варка")
+    if good and gname:
+        effs.append({"text": f"{gname} ×{e.good_price:g}", "good": e.good_price > 1})
+    return {"emoji": e.emoji, "name": e.name, "blurb": e.blurb, "good": good, "good_name": gname, "effects": effs}
+
+
+def _city_state(city) -> dict | None:
+    """Город сегодня: настроение, текущая ситуация и расклад сил фракций."""
+    if city is None:
+        return None
+    from bot.game import city as citymod, factions
+    from bot import texts
+    sit = citymod.current(city)
+    fp = {f: v for f, v in (city.faction_power or {}).items() if v}
+    mv = citymod.mood_value(city)
+    return {
+        "mood": int(mv), "mood_label": texts._mood_label(mv),
+        "situation": ({"emoji": sit.emoji, "label": sit.label} if sit else None),
+        "factions": [{"id": f, "name": factions.name(f), "power": int(v)}
+                     for f, v in sorted(fp.items(), key=lambda x: -x[1])],
+    }
+
+
 def _tavern_state(p, t) -> dict:
     """Состояние Таверны для мини-аппа — собрано из ТЕХ ЖЕ функций, что и текстовый
     экран бота (texts/logic/balance), но структурировано в JSON. Чистое чтение."""
@@ -491,6 +534,8 @@ async def _api_state(request: web.Request) -> web.Response:
             await s.commit()
         out = _tavern_state(p, p.tavern)
         out["story"] = _story_state(p, city)         # с городом — корректная доступность выборов
+        out["world_event"] = _world_event_state()    # баннер активного мирового события
+        out["city"] = _city_state(city)              # настроение + фракции + ситуация
     return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 

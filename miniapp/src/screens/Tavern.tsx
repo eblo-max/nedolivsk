@@ -11,6 +11,10 @@ import StoryVisitor, { type StoryData } from './StoryVisitor'
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
 interface CellarLine { key: string; name: string; qty: number }
+interface WEffect { text: string; good: boolean }
+interface WorldEvent { emoji: string; name: string; blurb: string; good?: string | null; good_name?: string | null; effects: WEffect[] }
+interface CityFaction { id: string; name: string; power: number }
+interface CityData { mood: number; mood_label: string; situation: { emoji: string; label: string } | null; factions: CityFaction[] }
 interface TavernState {
   ok: boolean
   name: string; level: number; region: string; flavor: string
@@ -21,6 +25,8 @@ interface TavernState {
   world: string[]
   next_upgrade?: Record<string, number> | null; upgrade_pct?: number | null; maxed?: boolean
   story?: StoryData | null
+  world_event?: WorldEvent | null
+  city?: CityData | null
 }
 
 // образец для оффлайн-превью (форма 1:1 как у /api/state)
@@ -46,6 +52,8 @@ const SAMPLE: TavernState = {
   ],
   world: ['🍂 Осень — спрос обычный', '🪓 Орда орков точит топоры на севере', '🏛 В городе тихо'],
   next_upgrade: { gold: 715, wood: 220, grain: 180, hops: 120 }, upgrade_pct: 60,
+  world_event: { emoji: '🔥', name: 'Ажиотаж', blurb: 'Весь Недоливск помешался на одном товаре — он в цене, налетай!', good: 'butter', good_name: 'Масло', effects: [{ text: 'Масло ×1.5', good: true }] },
+  city: { mood: 18, mood_label: '🙂 доброе', situation: { emoji: '💰', label: 'Купеческий бум' }, factions: [{ id: 'merchants', name: 'Купеческая лига', power: 42 }, { id: 'thieves', name: 'Воровская гильдия', power: 20 }, { id: 'watch', name: 'Стража', power: -15 }] },
 }
 
 export default function Tavern() {
@@ -116,6 +124,24 @@ export default function Tavern() {
         <div className="flavor">«{t.flavor}»</div>
       </div>
 
+      {/* мировое событие — баннер */}
+      {t.world_event && (
+        <div className="we-banner rise" style={{ animationDelay: '.02s' }}>
+          <span className="we-emo">{t.world_event.emoji}</span>
+          <div className="we-body">
+            <div className="we-name">{t.world_event.name}</div>
+            <div className="we-blurb">{t.world_event.blurb}</div>
+            {t.world_event.effects.length > 0 && (
+              <div className="we-effs">
+                {t.world_event.effects.map((e, i) => (
+                  <span key={i} className={`we-eff ${e.good ? 'pos' : 'neg'}`}>{e.text}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* доход */}
       <div className="card rise" style={{ animationDelay: '.04s' }}>
         <div className="card-h"><span className="he">💰</span>ДОХОД<span className="cnt">+{t.income_rate}/ч</span></div>
@@ -136,6 +162,29 @@ export default function Tavern() {
         <div className="card-h"><span className="he">⚡</span>СЕЙЧАС</div>
         <div className="card-b">{t.now.map((a, i) => <ActivityRow key={i} a={a} onAct={openSheet} />)}</div>
       </div>
+
+      {/* город: настроение + фракции + ситуация */}
+      {t.city && (
+        <div className="card rise" style={{ animationDelay: '.1s' }}>
+          <div className="card-h"><span className="he">🏛</span>ГОРОД<span className="cnt">{t.city.mood_label}</span></div>
+          <div className="card-b">
+            {t.city.situation && (
+              <div className="city-sit">{t.city.situation.emoji} <b>{t.city.situation.label}</b> — в самом разгаре</div>
+            )}
+            {t.city.factions.length > 0 ? (
+              <div className="city-facs">
+                {t.city.factions.map((f) => (
+                  <div key={f.id} className="city-fac">
+                    <span className="cf-name">{f.name}</span>
+                    <span className="cf-bar"><i className={f.power >= 0 ? 'up' : 'dn'} style={{ width: `${Math.min(100, Math.abs(f.power))}%` }} /></span>
+                    <span className="cf-val">{f.power > 0 ? '+' : ''}{f.power}</span>
+                  </div>
+                ))}
+              </div>
+            ) : <div className="muted" style={{ fontStyle: 'italic', fontFamily: 'var(--text)' }}>Тишь да гладь — фракции дремлют. Пока.</div>}
+          </div>
+        </div>
+      )}
 
       {/* заведение */}
       <div className="card rise" style={{ animationDelay: '.12s' }}>

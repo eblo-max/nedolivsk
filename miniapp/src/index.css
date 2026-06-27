@@ -1031,3 +1031,28 @@ body {
   border-radius:16px; object-fit:cover; font-size:46px; line-height:1; overflow:hidden;
   background:rgba(231,191,99,.08); box-shadow:0 4px 14px #000c, inset 0 0 0 1px #ffffff1c;
   animation:sv-pop .4s cubic-bezier(.2,1.5,.4,1) both; }
+
+/* ── баннер мирового события на Таверне ── */
+.we-banner { display:flex; gap:11px; align-items:flex-start; padding:11px 13px; border-radius:14px;
+  background:linear-gradient(135deg,#2a1c0c,#1a1207); border:1px solid var(--brass-d,#5a4326);
+  box-shadow:0 4px 16px #0008, inset 0 1px 0 #ffffff0c; }
+.we-emo { font-size:30px; line-height:1; flex:none; filter:drop-shadow(0 2px 6px #000a); margin-top:1px; }
+.we-body { flex:1; min-width:0; }
+.we-name { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:15px; color:var(--gold,#f0b859); letter-spacing:-.2px; }
+.we-blurb { font-family:var(--text),Georgia,serif; font-size:12px; color:#c2b594; line-height:1.4; margin:2px 0 6px; }
+.we-effs { display:flex; flex-wrap:wrap; gap:6px; }
+.we-eff { font-family:system-ui,sans-serif; font-weight:700; font-size:11px; padding:3px 9px; border-radius:99px; }
+.we-eff.pos { color:#b8e88a; background:rgba(120,200,120,.12); box-shadow:inset 0 0 0 1px #86c98a44; }
+.we-eff.neg { color:#f0a08a; background:rgba(200,90,70,.12); box-shadow:inset 0 0 0 1px #cf6a4a44; }
+
+/* ── карточка «Город» ── */
+.city-sit { font-family:var(--text),system-ui,sans-serif; font-size:13.5px; color:#e3d9c4; margin-bottom:10px; }
+.city-sit b { color:var(--gold,#f0b859); }
+.city-facs { display:flex; flex-direction:column; gap:8px; }
+.city-fac { display:flex; align-items:center; gap:10px; }
+.cf-name { font-family:system-ui,sans-serif; font-size:12.5px; color:#cbc0a6; width:118px; flex:none; }
+.cf-bar { flex:1; height:7px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; position:relative; }
+.cf-bar i { display:block; height:100%; border-radius:99px; }
+.cf-bar i.up { background:linear-gradient(90deg,#c97a2a,#f3b85a); }
+.cf-bar i.dn { background:linear-gradient(90deg,#7a3320,#cf6a4a); }
+.cf-val { font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:12px; color:#b7a587; width:34px; text-align:right; flex:none; }
