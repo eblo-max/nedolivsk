@@ -707,13 +707,13 @@ body {
 .nr-split { inset:0; display:flex; }
 .nr-half { position:relative; flex:1; border:none; cursor:pointer; padding:0; display:flex; align-items:flex-end; justify-content:center;
   background:transparent; -webkit-tap-highlight-color:transparent; transition:filter .18s; }
-/* тон — мягкое свечение снизу (откуда текст), тает к верху и краям: без прямоугольных границ, сцена просвечивает.
-   ::before продлён ВНИЗ под навбар (bottom отрицательный) — чтобы при скролле не было кромки тонировки */
+/* тон — вертикальный градиент снизу вверх (равномерен по ширине → нет боковых краёв; прозрачный сверху → сцена видна).
+   ::before продлён ВНИЗ под навбар (bottom отрицательный) — чтобы при скролле не было нижней кромки */
 .nr-half::before { content:""; position:absolute; top:0; left:0; right:0; bottom:calc(-1 * (var(--nav-h) + 40px + var(--sa-bottom))); pointer-events:none; transition:opacity .2s; }
-.nr-half.risk::before { background:radial-gradient(135% 46% at 50% 100%, rgba(168,46,30,.5), rgba(110,28,18,0) 74%); }
-.nr-half.safe::before { background:radial-gradient(135% 46% at 50% 100%, rgba(28,128,76,.46), rgba(16,86,52,0) 74%); }
-.nr-half.gold::before { background:radial-gradient(135% 46% at 50% 100%, rgba(168,120,44,.46), rgba(90,64,18,0) 74%); }
-.nr-half.cool::before { background:radial-gradient(135% 46% at 50% 100%, rgba(48,96,140,.46), rgba(26,52,84,0) 74%); }
+.nr-half.risk::before { background:linear-gradient(to top, rgba(160,44,28,.46) 0, rgba(160,44,28,.4) 120px, rgba(160,44,28,0) 350px); }
+.nr-half.safe::before { background:linear-gradient(to top, rgba(28,124,74,.44) 0, rgba(28,124,74,.38) 120px, rgba(28,124,74,0) 350px); }
+.nr-half.gold::before { background:linear-gradient(to top, rgba(160,116,42,.44) 0, rgba(160,116,42,.38) 120px, rgba(160,116,42,0) 350px); }
+.nr-half.cool::before { background:linear-gradient(to top, rgba(46,92,136,.44) 0, rgba(46,92,136,.38) 120px, rgba(46,92,136,0) 350px); }
 .nr-half:active { filter:brightness(1.18); }
 .nr-half:active::before { opacity:.72; }
 /* фикс. высота контента → эмодзи/имя/строки совпадают по высоте в обеих половинах (верх блока выровнен) */
