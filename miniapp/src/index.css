@@ -704,7 +704,8 @@ body {
 .nr-sat small { color:#bba16f; font-weight:400; font-size:11px; } .nr-sat b { color:#ffcf7a; }
 
 /* ── РАСКОЛ СЦЕНЫ: две тапающиеся половины мира ── */
-.nr-split { inset:0; display:flex; }
+/* full-bleed на всю ширину вьюпорта (вырываемся из 12px-паддинга .scroll), резиново через 100vw → нет боковых линий */
+.nr-split { top:0; bottom:0; left:50%; width:100vw; transform:translateX(-50%); display:flex; }
 .nr-half { position:relative; flex:1; border:none; cursor:pointer; padding:0; display:flex; align-items:flex-end; justify-content:center;
   background:transparent; -webkit-tap-highlight-color:transparent; transition:filter .18s; }
 /* тон — вертикальный градиент снизу вверх (равномерен по ширине → нет боковых краёв; прозрачный сверху → сцена видна).
