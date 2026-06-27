@@ -7,8 +7,6 @@ import Splash from './screens/Splash'
 import Tavern from './screens/Tavern'
 import Character from './screens/Character'
 import Sorties from './screens/Sorties'
-import Market from './screens/Market'
-import MapScreen from './screens/MapScreen'
 import Buildings from './screens/Buildings'
 
 export default function App() {
@@ -47,14 +45,13 @@ export default function App() {
       {intro && <Splash onEnter={() => setIntro(false)} />}
       <div className="app">
         {/* место под фикс. тикер резервируем только на Таверне (он там и рендерится) */}
-        <div className={`scroll${['/buildings', '/character', '/sorties', '/market', '/map'].includes(loc.pathname) ? '' : ' with-ticker'}`}>
+        <div className={`scroll${['/buildings', '/character', '/sorties'].includes(loc.pathname) ? '' : ' with-ticker'}`}>
           <Routes>
             <Route path="/" element={<Tavern />} />
             <Route path="/buildings" element={<Buildings />} />
             <Route path="/character" element={<Character />} />
             <Route path="/sorties" element={<Sorties />} />
-            <Route path="/market" element={<Market />} />
-            <Route path="/map" element={<MapScreen />} />
+            {/* Торг и Карта пока не готовы — любой др. путь ведёт в Таверну */}
             <Route path="*" element={<Tavern />} />
           </Routes>
         </div>

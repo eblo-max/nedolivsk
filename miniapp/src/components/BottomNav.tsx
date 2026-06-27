@@ -1,13 +1,12 @@
 import { NavLink } from 'react-router-dom'
 import { haptic } from '../telegram'
 
+// Только готовые разделы. Торг и Карта пока в боте — вернём вкладки, когда доделаем.
 const TABS = [
   { to: '/', icon: '🏠', label: 'Таверна' },
   { to: '/buildings', icon: '🏗', label: 'Стройка' },
   { to: '/character', icon: '🧍', label: 'Персонаж' },
   { to: '/sorties', icon: '⚔️', label: 'Вылазки' },
-  { to: '/market', icon: '💰', label: 'Торг' },
-  { to: '/map', icon: '🗺', label: 'Карта' },
 ]
 
 export default function BottomNav() {

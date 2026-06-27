@@ -73,6 +73,16 @@ def tavern_kb(player: Player, private: bool = True) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     sizes: list[int] = []
 
+    # ГЛАВНЫЙ ВХОД в мини-апп (только в личке — web_app группа не принимает).
+    # Открываем всем игрокам; внутри доступны готовые разделы (Таверна/Стройка/
+    # Персонаж/Вылазки), Торг и Карта пока живут в боте.
+    if private:
+        from bot import webapp
+        _aurl = webapp.base_url()
+        if _aurl:
+            kb.button(text="🏰 Открыть в приложении", web_app=WebAppInfo(url=f"{_aurl}/app"), style="success")
+            sizes.append(1)
+
     if raidmod.active_id() is not None:  # идёт глобальный рейд-босс — в бой!
         kb.button(text="⚔️ РЕЙД-БОСС — В БОЙ!", callback_data="raidopen", style="danger")
         sizes.append(1)

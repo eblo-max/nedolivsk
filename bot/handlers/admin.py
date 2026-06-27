@@ -130,19 +130,24 @@ async def cmd_reset(
 
 @router.message(Command("app"))
 async def cmd_app(message: Message) -> None:
-    """Открыть React-мини-апп (каркас игры) на телефоне (только админ)."""
-    if not _is_admin(message):
-        return
+    """Открыть мини-апп Недоливска. Доступно всем — только в личке (web_app)."""
     from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
     from bot.webapp import base_url
+    if message.chat.type != "private":
+        await message.answer("🏰 Мини-апп открывается в личке — напиши мне в ЛС и жми «🏰 Открыть в приложении».")
+        return
     b = base_url()
     if not b:
-        await message.answer("Нет webapp-домена (RAILWAY_PUBLIC_DOMAIN не задан).")
+        await message.answer("Мини-апп временно недоступен — приложение ещё разворачивается.")
         return
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🏰 Открыть Недоливск", web_app=WebAppInfo(url=b + "/app"))],
     ])
-    await message.answer("🏰 Мини-апп (каркас — Таверна + навигация):", reply_markup=kb)
+    await message.answer(
+        "🏰 <b>Недоливск</b> — таверна теперь в приложении!\n"
+        "Внутри: твоя таверна, стройка, персонаж с кузницей и вылазки на тракт.",
+        reply_markup=kb,
+    )
 
 
 @router.message(Command("fair"))
