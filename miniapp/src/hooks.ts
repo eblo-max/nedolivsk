@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api'
+import { initData } from './telegram'
 
 interface State<T> { data: T | null; loading: boolean; error: string | null }
 
-/** Загрузка состояния экрана с сервера. fallback — данные для оффлайн-превью
- * (когда нет initData/бэкенда), чтобы экран рисовался при локальной разработке. */
+/** Загрузка состояния экрана с сервера. fallback — данные ТОЛЬКО для оффлайн-превью
+ * (когда нет initData/бэкенда), чтобы экран рисовался при локальной разработке.
+ * В реальном Telegram fallback НЕ подставляется — иначе при сбое (auth/timeout)
+ * игрок увидел бы чужую демо-таверну вместо своей. */
 export function useApi<T>(path: string, fallback?: T) {
   const [s, setS] = useState<State<T>>({ data: null, loading: true, error: null })
 
@@ -12,7 +15,13 @@ export function useApi<T>(path: string, fallback?: T) {
     setS((p) => ({ ...p, loading: true }))
     api<T>(path)
       .then((d) => setS({ data: d, loading: false, error: null }))
-      .catch((e) => setS({ data: fallback ?? null, loading: false, error: String(e?.code || e) }))
+      .catch((e) => setS({
+        // в Telegram демо НЕ подставляем (иначе видна чужая «Кривая Кружка»);
+        // fallback — только для оффлайн-превью вне Telegram.
+        data: initData() ? null : (fallback ?? null),
+        loading: false,
+        error: String(e?.code || e),
+      }))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path])
 
