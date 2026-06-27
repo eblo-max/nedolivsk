@@ -384,7 +384,8 @@ body {
 .ih-name { font-family:var(--disp); font-weight:700; font-size:16px; color:#f3e8cb; line-height:1.15; }
 
 /* ── bottom-sheet панель действия (бонус/грамота/бригады) ── */
-.sheet-ov { position:fixed; inset:0; z-index:40; background:#000b; backdrop-filter:blur(2px);
+.sheet-ov { position:fixed; top:0; left:0; right:0; height:var(--app-h, 100vh); z-index:40;
+  background:#000b; backdrop-filter:blur(2px);
   display:flex; align-items:flex-end; justify-content:center; animation:ov-in .2s ease;
   overscroll-behavior:contain; touch-action:none; }
 .sheet-ov.out { animation:ov-out .24s ease forwards; }
@@ -393,7 +394,7 @@ body {
 /* высоту ограничиваем РЕАЛЬНЫМ стабильным вьюпортом Telegram (на мобиле апп — BottomSheet,
    где 100vh может быть больше видимой области); фолбэк на 86vh вне Telegram */
 .sheet { width:100%; max-width:480px; display:flex; flex-direction:column;
-  max-height:calc(var(--tg-viewport-stable-height, 100vh) * 0.86);
+  max-height:calc(var(--app-h, 100vh) * 0.86);
   background-image:var(--wood),var(--glass); background-repeat:repeat,no-repeat;
   border:1px solid #9c7838; border-bottom:none; border-radius:16px 16px 0 0;
   box-shadow:0 -12px 44px #000d; padding-bottom:calc(var(--sa-bottom) + 10px);
@@ -986,7 +987,7 @@ body {
 .ep-lose-body .ep-tally { font-style:italic; color:#e0903c; font-size:14px; }
 
 /* ── ВНЕЗАПНЫЙ ВИЗИТЁР (story-движок) ── */
-.sv-backdrop { position:fixed; inset:0; z-index:40; display:flex; align-items:flex-end; justify-content:center;
+.sv-backdrop { position:fixed; top:0; left:0; right:0; height:var(--app-h, 100vh); z-index:40; display:flex; align-items:flex-end; justify-content:center;
   background:rgba(6,5,3,.72); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); animation:sv-fade .22s ease; padding:14px; }
 @keyframes sv-fade { from{opacity:0} to{opacity:1} }
 .sv-card { width:100%; max-width:440px; border-radius:20px 20px 18px 18px; padding:18px 17px calc(18px + var(--sa-bottom,0px));
@@ -1087,7 +1088,7 @@ body {
 .chron-close { margin-top:12px; flex:none; }
 
 /* ── дисклеймер раннего доступа (центр. модалка при каждом входе) ── */
-.ta-backdrop { position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+.ta-backdrop { position:fixed; top:0; left:0; right:0; height:var(--app-h, 100vh); z-index:60; display:flex; align-items:center; justify-content:center;
   background:rgba(6,5,3,.8); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); animation:sv-fade .22s ease; padding:22px; }
 .ta-card { width:100%; max-width:380px; border-radius:20px; padding:22px 20px calc(20px + var(--sa-bottom,0px));
   background:linear-gradient(180deg,#1f1710,#130d07); border:1px solid var(--brass-d,#5a4326);
