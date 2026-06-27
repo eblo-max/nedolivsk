@@ -99,7 +99,26 @@ function applySafeArea() {
   r.setProperty('--sa-bottom', `${(s?.bottom ?? 0) + (c?.bottom ?? 0)}px`)
 }
 
-export const initData = () => tg?.initData ?? ''
+// Подпись запуска. Обычно лежит в tg.initData. Но на части Android-клиентов/WebView
+// (напр. MIUI/Xiaomi) SDK не прокидывает её в WebApp.initData, хотя сама строка пришла
+// в URL-хэше как tgWebAppData. Тогда достаём её из hash/query сами (раз запомнив).
+let _initCache = ''
+function _initFromUrl(): string {
+  try {
+    for (const raw of [window.location.hash.slice(1), window.location.search.slice(1)]) {
+      if (!raw) continue
+      const d = new URLSearchParams(raw).get('tgWebAppData')
+      if (d) return d
+    }
+  } catch { /* */ }
+  return ''
+}
+export const initData = () => {
+  const live = tg?.initData
+  if (live) { _initCache = live; return live }
+  if (!_initCache) _initCache = _initFromUrl()   // фолбэк для кривых WebView
+  return _initCache
+}
 export const tgUser = () => tg?.initDataUnsafe?.user
 
 /** Открыть ссылку на канал/чат Telegram изнутри мини-аппа (t.me/...).
