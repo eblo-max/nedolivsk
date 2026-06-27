@@ -4,7 +4,7 @@ import { haptic, hapticNotify } from '../telegram'
 import { ResIcon, fmt } from '../components/icons'
 
 // ── типы (зеркало webapp _story_state / _api_story_choice) ──
-interface StoryNpc { emoji: string; name: string; blurb: string; traits: string[] }
+interface StoryNpc { emoji: string; name: string; blurb: string; traits: string[]; avatar?: number | null }
 interface StoryChoice { index: number; label: string }
 export interface StoryData { id: string; title: string; text: string; npc: StoryNpc | null; choices: StoryChoice[] }
 interface ResLine { key: string; qty: number; name: string; emoji?: string }
@@ -16,7 +16,14 @@ export default function StoryVisitor({ story, onResolved, onClose }:
   { story: StoryData; onResolved: (state: unknown) => void; onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const [out, setOut] = useState<Outcome | null>(null)
+  const [avFail, setAvFail] = useState(false)
   const newState = useRef<unknown>(null)
+  const avUrl = story.npc?.avatar ? `${import.meta.env.BASE_URL}npc/${story.npc.avatar}.png` : null
+  const showAv = !!avUrl && !avFail
+  const Avatar = ({ cls }: { cls: string }) => (
+    showAv ? <img className={cls} src={avUrl!} alt="" onError={() => setAvFail(true)} />
+      : <span className={cls}>{story.npc?.emoji}</span>
+  )
 
   async function choose(i: number) {
     if (busy) return; setBusy(true); haptic('medium')
@@ -41,7 +48,7 @@ export default function StoryVisitor({ story, onResolved, onClose }:
           <>
             {npc && (
               <div className="sv-npc">
-                <span className="sv-npc-emo">{npc.emoji}</span>
+                <Avatar cls="sv-npc-av" />
                 <div className="sv-npc-id">
                   <div className="sv-npc-nm">{npc.name}</div>
                   {npc.blurb && <div className="sv-npc-bl">{npc.blurb}</div>}
@@ -64,7 +71,7 @@ export default function StoryVisitor({ story, onResolved, onClose }:
           </>
         ) : (
           <div className="sv-result">
-            {npc && <div className="sv-res-emo">{npc.emoji}</div>}
+            {npc && <Avatar cls="sv-res-av" />}
             <div className="sv-title">{story.title}</div>
             <p className="sv-text">{out.text}</p>
             <div className="sv-deltas">

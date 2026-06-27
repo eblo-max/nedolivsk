@@ -1022,3 +1022,12 @@ body {
 .sv-delta.pos { color:#b8e88a; background:rgba(120,200,120,.12); box-shadow:inset 0 0 0 1px #86c98a44; }
 .sv-delta.neg { color:#f0a08a; background:rgba(200,90,70,.12); box-shadow:inset 0 0 0 1px #cf6a4a44; }
 .sv-done { margin-top:4px; }
+
+/* аватар NPC в карточке визитёра (img → реальный портрет; span → эмодзи-фолбэк) */
+.sv-npc-av { width:54px; height:54px; flex:none; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:13px; object-fit:cover; font-size:34px; line-height:1; overflow:hidden;
+  background:rgba(231,191,99,.08); box-shadow:0 3px 10px #000a, inset 0 0 0 1px #ffffff1c; }
+.sv-res-av { width:72px; height:72px; flex:none; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:16px; object-fit:cover; font-size:46px; line-height:1; overflow:hidden;
+  background:rgba(231,191,99,.08); box-shadow:0 4px 14px #000c, inset 0 0 0 1px #ffffff1c;
+  animation:sv-pop .4s cubic-bezier(.2,1.5,.4,1) both; }
