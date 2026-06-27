@@ -273,7 +273,6 @@ export default function Nightrun() {
 
 // ── плавающий HUD ходки: без коробки, текст поверх сцены (язык «раскол сцены») ──
 function NrTopHud({ run, max }: { run: NRun; max: number }) {
-  const hpPct = Math.max(0, Math.min(100, (run.hp / run.hp_max) * 100))
   const sc = sceneFor(run.leg)
   const sat = useCounter(run.satchel_value)
   return (
@@ -285,7 +284,7 @@ function NrTopHud({ run, max }: { run: NRun; max: number }) {
         ))}
       </div>
       <div className="nr-top-stats">
-        <span className="nr-hp"><span className="nr-bar"><i style={{ width: `${hpPct}%` }} /></span><b>{run.hp}</b><small>/{run.hp_max}</small></span>
+        <span className="nr-hp">❤️ <b>{run.hp}</b><small>/{run.hp_max}</small></span>
         <span className="nr-dot">·</span>
         <span className="nr-sat">🎒 <b>{fmt(sat)}</b><small>🪙-экв</small></span>
       </div>
