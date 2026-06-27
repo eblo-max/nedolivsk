@@ -1,11 +1,15 @@
 # ── Этап 1: сборка React-мини-аппа (Vite) ──
+# ВАЖНО: NODE_ENV=production. При NODE_ENV=development `vite build` собирает
+# бандл с import.meta.env.DEV=true и React в dev-режиме — тогда в проде
+# показывалась демо-таверна (fallback завязан на DEV) и тормозил React.
 FROM node:20-slim AS miniapp
-ENV NODE_ENV=development
+ENV NODE_ENV=production
 WORKDIR /m
 COPY miniapp/package.json miniapp/package-lock.json ./
 # npm install (не ci): lock сгенерён на Windows и не содержит linux-вариантов
 # платформенных optional-deps (@emnapi/* от oxlint) — строгий npm ci на них падает.
-# install их доставит под linux; --include=dev форсит vite/typescript (Railway = NODE_ENV=production).
+# --include=dev ФОРСИТ vite/typescript даже при NODE_ENV=production (иначе devDeps
+# пропустятся) — поэтому dev-зависимости ставятся, а сборка остаётся продакшен-режима.
 RUN npm install --include=dev --no-audit --no-fund
 COPY miniapp/ ./
 RUN npm run build      # → /m/dist (отдаётся питоном под /app)
