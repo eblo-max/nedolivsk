@@ -31,6 +31,8 @@ interface TgWebApp {
   }
   onEvent(e: string, cb: () => void): void
   offEvent(e: string, cb: () => void): void
+  openTelegramLink?(url: string): void
+  openLink?(url: string, opts?: { try_instant_view?: boolean }): void
 }
 
 declare global {
@@ -99,6 +101,14 @@ function applySafeArea() {
 
 export const initData = () => tg?.initData ?? ''
 export const tgUser = () => tg?.initDataUnsafe?.user
+
+/** Открыть ссылку на канал/чат Telegram изнутри мини-аппа (t.me/...).
+ * В Telegram — нативно через openTelegramLink; вне (браузер-превью) — обычное окно. */
+export function openTgLink(url: string) {
+  if (tg?.openTelegramLink) { try { tg.openTelegramLink(url); return } catch { /* */ } }
+  if (tg?.openLink) { try { tg.openLink(url); return } catch { /* */ } }
+  window.open(url, '_blank', 'noopener')
+}
 
 /** Тактильный отклик (крафт/удар/переход). Версионируем (6.1+), иначе клиент шлёт варнинг. */
 export function haptic(style: HapticStyle = 'light') {

@@ -1086,6 +1086,25 @@ body {
 .chron-ago { font-family:system-ui,sans-serif; font-size:10.5px; color:#8a7f6a; }
 .chron-close { margin-top:12px; flex:none; }
 
+/* ── дисклеймер раннего доступа (центр. модалка при каждом входе) ── */
+.ta-backdrop { position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+  background:rgba(6,5,3,.8); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); animation:sv-fade .22s ease; padding:22px; }
+.ta-card { width:100%; max-width:380px; border-radius:20px; padding:22px 20px calc(20px + var(--sa-bottom,0px));
+  background:linear-gradient(180deg,#1f1710,#130d07); border:1px solid var(--brass-d,#5a4326);
+  box-shadow:0 18px 60px #000d, inset 0 1px 0 #ffffff12; text-align:center;
+  animation:ta-pop .34s cubic-bezier(.2,.9,.3,1.1) both; }
+@keyframes ta-pop { from{transform:scale(.9) translateY(14px); opacity:0} to{transform:none; opacity:1} }
+.ta-badge { display:inline-block; font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:10px;
+  letter-spacing:2px; color:#f0c879; padding:4px 12px; border-radius:999px; margin-bottom:12px;
+  background:rgba(231,191,99,.1); box-shadow:inset 0 0 0 1px rgba(231,191,99,.3); }
+.ta-title { font-family:var(--disp),system-ui,sans-serif; font-weight:900; font-size:23px; color:var(--gold,#f0b859);
+  letter-spacing:-.3px; margin-bottom:12px; }
+.ta-text { font-family:Georgia,serif; font-size:14.5px; line-height:1.55; color:#ddd2bb; margin:0 0 12px; }
+.ta-text b { color:#f3d9a0; font-weight:700; }
+.ta-chan { margin-top:4px; color:#cfe0ff !important; border-color:#3c5a86 !important;
+  background:linear-gradient(#1a2436,#121826) !important; }
+.ta-ok { margin-top:10px; }
+
 /* ── экран репутации (фракции + горожане), поверх sv-backdrop ── */
 .rep-sheet { width:100%; max-width:440px; max-height:86vh; display:flex; flex-direction:column;
   border-radius:20px 20px 18px 18px; padding:16px 16px calc(14px + var(--sa-bottom,0px));

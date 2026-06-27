@@ -4,6 +4,7 @@ import { pushBack, popBack } from './telegram'
 import BottomNav from './components/BottomNav'
 import { music } from './music'
 import Splash from './screens/Splash'
+import TestAccessModal from './screens/TestAccessModal'
 import Tavern from './screens/Tavern'
 import Character from './screens/Character'
 import Sorties from './screens/Sorties'
@@ -11,6 +12,7 @@ import Buildings from './screens/Buildings'
 
 export default function App() {
   const [intro, setIntro] = useState(true)
+  const [notice, setNotice] = useState(false)   // дисклеймер раннего доступа (каждый вход)
   const loc = useLocation()
   const nav = useNavigate()
 
@@ -42,7 +44,8 @@ export default function App() {
       <div className="fx-glow" />
       <div className="fx-grain" />
       <div className="fx-vig" />
-      {intro && <Splash onEnter={() => setIntro(false)} />}
+      {intro && <Splash onEnter={() => { setIntro(false); setNotice(true) }} />}
+      {!intro && notice && <TestAccessModal onClose={() => setNotice(false)} />}
       <div className="app">
         {/* место под фикс. тикер резервируем только на Таверне (он там и рендерится) */}
         <div className={`scroll${['/buildings', '/character', '/sorties'].includes(loc.pathname) ? '' : ' with-ticker'}`}>
