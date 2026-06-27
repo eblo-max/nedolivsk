@@ -8,6 +8,7 @@ import ActionSheet from './ActionSheet'
 import MusicToggle from '../components/MusicToggle'
 import StoryVisitor, { type StoryData } from './StoryVisitor'
 import AnimEmoji from '../components/AnimEmoji'
+import ChronicleSheet from './ChronicleSheet'
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
@@ -64,6 +65,7 @@ export default function Tavern() {
   const [created, setCreated] = useState(false)
   const [sheet, setSheet] = useState<string | null>(null)
   const [storyOpen, setStoryOpen] = useState(false)
+  const [chronOpen, setChronOpen] = useState(false)
   const storySeen = useRef<string | null>(null)        // авто-показ визитёра один раз на его id
   const panelCache = useRef<Record<string, unknown>>({})
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -182,6 +184,7 @@ export default function Tavern() {
                 ))}
               </div>
             ) : <div className="muted" style={{ fontStyle: 'italic', fontFamily: 'var(--text)' }}>Тишь да гладь — фракции дремлют. Пока.</div>}
+            <button className="chron-open" onClick={() => { haptic('light'); setChronOpen(true) }}>📜 Летопись города →</button>
           </div>
         </div>
       )}
@@ -242,6 +245,7 @@ export default function Tavern() {
           onResolved={(s) => { if (s) set(s as TavernState); setStoryOpen(false); reload() }}
           onClose={() => setStoryOpen(false)} />
       )}
+      {chronOpen && <ChronicleSheet onClose={() => setChronOpen(false)} />}
       {toast && <div className="toast">{toast}</div>}
     </>
   )

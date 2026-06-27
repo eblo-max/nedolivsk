@@ -540,6 +540,44 @@ async def _api_state(request: web.Request) -> web.Response:
     return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 
+def _chron_ago(ts, now) -> str:
+    if ts is None:
+        return ""
+    if ts.tzinfo is None:
+        from datetime import timezone as _tz
+        ts = ts.replace(tzinfo=_tz.utc)
+    d = (now - ts).total_seconds()
+    if d < 3600:
+        return f"{max(1, int(d // 60))} мин назад"
+    if d < 86400:
+        return f"{int(d // 3600)} ч назад"
+    days = int(d // 86400)
+    return "вчера" if days == 1 else f"{days} дн назад"
+
+
+async def _api_chronicle(request: web.Request) -> web.Response:
+    """Летопись домашнего города игрока — лента заметных событий (свежие сверху)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from bot.db.models import Chronicle
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        entries = []
+        if p.chat_id is not None:
+            rows = (await s.execute(
+                select(Chronicle.text, Chronicle.ts)
+                .where(Chronicle.chat_id == p.chat_id)
+                .order_by(Chronicle.id.desc()).limit(40))).all()
+            now = datetime.now(timezone.utc)
+            entries = [{"text": t, "ago": _chron_ago(ts, now)} for t, ts in rows]
+    return web.json_response({"ok": True, "entries": entries}, headers={"Cache-Control": "no-store"})
+
+
 async def _api_story_choice(request: web.Request) -> web.Response:
     """Резолв выбора у визитёра (story_engine.resolve): применить эффекты, записать
     летопись, эхо в общий чат (через очередь нотифаера), вернуть исход + дельты."""
@@ -2037,6 +2075,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/nightrun/push", _api_nightrun_push)    # глубже
     app.router.add_post("/api/nightrun/bank", _api_nightrun_bank)    # свернуть (банк)
     app.router.add_post("/api/story_choice", _api_story_choice)  # резолв выбора у визитёра
+    app.router.add_post("/api/chronicle", _api_chronicle)        # летопись города
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы

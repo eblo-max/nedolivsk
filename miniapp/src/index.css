@@ -1060,3 +1060,28 @@ body {
 .cf-bar i.up { background:linear-gradient(90deg,#c97a2a,#f3b85a); }
 .cf-bar i.dn { background:linear-gradient(90deg,#7a3320,#cf6a4a); }
 .cf-val { font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:12px; color:#b7a587; width:34px; text-align:right; flex:none; }
+
+/* ── ссылка «Летопись» в карточке Город ── */
+.chron-open { margin-top:12px; width:100%; background:none; border:1px dashed var(--brass-d,#5a4326); border-radius:11px;
+  padding:9px; cursor:pointer; font-family:var(--text),system-ui,sans-serif; font-size:13px; color:var(--gold,#f0b859);
+  -webkit-tap-highlight-color:transparent; transition:background .14s; }
+.chron-open:active { background:rgba(231,191,99,.08); }
+
+/* ── лист летописи (bottom-sheet, поверх sv-backdrop) ── */
+.chron-sheet { width:100%; max-width:440px; max-height:82vh; display:flex; flex-direction:column;
+  border-radius:20px 20px 18px 18px; padding:16px 16px calc(14px + var(--sa-bottom,0px));
+  background:linear-gradient(180deg,#1b140c,#120d07); border:1px solid var(--brass-d,#5a4326);
+  box-shadow:0 -8px 40px #000c, inset 0 1px 0 #ffffff10; animation:sv-rise .3s cubic-bezier(.2,.8,.3,1) both; }
+.chron-head { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:17px; color:var(--gold,#f0b859);
+  text-align:center; margin-bottom:12px; letter-spacing:-.2px; }
+.chron-empty { font-family:Georgia,serif; font-style:italic; font-size:14px; color:#c2b594; line-height:1.5; text-align:center; padding:18px 6px; }
+.chron-list { flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-right:2px;
+  display:flex; flex-direction:column; }
+.chron-row { display:flex; gap:11px; padding:9px 2px; position:relative; }
+.chron-row:not(:last-child)::after { content:""; position:absolute; left:4px; top:18px; bottom:-9px; width:1px; background:#ffffff14; }
+.chron-dot { flex:none; width:9px; height:9px; border-radius:50%; margin-top:5px; z-index:1;
+  background:radial-gradient(circle at 35% 30%, #f3b85a, #b9701c); box-shadow:0 0 7px #f0a83366; }
+.chron-body { flex:1; min-width:0; }
+.chron-text { font-family:Georgia,serif; font-size:14px; line-height:1.5; color:#e7ddc8; margin:0; }
+.chron-ago { font-family:system-ui,sans-serif; font-size:10.5px; color:#8a7f6a; }
+.chron-close { margin-top:12px; flex:none; }
