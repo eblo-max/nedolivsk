@@ -555,6 +555,58 @@ def _chron_ago(ts, now) -> str:
     return "вчера" if days == 1 else f"{days} дн назад"
 
 
+_FAC_EMOJI = {"watch": "👮", "thieves": "🥷", "merchants": "💰", "crown": "👑", "church": "⛪"}
+_FAC_ORDER = ["watch", "thieves", "merchants", "crown", "church"]
+
+
+def _rep_rank(v: int, npc: bool = False):
+    """Ранг по репутации (−100..100): (метка, тон pos/neu/neg)."""
+    from bot.game import balance as bal
+    if v >= bal.REL_FRIEND:
+        return ("Друг" if npc else "Свой", "pos")
+    if v >= 15:
+        return ("Приятель" if npc else "В фаворе", "pos")
+    if v > -15:
+        return ("Знакомый" if npc else "Нейтралитет", "neu")
+    if v > bal.REL_FOE:
+        return ("Недолюбливает" if npc else "На заметке", "neg")
+    return ("Враг", "neg")
+
+
+async def _api_reputation(request: web.Request) -> web.Response:
+    """Репутация игрока: расклад у 5 фракций + отношения с конкретными горожанами."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import story_state as ss, factions, npc as npcmod, balance as bal
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        fac = (p.story or {}).get("faction", {})
+        facs = []
+        for fid in _FAC_ORDER:
+            v = int(fac.get(fid, 0))
+            label, tone = _rep_rank(v)
+            facs.append({"id": fid, "name": factions.name(fid), "emoji": _FAC_EMOJI.get(fid, "•"),
+                         "value": v, "rank": label, "tone": tone,
+                         "member": fid == "thieves" and ss.has_flag(p, "guild_member")})
+        rel = (p.story or {}).get("npc_rel", {})
+        npcs = []
+        for nid, v in sorted(rel.items(), key=lambda kv: -abs(int(kv[1]))):
+            v = int(v)
+            if v == 0:
+                continue
+            cz = npcmod.CATALOG.get(nid)
+            label, tone = _rep_rank(v, npc=True)
+            npcs.append({"id": nid, "name": cz.name if cz else nid, "emoji": cz.emoji if cz else "🙂",
+                         "blurb": cz.blurb if cz else "", "avatar": _npc_avatar(nid, cz.estate if cz else None),
+                         "value": v, "rank": label, "tone": tone})
+    return web.json_response({"ok": True, "factions": facs, "npcs": npcs,
+                              "min": bal.FACTION_MIN, "max": bal.FACTION_MAX},
+                             headers={"Cache-Control": "no-store"})
+
+
 async def _api_chronicle(request: web.Request) -> web.Response:
     """Летопись домашнего города игрока — лента заметных событий (свежие сверху)."""
     uid, body = await _auth(request)
@@ -2076,6 +2128,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/nightrun/bank", _api_nightrun_bank)    # свернуть (банк)
     app.router.add_post("/api/story_choice", _api_story_choice)  # резолв выбора у визитёра
     app.router.add_post("/api/chronicle", _api_chronicle)        # летопись города
+    app.router.add_post("/api/reputation", _api_reputation)      # репутация у фракций/NPC
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы

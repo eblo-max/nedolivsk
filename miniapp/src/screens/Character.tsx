@@ -4,6 +4,7 @@ import { api } from '../api'
 import { haptic, hapticNotify, initData } from '../telegram'
 import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
+import ReputationSheet from './ReputationSheet'
 
 interface Slot { slot: string; slot_name: string; id?: string; name?: string; tier?: number; sprite?: string; trophy?: boolean }
 interface Craft { state: string; name?: string; tier?: number; minutes?: number; sprite?: string }
@@ -89,6 +90,7 @@ export default function Character() {
   const [forge, setForge] = useState<ForgeState | null>(null)
   const [pick, setPick] = useState<ForgeItem | null>(null)
   const [healOpen, setHealOpen] = useState(false)
+  const [repOpen, setRepOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
@@ -273,9 +275,13 @@ export default function Character() {
       )}
 
       <div className="flavor rise" style={{ margin: '8px 14px 4px', fontSize: 13.5, animationDelay: '.14s' }}>«Голый трактирщик — смешной трактирщик. Загляни в кузницу.»</div>
-      <button className="btn gold rise" style={{ animationDelay: '.16s' }} onClick={openForge}>⚒ В кузницу</button>
+      <div className="char-cta rise" style={{ animationDelay: '.16s' }}>
+        <button className="btn gold" onClick={openForge}>⚒ В кузницу</button>
+        <button className="btn" onClick={() => { haptic('light'); setRepOpen(true) }}>🤝 Репутация</button>
+      </div>
       {pick && <ItemSheet item={pick} busy={busy} craftState={c.craft.state} onMake={make} onClose={() => setPick(null)} />}
       {healOpen && <HealSheet full={c.heal.full} options={c.heal.options} busy={busy} onHeal={heal} onClose={() => setHealOpen(false)} />}
+      {repOpen && <ReputationSheet onClose={() => setRepOpen(false)} />}
       {toast && <div className="toast">{toast}</div>}
     </>
   )
