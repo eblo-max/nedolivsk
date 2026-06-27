@@ -9,6 +9,7 @@ import MusicToggle from '../components/MusicToggle'
 import StoryVisitor, { type StoryData } from './StoryVisitor'
 import AnimEmoji from '../components/AnimEmoji'
 import ChronicleSheet from './ChronicleSheet'
+import ReferralSheet from './ReferralSheet'
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
@@ -66,6 +67,7 @@ export default function Tavern() {
   const [sheet, setSheet] = useState<string | null>(null)
   const [storyOpen, setStoryOpen] = useState(false)
   const [chronOpen, setChronOpen] = useState(false)
+  const [refOpen, setRefOpen] = useState(false)
   const storySeen = useRef<string | null>(null)        // авто-показ визитёра один раз на его id
   const panelCache = useRef<Record<string, unknown>>({})
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -189,6 +191,16 @@ export default function Tavern() {
         </div>
       )}
 
+      {/* зазывала (рефералка) — компактный вход */}
+      <button className="zz-cta rise" style={{ animationDelay: '.11s' }} onClick={() => { haptic('light'); setRefOpen(true) }}>
+        <span className="zz-cta-emo">🍻</span>
+        <span className="zz-cta-body">
+          <b>Зазывала</b>
+          <small>Зови друзей — золото и репутация обоим</small>
+        </span>
+        <span className="zz-cta-chev">›</span>
+      </button>
+
       {/* заведение */}
       <div className="card rise" style={{ animationDelay: '.12s' }}>
         <div className="card-h"><span className="he">🏰</span>ЗАВЕДЕНИЕ</div>
@@ -246,6 +258,7 @@ export default function Tavern() {
           onClose={() => setStoryOpen(false)} />
       )}
       {chronOpen && <ChronicleSheet onClose={() => setChronOpen(false)} />}
+      {refOpen && <ReferralSheet onClose={() => setRefOpen(false)} />}
       {toast && <div className="toast">{toast}</div>}
     </>
   )

@@ -630,6 +630,45 @@ async def _api_chronicle(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "entries": entries}, headers={"Cache-Control": "no-store"})
 
 
+async def _api_referral(request: web.Request) -> web.Response:
+    """Зазывала (рефералка): личная ссылка, прогресс по вехам, топ зазывал.
+    Зеркало texts.referral_screen / referrers_screen из бота."""
+    from urllib.parse import quote
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import balance as bal
+    from bot.keyboards.inline import get_bot_username
+    _SHARE_TEXT = "Айда в Недоливск — заведём кабаки и зальём весь город элем! 🍺"
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        uname = get_bot_username()
+        link = f"https://t.me/{uname}?start=ref_{p.id}" if uname else ""
+        share_url = (f"https://t.me/share/url?url={quote(link)}&text={quote(_SHARE_TEXT)}"
+                     if link else "")
+        invited = await repo.count_referrals(s, p.id)
+        tier = int(p.ref_tier or 0)
+        tiers = [{"need": need, "bonus": bonus, "done": i < tier}
+                 for i, (need, bonus) in enumerate(bal.REFERRAL_TIERS)]
+        nxt = None
+        if tier < len(bal.REFERRAL_TIERS):
+            need, bonus = bal.REFERRAL_TIERS[tier]
+            nxt = {"need": need, "bonus": bonus, "left": max(0, need - invited)}
+        rows = await repo.top_referrers(s)
+        top = [{"name": (pl.first_name or "—"), "count": n, "me": pl.id == p.id}
+               for pl, n in rows]
+    return web.json_response({
+        "ok": True, "link": link, "share_url": share_url, "invited": invited,
+        "tier": tier, "tiers": tiers, "next": nxt,
+        "reward": {"inviter_gold": bal.REFERRAL_INVITER_GOLD,
+                   "inviter_rep": bal.REFERRAL_INVITER_REP,
+                   "invitee_gold": bal.REFERRAL_INVITEE_GOLD},
+        "top": top,
+    }, headers={"Cache-Control": "no-store"})
+
+
 async def _api_story_choice(request: web.Request) -> web.Response:
     """Резолв выбора у визитёра (story_engine.resolve): применить эффекты, записать
     летопись, эхо в общий чат (через очередь нотифаера), вернуть исход + дельты."""
@@ -2129,6 +2168,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/story_choice", _api_story_choice)  # резолв выбора у визитёра
     app.router.add_post("/api/chronicle", _api_chronicle)        # летопись города
     app.router.add_post("/api/reputation", _api_reputation)      # репутация у фракций/NPC
+    app.router.add_post("/api/referral", _api_referral)          # зазывала (рефералка)
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы

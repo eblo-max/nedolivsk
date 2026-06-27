@@ -948,6 +948,11 @@ def set_bot_username(username: str) -> None:
     _BOT_USERNAME = (username or "").lstrip("@")
 
 
+def get_bot_username() -> str:
+    """Текущее имя бота (для ссылок t.me/<bot>?start=… в мини-аппе)."""
+    return _BOT_USERNAME
+
+
 def world_map_kb(private: bool) -> InlineKeyboardMarkup | None:
     """Кнопка «Открыть интерактивную карту»: в личке — web_app (работает сразу);
     в группе — url на Direct-Link Mini App (если настроен webapp_short_name + имя
