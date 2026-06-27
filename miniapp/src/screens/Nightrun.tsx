@@ -3,6 +3,7 @@ import lottie from 'lottie-web/build/player/lottie_light'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify, initData } from '../telegram'
+import { music } from '../music'
 import { ResIcon, fmt } from '../components/icons'
 
 // ── типы (зеркало webapp _nightrun_state / _nr_out) ──
@@ -125,6 +126,8 @@ export default function Nightrun() {
   const narr = (o: NOut) => { o.story = narrate(o); beat(o.story); return o }
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
   const off = !initData()
+  // музыка: на ночной ходке — тёмно-эпичный набор, по выходу — обратно к трактирному
+  useEffect(() => { music.setScene('night'); return () => music.setScene('tavern') }, [])
 
   // живой кулдаун-таймер
   const [, tick] = useState(0)

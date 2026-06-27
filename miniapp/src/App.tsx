@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { pushBack, popBack } from './telegram'
 import BottomNav from './components/BottomNav'
+import MusicToggle from './components/MusicToggle'
 import Splash from './screens/Splash'
 import Tavern from './screens/Tavern'
 import Character from './screens/Character'
@@ -44,6 +45,7 @@ export default function App() {
           </Routes>
         </div>
         <BottomNav />
+        <MusicToggle />
       </div>
     </>
   )
