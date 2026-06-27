@@ -1032,16 +1032,20 @@ body {
   background:rgba(231,191,99,.08); box-shadow:0 4px 14px #000c, inset 0 0 0 1px #ffffff1c;
   animation:sv-pop .4s cubic-bezier(.2,1.5,.4,1) both; }
 
-/* ── баннер мирового события на Таверне ── */
-.we-banner { display:flex; gap:11px; align-items:flex-start; padding:11px 13px; border-radius:14px;
-  background:linear-gradient(135deg,#2a1c0c,#1a1207); border:1px solid var(--brass-d,#5a4326);
-  box-shadow:0 4px 16px #0008, inset 0 1px 0 #ffffff0c; }
-.we-emo { font-size:30px; line-height:1; flex:none; filter:drop-shadow(0 2px 6px #000a); margin-top:1px; }
-.we-body { flex:1; min-width:0; }
-.we-name { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:15px; color:var(--gold,#f0b859); letter-spacing:-.2px; }
-.we-blurb { font-family:var(--text),Georgia,serif; font-size:12px; color:#c2b594; line-height:1.4; margin:2px 0 6px; }
+/* ── компактный баннер мирового события (одна строка, нативный анимир. эмодзи) ── */
+.we-banner { position:relative; overflow:hidden; display:flex; align-items:center; gap:11px; padding:7px 13px 7px 9px; border-radius:13px;
+  background:linear-gradient(110deg,#2a1c0c 0%,#170f06 62%); border:1px solid var(--brass-d,#5a4326);
+  box-shadow:0 3px 14px #0007, inset 0 1px 0 #ffffff0c; }
+.we-banner::before { content:""; position:absolute; left:-6px; top:50%; width:78px; height:78px; transform:translateY(-50%);
+  border-radius:50%; background:radial-gradient(circle, rgba(240,168,51,.22), transparent 70%); pointer-events:none;
+  animation:we-pulse 3.2s ease-in-out infinite; }
+@keyframes we-pulse { 0%,100%{opacity:.7} 50%{opacity:1} }
+.we-emo { width:40px; height:40px; flex:none; display:flex; align-items:center; justify-content:center; position:relative; z-index:1;
+  filter:drop-shadow(0 2px 7px #000a); }
+.we-body { position:relative; z-index:1; flex:1; min-width:0; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.we-name { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:15px; color:var(--gold,#f0b859); letter-spacing:-.2px; white-space:nowrap; text-shadow:0 1px 8px #f0a83333; }
 .we-effs { display:flex; flex-wrap:wrap; gap:6px; }
-.we-eff { font-family:system-ui,sans-serif; font-weight:700; font-size:11px; padding:3px 9px; border-radius:99px; }
+.we-eff { font-family:system-ui,sans-serif; font-weight:700; font-size:11px; padding:3px 9px; border-radius:99px; white-space:nowrap; }
 .we-eff.pos { color:#b8e88a; background:rgba(120,200,120,.12); box-shadow:inset 0 0 0 1px #86c98a44; }
 .we-eff.neg { color:#f0a08a; background:rgba(200,90,70,.12); box-shadow:inset 0 0 0 1px #cf6a4a44; }
 

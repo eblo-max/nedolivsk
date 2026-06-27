@@ -7,12 +7,13 @@ import Onboarding from './Onboarding'
 import ActionSheet from './ActionSheet'
 import MusicToggle from '../components/MusicToggle'
 import StoryVisitor, { type StoryData } from './StoryVisitor'
+import AnimEmoji from '../components/AnimEmoji'
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
 interface CellarLine { key: string; name: string; qty: number }
 interface WEffect { text: string; good: boolean }
-interface WorldEvent { emoji: string; name: string; blurb: string; good?: string | null; good_name?: string | null; effects: WEffect[] }
+interface WorldEvent { id: string; emoji: string; name: string; blurb: string; good?: string | null; good_name?: string | null; effects: WEffect[] }
 interface CityFaction { id: string; name: string; power: number }
 interface CityData { mood: number; mood_label: string; situation: { emoji: string; label: string } | null; factions: CityFaction[] }
 interface TavernState {
@@ -52,7 +53,7 @@ const SAMPLE: TavernState = {
   ],
   world: ['🍂 Осень — спрос обычный', '🪓 Орда орков точит топоры на севере', '🏛 В городе тихо'],
   next_upgrade: { gold: 715, wood: 220, grain: 180, hops: 120 }, upgrade_pct: 60,
-  world_event: { emoji: '🔥', name: 'Ажиотаж', blurb: 'Весь Недоливск помешался на одном товаре — он в цене, налетай!', good: 'butter', good_name: 'Масло', effects: [{ text: 'Масло ×1.5', good: true }] },
+  world_event: { id: 'fashion', emoji: '🔥', name: 'Ажиотаж', blurb: 'Весь Недоливск помешался на одном товаре — он в цене, налетай!', good: 'butter', good_name: 'Масло', effects: [{ text: 'Масло ×1.5', good: true }] },
   city: { mood: 18, mood_label: '🙂 доброе', situation: { emoji: '💰', label: 'Купеческий бум' }, factions: [{ id: 'merchants', name: 'Купеческая лига', power: 42 }, { id: 'thieves', name: 'Воровская гильдия', power: 20 }, { id: 'watch', name: 'Стража', power: -15 }] },
 }
 
@@ -124,13 +125,12 @@ export default function Tavern() {
         <div className="flavor">«{t.flavor}»</div>
       </div>
 
-      {/* мировое событие — баннер */}
+      {/* мировое событие — компактный баннер с нативным анимированным эмодзи */}
       {t.world_event && (
-        <div className="we-banner rise" style={{ animationDelay: '.02s' }}>
-          <span className="we-emo">{t.world_event.emoji}</span>
+        <div className="we-banner rise" style={{ animationDelay: '.02s' }} title={t.world_event.blurb}>
+          <div className="we-emo"><AnimEmoji id={t.world_event.id} fallback={t.world_event.emoji} size={40} /></div>
           <div className="we-body">
             <div className="we-name">{t.world_event.name}</div>
-            <div className="we-blurb">{t.world_event.blurb}</div>
             {t.world_event.effects.length > 0 && (
               <div className="we-effs">
                 {t.world_event.effects.map((e, i) => (

@@ -414,7 +414,8 @@ def _world_event_state() -> dict | None:
     spd(e.exp_speed, "бригады"); spd(e.prod_speed, "варка")
     if good and gname:
         effs.append({"text": f"{gname} ×{e.good_price:g}", "good": e.good_price > 1})
-    return {"emoji": e.emoji, "name": e.name, "blurb": e.blurb, "good": good, "good_name": gname, "effects": effs}
+    return {"id": e.id, "emoji": e.emoji, "name": e.name, "blurb": e.blurb,
+            "good": good, "good_name": gname, "effects": effs}
 
 
 def _city_state(city) -> dict | None:
