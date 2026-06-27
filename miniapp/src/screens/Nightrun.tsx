@@ -168,33 +168,41 @@ export default function Nightrun() {
     if (busy || !run) return; setBusy(true); haptic('medium')
     if (off) { offPick(f); setBusy(false); return }
     const r = await call<{ out: NOut; nightrun: NState }>('nightrun/pick', { kind: f.kind })
-    if (r) { (f.kind === 'meet' || f.kind === 'quiz') ? set(r.nightrun) : resolveOut(r.out, r.nightrun) }
+    if (r) { (f.kind === 'meet' || f.kind === 'quiz') ? set(r.nightrun) : resolveOut(r.out, r.nightrun) } else reload()
     setBusy(false)
   }
   async function meet(optId: string) {
     if (busy) return; setBusy(true); haptic('medium')
     if (off) { offMeet(optId); setBusy(false); return }
     const r = await call<{ out: NOut; nightrun: NState }>('nightrun/meet', { opt: optId })
-    if (r) resolveOut(r.out, r.nightrun)
+    if (r) resolveOut(r.out, r.nightrun); else reload()
     setBusy(false)
   }
   async function quiz(ans: number) {
     if (busy) return; setBusy(true); haptic('medium')
     if (off) { offQuiz(ans); setBusy(false); return }
     const r = await call<{ out: NOut; nightrun: NState }>('nightrun/quiz', { answer: ans })
-    if (r) resolveOut(r.out, r.nightrun)
+    if (r) resolveOut(r.out, r.nightrun); else reload()
     setBusy(false)
   }
   async function push() {
     if (busy) return; setBusy(true); haptic('medium'); setOut(null)
     if (off && run) { const leg = run.leg + 1; set(offState({ ...run, leg, state: 'fork', fork: offFork(leg) })); setBusy(false); return }
-    const r = await call<NState>('nightrun/push'); if (r) set(r); setBusy(false)
+    const r = await call<NState>('nightrun/push'); if (r) set(r); else reload(); setBusy(false)
   }
   async function bank() {
     if (busy || !run) return; setBusy(true); haptic('medium'); setOut(null)
     if (off) { setEnd({ kind: 'bank', banked: run.satchel, value: run.satchel_value }); setBusy(false); return }
-    const r = await call<{ banked: NItem[]; value: number; nightrun: NState }>('nightrun/bank')
-    if (r) { setEnd({ kind: 'bank', banked: r.banked, value: r.value }); set(r.nightrun) }
+    // банк особый: если ответ-успех потерялся (таймаут/повтор), забег на сервере уже свёрнут
+    // (добыча начислена) → трактуем 'stale' как успех и ресинкаемся, а не пугаем «Не вышло».
+    try {
+      const r = await api<{ banked: NItem[]; value: number; nightrun: NState }>('nightrun/bank')
+      setEnd({ kind: 'bank', banked: r.banked, value: r.value }); set(r.nightrun)
+    } catch (e) {
+      const code = (e as { code?: string })?.code
+      if (code === 'cooldown') flash('Ноги ещё гудят — отдышись')
+      else { flash(code === 'stale' ? 'Забег свёрнут — добыча уже в таверне' : 'Связь подвисла — сверяюсь с сервером'); hapticNotify('warning'); reload() }
+    }
     setBusy(false)
   }
 
