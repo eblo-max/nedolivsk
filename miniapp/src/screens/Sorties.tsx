@@ -176,7 +176,7 @@ export default function Sorties() {
                 <div className="poster-row">
                   {b.sprite && MONSTERS[b.sprite]
                     ? <div className="poster-mug"><Sprite path={`monsters/${b.sprite}`} meta={MONSTERS[b.sprite]} anim="idle" token={0}
-                        height={Math.min(58, Math.round(78 * MONSTERS[b.sprite].fh / MONSTERS[b.sprite].fw))} flip={!!MON_FLIP[b.sprite]} /></div>
+                        height={Math.min(58, Math.round(78 * MONSTERS[b.sprite].fh / MONSTERS[b.sprite].fw))} flip={!!MON_FLIP[b.sprite]} animate={false} /></div>
                     : <span className="poster-emo">{b.emoji}</span>}
                   <div className="poster-id">
                     <span className="poster-name">{b.name}</span>
@@ -288,14 +288,16 @@ function synthFight(b: Beast, d: HuntState): FightRes {
 }
 
 // ── Анимированный спрайт (лента кадров fw×fh, шаги по кадрам) ──────────────
-function Sprite({ path, meta, anim, token, height, flip }: {
-  path: string; meta: MonMeta; anim: AnimName; token: number; height: number; flip: boolean
+function Sprite({ path, meta, anim, token, height, flip, animate = true }: {
+  path: string; meta: MonMeta; anim: AnimName; token: number; height: number; flip: boolean; animate?: boolean
 }) {
   const [frame, setFrame] = useState(0)
   const n = meta[anim] || 1
   useEffect(() => {
     setFrame(0)
-    if (n <= 1) return
+    // на доске розыска ~10 спрайтов разом: НЕ анимируем (статичный 1-й кадр),
+    // иначе на слабом Android ~100 ререндеров/сек → фриз. Анимация — в карточке/бою.
+    if (!animate || n <= 1) return
     const loop = anim === 'idle' || anim === 'run'
     // фиксированная длительность клипа (мс) → кадр = длительность/кадры:
     // любой клип успевает доиграть внутри раунда вне зависимости от числа кадров
@@ -314,7 +316,7 @@ function Sprite({ path, meta, anim, token, height, flip }: {
     }, interval)
     return () => clearInterval(id)
     // token заставляет переиграть даже ту же анимацию (hurt 2 раунда подряд)
-  }, [anim, token, n])
+  }, [anim, token, n, animate])
   const scale = height / meta.fh
   return (
     <div className="ep-sprite" style={{
