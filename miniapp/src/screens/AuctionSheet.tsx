@@ -275,9 +275,9 @@ export default function AuctionSheet({ onClose }: { onClose: () => void }) {
               <button className="btn auc-cancel" disabled={busy} onClick={cancel}>✋ Снять лот</button>
               <p className="auc-hint">Торги идут сами — горожане набегают. Закроются по таймеру, золото упадёт в казну.</p>
 
-              {d.admin && (
+              {DEV && (   /* тест-панель только в превью (localhost); в прод-сборке вырезается */
                 <div className="auc-test">
-                  <span className="auc-test-h">🧪 тест-режим (только ты)</span>
+                  <span className="auc-test-h">🧪 тест-режим (превью)</span>
                   <div className="auc-test-row">
                     <button className="auc-test-b" disabled={busy} onClick={seedBids}>🎲 ставки</button>
                     <button className="auc-test-b" disabled={busy} onClick={settleNow}>⏱ завершить</button>
