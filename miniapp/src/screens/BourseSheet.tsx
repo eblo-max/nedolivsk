@@ -84,10 +84,7 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
     <div className="sv-backdrop" onClick={onClose}>
       <div className="auc-sheet brs-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="brs-top">
-          <div className="brs-title-row">
-            <div className="brs-title"><span className="brs-glyph">📈</span> Биржа Недоливска</div>
-            {d?.open && d.gold != null && <span className="brs-purse"><ResIcon k="gold" size={13} />{fmt(d.gold)}</span>}
-          </div>
+          <div className="brs-title"><span className="brs-glyph">📈</span> Биржа Недоливска</div>
           {ticker.length > 0 && (
             <div className="brs-tape"><div className="brs-tape-run">
               {[...ticker, ...ticker].map((b, i) => (
@@ -132,7 +129,10 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
 
                 {tab === 'prices' && (
                   <>
-                    <div className="brs-depth-leg"><span className="dot bid" />спрос (купят)<span className="brs-leg-sp">·</span><span className="dot ask" />предложение (продают)</div>
+                    <div className="brs-depth-leg">
+                      <span className="brs-leg-side"><span className="dot bid" />спрос · купят</span>
+                      <span className="brs-leg-side ask">продают · предложение<span className="dot ask" /></span>
+                    </div>
                     {(d.board && d.board.length > 0) ? d.board.map((b) => {
                       const bidW = b.bid_qty ? Math.max(7, (b.bid_qty / maxQty) * 100) : 0
                       const askW = b.ask_qty ? Math.max(7, (b.ask_qty / maxQty) * 100) : 0
