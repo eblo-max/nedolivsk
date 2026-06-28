@@ -47,7 +47,7 @@ const bourseApi = (): Promise<BState> => DEV ? Promise.resolve(DEMO) : api<BStat
 type Tab = 'buy' | 'bids' | 'prices' | 'mine'
 const TABS: { id: Tab; ic: string; t: string }[] = [
   { id: 'buy', ic: '🛒', t: 'Купить' }, { id: 'bids', ic: '📣', t: 'Заявки' },
-  { id: 'prices', ic: '📊', t: 'Стакан' }, { id: 'mine', ic: '📦', t: 'Мои' },
+  { id: 'prices', ic: '📊', t: 'Цены' }, { id: 'mine', ic: '📦', t: 'Мои' },
 ]
 
 /** Глассовый «трейд-тикет» ордера. buy=зелёный (заявка), sell=золото (продажа). */
@@ -149,7 +149,7 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
                           </div>
                         </div>
                       )
-                    }) : <p className="auc-empty">«Стакан пуст — ни лотов, ни заявок.»</p>}
+                    }) : <p className="auc-empty">«Пусто — ни лотов, ни заявок.»</p>}
 
                     {d.sellers && d.sellers.length > 0 && (
                       <div className="brs-lead">
@@ -173,7 +173,7 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
                 )}
               </div>
 
-              <p className="auc-hint">📡 Стакан в реальном времени. Купля-продажа и заявки — следующей волной.</p>
+              <p className="auc-hint">📡 Цены в реальном времени. Купля-продажа и заявки — следующей волной.</p>
             </>
           )}
 

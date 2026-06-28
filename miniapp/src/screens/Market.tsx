@@ -121,7 +121,7 @@ export default function Market() {
       <div className="torg-cap">📈 Биржа</div>
       <button className="torg-act rise" onClick={() => { haptic('light'); setBrsOpen(true) }}>
         <span className="torg-act-emo">📈</span>
-        <span className="torg-act-body"><b>Открыть стакан</b><small>котировки и сбыт оптом между игроками</small></span>
+        <span className="torg-act-body"><b>Открыть биржу</b><small>котировки и сбыт оптом между игроками</small></span>
         <span className="torg-act-chev">›</span>
       </button>
 
