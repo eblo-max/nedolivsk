@@ -1182,20 +1182,32 @@ body {
   color:#a48a5a; padding:8px 15px; border-radius:999px; background:rgba(231,191,99,.08); box-shadow:inset 0 0 0 1px rgba(231,191,99,.25); }
 .torg-chan { max-width:300px; color:#cfe0ff !important; border-color:#3c5a86 !important; background:linear-gradient(#1a2436,#121826) !important; }
 
-/* ── Торг: ОТКРЫТО — купец + ящики ── */
-.torg-merchant { display:flex; align-items:center; gap:11px; margin:6px 12px 4px; padding:11px 13px; border-radius:16px;
-  background:linear-gradient(150deg,#2a1d0d,#180f06); border:1px solid var(--brass-d,#5a4326);
-  box-shadow:0 6px 18px #0008, inset 0 1px 0 #ffffff10; }
-.torg-mav { flex:none; width:52px; height:52px; border-radius:13px; overflow:hidden;
-  border:1px solid #caa64e66; box-shadow:0 3px 10px #0008, inset 0 0 0 1px #0006; background:#221a10; }
-.torg-mav img { width:100%; height:100%; object-fit:cover; display:block; }
-.torg-mav-emo { display:flex; width:100%; height:100%; align-items:center; justify-content:center; font-size:28px; }
-.torg-minfo { flex:1; min-width:0; }
-.torg-mname { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:16px; color:var(--gold,#f0b859); }
-.torg-mline { font-family:Georgia,serif; font-style:italic; font-size:12px; color:#b7a587; line-height:1.4; margin-top:1px; }
-.torg-pouch { flex:none; display:inline-flex; align-items:center; gap:5px; padding:7px 11px; border-radius:12px;
-  background:radial-gradient(circle at 40% 30%, #3a2a12, #241804); box-shadow:inset 0 0 0 1px #caa64e44, 0 2px 6px #0007;
-  font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:15px; color:#f6d885; }
+/* ── Торг: ОТКРЫТО — современный frameless-верх (без рамки) + строка баланса ── */
+.torg-head { position:relative; margin:6px 16px 2px; padding:6px 0 2px; }
+.torg-head-row { display:flex; align-items:center; gap:13px; }
+.torg-portrait { position:relative; flex:none; width:58px; height:58px; border-radius:50%; padding:2px;
+  background:conic-gradient(from 140deg, #ffe39a, #cf9a3c, #8a5e1f, #ffe39a);
+  box-shadow:0 6px 18px #0009, 0 0 22px #e7bf6333; }
+.torg-portrait img { width:100%; height:100%; border-radius:50%; object-fit:cover; display:block; background:#221a10; }
+.torg-portrait .torg-mav-emo { display:flex; width:100%; height:100%; align-items:center; justify-content:center;
+  font-size:28px; border-radius:50%; background:#221a10; }
+.torg-status { position:absolute; right:1px; bottom:1px; width:14px; height:14px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #7af0a0, #2f9e54); box-shadow:0 0 0 3px var(--bg,#0f0a05), 0 0 9px #46c46aaa; }
+.torg-hero-id { flex:1; min-width:0; }
+.torg-hero-name { font-family:var(--disp),system-ui,sans-serif; font-weight:900; font-size:26px; letter-spacing:-.4px; line-height:1.05;
+  background:linear-gradient(92deg, #ffeec2, #e7bf63 55%, #cf9a3c); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.torg-hero-role { font-family:system-ui,sans-serif; font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:#9a8657; margin-top:4px; }
+.torg-quote { position:relative; margin:12px 0 0; padding-left:2px; font-family:Georgia,serif; font-style:italic;
+  font-size:13px; line-height:1.5; color:#c9bc9c; }
+.torg-q { font-family:Georgia,serif; font-style:normal; font-size:28px; color:#caa64e; line-height:0;
+  vertical-align:-10px; margin-right:3px; opacity:.8; }
+/* строка баланса — широкая, на всю ширину, без тяжёлой рамки */
+.torg-bal { display:flex; align-items:center; gap:8px; margin-top:13px; padding:11px 15px; border-radius:14px;
+  background:linear-gradient(100deg, rgba(231,191,99,.16), rgba(231,191,99,.03));
+  box-shadow:inset 0 0 0 1px rgba(231,191,99,.26); }
+.torg-bal-v { display:inline-flex; align-items:center; gap:7px; font-family:var(--num),system-ui,sans-serif;
+  font-weight:800; font-size:21px; color:#f6d885; text-shadow:0 1px 8px #e7bf6344; }
+.torg-bal-l { margin-left:auto; font-family:system-ui,sans-serif; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:#9a8657; }
 
 .torg-cap { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:16px 16px 8px;
   font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:13.5px; letter-spacing:.4px; color:#e7ddc8; }

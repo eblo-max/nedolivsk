@@ -61,16 +61,23 @@ export default function Market() {
     <div className="scr">
       {toast && <div className="toast">{toast}</div>}
 
-      {/* купеческий баннер */}
-      <div className="torg-merchant rise">
-        <div className="torg-mav">
-          {avOk ? <img src={MERCHANT} alt="" onError={() => setAvOk(false)} /> : <span className="torg-mav-emo">⚖️</span>}
+      {/* купеческий баннер — современная hero-плашка */}
+      <div className="torg-head rise">
+        <div className="torg-head-row">
+          <div className="torg-portrait">
+            {avOk ? <img src={MERCHANT} alt="" onError={() => setAvOk(false)} /> : <span className="torg-mav-emo">⚖️</span>}
+            <span className="torg-status" />
+          </div>
+          <div className="torg-hero-id">
+            <div className="torg-hero-name">Скупщик</div>
+            <div className="torg-hero-role">бродячий купец · сырьё за золото</div>
+          </div>
         </div>
-        <div className="torg-minfo">
-          <div className="torg-mname">Скупщик</div>
-          <div className="torg-mline">«Сырьё любое — плати золотом и бери сразу. Дорого, да без ожидания бригад.»</div>
+        <p className="torg-quote"><span className="torg-q">“</span>Сырьё любое — плати золотом и бери сразу. Дорого, да без ожидания бригад.</p>
+        <div className="torg-bal">
+          <span className="torg-bal-v"><ResIcon k="gold" size={18} />{fmt(d.gold ?? 0)}</span>
+          <span className="torg-bal-l">в мошне</span>
         </div>
-        <div className="torg-pouch"><ResIcon k="gold" size={20} /><b>{fmt(d.gold ?? 0)}</b></div>
       </div>
 
       {/* лавка — ящики с товаром */}
