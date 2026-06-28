@@ -1239,15 +1239,34 @@ body {
   color:#a99e85; line-height:1.45; background:linear-gradient(168deg,#211a0f,#160f07); border:1px dashed #5a4326; }
 
 /* карточка-вход в аукцион */
-.torg-act { display:flex; align-items:center; gap:12px; width:calc(100% - 24px); margin:0 12px; padding:13px 14px; cursor:pointer;
-  text-align:left; color:#eee6d6; border-radius:14px; border:1px solid #6a4f2a;
-  background:linear-gradient(135deg,#3a2a14,#241804); box-shadow:0 5px 14px #0008, inset 0 1px 0 #ffffff10; transition:transform .08s; }
+.torg-act { --acc:oklch(0.81 0.14 82); position:relative; overflow:hidden;
+  display:flex; align-items:center; gap:13px; width:calc(100% - 24px); margin:0 12px; padding:14px 15px; cursor:pointer;
+  text-align:left; color:#eee6d6; border-radius:16px; border:1px solid color-mix(in oklch, var(--acc) 30%, #2a2012);
+  background:radial-gradient(130% 150% at 0% 50%, color-mix(in oklch, var(--acc) 13%, transparent), transparent 56%),
+    linear-gradient(135deg, oklch(0.26 0.03 68), oklch(0.17 0.02 58));
+  box-shadow:0 6px 20px color-mix(in oklch, var(--acc) 15%, #0009), inset 0 1px 0 #ffffff14,
+    inset 0 0 0 1px color-mix(in oklch, var(--acc) 16%, transparent); transition:transform .1s, box-shadow .2s; }
 .torg-act:active { transform:translateY(1px) scale(.99); }
-.torg-act-emo { font-size:24px; flex:none; filter:drop-shadow(0 2px 4px #0008); }
-.torg-act-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
-.torg-act-body b { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:15px; color:var(--gold,#f0b859); }
-.torg-act-body small { font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#b7a587; }
-.torg-act-chev { flex:none; font-size:22px; color:#8a7350; }
+.torg-act.t-auc { --acc:oklch(0.81 0.14 82); }    /* золото аукциона */
+.torg-act.t-brs { --acc:oklch(0.74 0.15 152); }   /* изумруд биржи */
+/* пробегающий блик акцентного цвета */
+.torg-act::after { content:""; position:absolute; top:-30%; left:-30%; width:20%; height:160%; pointer-events:none;
+  background:linear-gradient(100deg, transparent, color-mix(in oklch, var(--acc) 50%, #fff), transparent);
+  opacity:.45; transform:skewX(-18deg); animation:sweep 6.5s ease-in-out 1.5s infinite; }
+/* иконка-плитка со свечением */
+.torg-act-emo { flex:none; z-index:1; display:grid; place-items:center; width:48px; height:48px; border-radius:14px; font-size:24px;
+  background:radial-gradient(circle at 50% 35%, color-mix(in oklch, var(--acc) 26%, transparent), transparent 70%), oklch(0.14 0.02 58);
+  box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--acc) 30%, transparent), 0 2px 8px #0007; }
+.torg-act-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; z-index:1; }
+.torg-act-body b { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:16px; letter-spacing:.2px;
+  background:linear-gradient(92deg, oklch(0.93 0.05 92), var(--acc)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.torg-act-body small { font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#b3a584; }
+.torg-act-chev { flex:none; z-index:1; display:grid; place-items:center; width:24px; height:24px; border-radius:50%; font-size:16px;
+  color:color-mix(in oklch, var(--acc) 75%, #fff); background:color-mix(in oklch, var(--acc) 14%, transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--acc) 26%, transparent); }
+/* живой огонёк (биржа) */
+.torg-act-live { position:absolute; top:11px; right:13px; z-index:2; width:7px; height:7px; border-radius:50%; background:var(--acc);
+  box-shadow:0 0 0 0 color-mix(in oklch, var(--acc) 70%, transparent); animation:brs-live 1.8s ease-out infinite; }
 
 /* ── 🔨 АУКЦИОН: лист (зал/витрина) ── */
 .auc-sheet { width:100%; max-width:440px; max-height:90vh; display:flex; flex-direction:column;

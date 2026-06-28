@@ -96,13 +96,14 @@ export default function Market() {
 
       {/* рынок игроков — выше лавки скупщика */}
       <div className="torg-cap">🔨 Аукцион</div>
-      <button className="torg-act rise" onClick={() => { haptic('light'); setAucOpen(true) }}>
+      <button className="torg-act t-auc rise" onClick={() => { haptic('light'); setAucOpen(true) }}>
         <span className="torg-act-emo">🏷️</span>
         <span className="torg-act-body"><b>Выставить лот</b><small>горожане сами набегут перебивать цену</small></span>
         <span className="torg-act-chev">›</span>
       </button>
       <div className="torg-cap">📈 Биржа</div>
-      <button className="torg-act rise" onClick={() => { haptic('light'); setBrsOpen(true) }}>
+      <button className="torg-act t-brs rise" onClick={() => { haptic('light'); setBrsOpen(true) }}>
+        <span className="torg-act-live" />
         <span className="torg-act-emo">⚖️</span>
         <span className="torg-act-body"><b>Открыть биржу</b><small>котировки и сбыт оптом между игроками</small></span>
         <span className="torg-act-chev">›</span>
