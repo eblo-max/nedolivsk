@@ -10,6 +10,18 @@ interface TorgState { ok: boolean; open: boolean; gold?: number; limit?: number;
 
 const MERCHANT = `${import.meta.env.BASE_URL}npc/15.png`   // аватар скупщика
 
+// превью-демо лавки (только import.meta.env.DEV): на localhost нет Telegram-подписи,
+// сервер закрывает Торг — но в DEV открываем витрину, чтобы прощёлкать Торг/Аукцион.
+// В прод-сборке (DEV=false) недостижимо. См. [[miniapp-no-sample-in-prod]].
+const DEMO_TORG: TorgState = { ok: true, open: true, gold: 4810, limit: 150, shop: [
+  { key: 'wood', name: 'Дрова', emoji: '🪵', price: 8, room: 150, limit: 150, max: 99, have: 0 },
+  { key: 'grain', name: 'Зерно', emoji: '🌾', price: 10, room: 120, limit: 150, max: 99, have: 12 },
+  { key: 'hops', name: 'Хмель', emoji: '🌿', price: 12, room: 150, limit: 150, max: 99, have: 0 },
+  { key: 'stone', name: 'Камень', emoji: '🪨', price: 9, room: 80, limit: 150, max: 99, have: 5 },
+  { key: 'ore', name: 'Руда', emoji: '⛏', price: 14, room: 0, limit: 150, max: 0, have: 0 },
+  { key: 'clay', name: 'Глина', emoji: '🧱', price: 7, room: 150, limit: 150, max: 99, have: 0 },
+] }
+
 /** Торг: лавка скупщика (купить сырьё за золото). Закрыт для всех (ставни + замок),
  * кроме админа/флага TORG_OPEN — гейт серверный. Аукцион и биржа — «скоро». */
 export default function Market() {
@@ -21,7 +33,9 @@ export default function Market() {
   const [avOk, setAvOk] = useState(true)
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2000) }
 
-  const load = () => api<TorgState>('torg').then(setD).catch(() => setD({ ok: true, open: false }))
+  const load = () => api<TorgState>('torg')
+    .then((r) => setD(r.open || !import.meta.env.DEV ? r : DEMO_TORG))   // DEV: закрыт сервером → демо-витрина
+    .catch(() => setD(import.meta.env.DEV ? DEMO_TORG : { ok: true, open: false }))
   useEffect(() => { load() }, [])
 
   async function buy(it: ShopItem, qty: number) {

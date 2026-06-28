@@ -61,7 +61,8 @@ def _ceiling(arch, fv: float, rng: random.Random) -> float:
     greed = rng.uniform(*arch.greed)
     need = rng.uniform(*arch.need)
     c = fv * (1 + need) * (1 - greed * 0.3)
-    return max(fv * balance.TRADE_MIN_UNDER, min(fv * balance.TRADE_MAX_OVER, c))
+    base = max(fv * balance.TRADE_MIN_UNDER, min(fv * balance.TRADE_MAX_OVER, c))
+    return base * balance.AUCTION_CEIL_BUMP   # аукционный азарт: на торгах платят сверх обычного потолка
 
 
 def create(player, tavern, good: str, qty: int, unit_min: int) -> tuple[bool, str]:
@@ -158,6 +159,9 @@ def settle(player, tavern, world) -> dict | None:
                    * worldevent.sale_mult(player))      # баф + погода (Лихорадка/Буря)
         player.gold += gold
         story_state.adjust_faction(player, "merchants", 1)
+        from bot.game import logic            # ленивый импорт — без цикла
+        logic.add_goods_rep_progress(player, tavern, qty * balance.REP_POINTS_AUCTION)  # молва, как на бирже
+        tavern.auction_sold = int(tavern.auction_sold or 0) + qty  # в рейтинг продавцов
         market.add_supply(world, good, int(qty * balance.MARKET_WHOLESALE_WEIGHT))
         res = {"sold": True, "good": good, "qty": qty, "unit": top, "gold": gold, "npc": bidder}
     else:

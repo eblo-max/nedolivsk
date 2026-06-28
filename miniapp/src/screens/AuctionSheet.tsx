@@ -6,7 +6,7 @@ import AnimEmoji from '../components/AnimEmoji'
 
 interface AucNpc { name: string; emoji: string; avatar: number | null }
 interface AucHist { unit: number; name: string; emoji: string; avatar: number | null }
-interface AucGood { key: string; name: string; emoji: string; stock: number; fv: number }
+interface AucGood { key: string; name: string; emoji: string; stock: number; fv: number; prices?: number[] }
 interface AucTier { mult: number; label: string }
 interface AucResult { sold: boolean; good: string; name: string; emoji: string; qty: number; unit?: number; gold?: number; winner?: AucNpc | null }
 interface AucState {
@@ -54,6 +54,79 @@ function Countdown({ ends }: { ends: string }) {
   return <span className={`auc-clock${left < 600 ? ' hot' : ''}`}>{h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`}</span>
 }
 
+// ── ПРЕВЬЮ-ДЕМО (только import.meta.env.DEV) ─────────────────────────────────
+// В превью на localhost нет Telegram-подписи → сервер не знает, что ты админ,
+// и аукцион «закрыт». Чтобы вживую прощёлкать все экраны, в DEV весь аукцион
+// обслуживает локальный демо-лот в памяти. В прод-сборке (DEV=false) ничего
+// этого нет — там работает настоящий /api/auction. См. [[miniapp-no-sample-in-prod]].
+const DEV = import.meta.env.DEV
+const TIER_MULT = [1, 1.2, 1.4]
+const demoPrices = (fv: number) => TIER_MULT.map((m) => Math.max(1, Math.round(fv * m)))
+const DEMO_GOODS: AucGood[] = [
+  { key: 'ale1', name: 'Хмельной эль', emoji: '🍺', stock: 24, fv: 12, prices: demoPrices(12) },
+  { key: 'mead', name: 'Медовуха', emoji: '🍯', stock: 8, fv: 18, prices: demoPrices(18) },
+  { key: 'bread', name: 'Хлеб', emoji: '🍞', stock: 15, fv: 6, prices: demoPrices(6) },
+  { key: 'roast', name: 'Жаркое', emoji: '🍖', stock: 5, fv: 22, prices: demoPrices(22) },
+]
+const DEMO_NPC: AucNpc[] = [
+  { name: 'Кума Дарья', emoji: '👩', avatar: 5 },
+  { name: 'Балагур Прохор', emoji: '🧔', avatar: 3 },
+  { name: 'Кузнец Фома', emoji: '🧔‍🦰', avatar: 7 },
+  { name: 'Купец Гордей', emoji: '🧑', avatar: 19 },
+]
+interface DemoLot { good: string; name: string; emoji: string; qty: number; reserve: number
+  top_bid: number | null; bidder: AucNpc | null; bids: number; ends_at: string; history: AucHist[] }
+const demo: { lot: DemoLot | null; last: AucResult | null } = { lot: null, last: null }
+const rnd = (n: number) => Math.floor(Math.random() * n)
+
+function demoState(): AucState {
+  const base = { ok: true, open: true, gold: 4810, admin: true }
+  if (demo.lot) {
+    const l = demo.lot
+    return { ...base, active: true, good: l.good, name: l.name, emoji: l.emoji, qty: l.qty,
+      reserve: l.reserve, top_bid: l.top_bid, bidder: l.bidder, bids: l.bids, ends_at: l.ends_at,
+      mins_left: Math.max(0, Math.round((new Date(l.ends_at).getTime() - Date.now()) / 60000)),
+      history: [...l.history].reverse(), duration_h: 6 }   // новые сверху — как настоящий сервер
+  }
+  return { ...base, active: false, goods: DEMO_GOODS, presets: [5, 10, 20], qty_max: 20, duration_h: 6,
+    tiers: [{ mult: 1, label: 'по рынку' }, { mult: 1.2, label: 'бодро' }, { mult: 1.4, label: 'дорого' }],
+    ...(demo.last ? { result: demo.last } : {}) }
+}
+
+/** В DEV — локальный демо-аукцион; в прод — настоящий /api/auction. */
+function aucApi(path: string, body?: Record<string, unknown>): Promise<AucState> {
+  if (!DEV) return api<AucState>(path, body)
+  if (path === 'auction/create' && body) {
+    const g = DEMO_GOODS.find((x) => x.key === body.good) || DEMO_GOODS[0]
+    const unit = body.price != null
+      ? Math.max(1, Number(body.price))                                    // своя цена
+      : Math.max(1, Math.round(g.fv * TIER_MULT[(body.tier as number) ?? 0]))   // тир
+    demo.lot = { good: g.key, name: g.name, emoji: g.emoji, qty: (body.qty as number) || 5, reserve: unit,
+      top_bid: null, bidder: null, bids: 0, history: [],
+      ends_at: new Date(Date.now() + 6 * 3600 * 1000).toISOString() }
+    demo.last = null
+  } else if (path === 'auction/cancel') {
+    demo.lot = null
+  } else if (path === 'auction/seed' && demo.lot) {
+    const l = demo.lot
+    for (let i = 0, n = 2 + rnd(2); i < n; i++) {
+      const npc = DEMO_NPC[rnd(DEMO_NPC.length)]
+      l.top_bid = l.top_bid ? l.top_bid + 1 + rnd(3) : l.reserve
+      l.bidder = npc; l.bids++
+      l.history = [...l.history, { unit: l.top_bid, ...npc }].slice(-5)
+    }
+  } else if (path === 'auction/settle_now' && demo.lot) {
+    const l = demo.lot
+    demo.last = l.top_bid
+      ? { sold: true, good: l.good, name: l.name, emoji: l.emoji, qty: l.qty, unit: l.top_bid, gold: l.top_bid * l.qty, winner: l.bidder }
+      : { sold: false, good: l.good, name: l.name, emoji: l.emoji, qty: l.qty }
+    demo.lot = null
+  } else if (path === 'auction/seen') {
+    demo.last = null
+  }
+  return Promise.resolve(demoState())
+}
+
 export default function AuctionSheet({ onClose }: { onClose: () => void }) {
   const [d, setD] = useState<AucState | null>(null)
   const [busy, setBusy] = useState(false)
@@ -61,12 +134,13 @@ export default function AuctionSheet({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<'good' | 'set'>('good')
   const [pick, setPick] = useState<AucGood | null>(null)
   const [qty, setQty] = useState(0)
+  const [customPrice, setCustomPrice] = useState('')   // своя цена за шт (помимо тиров)
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
   const [bidFlash, setBidFlash] = useState(false)   // вспышка при новой ставке горожанина
   const prevBids = useRef<number | null>(null)      // сколько ставок было в прошлый опрос
   const resGong = useRef(false)                      // гонг финала отбили (раз)
 
-  const load = (silent = false) => api<AucState>('auction').then((r) => { setD(r); void silent }).catch(() => setD({ ok: true, open: false }))
+  const load = (silent = false) => aucApi('auction').then((r) => { setD(r); void silent }).catch(() => setD({ ok: true, open: false }))
   useEffect(() => { load() }, [])
   // живой лот — тихо подтягиваем новые ставки горожан
   const active = !!d?.active
@@ -97,27 +171,29 @@ export default function AuctionSheet({ onClose }: { onClose: () => void }) {
   async function dismissResult() {
     if (busy) return
     setBusy(true); haptic('light')
-    try { await api('auction/seen') } catch { /* всё равно перезагрузим */ }
+    try { await aucApi('auction/seen') } catch { /* всё равно перезагрузим */ }
     setBusy(false); resGong.current = false; await load()
   }
 
-  async function create(tier: number) {
+  async function submitLot(body: Record<string, unknown>) {
     if (busy || !pick || qty <= 0) return
     setBusy(true); haptic('medium')
     try {
-      const r = await api<AucState>('auction/create', { good: pick.key, qty, tier })
+      const r = await aucApi('auction/create', { good: pick.key, qty, ...body })
       setD(r); hapticNotify('success'); flash('Лот выставлен — жди покупателей!')
-      setStep('good'); setPick(null); setQty(0)
+      setStep('good'); setPick(null); setQty(0); setCustomPrice('')
     } catch (e) {
       const c = (e as { code?: string })?.code
-      flash(c === 'busy' ? 'Лот уже на торгах' : c === 'empty' ? 'Товара нет' : 'Не вышло')
+      flash(c === 'busy' ? 'Лот уже на торгах' : c === 'empty' ? 'Товара нет' : c === 'price' ? 'Цена должна быть ≥ 1' : 'Не вышло')
       hapticNotify('warning')
     } finally { setBusy(false) }
   }
+  const create = (tier: number) => submitLot({ tier })
+  const createPrice = (price: number) => submitLot({ price })
   async function cancel() {
     if (busy) return
     setBusy(true); haptic('medium')
-    try { const r = await api<AucState>('auction/cancel'); setD(r); hapticNotify('success'); flash('Лот снят, товар вернулся в погреб') }
+    try { const r = await aucApi('auction/cancel'); setD(r); hapticNotify('success'); flash('Лот снят, товар вернулся в погреб') }
     catch { flash('Не вышло'); hapticNotify('warning') }
     finally { setBusy(false) }
   }
@@ -125,14 +201,14 @@ export default function AuctionSheet({ onClose }: { onClose: () => void }) {
   async function seedBids() {
     if (busy) return
     setBusy(true); haptic('medium')
-    try { const r = await api<AucState>('auction/seed'); prevBids.current = null; setD(r); flash('🧪 ставки подброшены') }
+    try { const r = await aucApi('auction/seed'); setD(r); flash('🧪 ставки подброшены') }   // не сбрасываем prevBids — пусть сработает подсветка+гонг
     catch { flash('Не вышло'); hapticNotify('warning') }
     finally { setBusy(false) }
   }
   async function settleNow() {
     if (busy) return
     setBusy(true); haptic('medium')
-    try { const r = await api<AucState>('auction/settle_now'); setD(r); flash('🧪 торги закрыты') }
+    try { const r = await aucApi('auction/settle_now'); setD(r); flash('🧪 торги закрыты') }
     catch { flash('Не вышло'); hapticNotify('warning') }
     finally { setBusy(false) }
   }
@@ -187,7 +263,7 @@ export default function AuctionSheet({ onClose }: { onClose: () => void }) {
                 <div className="auc-feed">
                   <div className="auc-feed-h">📣 Ход торгов</div>
                   {d.history.map((h, i) => (
-                    <div key={i} className={`auc-feed-row${bidFlash && i === d.history!.length - 1 ? ' fresh' : ''}`} style={{ animationDelay: `${i * 0.05}s` }}>
+                    <div key={i} className={`auc-feed-row${bidFlash && i === 0 ? ' fresh' : ''}`} style={{ animationDelay: `${i * 0.05}s` }}>
                       <Face n={h} size={24} />
                       <span className="auc-feed-nm">{h.name}</span>
                       <span className="auc-feed-bid"><ResIcon k="gold" size={12} />{h.unit}</span>
@@ -262,16 +338,25 @@ export default function AuctionSheet({ onClose }: { onClose: () => void }) {
 
                   <div className="auc-cap">Объём лота</div>
                   <div className="auc-qtys">
-                    {(d.presets || []).filter((q) => q <= pick.stock).map((q) => (
-                      <button key={q} className={`auc-qty${qty === q ? ' on' : ''}`} onClick={() => { haptic('light'); setQty(q) }}>{q}</button>
-                    ))}
-                    {pick.stock < (d.presets?.[0] ?? 5) && <button className={`auc-qty${qty === pick.stock ? ' on' : ''}`} onClick={() => setQty(pick.stock)}>{pick.stock}</button>}
+                    {(() => {
+                      // как в текстовом боте: пресеты, клампленные к остатку, + «Всё» = min(остаток, лимит)
+                      const max = Math.min(pick.stock, d.qty_max ?? 20)
+                      const opts: number[] = []
+                      for (const n of (d.presets || [])) { const q = Math.min(n, max); if (q > 0 && !opts.includes(q)) opts.push(q) }
+                      const allExtra = max > 0 && !opts.includes(max)
+                      if (allExtra) opts.push(max)
+                      return opts.map((q) => (
+                        <button key={q} className={`auc-qty${qty === q ? ' on' : ''}`} onClick={() => { haptic('light'); setQty(q) }}>
+                          {allExtra && q === max ? `Всё ${q}` : q}
+                        </button>
+                      ))
+                    })()}
                   </div>
 
                   <div className="auc-cap">Резервная цена · за {qty} шт</div>
                   <div className="auc-tiers">
                     {(d.tiers || []).map((t, i) => {
-                      const unit = Math.max(1, Math.round(pick.fv * t.mult))
+                      const unit = pick.prices?.[i] ?? Math.max(1, Math.round(pick.fv * t.mult))
                       return (
                         <button key={i} className="auc-tier" disabled={busy || qty <= 0} onClick={() => create(i)}>
                           <span className="auc-tier-lbl">{t.label}</span>
@@ -280,6 +365,18 @@ export default function AuctionSheet({ onClose }: { onClose: () => void }) {
                         </button>
                       )
                     })}
+                  </div>
+
+                  <div className="auc-cap">Своя цена · за шт</div>
+                  <div className="auc-custom">
+                    <span className="auc-custom-coin"><ResIcon k="gold" size={15} /></span>
+                    <input className="auc-price-inp" type="number" inputMode="numeric" min={1}
+                      placeholder={`${pick.fv}`} value={customPrice}
+                      onChange={(e) => setCustomPrice(e.target.value.replace(/[^\d]/g, ''))} />
+                    <button className="auc-price-go" disabled={busy || qty <= 0 || !(Number(customPrice) >= 1)}
+                      onClick={() => createPrice(Number(customPrice))}>
+                      {Number(customPrice) >= 1 ? `куш ≈ ${fmt(Number(customPrice) * qty)} 🪙` : 'своя цена'}
+                    </button>
                   </div>
                   <p className="auc-hint">Лот висит {d.duration_h} ч. Заломишь цену — могут и не взять; не возьмут — товар вернётся.</p>
                 </div>

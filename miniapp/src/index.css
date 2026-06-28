@@ -1253,7 +1253,8 @@ body {
 .auc-sheet { width:100%; max-width:440px; max-height:90vh; display:flex; flex-direction:column;
   border-radius:20px 20px 18px 18px; padding:16px 16px calc(14px + var(--sa-bottom,0px));
   background:linear-gradient(180deg,#1b140c,#120d07); border:1px solid var(--brass-d,#5a4326);
-  box-shadow:0 -8px 40px #000c, inset 0 1px 0 #ffffff10; animation:sv-rise .3s cubic-bezier(.2,.8,.3,1) both; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  box-shadow:0 -8px 40px #000c, inset 0 1px 0 #ffffff10; animation:sv-rise .3s cubic-bezier(.2,.8,.3,1) both;
+  overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; }   /* x:hidden — повёрнутый бокс лучей не тянет горизонт. скролл */
 .auc-head { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:17px; color:var(--gold,#f0b859); text-align:center; margin-bottom:10px; }
 .auc-close { margin-top:12px; flex:none; }
 
@@ -1335,7 +1336,8 @@ body {
 .auc-cfg-good b { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:15px; color:#ece3cd; display:block; }
 .auc-cfg-good small { font-family:var(--text),system-ui,sans-serif; font-size:11.5px; color:#a99e85; }
 .auc-cap { font-family:var(--disp),system-ui,sans-serif; font-weight:700; font-size:10.5px; letter-spacing:1.5px; text-transform:uppercase; color:#9a8657; margin:14px 2px 7px; }
-.auc-qtys { display:flex; gap:8px; }
+.auc-qtys { display:flex; gap:8px; flex-wrap:wrap; }
+.auc-qtys .auc-qty { flex:1 1 auto; min-width:56px; }
 .auc-qty { flex:1; padding:11px 0; border-radius:11px; cursor:pointer; font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:16px; color:#cbbf9f;
   background:#1a1207; border:1px solid #4a3719; }
 .auc-qty.on { color:#241501; background:linear-gradient(var(--gold-2,#f6d885),#cf9a3c); border-color:#f6dd92; }
@@ -1348,6 +1350,20 @@ body {
 .auc-tier-unit { font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:13.5px; color:#ece3cd; }
 .auc-tier-tot { margin-left:auto; font-family:var(--num),system-ui,sans-serif; font-size:12px; color:#b6a169; }
 
+/* своя цена за штуку — рядом с тирами */
+.auc-custom { display:flex; align-items:center; gap:8px; }
+.auc-custom-coin { display:inline-flex; align-items:center; padding-left:2px; }
+.auc-price-inp { width:84px; flex:none; padding:11px 10px; border-radius:11px; text-align:center;
+  font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:16px; color:#f6d885;
+  background:#1a1207; border:1px solid #5a4326; -webkit-appearance:none; appearance:none; }
+.auc-price-inp::placeholder { color:#8a7c58; font-weight:600; }
+.auc-price-inp:focus { outline:none; border-color:#caa64e; }
+.auc-price-go { flex:1; padding:12px 12px; border-radius:11px; cursor:pointer; text-align:center;
+  font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:13.5px; color:#241501;
+  background:linear-gradient(var(--gold-2,#f6d885),#cf9a3c); border:1px solid #f6dd92; }
+.auc-price-go:active { transform:scale(.99); }
+.auc-price-go:disabled { opacity:.45; background:#2a2113; color:#9a8f76; border-color:#4a3719; }
+
 /* ── подсветка новой ставки горожанина ── */
 .auc-hall.bidflash { animation:auc-flash .9s ease-out; }
 @keyframes auc-flash { 0%{ box-shadow:inset 0 0 0 0 #f3c76800 } 18%{ box-shadow:inset 0 0 60px 4px #f3c76833 } 100%{ box-shadow:inset 0 0 0 0 #f3c76800 } }
@@ -1357,7 +1373,7 @@ body {
 @keyframes auc-fresh { 0%{ background:#f3c76800 } 20%{ background:#f3c7682e } 100%{ background:#f3c76800 } }
 
 /* ── финал торгов: продано / не взяли ── */
-.auc-fin { position:relative; display:flex; flex-direction:column; align-items:center; padding:6px 4px 2px; overflow:hidden; animation:sv-rise .35s both; }
+.auc-fin { position:relative; display:flex; flex-direction:column; align-items:center; padding:6px 4px 2px; animation:sv-rise .35s both; }
 .auc-fin-stamp { font-family:var(--disp),system-ui,sans-serif; font-weight:900; font-size:34px; letter-spacing:2px;
   margin:4px 0 2px; animation:auc-stamp .5s cubic-bezier(.2,1.5,.4,1) both; }
 .auc-fin.won .auc-fin-stamp { color:#7ff0a8; text-shadow:0 0 22px #2ba35eaa, 0 2px 10px #000; }
@@ -1366,10 +1382,11 @@ body {
 .auc-fin-stage { position:relative; width:100%; height:170px; display:flex; align-items:center; justify-content:center; }
 .auc-fin-halo { position:absolute; top:50%; left:50%; width:200px; height:200px; transform:translate(-50%,-54%);
   background:radial-gradient(circle,#7ff0a833 0%,transparent 62%); filter:blur(4px); animation:nr-pulse 2.6s ease-in-out infinite; }
-.auc-fin-item { position:relative; z-index:2; animation:auc-float 3.4s ease-in-out infinite;
+.auc-fin-item { position:relative; z-index:2; animation:auc-floatf 3.4s ease-in-out infinite;
   filter:drop-shadow(0 10px 14px #000a) drop-shadow(0 0 22px #e7bf6344); }
 .auc-fin.lost .auc-fin-item { filter:drop-shadow(0 10px 14px #000a) grayscale(.5); opacity:.7; }
-@keyframes auc-float { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-9px) } }
+/* отдельное имя — не конфликтовать с auc-float у .auc-item (там нужен translateX(-50%)) */
+@keyframes auc-floatf { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-9px) } }
 .auc-fin-name { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:18px; color:#f3ead4; text-shadow:0 2px 12px #000; margin-bottom:8px; }
 .auc-fin-who { display:flex; align-items:center; gap:8px; font-family:var(--text),system-ui,sans-serif; font-size:13.5px; color:#cbbf9f; margin-bottom:8px; }
 .auc-fin-who b { color:#ece3cd; }
@@ -1380,12 +1397,16 @@ body {
 .auc-fin-ok { margin-top:16px; }
 .auc-fin.won .auc-fin-ok { color:#0d2417 !important; border-color:#5fd497 !important;
   background:linear-gradient(#7ff0a8,#2ba35e) !important; box-shadow:0 6px 20px #2ba35e55 !important; }
-/* лучи победы */
-.auc-rays { position:absolute; top:120px; left:50%; width:380px; height:380px; transform:translate(-50%,-50%); pointer-events:none; z-index:0;
-  background:repeating-conic-gradient(from 0deg, #f6d88514 0deg 9deg, transparent 9deg 18deg);
-  -webkit-mask:radial-gradient(circle, transparent 32%, #000 38%, transparent 74%); mask:radial-gradient(circle, transparent 32%, #000 38%, transparent 74%);
-  animation:auc-spin 22s linear infinite; }
-@keyframes auc-spin { to{ transform:translate(-50%,-50%) rotate(360deg) } }
+/* лучи победы — мягкий бесшовный веер: лучи плавно проступают и гаснут (без резких
+   стопов), маска растворяет края к прозрачному (без видимой границы/обрезки) */
+.auc-rays { position:absolute; top:128px; left:50%; width:340px; height:340px; transform:translate(-50%,-50%); pointer-events:none; z-index:0;
+  background:repeating-conic-gradient(from 0deg, transparent 0deg, #f6d8851c 4deg, transparent 8deg, transparent 16deg);
+  /* .auc-fin больше не обрезает — лучи свободны; маска в px плавно гасит к прозрачному (бесшовно) */
+  -webkit-mask:radial-gradient(circle 170px at 50% 50%, transparent 18%, #000 42%, transparent 92%);
+  mask:radial-gradient(circle 170px at 50% 50%, transparent 18%, #000 42%, transparent 92%);
+  animation:auc-spinr 22s linear infinite; }
+/* отдельное имя — не конфликтовать с auc-spin у .auc-halo (там translateX(-50%) без Y) */
+@keyframes auc-spinr { to{ transform:translate(-50%,-50%) rotate(360deg) } }
 
 /* ── зазывала: яркая выделенная карточка-вход на таверне + лист рефералки ── */
 .zz-cta { position:relative; overflow:hidden; display:flex; align-items:center; gap:12px;

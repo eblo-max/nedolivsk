@@ -741,10 +741,15 @@ def _auction_state(p, world) -> dict:
                 "mins_left": auc.time_left_minutes(lot), "history": hist,
                 "duration_h": bal.AUCTION_DURATION_HOURS}
     prods = t.products or {}
-    goods = [{"key": k, "name": (prod.GOODS[k].name if k in prod.GOODS else k),
-              "emoji": (prod.GOODS[k].emoji if k in prod.GOODS else "📦"),
-              "stock": int(prods.get(k, 0)), "fv": int(round(auc.fair_value(world, k)))}
-             for k in auc.sellable_goods(t)]
+
+    def _good(k):
+        fv = auc.fair_value(world, k)
+        return {"key": k, "name": (prod.GOODS[k].name if k in prod.GOODS else k),
+                "emoji": (prod.GOODS[k].emoji if k in prod.GOODS else "📦"),
+                "stock": int(prods.get(k, 0)), "fv": int(round(fv)),
+                # точные цены тиров (та же формула, что и при создании) — превью == факт
+                "prices": [max(1, round(fv * m)) for m in bal.AUCTION_PRICE_TIERS]}
+    goods = [_good(k) for k in auc.sellable_goods(t)]
     tiers = [{"mult": m, "label": lbl}
              for m, lbl in zip(bal.AUCTION_PRICE_TIERS, ("по рынку", "бодро", "дорого"))]
     return {"active": False, "goods": goods, "tiers": tiers,
@@ -790,8 +795,11 @@ async def _api_auction(request: web.Request) -> web.Response:
             return web.json_response({"ok": True, "open": False}, headers={"Cache-Control": "no-store"})
         world = await repo.get_or_create_world(s)
         if auc.is_due(p.tavern):                       # таймер вышел — закрыть немедленно
-            auc.settle(p, p.tavern, world)
+            res = auc.settle(p, p.tavern, world)
             repo.add_log(s, "player", p.id, "🔨 торги закрыты (мини-апп)")
+            if res is not None:                        # DM как у нотифаера — чтобы паритет был полный
+                from bot import texts as _t
+                repo.queue_notify(s, p.id, _t.auction_settled(res))
             await s.commit()
         out = {"ok": True, "open": True, "gold": p.gold, "admin": _is_admin(uid), **_auction_state(p, world)}
         res = _auc_result((p.story or {}).get("auc_last"))
