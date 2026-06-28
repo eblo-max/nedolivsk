@@ -896,6 +896,7 @@ async def _api_auction_seed(request: web.Request) -> web.Response:
         lot = p.tavern.auction
         if not lot:
             return web.json_response({"ok": False, "error": "none"})
+        lot = dict(lot)   # КОПИЯ (см. try_bid): иначе in-place мутация не сохранится (JSONB)
         rng = random.Random()
         added = 0
         for _ in range(rng.randint(2, 3)):                 # цена лезет от резерва вверх

@@ -105,6 +105,8 @@ def try_bid(tavern, world, rng: random.Random | None = None) -> dict | None:
     lot = tavern.auction
     if not lot:
         return None
+    lot = dict(lot)   # КОПИЯ: мутируем её, а не загруженный объект — иначе SQLAlchemy
+                      # не увидит изменения при tavern.auction = dict(lot) (JSONB без Mutable)
     good = lot["good"]
     fv = fair_value(world, good)
     cit = npc.random_trader(rng)
