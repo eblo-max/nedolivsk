@@ -3,6 +3,7 @@ import { api } from '../api'
 import { haptic, hapticNotify, openTgLink } from '../telegram'
 import { ResIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
+import AuctionSheet from './AuctionSheet'
 
 interface ShopItem { key: string; name: string; emoji: string; price: number; room: number; limit: number; max: number; have: number }
 interface TorgState { ok: boolean; open: boolean; gold?: number; limit?: number; shop?: ShopItem[] }
@@ -14,6 +15,7 @@ const MERCHANT = `${import.meta.env.BASE_URL}npc/15.png`   // аватар ск�
 export default function Market() {
   const [d, setD] = useState<TorgState | null>(null)
   const [pick, setPick] = useState<ShopItem | null>(null)
+  const [aucOpen, setAucOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
   const [avOk, setAvOk] = useState(true)
@@ -94,8 +96,12 @@ export default function Market() {
         })}
       </div>
 
-      <div className="torg-cap">🔨 Аукцион<span>скоро</span></div>
-      <div className="torg-soon rise">Лоты между игроками — выставляй излишки, торгуйся за чужое. На подходе.</div>
+      <div className="torg-cap">🔨 Аукцион</div>
+      <button className="torg-act rise" onClick={() => { haptic('light'); setAucOpen(true) }}>
+        <span className="torg-act-emo">🔨</span>
+        <span className="torg-act-body"><b>Выставить лот</b><small>горожане сами набегут перебивать цену</small></span>
+        <span className="torg-act-chev">›</span>
+      </button>
       <div className="torg-cap">📈 Биржа<span>скоро</span></div>
       <div className="torg-soon rise">Котировки в реальном времени и сбыт оптом. На подходе.</div>
 
@@ -120,6 +126,7 @@ export default function Market() {
           )}
         </Sheet>
       )}
+      {aucOpen && <AuctionSheet onClose={() => setAucOpen(false)} />}
     </div>
   )
 }

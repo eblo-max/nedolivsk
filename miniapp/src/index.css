@@ -41,17 +41,18 @@ body {
   font-family:var(--text); color:var(--parch); background:var(--ink);
   overflow-y:scroll; overflow-x:hidden; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain;
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; user-select:none;
-  background-image:radial-gradient(120% 70% at 50% -8%,#3a2410 0%,#1a1207 46%,#0a0604 100%);
-  background-attachment:fixed;
+  /* базовый градиент перенесён на фикс. слой .fx-vig — иначе background-attachment:fixed
+     заставлял Android перерисовывать фон на каждом кадре прокрутки (лаг скролла) */
 }
 
 /* фон-атмосфера: угли очага (тёплый дым, не золотой блеск) */
 .fx-glow,.fx-grain,.fx-vig { position:fixed; inset:0; pointer-events:none; z-index:0; }
-.fx-glow { background:radial-gradient(62% 40% at 50% 8%,#8a3e0e 0%,#5a2c0c 30%,transparent 66%); animation:flick 6s ease-in-out infinite; }
+.fx-glow { background:radial-gradient(62% 40% at 50% 8%,#8a3e0e 0%,#5a2c0c 30%,transparent 66%); animation:flick 6s ease-in-out infinite; will-change:opacity; }
 @keyframes flick { 0%,100%{opacity:.7} 30%{opacity:1} 55%{opacity:.78} 75%{opacity:.92} }
 .fx-grain { opacity:.045; mix-blend-mode:overlay;
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-.fx-vig { background:radial-gradient(130% 92% at 50% 32%,transparent 50%,#000c 100%); }
+.fx-vig { background:radial-gradient(130% 92% at 50% 32%,transparent 50%,#000c 100%),
+  radial-gradient(120% 70% at 50% -8%,#3a2410 0%,#1a1207 46%,#0a0604 100%); }
 
 /* оболочка */
 .app { position:relative; z-index:1; min-height:var(--app-h, 100%); display:flex; flex-direction:column; }
@@ -70,8 +71,8 @@ body {
 .ticker {
   position:fixed; top:0; left:0; right:0; z-index:6; height:calc(var(--hud-h) + var(--sa-top));
   padding-top:var(--sa-top); max-width:480px; margin:0 auto; display:flex; align-items:center; overflow:hidden;
-  background:linear-gradient(#1c1206f2,#140d07e6); border-bottom:1px solid var(--brass-d);
-  box-shadow:0 4px 16px #000a; backdrop-filter:blur(6px);
+  background:linear-gradient(#1c1206fa,#140d07f2); border-bottom:1px solid var(--brass-d);
+  box-shadow:0 4px 16px #000a;   /* blur убран — фикс. бар над скроллом + бегущий текст = двойной пересчёт */
 }
 .ticker .lbl { flex:0 0 auto; display:flex; align-items:center; gap:5px; padding:0 11px; align-self:stretch;
   font-family:var(--disp); font-weight:700; font-size:10px; letter-spacing:1px; color:var(--brass);
@@ -188,7 +189,7 @@ body {
 .nav { position:fixed; left:0; right:0; bottom:0; z-index:5; display:flex;
   height:calc(var(--nav-h) + var(--sa-bottom)); padding-bottom:var(--sa-bottom);
   max-width:480px; margin:0 auto;
-  background:linear-gradient(0deg,#0b0703 72%,#0b070300); border-top:1px solid var(--line); backdrop-filter:blur(4px); }
+  background:linear-gradient(0deg,#0b0703 86%,#0b0703e0); border-top:1px solid var(--line); }   /* blur убран — пересчитывался на каждом кадре скролла под фикс. меню */
 .nav a { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
   text-decoration:none; color:var(--dim); font-family:var(--disp); font-size:9.5px; letter-spacing:.4px; padding-top:5px; font-weight:600; }
 .nav a .ic { font-size:20px; filter:grayscale(.45) drop-shadow(0 1px 1px #000); transition:transform .12s; }
@@ -385,7 +386,7 @@ body {
 
 /* ── bottom-sheet панель действия (бонус/грамота/бригады) ── */
 .sheet-ov { position:fixed; top:0; left:0; right:0; height:var(--app-h, 100vh); z-index:40;
-  background:#000b; backdrop-filter:blur(2px);
+  background:#000d;   /* без backdrop-filter: blur полноэкранного оверлея лагал на Android */
   display:flex; align-items:flex-end; justify-content:center; animation:ov-in .2s ease;
   overscroll-behavior:contain; touch-action:none; }
 .sheet-ov.out { animation:ov-out .24s ease forwards; }
@@ -813,7 +814,7 @@ body {
 
 /* журнал-летопись на распутье (последние беды пути) */
 .nr-journal { width:100%; max-width:360px; margin:0 auto 12px; padding:10px 12px; border-radius:14px;
-  background:linear-gradient(180deg,#1a1612cc,#100d0acc); border:1px solid #ffffff12; backdrop-filter:blur(8px);
+  background:linear-gradient(180deg,#1a1612f2,#100d0af2); border:1px solid #ffffff12;
   box-shadow:0 8px 26px #000a, inset 0 1px 0 #ffffff0c; }
 .nr-journal-h { font-family:var(--text); font-size:10px; letter-spacing:1.6px; text-transform:uppercase; color:#8a7f6a; margin-bottom:6px; }
 .nr-journal-l { font-family:var(--text); font-size:12.5px; line-height:1.45; color:#c7bda8; margin:3px 0; opacity:0; animation:nr-jin .5s ease forwards; }
@@ -823,7 +824,7 @@ body {
 
 /* полная хроника ночи в финале */
 .nr-chron { width:100%; max-width:360px; margin:14px auto 4px; padding:12px 14px; border-radius:16px; text-align:left;
-  background:linear-gradient(180deg,#17130ecc,#0c0a07e6); border:1px solid #ffffff10; backdrop-filter:blur(10px);
+  background:linear-gradient(180deg,#17130ef2,#0c0a07f7); border:1px solid #ffffff10;
   box-shadow:0 12px 32px #000b, inset 0 1px 0 #ffffff0a; }
 .nr-chron-h { font-family:var(--text); font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#a8946a; margin-bottom:8px; text-align:center; }
 .nr-chron-body { max-height:190px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -988,7 +989,7 @@ body {
 
 /* ── ВНЕЗАПНЫЙ ВИЗИТЁР (story-движок) ── */
 .sv-backdrop { position:fixed; top:0; left:0; right:0; height:var(--app-h, 100vh); z-index:40; display:flex; align-items:flex-end; justify-content:center;
-  background:rgba(6,5,3,.72); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); animation:sv-fade .22s ease; padding:14px; }
+  background:rgba(6,5,3,.84); animation:sv-fade .22s ease; padding:14px; }   /* blur убран — лагал на Android */
 @keyframes sv-fade { from{opacity:0} to{opacity:1} }
 .sv-card { width:100%; max-width:440px; border-radius:20px 20px 18px 18px; padding:18px 17px calc(18px + var(--sa-bottom,0px));
   background:linear-gradient(180deg,#1b140c,#120d07); border:1px solid var(--brass-d,#5a4326);
@@ -1089,7 +1090,7 @@ body {
 
 /* ── дисклеймер раннего доступа (центр. модалка при каждом входе) ── */
 .ta-backdrop { position:fixed; top:0; left:0; right:0; height:var(--app-h, 100vh); z-index:60; display:flex; align-items:center; justify-content:center;
-  background:rgba(6,5,3,.8); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); animation:sv-fade .22s ease; padding:22px; }
+  background:rgba(6,5,3,.88); animation:sv-fade .22s ease; padding:22px; }   /* blur убран — лагал на Android */
 .ta-card { width:100%; max-width:380px; border-radius:20px; padding:22px 20px calc(20px + var(--sa-bottom,0px));
   background:linear-gradient(180deg,#1f1710,#130d07); border:1px solid var(--brass-d,#5a4326);
   box-shadow:0 18px 60px #000d, inset 0 1px 0 #ffffff12; text-align:center;
@@ -1236,6 +1237,155 @@ body {
 
 .torg-soon { margin:0 12px; padding:13px 15px; border-radius:13px; font-family:Georgia,serif; font-style:italic; font-size:13px;
   color:#a99e85; line-height:1.45; background:linear-gradient(168deg,#211a0f,#160f07); border:1px dashed #5a4326; }
+
+/* карточка-вход в аукцион */
+.torg-act { display:flex; align-items:center; gap:12px; width:calc(100% - 24px); margin:0 12px; padding:13px 14px; cursor:pointer;
+  text-align:left; color:#eee6d6; border-radius:14px; border:1px solid #6a4f2a;
+  background:linear-gradient(135deg,#3a2a14,#241804); box-shadow:0 5px 14px #0008, inset 0 1px 0 #ffffff10; transition:transform .08s; }
+.torg-act:active { transform:translateY(1px) scale(.99); }
+.torg-act-emo { font-size:24px; flex:none; filter:drop-shadow(0 2px 4px #0008); }
+.torg-act-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.torg-act-body b { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:15px; color:var(--gold,#f0b859); }
+.torg-act-body small { font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#b7a587; }
+.torg-act-chev { flex:none; font-size:22px; color:#8a7350; }
+
+/* ── 🔨 АУКЦИОН: лист (зал/витрина) ── */
+.auc-sheet { width:100%; max-width:440px; max-height:90vh; display:flex; flex-direction:column;
+  border-radius:20px 20px 18px 18px; padding:16px 16px calc(14px + var(--sa-bottom,0px));
+  background:linear-gradient(180deg,#1b140c,#120d07); border:1px solid var(--brass-d,#5a4326);
+  box-shadow:0 -8px 40px #000c, inset 0 1px 0 #ffffff10; animation:sv-rise .3s cubic-bezier(.2,.8,.3,1) both; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.auc-head { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:17px; color:var(--gold,#f0b859); text-align:center; margin-bottom:10px; }
+.auc-close { margin-top:12px; flex:none; }
+
+/* lock */
+.auc-lock { display:flex; flex-direction:column; align-items:center; text-align:center; gap:11px; padding:26px 18px; }
+.auc-lock-emo { font-size:54px; filter:drop-shadow(0 4px 12px #000a); animation:nr-pulse 2.6s ease-in-out infinite; }
+.auc-lock-h { font-family:var(--disp),system-ui,sans-serif; font-weight:900; font-size:21px; color:var(--gold,#f0b859); }
+.auc-lock-txt { font-family:Georgia,serif; font-style:italic; font-size:13.5px; line-height:1.5; color:#c2b594; margin:0; }
+
+/* ── зал: ультра-современная сцена лота ── */
+.auc-hall { display:flex; flex-direction:column; }
+.auc-stage { position:relative; height:188px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+  overflow:visible; background:none; }
+.auc-halo { position:absolute; top:18px; left:50%; width:150px; height:150px; transform:translateX(-50%); border-radius:50%;
+  background:conic-gradient(from 0deg,#ffe7a300,#ffe7a33d,#ffe7a300,#ffe7a328,#ffe7a300); filter:blur(13px); opacity:.4;
+  animation:auc-spin 9s linear infinite; pointer-events:none; }
+@keyframes auc-spin { to { transform:translateX(-50%) rotate(360deg) } }
+.auc-item { position:absolute; top:24px; left:50%; transform:translateX(-50%); z-index:2; animation:auc-float 3.6s ease-in-out infinite; }
+.auc-item .ric, .auc-item img { filter:drop-shadow(0 16px 14px #000a) drop-shadow(0 6px 8px #0008) drop-shadow(0 0 16px #e7bf6344); }
+@keyframes auc-float { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-9px)} }
+.auc-podium { position:absolute; bottom:42px; left:50%; transform:translateX(-50%); width:120px; height:14px; border-radius:50%;
+  background:#00000066; filter:blur(5px); animation:auc-shadow 3.6s ease-in-out infinite; }
+@keyframes auc-shadow { 0%,100%{transform:translateX(-50%) scale(1); opacity:.55} 50%{transform:translateX(-50%) scale(.82); opacity:.35} }
+.auc-qty-badge { position:absolute; top:13px; right:13px; z-index:3; padding:4px 11px; border-radius:999px;
+  background:rgba(0,0,0,.42); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); box-shadow:inset 0 0 0 1px #caa64e55;
+  font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:13px; color:#f6d885; }
+.auc-lot-name { position:relative; z-index:2; margin-bottom:15px; font-family:var(--disp),system-ui,sans-serif; font-weight:800;
+  font-size:19px; color:#f3ead4; text-shadow:0 2px 14px #000, 0 0 18px #e7bf6322; }
+
+.auc-bidbox { text-align:center; margin:12px 0 4px; }
+.auc-bid-lbl { font-family:system-ui,sans-serif; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:#9a8657; }
+.auc-bid-v { display:inline-flex; align-items:center; gap:6px; font-family:var(--num),system-ui,sans-serif; font-weight:900; font-size:30px;
+  color:#f6d885; text-shadow:0 2px 14px #e7bf6355; margin-top:2px; }
+.auc-bid-v small { font-size:13px; color:#b6a169; font-weight:700; }
+.auc-bid-who { display:inline-flex; align-items:center; gap:6px; margin-top:5px; font-family:var(--text),system-ui,sans-serif; font-size:12.5px; color:#cbbf9f; }
+.auc-bid-tot { font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#a99e85; margin-top:3px; }
+
+.auc-meta { display:flex; justify-content:center; gap:18px; margin:8px 0 4px; font-family:var(--num),system-ui,sans-serif; font-size:13px; color:#cbbf9f; }
+.auc-clock { font-weight:800; color:#e7ddc8; }
+.auc-clock.hot { color:#f0a04a; animation:nr-pulse 1.4s ease-in-out infinite; }
+.auc-heat { display:inline-flex; align-items:center; gap:3px; color:#e8956a; }
+
+.auc-feed { margin:10px 0 4px; }
+.auc-feed-h { font-family:var(--disp),system-ui,sans-serif; font-weight:700; font-size:10.5px; letter-spacing:1.5px; text-transform:uppercase; color:#9a8657; margin-bottom:7px; }
+.auc-feed-row { display:flex; align-items:center; gap:9px; padding:6px 2px; border-top:1px solid #ffffff0d; animation:sv-rise .3s both; }
+.auc-feed-nm { flex:1; min-width:0; font-family:var(--text),system-ui,sans-serif; font-size:13px; color:#ddd2bb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.auc-feed-bid { display:inline-flex; align-items:center; gap:3px; font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:13px; color:#f3c768; }
+.auc-face { border-radius:8px; object-fit:cover; flex:none; box-shadow:0 1px 4px #0007; background:#221a10; }
+.auc-face-emo { display:inline-flex; align-items:center; justify-content:center; }
+.auc-cancel { margin-top:12px; color:#f0a08a !important; border-color:#7a3b2e !important; background:linear-gradient(#2c1410,#1a0d08) !important; }
+.auc-hint { font-family:Georgia,serif; font-style:italic; font-size:11.5px; color:#8a7f6a; text-align:center; margin:9px 4px 0; line-height:1.4; }
+
+/* тест-панель аукциона — рендерится только админу (d.admin), убрать перед общим релизом */
+.auc-test { margin-top:12px; padding:9px 10px; border-radius:12px; border:1px dashed #4a6a8a;
+  background:repeating-linear-gradient(45deg,#16202c,#16202c 8px,#131b25 8px,#131b25 16px); }
+.auc-test-h { display:block; text-align:center; font-family:system-ui,sans-serif; font-size:10px; letter-spacing:1px;
+  text-transform:uppercase; color:#7fa8cc; margin-bottom:7px; }
+.auc-test-row { display:flex; gap:8px; }
+.auc-test-b { flex:1; padding:9px 0; border-radius:9px; cursor:pointer; font-family:system-ui,sans-serif; font-weight:700;
+  font-size:13px; color:#dce8f3; background:#1d2b3a; border:1px solid #36506c; }
+.auc-test-b:active { transform:scale(.98); }
+.auc-test-b:disabled { opacity:.5; }
+
+/* ── витрина: выставление ── */
+.auc-make { display:flex; flex-direction:column; }
+.auc-sub { font-family:Georgia,serif; font-style:italic; font-size:13px; color:#c2b594; margin:0 0 10px; }
+.auc-empty { font-family:Georgia,serif; font-style:italic; font-size:13.5px; color:#c2b594; text-align:center; padding:24px 8px; line-height:1.5; }
+.auc-goods { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.auc-gtile { position:relative; display:flex; flex-direction:column; align-items:center; gap:3px; padding:12px 6px 9px; cursor:pointer;
+  border-radius:12px; border:1px solid #5a4326; background:linear-gradient(168deg,#2a1d0d,#180f06); box-shadow:0 3px 9px #0006; transition:transform .08s; }
+.auc-gtile:active { transform:translateY(1px) scale(.98); }
+.auc-gnm { font-family:var(--text),system-ui,sans-serif; font-size:11.5px; color:#ece3cd; }
+.auc-gstock { font-family:var(--num),system-ui,sans-serif; font-size:10px; color:#9a8f76; }
+.auc-gfv { display:inline-flex; align-items:center; gap:2px; font-family:var(--num),system-ui,sans-serif; font-size:10.5px; color:#b6a169; }
+
+.auc-cfg { display:flex; flex-direction:column; gap:4px; }
+.auc-back { align-self:flex-start; background:none; border:none; color:#a48a5a; font-family:system-ui,sans-serif; font-size:12.5px; cursor:pointer; padding:2px 0 6px; }
+.auc-cfg-good { display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:13px; background:linear-gradient(168deg,#2a1d0d,#180f06); box-shadow:inset 0 0 0 1px #ffffff10; }
+.auc-cfg-good b { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:15px; color:#ece3cd; display:block; }
+.auc-cfg-good small { font-family:var(--text),system-ui,sans-serif; font-size:11.5px; color:#a99e85; }
+.auc-cap { font-family:var(--disp),system-ui,sans-serif; font-weight:700; font-size:10.5px; letter-spacing:1.5px; text-transform:uppercase; color:#9a8657; margin:14px 2px 7px; }
+.auc-qtys { display:flex; gap:8px; }
+.auc-qty { flex:1; padding:11px 0; border-radius:11px; cursor:pointer; font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:16px; color:#cbbf9f;
+  background:#1a1207; border:1px solid #4a3719; }
+.auc-qty.on { color:#241501; background:linear-gradient(var(--gold-2,#f6d885),#cf9a3c); border-color:#f6dd92; }
+.auc-tiers { display:flex; flex-direction:column; gap:8px; }
+.auc-tier { display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:13px; cursor:pointer; text-align:left;
+  color:#eee6d6; background:linear-gradient(168deg,#241a0e,#180f06); border:1px solid var(--brass-d,#5a4326); transition:transform .08s; }
+.auc-tier:active { transform:scale(.99); }
+.auc-tier:disabled { opacity:.5; }
+.auc-tier-lbl { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:14px; color:var(--gold,#f0b859); width:78px; }
+.auc-tier-unit { font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:13.5px; color:#ece3cd; }
+.auc-tier-tot { margin-left:auto; font-family:var(--num),system-ui,sans-serif; font-size:12px; color:#b6a169; }
+
+/* ── подсветка новой ставки горожанина ── */
+.auc-hall.bidflash { animation:auc-flash .9s ease-out; }
+@keyframes auc-flash { 0%{ box-shadow:inset 0 0 0 0 #f3c76800 } 18%{ box-shadow:inset 0 0 60px 4px #f3c76833 } 100%{ box-shadow:inset 0 0 0 0 #f3c76800 } }
+.auc-bidbox.hot .auc-bid-v { animation:auc-bidpop .6s cubic-bezier(.2,1.4,.4,1); }
+@keyframes auc-bidpop { 0%{ transform:scale(1) } 35%{ transform:scale(1.16); text-shadow:0 2px 24px #f3c768cc, 0 0 40px #f3c76888 } 100%{ transform:scale(1) } }
+.auc-feed-row.fresh { animation:auc-fresh 1.3s ease-out; border-radius:9px; }
+@keyframes auc-fresh { 0%{ background:#f3c76800 } 20%{ background:#f3c7682e } 100%{ background:#f3c76800 } }
+
+/* ── финал торгов: продано / не взяли ── */
+.auc-fin { position:relative; display:flex; flex-direction:column; align-items:center; padding:6px 4px 2px; overflow:hidden; animation:sv-rise .35s both; }
+.auc-fin-stamp { font-family:var(--disp),system-ui,sans-serif; font-weight:900; font-size:34px; letter-spacing:2px;
+  margin:4px 0 2px; animation:auc-stamp .5s cubic-bezier(.2,1.5,.4,1) both; }
+.auc-fin.won .auc-fin-stamp { color:#7ff0a8; text-shadow:0 0 22px #2ba35eaa, 0 2px 10px #000; }
+.auc-fin.lost .auc-fin-stamp { color:#caa; text-shadow:0 2px 10px #000; opacity:.85; }
+@keyframes auc-stamp { 0%{ transform:scale(2.2) rotate(-9deg); opacity:0 } 60%{ transform:scale(.94) rotate(-3deg); opacity:1 } 100%{ transform:scale(1) rotate(-3deg) } }
+.auc-fin-stage { position:relative; width:100%; height:170px; display:flex; align-items:center; justify-content:center; }
+.auc-fin-halo { position:absolute; top:50%; left:50%; width:200px; height:200px; transform:translate(-50%,-54%);
+  background:radial-gradient(circle,#7ff0a833 0%,transparent 62%); filter:blur(4px); animation:nr-pulse 2.6s ease-in-out infinite; }
+.auc-fin-item { position:relative; z-index:2; animation:auc-float 3.4s ease-in-out infinite;
+  filter:drop-shadow(0 10px 14px #000a) drop-shadow(0 0 22px #e7bf6344); }
+.auc-fin.lost .auc-fin-item { filter:drop-shadow(0 10px 14px #000a) grayscale(.5); opacity:.7; }
+@keyframes auc-float { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-9px) } }
+.auc-fin-name { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:18px; color:#f3ead4; text-shadow:0 2px 12px #000; margin-bottom:8px; }
+.auc-fin-who { display:flex; align-items:center; gap:8px; font-family:var(--text),system-ui,sans-serif; font-size:13.5px; color:#cbbf9f; margin-bottom:8px; }
+.auc-fin-who b { color:#ece3cd; }
+.auc-fin-gold { display:inline-flex; align-items:center; gap:7px; font-family:var(--num),system-ui,sans-serif; font-weight:900; font-size:38px;
+  color:#7ff0a8; text-shadow:0 2px 18px #2ba35e88; animation:auc-bidpop .7s cubic-bezier(.2,1.4,.4,1) .15s both; }
+.auc-fin-sub { font-family:var(--text),system-ui,sans-serif; font-size:12.5px; color:#a99e85; margin-top:4px; text-align:center; }
+.auc-fin-sub.lost { font-family:Georgia,serif; font-style:italic; font-size:13px; color:#bcae8e; max-width:300px; line-height:1.5; margin-top:10px; }
+.auc-fin-ok { margin-top:16px; }
+.auc-fin.won .auc-fin-ok { color:#0d2417 !important; border-color:#5fd497 !important;
+  background:linear-gradient(#7ff0a8,#2ba35e) !important; box-shadow:0 6px 20px #2ba35e55 !important; }
+/* лучи победы */
+.auc-rays { position:absolute; top:120px; left:50%; width:380px; height:380px; transform:translate(-50%,-50%); pointer-events:none; z-index:0;
+  background:repeating-conic-gradient(from 0deg, #f6d88514 0deg 9deg, transparent 9deg 18deg);
+  -webkit-mask:radial-gradient(circle, transparent 32%, #000 38%, transparent 74%); mask:radial-gradient(circle, transparent 32%, #000 38%, transparent 74%);
+  animation:auc-spin 22s linear infinite; }
+@keyframes auc-spin { to{ transform:translate(-50%,-50%) rotate(360deg) } }
 
 /* ── зазывала: яркая выделенная карточка-вход на таверне + лист рефералки ── */
 .zz-cta { position:relative; overflow:hidden; display:flex; align-items:center; gap:12px;

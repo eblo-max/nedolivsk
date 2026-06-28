@@ -137,6 +137,14 @@ def try_bid(tavern, world, rng: random.Random | None = None) -> dict | None:
     return {"npc": cit.id, "unit": bid, "fv": fv}
 
 
+def _stash_last(player, res: dict) -> None:
+    """Запомнить итог последних торгов в player.story — чтобы мини-апп показал
+    финал-экран «Продано/Не взяли» (бот шлёт ещё и DM). Переприсваивание для JSONB."""
+    st = dict(player.story or {})
+    st["auc_last"] = {**res, "ts": _now().isoformat()}
+    player.story = st
+
+
 def settle(player, tavern, world) -> dict | None:
     """Закрыть торги: продать победителю или вернуть товар. Возвращает итог."""
     lot = tavern.auction
@@ -151,9 +159,11 @@ def settle(player, tavern, world) -> dict | None:
         player.gold += gold
         story_state.adjust_faction(player, "merchants", 1)
         market.add_supply(world, good, int(qty * balance.MARKET_WHOLESALE_WEIGHT))
-        return {"sold": True, "good": good, "qty": qty,
-                "unit": top, "gold": gold, "npc": bidder}
-    prods = dict(tavern.products or {})
-    prods[good] = prods.get(good, 0) + qty
-    tavern.products = prods
-    return {"sold": False, "good": good, "qty": qty}
+        res = {"sold": True, "good": good, "qty": qty, "unit": top, "gold": gold, "npc": bidder}
+    else:
+        prods = dict(tavern.products or {})
+        prods[good] = prods.get(good, 0) + qty
+        tavern.products = prods
+        res = {"sold": False, "good": good, "qty": qty}
+    _stash_last(player, res)
+    return res

@@ -4,7 +4,7 @@ import lottie from 'lottie-web/build/player/lottie_light'
 // id мирового события → slug нативного анимированного эмодзи Telegram (public/event/<slug>.tgs)
 const SLUG: Record<string, string> = {   // только реально выгруженные (остальные — фолбэк на эмодзи)
   clear: 'sun', goldrush: 'coin', rain: 'rain', frost: 'snow',
-  drought: 'fire', plague: 'virus', fashion: 'fire',
+  drought: 'fire', plague: 'virus', fashion: 'fire', fire: 'fire',
 }
 
 /** Нативный анимированный эмодзи Telegram (TGS/Lottie, зациклен). Фолбэк — обычный эмодзи. */

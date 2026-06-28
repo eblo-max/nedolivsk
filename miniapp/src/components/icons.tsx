@@ -23,8 +23,9 @@ const GOOD_ICON: Record<string, string> = {
   roast: 'roast', bread: 'bread', pie: 'pie', cured: 'cured', smoked_fish: 'smoked_fish',
   cheese: 'cheese', butter: 'butter',
 }
-export function GoodIcon({ k }: { k: string }) {
+export function GoodIcon({ k, size }: { k: string; size?: number }) {
+  const st = size ? { width: size, height: size } : undefined
   const f = GOOD_ICON[k]
-  if (f) return <img className="ric" src={`${import.meta.env.BASE_URL}goods/${f}.png`} alt="" loading="lazy" />
-  return <span className="ric-e">🍽</span>
+  if (f) return <img className="ric" style={st} src={`${import.meta.env.BASE_URL}goods/${f}.png`} alt="" loading="lazy" />
+  return <span className="ric-e" style={size ? { fontSize: size * 0.8 } : undefined}>🍽</span>
 }

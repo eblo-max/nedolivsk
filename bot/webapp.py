@@ -705,6 +705,233 @@ async def _api_torg_buy(request: web.Request) -> web.Response:
     return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 
+def _auction_open(uid: int) -> bool:
+    from bot.game import balance as bal
+    from bot.config import settings
+    return bool(bal.AUCTION_OPEN) or uid == settings.admin_id
+
+
+def _is_admin(uid: int) -> bool:
+    from bot.config import settings
+    return uid == settings.admin_id
+
+
+def _auc_npc(nid):
+    from bot.game import npc as npcmod
+    if not nid:
+        return None
+    cz = npcmod.CATALOG.get(nid)
+    return {"name": cz.name if cz else nid, "emoji": cz.emoji if cz else "🙂",
+            "avatar": _npc_avatar(nid, cz.estate if cz else None)}
+
+
+def _auction_state(p, world) -> dict:
+    """Состояние аукциона: живой лот (товар/таймер/ставки/история) либо форма
+    выставления (товары погреба со справедливой ценой, объёмы, тиры цены)."""
+    from bot.game import auction as auc, balance as bal, production as prod
+    t = p.tavern
+    lot = auc.active(t)
+    if lot:
+        g = prod.GOODS.get(lot["good"])
+        hist = [{"unit": h["unit"], **(_auc_npc(h["npc"]) or {})} for h in reversed(lot.get("history", []))]
+        return {"active": True, "good": lot["good"], "name": g.name if g else lot["good"],
+                "emoji": g.emoji if g else "📦", "qty": lot["qty"], "reserve": lot["unit_min"],
+                "top_bid": lot.get("top_bid"), "bidder": _auc_npc(lot.get("top_bidder")),
+                "bids": lot.get("bids", 0), "ends_at": lot["ends_at"],
+                "mins_left": auc.time_left_minutes(lot), "history": hist,
+                "duration_h": bal.AUCTION_DURATION_HOURS}
+    prods = t.products or {}
+    goods = [{"key": k, "name": (prod.GOODS[k].name if k in prod.GOODS else k),
+              "emoji": (prod.GOODS[k].emoji if k in prod.GOODS else "📦"),
+              "stock": int(prods.get(k, 0)), "fv": int(round(auc.fair_value(world, k)))}
+             for k in auc.sellable_goods(t)]
+    tiers = [{"mult": m, "label": lbl}
+             for m, lbl in zip(bal.AUCTION_PRICE_TIERS, ("по рынку", "бодро", "дорого"))]
+    return {"active": False, "goods": goods, "tiers": tiers,
+            "presets": list(bal.AUCTION_QTY_PRESETS), "qty_max": bal.AUCTION_QTY_MAX,
+            "duration_h": bal.AUCTION_DURATION_HOURS}
+
+
+def _auc_result(res: dict) -> dict | None:
+    """Итог последних торгов для финал-экрана (свежее AUCTION_DURATION ч)."""
+    if not res:
+        return None
+    from datetime import datetime, timezone
+    from bot.game import balance as bal, production as prod
+    try:
+        ts = datetime.fromisoformat(res["ts"])
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if (datetime.now(timezone.utc) - ts).total_seconds() > bal.AUCTION_DURATION_HOURS * 3600:
+            return None
+    except (KeyError, ValueError, TypeError):
+        return None
+    g = prod.GOODS.get(res.get("good"))
+    out = {"sold": bool(res.get("sold")), "qty": res.get("qty"), "good": res.get("good"),
+           "name": g.name if g else res.get("good"), "emoji": g.emoji if g else "📦"}
+    if res.get("sold"):
+        out["unit"] = res.get("unit"); out["gold"] = res.get("gold")
+        out["winner"] = _auc_npc(res.get("npc"))
+    return out
+
+
+async def _api_auction(request: web.Request) -> web.Response:
+    """Аукцион: живой лот или форма выставления. Гейт: admin/AUCTION_OPEN.
+    Если лот вышел по таймеру — закрываем прямо тут и отдаём итог (финал-экран)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import auction as auc
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not _auction_open(uid):
+            return web.json_response({"ok": True, "open": False}, headers={"Cache-Control": "no-store"})
+        world = await repo.get_or_create_world(s)
+        if auc.is_due(p.tavern):                       # таймер вышел — закрыть немедленно
+            auc.settle(p, p.tavern, world)
+            repo.add_log(s, "player", p.id, "🔨 торги закрыты (мини-апп)")
+            await s.commit()
+        out = {"ok": True, "open": True, "gold": p.gold, "admin": _is_admin(uid), **_auction_state(p, world)}
+        res = _auc_result((p.story or {}).get("auc_last"))
+        if res and not out.get("active"):
+            out["result"] = res
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+async def _api_auction_seen(request: web.Request) -> web.Response:
+    """Игрок увидел финал-экран — гасим запомненный итог."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is not None and (p.story or {}).get("auc_last"):
+            st = dict(p.story); st.pop("auc_last", None); p.story = st
+            await s.commit()
+    return web.json_response({"ok": True}, headers={"Cache-Control": "no-store"})
+
+
+async def _api_auction_create(request: web.Request) -> web.Response:
+    """Выставить лот: {good, qty, tier} (индекс тира цены) или {good, qty, price}."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import auction as auc, balance as bal
+    good = str(body.get("good") or "")
+    try:
+        qty = int(body.get("qty") or 0)
+    except (TypeError, ValueError):
+        qty = 0
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not _auction_open(uid):
+            return web.json_response({"ok": False, "error": "closed"})
+        world = await repo.get_or_create_world(s)
+        if "tier" in body:
+            prices = [max(1, round(auc.fair_value(world, good) * m)) for m in bal.AUCTION_PRICE_TIERS]
+            try:
+                price = prices[int(body.get("tier"))]
+            except (TypeError, ValueError, IndexError):
+                return web.json_response({"ok": False, "error": "price"})
+        else:
+            try:
+                price = int(body.get("price") or 0)
+            except (TypeError, ValueError):
+                price = 0
+        ok, reason = auc.create(p, p.tavern, good, qty, price)
+        if not ok:
+            return web.json_response({"ok": False, "error": reason})
+        repo.add_log(s, "player", p.id, f"🔨 выставил лот {qty}×{good} по {price}🪙 (мини-апп)")
+        await s.commit()
+        out = {"ok": True, "open": True, "gold": p.gold, "admin": _is_admin(uid), **_auction_state(p, world)}
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+async def _api_auction_cancel(request: web.Request) -> web.Response:
+    """Снять лот: замороженный товар вернётся в погреб."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import auction as auc
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not auc.cancel(p, p.tavern):
+            return web.json_response({"ok": False, "error": "none"})
+        repo.add_log(s, "player", p.id, "🔨 снял лот с торгов (мини-апп)")
+        await s.commit()
+        world = await repo.get_or_create_world(s)
+        out = {"ok": True, "open": True, "gold": p.gold, "admin": _is_admin(uid), **_auction_state(p, world)}
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+async def _api_auction_seed(request: web.Request) -> web.Response:
+    """ТЕСТ (только админ): подбросить 2-3 живые ставки горожан на текущий лот —
+    чтобы вживую проверить зал торгов/подсветку/финал, не дожидаясь нотифаера."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    if not _is_admin(uid):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+    import random
+    from bot.game import auction as auc, npc as npcmod
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        world = await repo.get_or_create_world(s)
+        lot = p.tavern.auction
+        if not lot:
+            return web.json_response({"ok": False, "error": "none"})
+        rng = random.Random()
+        added = 0
+        for _ in range(rng.randint(2, 3)):                 # цена лезет от резерва вверх
+            cit = npcmod.random_trader(rng)
+            cur = lot.get("top_bid") or 0
+            bid = lot["unit_min"] if cur == 0 else cur + rng.randint(1, 3)
+            lot["top_bid"], lot["top_bidder"] = bid, cit.id
+            lot["bids"] = lot.get("bids", 0) + 1
+            hist = list(lot.get("history", []))
+            hist.append({"npc": cit.id, "unit": bid})
+            lot["history"] = hist[-5:]
+            added += 1
+        p.tavern.auction = dict(lot)                        # переприсваивание для JSONB
+        repo.add_log(s, "player", p.id, f"🧪 тест: +{added} ставок на лот (мини-апп)")
+        await s.commit()
+        out = {"ok": True, "open": True, "gold": p.gold, "admin": True, **_auction_state(p, world)}
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+async def _api_auction_settle_now(request: web.Request) -> web.Response:
+    """ТЕСТ (только админ): закрыть торги немедленно — увидеть финал «Продано/Не взяли»."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    if not _is_admin(uid):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+    from bot.game import auction as auc
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not p.tavern.auction:
+            return web.json_response({"ok": False, "error": "none"})
+        world = await repo.get_or_create_world(s)
+        auc.settle(p, p.tavern, world)
+        repo.add_log(s, "player", p.id, "🧪 тест: торги закрыты вручную (мини-апп)")
+        await s.commit()
+        out = {"ok": True, "open": True, "gold": p.gold, "admin": True, **_auction_state(p, world)}
+        res = _auc_result((p.story or {}).get("auc_last"))
+        if res and not out.get("active"):
+            out["result"] = res
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
 async def _api_chronicle(request: web.Request) -> web.Response:
     """Летопись домашнего города игрока — лента заметных событий (свежие сверху)."""
     uid, body = await _auth(request)
@@ -2268,6 +2495,12 @@ def build_app() -> web.Application:
     app.router.add_post("/api/reputation", _api_reputation)      # репутация у фракций/NPC
     app.router.add_post("/api/torg", _api_torg)                  # вкладка Торг (скупщик), гейт
     app.router.add_post("/api/torg/buy", _api_torg_buy)          # купить сырьё у скупщика
+    app.router.add_post("/api/auction", _api_auction)            # аукцион: стейт (лот/форма)
+    app.router.add_post("/api/auction/create", _api_auction_create)  # выставить лот
+    app.router.add_post("/api/auction/cancel", _api_auction_cancel)  # снять лот
+    app.router.add_post("/api/auction/seen", _api_auction_seen)      # погасить финал-экран
+    app.router.add_post("/api/auction/seed", _api_auction_seed)          # ТЕСТ(админ): подбросить ставки
+    app.router.add_post("/api/auction/settle_now", _api_auction_settle_now)  # ТЕСТ(админ): закрыть сейчас
     app.router.add_post("/api/referral", _api_referral)          # зазывала (рефералка)
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
