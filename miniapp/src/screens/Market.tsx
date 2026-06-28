@@ -74,14 +74,10 @@ export default function Market() {
           </div>
         </div>
         <p className="torg-quote"><span className="torg-q">“</span>Сырьё любое — плати золотом и бери сразу. Дорого, да без ожидания бригад.</p>
-        <div className="torg-bal">
-          <span className="torg-bal-v"><ResIcon k="gold" size={18} />{fmt(d.gold ?? 0)}</span>
-          <span className="torg-bal-l">в мошне</span>
-        </div>
       </div>
 
       {/* лавка — ящики с товаром */}
-      <div className="torg-cap">🛒 Лавка скупщика<span>сырьё за золото · лимит {d.limit}/сутки</span></div>
+      <div className="torg-cap">🛒 Лавка скупщика<span className="torg-coin"><ResIcon k="gold" size={13} />{fmt(d.gold ?? 0)}</span></div>
       <div className="torg-grid">
         {(d.shop || []).map((it) => {
           const used = Math.max(0, it.limit - it.room), pct = Math.round((used / it.limit) * 100)
