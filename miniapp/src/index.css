@@ -1154,25 +1154,73 @@ body {
 .char-cta { display:flex; gap:9px; padding:0 14px; margin-top:6px; }
 .char-cta .btn { flex:1; margin:0; }
 
-/* ── Торг: lock-экран (закрыто) + грид скупщика ── */
-.torg-lock { display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px;
-  margin:auto; padding:40px 26px; max-width:360px; }
-.torg-lock-emo { font-size:64px; filter:drop-shadow(0 4px 14px #000a); animation:nr-pulse 2.6s ease-in-out infinite; }
-.torg-lock-h { font-family:var(--disp),system-ui,sans-serif; font-weight:900; font-size:24px; color:var(--gold,#f0b859); letter-spacing:-.3px; }
-.torg-lock-txt { font-family:Georgia,serif; font-style:italic; font-size:14.5px; line-height:1.55; color:#cbbf9f; margin:0; }
-.torg-lock-soon { font-family:var(--disp),system-ui,sans-serif; font-weight:700; font-size:12px; letter-spacing:1px;
-  color:#a48a5a; padding:8px 14px; border-radius:999px; background:rgba(231,191,99,.08); box-shadow:inset 0 0 0 1px rgba(231,191,99,.25); }
+/* ── Торг: ЗАКРЫТО — ставни лавки с замком ── */
+.torg-closed { align-items:center; text-align:center; gap:14px; padding:18px 24px calc(24px + var(--sa-bottom,0px)); }
+.torg-stall { width:min(84vw,320px); margin:8px auto 0; }
+.torg-stall-sign { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:11px; letter-spacing:3px;
+  color:#9a7d49; margin-bottom:8px; }
+.torg-shutters { position:relative; height:188px; border-radius:14px; overflow:hidden;
+  box-shadow:0 16px 44px #000b, inset 0 0 0 3px #5a4326, inset 0 0 60px #0008; }
+.torg-plank { position:absolute; top:0; bottom:0; width:50%;
+  background:repeating-linear-gradient(180deg,#3c2c17 0 15px,#33260f 15px 17px),
+             linear-gradient(90deg,#2a1f0f,#43331c 55%,#34270f); }
+.torg-plank.l { left:0; box-shadow:inset -3px 0 8px #000a; }
+.torg-plank.r { right:0; background:repeating-linear-gradient(180deg,#3c2c17 0 15px,#33260f 15px 17px),
+             linear-gradient(270deg,#2a1f0f,#43331c 55%,#34270f); box-shadow:inset 3px 0 8px #000a; }
+.torg-bolt { position:absolute; width:7px; height:7px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#caa64e,#6e521f); box-shadow:0 1px 2px #000a; }
+.torg-bolt.b1 { left:12px; top:12px; } .torg-bolt.b2 { right:12px; bottom:12px; }
+.torg-pad { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:54px;
+  filter:drop-shadow(0 6px 14px #000c); animation:torg-sway 3.2s ease-in-out infinite; transform-origin:50% 18%; }
+@keyframes torg-sway { 0%,100%{transform:translate(-50%,-50%) rotate(-5deg)} 50%{transform:translate(-50%,-50%) rotate(5deg)} }
+.torg-shutters::after { content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(120px 90px at 50% 42%, #ffdf9e22, transparent 70%); }
+.torg-lock-h { font-family:var(--disp),system-ui,sans-serif; font-weight:900; font-size:25px; color:var(--gold,#f0b859);
+  letter-spacing:-.3px; text-shadow:0 2px 16px #e7bf6355; }
+.torg-lock-txt { font-family:Georgia,serif; font-style:italic; font-size:14.5px; line-height:1.55; color:#cbbf9f; margin:0; max-width:330px; }
+.torg-lock-soon { font-family:var(--disp),system-ui,sans-serif; font-weight:700; font-size:11.5px; letter-spacing:1px;
+  color:#a48a5a; padding:8px 15px; border-radius:999px; background:rgba(231,191,99,.08); box-shadow:inset 0 0 0 1px rgba(231,191,99,.25); }
+.torg-chan { max-width:300px; color:#cfe0ff !important; border-color:#3c5a86 !important; background:linear-gradient(#1a2436,#121826) !important; }
 
-.torg-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
-.torg-tile { display:flex; flex-direction:column; align-items:center; gap:3px; padding:11px 6px 9px; cursor:pointer;
-  border-radius:13px; background:linear-gradient(168deg,#241a0e,#180f06); border:1px solid var(--line2,#4a3719);
-  box-shadow:0 3px 9px #0006, inset 0 1px 0 #ffffff0c; transition:transform .08s; }
-.torg-tile:active { transform:translateY(1px) scale(.98); }
-.torg-tile:disabled { opacity:.6; }
-.torg-nm { font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#e7ddc8; }
-.torg-pr { display:inline-flex; align-items:center; gap:3px; font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:13px; color:#f3c768; }
-.torg-room { font-family:system-ui,sans-serif; font-size:10px; color:#8a7f6a; }
-.torg-room.out { color:#cf6a4a; }
+/* ── Торг: ОТКРЫТО — купец + ящики ── */
+.torg-merchant { display:flex; align-items:center; gap:11px; margin:6px 12px 4px; padding:11px 13px; border-radius:16px;
+  background:linear-gradient(150deg,#2a1d0d,#180f06); border:1px solid var(--brass-d,#5a4326);
+  box-shadow:0 6px 18px #0008, inset 0 1px 0 #ffffff10; }
+.torg-mav { flex:none; width:52px; height:52px; border-radius:13px; overflow:hidden;
+  border:1px solid #caa64e66; box-shadow:0 3px 10px #0008, inset 0 0 0 1px #0006; background:#221a10; }
+.torg-mav img { width:100%; height:100%; object-fit:cover; display:block; }
+.torg-mav-emo { display:flex; width:100%; height:100%; align-items:center; justify-content:center; font-size:28px; }
+.torg-minfo { flex:1; min-width:0; }
+.torg-mname { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:16px; color:var(--gold,#f0b859); }
+.torg-mline { font-family:Georgia,serif; font-style:italic; font-size:12px; color:#b7a587; line-height:1.4; margin-top:1px; }
+.torg-pouch { flex:none; display:inline-flex; align-items:center; gap:5px; padding:7px 11px; border-radius:12px;
+  background:radial-gradient(circle at 40% 30%, #3a2a12, #241804); box-shadow:inset 0 0 0 1px #caa64e44, 0 2px 6px #0007;
+  font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:15px; color:#f6d885; }
+
+.torg-cap { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:16px 16px 8px;
+  font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:13.5px; letter-spacing:.4px; color:#e7ddc8; }
+.torg-cap span { font-weight:600; font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:#9a8657; }
+
+.torg-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:9px; padding:0 12px; }
+.torg-crate { position:relative; display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 6px 9px; cursor:pointer;
+  border-radius:13px; border:1px solid #5a4326;
+  background:repeating-linear-gradient(90deg,#2c2010 0 9px,#281c0d 9px 11px), linear-gradient(168deg,#33260f,#1d1408);
+  box-shadow:0 4px 11px #0007, inset 0 1px 0 #ffffff0e, inset 0 -6px 12px #0006; transition:transform .08s; overflow:hidden; }
+.torg-crate:active { transform:translateY(1px) scale(.985); }
+.torg-crate.off { opacity:.62; }
+.torg-tag { position:absolute; top:0; right:0; display:inline-flex; align-items:center; gap:2px;
+  padding:3px 7px 3px 8px; font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:11.5px; color:#241501;
+  background:linear-gradient(var(--gold-2,#f6d885),#cf9a3c); border-bottom-left-radius:9px; box-shadow:0 2px 5px #0007; }
+.torg-ic { filter:drop-shadow(0 3px 5px #0009); margin-top:4px; }
+.torg-nm { font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#ece3cd; }
+.torg-lim { width:78%; height:4px; border-radius:3px; background:#00000055; box-shadow:inset 0 0 0 1px #ffffff10; overflow:hidden; }
+.torg-lim i { display:block; height:100%; border-radius:3px; background:linear-gradient(90deg,#caa23e,#f3c768); }
+.torg-room { font-family:system-ui,sans-serif; font-size:9.5px; color:#9a8f76; }
+.torg-crate.off .torg-room { color:#cf6a4a; }
+.torg-have { font-family:system-ui,sans-serif; font-size:9px; color:#7a8f6a; }
+
+.torg-soon { margin:0 12px; padding:13px 15px; border-radius:13px; font-family:Georgia,serif; font-style:italic; font-size:13px;
+  color:#a99e85; line-height:1.45; background:linear-gradient(168deg,#211a0f,#160f07); border:1px dashed #5a4326; }
 
 /* ── зазывала: яркая выделенная карточка-вход на таверне + лист рефералки ── */
 .zz-cta { position:relative; overflow:hidden; display:flex; align-items:center; gap:12px;

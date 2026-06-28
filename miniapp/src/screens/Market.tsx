@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import { haptic, hapticNotify } from '../telegram'
+import { haptic, hapticNotify, openTgLink } from '../telegram'
 import { ResIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
 
 interface ShopItem { key: string; name: string; emoji: string; price: number; room: number; limit: number; max: number; have: number }
 interface TorgState { ok: boolean; open: boolean; gold?: number; limit?: number; shop?: ShopItem[] }
 
-/** Торг: скупщик (купить сырьё за золото). Закрыт для всех (lock-экран), кроме
- * админа/флага TORG_OPEN — гейт серверный. Аукцион и биржа — «скоро». */
+const MERCHANT = `${import.meta.env.BASE_URL}npc/15.png`   // аватар скупщика
+
+/** Торг: лавка скупщика (купить сырьё за золото). Закрыт для всех (ставни + замок),
+ * кроме админа/флага TORG_OPEN — гейт серверный. Аукцион и биржа — «скоро». */
 export default function Market() {
   const [d, setD] = useState<TorgState | null>(null)
   const [pick, setPick] = useState<ShopItem | null>(null)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
+  const [avOk, setAvOk] = useState(true)
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2000) }
 
   const load = () => api<TorgState>('torg').then(setD).catch(() => setD({ ok: true, open: false }))
@@ -35,53 +38,63 @@ export default function Market() {
 
   if (!d) return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
 
-  // ── ЗАКРЫТО: lock-экран для всех ──
+  // ── ЗАКРЫТО: ставни лавки с замком ──
   if (!d.open) return (
-    <div className="scr">
-      <div className="torg-lock rise">
-        <div className="torg-lock-emo">🔒</div>
-        <div className="torg-lock-h">Сегодня Торг откроется</div>
-        <p className="torg-lock-txt">«Скупщик точит карандаш, купцы тащат тюки, на бирже уже бранятся за цену. Загляни чуть погодя — вот-вот распахнём ставни.»</p>
-        <div className="torg-lock-soon">🛒 Скупщик · 🔨 Аукцион · 📈 Биржа</div>
+    <div className="scr torg-closed">
+      <div className="torg-stall rise">
+        <div className="torg-stall-sign">— ЛАВКА ЗАКРЫТА —</div>
+        <div className="torg-shutters">
+          <i className="torg-plank l" /><i className="torg-plank r" />
+          <span className="torg-bolt b1" /><span className="torg-bolt b2" />
+          <div className="torg-pad">🔒</div>
+        </div>
       </div>
+      <div className="torg-lock-h rise" style={{ animationDelay: '.06s' }}>Сегодня Торг откроется</div>
+      <p className="torg-lock-txt rise" style={{ animationDelay: '.1s' }}>«Скупщик точит карандаш, купцы тащат тюки, на бирже уже бранятся за цену. Загляни чуть погодя — вот-вот распахнём ставни.»</p>
+      <div className="torg-lock-soon rise" style={{ animationDelay: '.14s' }}>🛒 Скупщик · 🔨 Аукцион · 📈 Биржа</div>
+      <button className="btn torg-chan rise" style={{ animationDelay: '.18s' }} onClick={() => { haptic('light'); openTgLink('https://t.me/nedolivsk') }}>📣 Узнать о запуске — @nedolivsk</button>
     </div>
   )
 
-  // ── ОТКРЫТО (админ/флаг): скупщик ──
+  // ── ОТКРЫТО (админ/флаг): лавка скупщика ──
   return (
     <div className="scr">
       {toast && <div className="toast">{toast}</div>}
-      <div className="hero rise" style={{ paddingBottom: 0 }}>
-        <div className="nm">Торг</div>
-        <div className="flavor" style={{ margin: '6px 14px 0', fontSize: 13.5 }}>«Скупщик берёт втридорога, да зато сразу — золото в дело.»</div>
-      </div>
 
-      <div className="card rise" style={{ animationDelay: '.04s' }}>
-        <div className="card-h"><span className="he">🛒</span>ЛАВКА СКУПЩИКА
-          <span className="cnt"><ResIcon k="gold" size={15} /> {fmt(d.gold ?? 0)}</span></div>
-        <div className="card-b">
-          <p className="muted" style={{ fontStyle: 'italic', margin: '0 0 6px', fontSize: 13 }}>Сырьё вылазок за золото. Дневной лимит — {d.limit}/сутки на ресурс.</p>
-          <div className="torg-grid">
-            {(d.shop || []).map((it) => (
-              <button key={it.key} className="torg-tile" disabled={busy} onClick={() => { haptic('light'); setPick(it) }}>
-                <ResIcon k={it.key} size={30} />
-                <span className="torg-nm">{it.name}</span>
-                <span className="torg-pr"><ResIcon k="gold" size={12} /> {it.price}<small>/шт</small></span>
-                <span className={`torg-room ${it.room <= 0 ? 'out' : ''}`}>{it.room <= 0 ? 'лимит' : `ост. ${it.room}`}</span>
-              </button>
-            ))}
-          </div>
+      {/* купеческий баннер */}
+      <div className="torg-merchant rise">
+        <div className="torg-mav">
+          {avOk ? <img src={MERCHANT} alt="" onError={() => setAvOk(false)} /> : <span className="torg-mav-emo">⚖️</span>}
         </div>
+        <div className="torg-minfo">
+          <div className="torg-mname">Скупщик</div>
+          <div className="torg-mline">«Беру всё, плачу золотом — да втридорога, не обессудь.»</div>
+        </div>
+        <div className="torg-pouch"><ResIcon k="gold" size={20} /><b>{fmt(d.gold ?? 0)}</b></div>
       </div>
 
-      <div className="card rise" style={{ animationDelay: '.1s' }}>
-        <div className="card-h"><span className="he">🔨</span>АУКЦИОН<span className="cnt">скоро</span></div>
-        <div className="card-b"><span className="muted" style={{ fontStyle: 'italic' }}>Лоты между игроками — на подходе.</span></div>
+      {/* лавка — ящики с товаром */}
+      <div className="torg-cap">🛒 Лавка скупщика<span>сырьё за золото · лимит {d.limit}/сутки</span></div>
+      <div className="torg-grid">
+        {(d.shop || []).map((it) => {
+          const used = Math.max(0, it.limit - it.room), pct = Math.round((used / it.limit) * 100)
+          return (
+            <button key={it.key} className={`torg-crate${it.max <= 0 ? ' off' : ''}`} disabled={busy} onClick={() => { haptic('light'); setPick(it) }}>
+              <span className="torg-tag"><ResIcon k="gold" size={11} />{it.price}</span>
+              <span className="torg-ic"><ResIcon k={it.key} size={34} /></span>
+              <span className="torg-nm">{it.name}</span>
+              <span className="torg-lim"><i style={{ width: `${pct}%` }} /></span>
+              <span className="torg-room">{it.room <= 0 ? '🚫 лимит' : `сегодня: ${it.room}`}</span>
+              {it.have > 0 && <span className="torg-have">в погребе {it.have}</span>}
+            </button>
+          )
+        })}
       </div>
-      <div className="card rise" style={{ animationDelay: '.14s' }}>
-        <div className="card-h"><span className="he">📈</span>БИРЖА<span className="cnt">скоро</span></div>
-        <div className="card-b"><span className="muted" style={{ fontStyle: 'italic' }}>Котировки и сбыт оптом — на подходе.</span></div>
-      </div>
+
+      <div className="torg-cap">🔨 Аукцион<span>скоро</span></div>
+      <div className="torg-soon rise">Лоты между игроками — выставляй излишки, торгуйся за чужое. На подходе.</div>
+      <div className="torg-cap">📈 Биржа<span>скоро</span></div>
+      <div className="torg-soon rise">Котировки в реальном времени и сбыт оптом. На подходе.</div>
 
       {pick && (
         <Sheet title={`🛒 ${pick.emoji} ${pick.name}`} onClose={() => setPick(null)}>
