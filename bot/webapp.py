@@ -628,6 +628,80 @@ async def _api_reputation(request: web.Request) -> web.Response:
                              headers={"Cache-Control": "no-store"})
 
 
+def _torg_open(uid: int) -> bool:
+    """Открыт ли Торг этому игроку: всем (флаг) либо только админу (закрытый запуск)."""
+    from bot.game import balance as bal
+    from bot.config import settings
+    return bool(bal.TORG_OPEN) or uid == settings.admin_id
+
+
+def _shop_items(p) -> list:
+    """Ассортимент скупщика для игрока: цена, дневной остаток, сколько по карману, запас."""
+    from bot.game import balance as bal, shop
+    inv = p.inventory or {}
+    out = []
+    for r in shop.sellable():
+        out.append({
+            "key": r, "name": bal.RESOURCE_NAMES.get(r, r), "emoji": bal.RESOURCE_EMOJI.get(r, "📦"),
+            "price": shop.price(r), "room": shop.buy_room(p, r), "limit": bal.SHOP_DAILY_LIMIT,
+            "max": shop.max_affordable(p, r), "have": int(inv.get(r, 0)),
+        })
+    return out
+
+
+async def _api_torg(request: web.Request) -> web.Response:
+    """Вкладка «Торг». Закрыта для всех (open=false) — кроме админа/флага. Открытому —
+    скупщик (цены/лимиты/золото). Аукцион и биржа — пока «скоро»."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import balance as bal
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not _torg_open(uid):
+            return web.json_response({"ok": True, "open": False}, headers={"Cache-Control": "no-store"})
+        out = {"ok": True, "open": True, "gold": p.gold, "limit": bal.SHOP_DAILY_LIMIT,
+               "shop": _shop_items(p)}
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+async def _api_torg_buy(request: web.Request) -> web.Response:
+    """Купить сырьё у скупщика. Серверный гейт + клампы (золото/дневной лимит)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import balance as bal, economy, inventory, shop
+    res = str(body.get("res") or "")
+    try:
+        want = int(body.get("qty") or 0)
+    except (TypeError, ValueError):
+        want = 0
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not _torg_open(uid):
+            return web.json_response({"ok": False, "error": "closed"})
+        if res not in shop.sellable():
+            return web.json_response({"ok": False, "error": "bad_res"})
+        qty = max(0, min(want, shop.max_affordable(p, res)))
+        if qty <= 0:
+            return web.json_response({"ok": False, "error": "cant"})
+        cost = qty * shop.price(res)
+        p.gold -= cost
+        economy.record(p, "shop", -cost)
+        inventory.add(p, res, qty)
+        shop.record_buy(p, res, qty)
+        repo.add_log(s, "player", p.id,
+                     f"🛒 купил в лавке {qty}×{bal.RESOURCE_NAMES.get(res, res)} (мини-апп)")
+        await s.commit()
+        out = {"ok": True, "open": True, "gold": p.gold, "limit": bal.SHOP_DAILY_LIMIT,
+               "shop": _shop_items(p), "bought": {"res": res, "qty": qty, "cost": cost}}
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
 async def _api_chronicle(request: web.Request) -> web.Response:
     """Летопись домашнего города игрока — лента заметных событий (свежие сверху)."""
     uid, body = await _auth(request)
@@ -2189,6 +2263,8 @@ def build_app() -> web.Application:
     app.router.add_post("/api/story_choice", _api_story_choice)  # резолв выбора у визитёра
     app.router.add_post("/api/chronicle", _api_chronicle)        # летопись города
     app.router.add_post("/api/reputation", _api_reputation)      # репутация у фракций/NPC
+    app.router.add_post("/api/torg", _api_torg)                  # вкладка Торг (скупщик), гейт
+    app.router.add_post("/api/torg/buy", _api_torg_buy)          # купить сырьё у скупщика
     app.router.add_post("/api/referral", _api_referral)          # зазывала (рефералка)
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
