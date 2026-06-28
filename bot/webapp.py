@@ -543,17 +543,20 @@ async def _api_state(request: web.Request) -> web.Response:
     if uid is None:
         return body
     from datetime import datetime, timezone
-    from bot.game import story_engine as se
+    from bot.game import story_engine as se, buff as buffmod
     async with session_factory() as s:
         p = await repo.get_player(s, uid, for_update=True)
         if p is None or not p.tavern:
             return web.json_response({"ok": False, "error": "no_tavern"})
         now = datetime.now(timezone.utc)
+        before = (p.bonus_kind, p.buff_kind, p.buff_until)
+        buffmod.refresh(p, now)                      # прокрутить ежедневный бонус (как бот перед таверной)
         city = await repo.get_or_create_city(s, p.chat_id, lock=True) if p.chat_id else None
         spawned = se.maybe_spawn(p, city, now)       # кулдаун+шанс → pending
         if spawned is not None:
             repo.add_log(s, "player", p.id, "🚪 у стойки объявился гость")
-            await s.commit()
+        if spawned is not None or (p.bonus_kind, p.buff_kind, p.buff_until) != before:
+            await s.commit()                         # persist только при реальном изменении
         out = _tavern_state(p, p.tavern)
         out["story"] = _story_state(p, city)         # с городом — корректная доступность выборов
         out["world_event"] = _world_event_state()    # баннер активного мирового события
