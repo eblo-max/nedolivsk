@@ -94,20 +94,20 @@ export default function Market() {
         <p className="torg-quote"><span className="torg-q">“</span>Сырьё любое — плати золотом и бери сразу. Дорого, да без ожидания бригад.</p>
       </div>
 
-      {/* рынок игроков — выше лавки скупщика */}
-      <div className="torg-cap">🔨 Аукцион</div>
-      <button className="torg-act t-auc rise" onClick={() => { haptic('light'); setAucOpen(true) }}>
-        <span className="torg-act-emo">🏷️</span>
-        <span className="torg-act-body"><b>Выставить лот</b><small>горожане сами набегут перебивать цену</small></span>
-        <span className="torg-act-chev">›</span>
-      </button>
-      <div className="torg-cap">📈 Биржа</div>
-      <button className="torg-act t-brs rise" onClick={() => { haptic('light'); setBrsOpen(true) }}>
-        <span className="torg-act-live" />
-        <span className="torg-act-emo">⚖️</span>
-        <span className="torg-act-body"><b>Открыть биржу</b><small>котировки и сбыт оптом между игроками</small></span>
-        <span className="torg-act-chev">›</span>
-      </button>
+      {/* рынок игроков — компактно, в одну строку, выше лавки скупщика */}
+      <div className="torg-pair">
+        <button className="torg-tile t-auc rise" onClick={() => { haptic('light'); setAucOpen(true) }}>
+          <span className="torg-tile-ic">🔨</span>
+          <span className="torg-tile-t">Аукцион</span>
+          <span className="torg-tile-s">выставить лот</span>
+        </button>
+        <button className="torg-tile t-brs rise" onClick={() => { haptic('light'); setBrsOpen(true) }}>
+          <span className="torg-tile-live" />
+          <span className="torg-tile-ic">📈</span>
+          <span className="torg-tile-t">Биржа</span>
+          <span className="torg-tile-s">сбыт оптом</span>
+        </button>
+      </div>
 
       {/* лавка — ящики с товаром */}
       <div className="torg-cap">🛒 Лавка скупщика<span className="torg-coin"><ResIcon k="gold" size={13} />{fmt(d.gold ?? 0)}</span></div>
