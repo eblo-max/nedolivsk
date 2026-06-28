@@ -233,7 +233,7 @@ def cellar_capacity(capacity: int) -> int:
 # тот же, что у купца (fv×TRADE_MAX_OVER) — без новых эксплойтов.
 AUCTION_DURATION_HOURS = 6     # сколько идут торги
 AUCTION_QTY_MAX = 20           # максимум в одном лоте
-AUCTION_BID_CHANCE = 0.03      # шанс ставки на лот за тик (~11 попыток за 6ч)
+AUCTION_BID_CHANCE = 0.08      # шанс ставки на лот за тик (~29 попыток за 6ч, 1-я ставка ~12-15 мин)
 AUCTION_FAIR_BID_MULT = 2.0    # на ярмарке ставят вдвое охотнее
 AUCTION_CEIL_BUMP = 1.15       # аукционный азарт: на торгах набавляют ×1.15 сверх обычного потолка
 AUCTION_BID_STEP = 0.06        # шаг перебивки (× fv). Настроение уже в fv (климат).
