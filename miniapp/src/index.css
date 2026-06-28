@@ -1339,17 +1339,18 @@ body {
 .brs-tape-q i { font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:13px; color:var(--brs-ask); font-style:normal; }
 
 /* сегмент-таб со скользящим свечением */
-.brs-seg { position:relative; display:flex; padding:4px; border-radius:14px; margin-bottom:12px;
-  background:oklch(0.18 0.02 70); box-shadow:inset 0 0 0 1px #ffffff12, inset 0 2px 6px #0007; }
-.brs-seg-glow { position:absolute; top:4px; bottom:4px; left:4px; width:calc((100% - 8px) / 4);
-  border-radius:11px; background:linear-gradient(180deg, oklch(0.82 0.13 84), oklch(0.62 0.15 70));
-  box-shadow:0 3px 12px color-mix(in oklch, var(--brs-ask) 45%, transparent), inset 0 1px 0 #fff6;
-  transform:translateX(calc(var(--i,0) * 100%)); transition:transform .32s cubic-bezier(.34,1.4,.4,1); }
+.brs-seg { position:relative; display:flex; padding:3px; border-radius:11px; margin-bottom:12px;
+  background:oklch(0.15 0.015 66); box-shadow:inset 0 0 0 1px #ffffff0c; }
+.brs-seg-glow { position:absolute; top:3px; bottom:3px; left:3px; width:calc((100% - 6px) / 4);
+  border-radius:8px; background:linear-gradient(180deg, oklch(0.28 0.025 74), oklch(0.22 0.02 66));
+  box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--brs-ask) 34%, transparent), inset 0 1px 0 #ffffff18, 0 1px 4px #0006;
+  transform:translateX(calc(var(--i,0) * 100%)); transition:transform .3s cubic-bezier(.34,1.25,.4,1); }
 .brs-seg-b { position:relative; z-index:1; flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
-  padding:9px 2px; border:none; background:none; cursor:pointer; font-family:system-ui,sans-serif; font-weight:700;
-  font-size:12px; color:#9a8f76; transition:color .2s; }
-.brs-seg-b.on { color:oklch(0.20 0.04 60); }
-.brs-seg-ic { font-size:14px; }
+  padding:7px 2px; border:none; background:none; cursor:pointer; font-family:system-ui,sans-serif; font-weight:600;
+  font-size:11.5px; color:#8c8470; letter-spacing:.1px; transition:color .2s; }
+.brs-seg-b.on { color:var(--brs-ask); font-weight:700; }
+.brs-seg-ic { font-size:13px; opacity:.85; }
+.brs-seg-b.on .brs-seg-ic { opacity:1; }
 .brs-body { min-height:150px; }
 
 /* трейд-тикет ордера — глассовая плитка с боковой жилой */
