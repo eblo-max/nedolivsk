@@ -2,9 +2,16 @@ from datetime import datetime
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from bot.db.base import Base
+
+# JSONB с отслеживанием in-place мутаций: x["k"]=v / x.append(...) на верхнем уровне
+# теперь помечают поле грязным и сохраняются. Иначе (как было в auction) изменение
+# терялось, если код не переприсваивал свежий объект. Чисто Python-обёртка, без миграции.
+_JDICT = MutableDict.as_mutable(JSONB)
+_JLIST = MutableList.as_mutable(JSONB)
 
 
 class Player(Base):
@@ -29,7 +36,7 @@ class Player(Base):
     chat_id: Mapped[int | None] = mapped_column(BigInteger)
 
     # Инвентарь сырья (Ярус 0): {id: количество}
-    inventory: Mapped[dict] = mapped_column(JSONB, default=dict)
+    inventory: Mapped[dict] = mapped_column(_JDICT, default=dict)
 
     # DEPRECATED: данные перелиты в inventory (миграция в base.py).
     # Колонки оставлены ради старых БД; в коде больше не используются.
@@ -38,7 +45,7 @@ class Player(Base):
     hops: Mapped[int] = mapped_column(default=5)
 
     # Бригады на вылазках (мультислот): [{resource, ends_at, notified}]
-    expeditions: Mapped[list] = mapped_column(JSONB, default=list)
+    expeditions: Mapped[list] = mapped_column(_JLIST, default=list)
 
     # DEPRECATED: одиночная вылазка — перелита в expeditions (миграция в base.py)
     expedition_resource: Mapped[str | None] = mapped_column(String(16))
@@ -48,7 +55,7 @@ class Player(Base):
     expedition_notified: Mapped[bool] = mapped_column(default=False)
 
     # Экипировка и крафт
-    equipment: Mapped[dict] = mapped_column(JSONB, default=dict)
+    equipment: Mapped[dict] = mapped_column(_JDICT, default=dict)
     craft_item: Mapped[str | None] = mapped_column(String(32))
     craft_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     craft_notified: Mapped[bool] = mapped_column(default=False)
@@ -60,7 +67,7 @@ class Player(Base):
 
     # Ночная ходка (соло push-your-luck): активный забег (JSONB машины состояний
     # из bot.game.nightrun) и метка кулдауна (когда можно уйти на тракт снова).
-    night_run: Mapped[dict] = mapped_column(JSONB, default=dict)
+    night_run: Mapped[dict] = mapped_column(_JDICT, default=dict)
     night_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Вылазка «телега за зерном» к мельнице: отправка + привезённое (ждёт сбора).
@@ -87,7 +94,7 @@ class Player(Base):
     # Онбординг-дожим: завёл аккаунт, но кабак не открыл — подтолкнули один раз.
     onboard_nudged: Mapped[bool] = mapped_column(default=False)
     # Лавка скупщика: учёт покупок сырья в 24ч-окне (анти-абуз) {ресурс:{t,q}}.
-    shop_buys: Mapped[dict] = mapped_column(JSONB, default=dict)
+    shop_buys: Mapped[dict] = mapped_column(_JDICT, default=dict)
 
     # Ежедневный бонус («опохмел»): claimable-предложение (bonus_kind) висит 24ч
     # и сгорает; активный баф (buff_kind) действует 4ч; bonus_next_at — когда
@@ -100,14 +107,14 @@ class Player(Base):
 
     # Живой город: память игрока — флаги-факты, отношения с NPC, репутация
     # фракций, текущее событие на решении (pending) и очередь отложенных (queue).
-    story: Mapped[dict] = mapped_column(JSONB, default=dict)
+    story: Mapped[dict] = mapped_column(_JDICT, default=dict)
 
     # Лимит покупки на бирже (анти-абуз, как buy-limit в RuneScape): сколько
     # каждого товара куплено в текущем 4-часовом окне. {good: {"t": iso, "q": n}}.
-    bourse_buys: Mapped[dict] = mapped_column(JSONB, default=dict)
+    bourse_buys: Mapped[dict] = mapped_column(_JDICT, default=dict)
     # Бухгалтерия золота (faucet/sink): {категория: суммарное золото}. Кран — плюс,
     # сток — минус. Накопитель для замера потоков (см. bot/game/economy.py, /econ).
-    econ: Mapped[dict] = mapped_column(JSONB, default=dict)
+    econ: Mapped[dict] = mapped_column(_JDICT, default=dict)
 
     tavern: Mapped["Tavern | None"] = relationship(
         back_populates="player", uselist=False, lazy="selectin"
@@ -132,14 +139,14 @@ class WorldState(Base):
     # ЕДИНЫЙ глобальный рынок (общий для всех чатов): оптовый завал/дефицит по
     # товарам — {good: glut_units, '_t': метка распада}. Двигают его ВСЕ сделки
     # мира (сбыт купцам, NPC-аукцион, P2P-биржа), цена одна для всех.
-    market: Mapped[dict] = mapped_column(JSONB, default=dict)
+    market: Mapped[dict] = mapped_column(_JDICT, default=dict)
     # Масштаб рынка = число активных чатов (нотифаер обновляет раз в тик). Пороги
     # насыщения/дефицита множатся на него: реактивность цены держится как у одного
     # чата при любом размере мира (нормировка по интенсивности, не по объёму).
     market_scale: Mapped[int] = mapped_column(default=1)
     # Кэш Telegram file_id статичных картинок/видео: {"имя:размер": file_id}.
     # Переживает деплой (ФС Railway эфемерна) → медиа не грузятся заново каждый раз.
-    media_ids: Mapped[dict] = mapped_column(JSONB, default=dict)
+    media_ids: Mapped[dict] = mapped_column(_JDICT, default=dict)
     # Время последней биржевой сводки в чаты (дайджест новых лотов раз в N минут).
     bourse_announced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Мировое событие (погода/экономика): одно активное на весь мир.
@@ -174,11 +181,11 @@ class CityState(Base):
 
     chat_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     mood: Mapped[int] = mapped_column(default=0)            # настроение города
-    faction_power: Mapped[dict] = mapped_column(JSONB, default=dict)  # {фракция: сила}
-    situations: Mapped[list] = mapped_column(JSONB, default=list)     # [{id, faction, until}]
+    faction_power: Mapped[dict] = mapped_column(_JDICT, default=dict)  # {фракция: сила}
+    situations: Mapped[list] = mapped_column(_JLIST, default=list)     # [{id, faction, until}]
     # Динамический рынок: {товар: завал, '_t': метка распада} — оптовая цена
     # проседает от сбыта и впитывается спросом со временем.
-    market: Mapped[dict] = mapped_column(JSONB, default=dict)
+    market: Mapped[dict] = mapped_column(_JDICT, default=dict)
     last_situation_end: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
@@ -254,14 +261,14 @@ class RaidBoss(Base):
     boss_key: Mapped[str] = mapped_column(String(32))
     max_hp: Mapped[int] = mapped_column(default=0)   # ставится при старте битвы
     hp: Mapped[int] = mapped_column(default=0)
-    contributions: Mapped[dict] = mapped_column(JSONB, default=dict)
-    messages: Mapped[dict] = mapped_column(JSONB, default=dict)
+    contributions: Mapped[dict] = mapped_column(_JDICT, default=dict)
+    messages: Mapped[dict] = mapped_column(_JDICT, default=dict)
     # Боевое состояние: {stun_until, ward_until, curse_until, adds_hp, adds_until,
     # cast_done (взятые HP-пороги), phase, second_wind} — заклинания/фазы боя.
-    state: Mapped[dict] = mapped_column(JSONB, default=dict)
+    state: Mapped[dict] = mapped_column(_JDICT, default=dict)
     # Админ-рига дропа: {"winner": pid, "drop": {"kind","item_id","tier"}} | None.
     # Если задано — settle отдаёт ИМЕННО этот трофей этому игроку (с обычным анонсом).
-    forced: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=None)
+    forced: Mapped[dict | None] = mapped_column(_JDICT, nullable=True, default=None)
     status: Mapped[str] = mapped_column(String(10), default="gathering")
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -285,12 +292,12 @@ class Invasion(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     sprite: Mapped[int] = mapped_column(default=1)         # орк-модель (ork{sprite})
-    registered: Mapped[dict] = mapped_column(JSONB, default=dict)
+    registered: Mapped[dict] = mapped_column(_JDICT, default=dict)
     threshold: Mapped[int] = mapped_column(default=0)      # порог орды (снимок при спавне)
     escal: Mapped[float] = mapped_column(default=1.0)      # эскалация (снимок при спавне)
     status: Mapped[str] = mapped_column(String(10), default="gathering")
-    messages: Mapped[dict] = mapped_column(JSONB, default=dict)
-    result: Mapped[dict] = mapped_column(JSONB, default=dict)
+    messages: Mapped[dict] = mapped_column(_JDICT, default=dict)
+    result: Mapped[dict] = mapped_column(_JDICT, default=dict)
     started_at: Mapped[datetime] = mapped_column(           # начало сбора
         DateTime(timezone=True), server_default=func.now()
     )
@@ -346,13 +353,13 @@ class Tavern(Base):
     rep_progress: Mapped[int] = mapped_column(default=0)
     auction_sold: Mapped[int] = mapped_column(default=0)
 
-    upgrades: Mapped[dict] = mapped_column(JSONB, default=dict)
-    buildings: Mapped[list] = mapped_column(JSONB, default=list)
-    production: Mapped[dict] = mapped_column(JSONB, default=dict)  # партии зданий
-    products: Mapped[dict] = mapped_column(JSONB, default=dict)    # погреб: {ярус: эль}
+    upgrades: Mapped[dict] = mapped_column(_JDICT, default=dict)
+    buildings: Mapped[list] = mapped_column(_JLIST, default=list)
+    production: Mapped[dict] = mapped_column(_JDICT, default=dict)  # партии зданий
+    products: Mapped[dict] = mapped_column(_JDICT, default=dict)    # погреб: {ярус: эль}
     # Аукцион: один активный лот {good, qty, unit_min, ends_at, top_bid,
     # top_bidder, bids, history} — товар заморожен в лоте.
-    auction: Mapped[dict] = mapped_column(JSONB, default=dict)
+    auction: Mapped[dict] = mapped_column(_JDICT, default=dict)
 
     last_income_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     map_slot: Mapped[int | None] = mapped_column(unique=True)
