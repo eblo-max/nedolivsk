@@ -40,7 +40,7 @@ const DEMO: BState = {
     { name: 'African Eastern', sold: 155, me: true },
     { name: 'У дохлого песца', sold: 90, me: false },
   ],
-  goods: [{ key: 'cheese', name: 'Сыр', emoji: '🧀', stock: 18 }],
+  goods: [{ key: 'cheese', name: 'Сыр', emoji: '🧀', stock: 18 }, { key: 'mead', name: 'Медовуха', emoji: '🍯', stock: 9 }],
 }
 const bourseApi = (): Promise<BState> => DEV ? Promise.resolve(DEMO) : api<BState>('bourse')
 
@@ -72,12 +72,22 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
   const [d, setD] = useState<BState | null>(null)
   const [tab, setTab] = useState<Tab>('prices')
 
-  useEffect(() => { bourseApi().then(setD).catch(() => setD({ ok: true, open: false })) }, [])
+  const load = () => bourseApi().then(setD).catch(() => setD({ ok: true, open: false }))
+  useEffect(() => { load() }, [])
+  // «в эфире»: тихо подтягиваем свежие цены раз в 8с (как в торговом терминале)
+  const open = !!d?.open
+  useEffect(() => {
+    if (!open) return
+    const i = setInterval(load, 8000)
+    return () => clearInterval(i)
+  }, [open])
 
   // нормировка глубины стакана: бары bid/ask относительно макс. объёма по доске
   const maxQty = useMemo(() => Math.max(1, ...((d?.board || []).flatMap((b) => [b.ask_qty || 0, b.bid_qty || 0]))), [d])
   // лента котировок (лучшие цены) для бегущей строки
   const ticker = useMemo(() => (d?.board || []).filter((b) => b.ask != null || b.bid != null), [d])
+  // погреб: что у меня есть на продажу — для подсветки «твой товар»/«выгодно»
+  const myStock = useMemo(() => new Map((d?.goods || []).map((g) => [g.key, g.stock])), [d])
   const tabIdx = TABS.findIndex((t) => t.id === tab)
 
   return (
@@ -86,11 +96,14 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
         <div className="brs-top">
           <div className="brs-title"><span className="brs-glyph">📈</span> Биржа Недоливска</div>
           {ticker.length > 0 && (
-            <div className="brs-tape"><div className="brs-tape-run">
-              {[...ticker, ...ticker].map((b, i) => (
-                <span key={i} className="brs-tape-q">{b.emoji}<i>{b.ask ?? b.bid}</i></span>
-              ))}
-            </div></div>
+            <div className="brs-tape-row">
+              <span className="brs-live"><span className="brs-live-dot" />в эфире</span>
+              <div className="brs-tape"><div className="brs-tape-run">
+                {[...ticker, ...ticker].map((b, i) => (
+                  <span key={i} className="brs-tape-q">{b.emoji}<i>{b.ask ?? b.bid}</i></span>
+                ))}
+              </div></div>
+            </div>
           )}
         </div>
 
@@ -133,15 +146,25 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
                       <span className="brs-leg-side"><span className="dot bid" />спрос · купят</span>
                       <span className="brs-leg-side ask">продают · предложение<span className="dot ask" /></span>
                     </div>
-                    {(d.board && d.board.length > 0) ? d.board.map((b) => {
+                    {(d.board && d.board.length > 0) ? d.board.map((b, idx) => {
                       const bidW = b.bid_qty ? Math.max(7, (b.bid_qty / maxQty) * 100) : 0
                       const askW = b.ask_qty ? Math.max(7, (b.ask_qty / maxQty) * 100) : 0
                       const spread = (b.ask != null && b.bid != null) ? b.ask - b.bid : null
+                      const range = Math.max(1, b.ceil - b.floor)
+                      const pos = (p: number) => Math.min(100, Math.max(0, ((p - b.floor) / range) * 100))
+                      const bidPos = b.bid != null ? pos(b.bid) : null
+                      const askPos = b.ask != null ? pos(b.ask) : null
+                      const stock = myStock.get(b.key) || 0
+                      const profit = stock > 0 && b.bid != null   // есть товар + кто-то его берёт
                       return (
-                        <div key={b.key} className="brs-dp">
+                        <div key={b.key} className={`brs-dp${stock ? ' mine' : ''}`} style={{ ['--di' as string]: idx }}>
                           <div className="brs-dp-head">
-                            <span className="brs-dp-nm"><GoodIcon k={b.key} size={22} />{b.name}</span>
-                            {spread != null && <span className="brs-dp-spread">спред {spread}</span>}
+                            <span className="brs-dp-nm"><GoodIcon k={b.key} size={22} />{b.name}
+                              {stock ? <span className="brs-dp-mine">🎒 {stock}</span> : null}</span>
+                            <span className="brs-dp-tags">
+                              {profit ? <span className="brs-dp-profit">💰 берут {b.bid}</span> : null}
+                              {spread != null ? <span className="brs-dp-spread">спред {spread}</span> : null}
+                            </span>
                           </div>
                           <div className="brs-dp-bars">
                             <div className="brs-dp-side bid">
@@ -157,6 +180,16 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
                                 <span className="brs-dp-px">{b.ask}{b.ask_qty ? <i>×{b.ask_qty}</i> : null}</span>
                               </>) : <span className="brs-dp-none">нет лотов</span>}
                             </div>
+                          </div>
+                          <div className="brs-dp-corr">
+                            <span className="brs-dp-edge">{b.floor}</span>
+                            <div className="brs-dp-track">
+                              {bidPos != null && askPos != null && askPos >= bidPos &&
+                                <span className="brs-dp-fill" style={{ left: `${bidPos}%`, width: `${askPos - bidPos}%` }} />}
+                              {bidPos != null && <span className="brs-dp-mark bid" style={{ left: `${bidPos}%` }} />}
+                              {askPos != null && <span className="brs-dp-mark ask" style={{ left: `${askPos}%` }} />}
+                            </div>
+                            <span className="brs-dp-edge">{b.ceil}</span>
                           </div>
                         </div>
                       )
