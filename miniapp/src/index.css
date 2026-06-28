@@ -1305,6 +1305,14 @@ body {
 .auc-face { border-radius:8px; object-fit:cover; flex:none; box-shadow:0 1px 4px #0007; background:#221a10; }
 .auc-face-emo { display:inline-flex; align-items:center; justify-content:center; }
 .auc-cancel { margin-top:12px; color:#f0a08a !important; border-color:#7a3b2e !important; background:linear-gradient(#2c1410,#1a0d08) !important; }
+/* 2-шаговое снятие лота со ставкой — чтобы не упустить куш случайно */
+.auc-cc { margin-top:12px; padding:11px 12px; border-radius:13px; border:1px solid #7a5a2e;
+  background:linear-gradient(#2a2010,#1a1308); animation:sv-rise .2s both; }
+.auc-cc-warn { font-family:var(--text),system-ui,sans-serif; font-size:13px; color:#e7c98a; text-align:center; line-height:1.4; margin-bottom:9px; }
+.auc-cc-warn b { color:#f6d885; }
+.auc-cc-row { display:flex; gap:8px; }
+.auc-cc-keep { flex:1; margin:0 !important; color:#dfe9d8 !important; border-color:#3f5a36 !important; background:linear-gradient(#23311d,#16210f) !important; }
+.auc-cc-yes { flex:1; margin:0 !important; color:#f0a08a !important; border-color:#7a3b2e !important; background:linear-gradient(#2c1410,#1a0d08) !important; }
 .auc-hint { font-family:Georgia,serif; font-style:italic; font-size:11.5px; color:#8a7f6a; text-align:center; margin:9px 4px 0; line-height:1.4; }
 
 /* тест-панель аукциона — рендерится только админу (d.admin), убрать перед общим релизом */

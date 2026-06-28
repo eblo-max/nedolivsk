@@ -136,6 +136,7 @@ export default function AuctionSheet({ onClose }: { onClose: () => void }) {
   const [qty, setQty] = useState(0)
   const [customPrice, setCustomPrice] = useState('')   // своя цена за шт (помимо тиров)
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2200) }
+  const [confirmCancel, setConfirmCancel] = useState(false)   // 2-шаговое снятие лота со ставкой
   const [bidFlash, setBidFlash] = useState(false)   // вспышка при новой ставке горожанина
   const prevBids = useRef<number | null>(null)      // сколько ставок было в прошлый опрос
   const resGong = useRef(false)                      // гонг финала отбили (раз)
@@ -193,10 +194,12 @@ export default function AuctionSheet({ onClose }: { onClose: () => void }) {
   async function cancel() {
     if (busy) return
     setBusy(true); haptic('medium')
-    try { const r = await aucApi('auction/cancel'); setD(r); hapticNotify('success'); flash('Лот снят, товар вернулся в погреб') }
+    try { const r = await aucApi('auction/cancel'); setD(r); setConfirmCancel(false); hapticNotify('success'); flash('Лот снят, товар вернулся в погреб') }
     catch { flash('Не вышло'); hapticNotify('warning') }
     finally { setBusy(false) }
   }
+  // тап «Снять лот»: со ставкой — спросить (упустит куш), без ставки — снять сразу
+  const onCancelTap = () => { haptic('light'); if (d?.top_bid) setConfirmCancel(true); else cancel() }
   // ── ТЕСТ (только админ): прогнать все экраны, не дожидаясь горожан/таймера ──
   async function seedBids() {
     if (busy) return
@@ -272,7 +275,17 @@ export default function AuctionSheet({ onClose }: { onClose: () => void }) {
                 </div>
               )}
 
-              <button className="btn auc-cancel" disabled={busy} onClick={cancel}>✋ Снять лот</button>
+              {!confirmCancel ? (
+                <button className="btn auc-cancel" disabled={busy} onClick={onCancelTap}>✋ Снять лот</button>
+              ) : (
+                <div className="auc-cc">
+                  <div className="auc-cc-warn">⚠️ За лот уже дают <b>{fmt((d.top_bid || 0) * (d.qty || 1))} 🪙</b> — снимешь, упустишь куш.</div>
+                  <div className="auc-cc-row">
+                    <button className="btn auc-cc-keep" disabled={busy} onClick={() => { haptic('light'); setConfirmCancel(false) }}>Оставить</button>
+                    <button className="btn auc-cc-yes" disabled={busy} onClick={cancel}>Снять, упустить</button>
+                  </div>
+                </div>
+              )}
               <p className="auc-hint">Торги идут сами — горожане набегают. Закроются по таймеру, золото упадёт в казну.</p>
 
               {DEV && (   /* тест-панель только в превью (localhost); в прод-сборке вырезается */
