@@ -1315,37 +1315,101 @@ body {
 .auc-cc-yes { flex:1; margin:0 !important; color:#f0a08a !important; border-color:#7a3b2e !important; background:linear-gradient(#2c1410,#1a0d08) !important; }
 .auc-hint { font-family:Georgia,serif; font-style:italic; font-size:11.5px; color:#8a7f6a; text-align:center; margin:9px 4px 0; line-height:1.4; }
 
-/* ── Биржа (P2P-ордербук), фаза 1: доска ── */
-.brs-sheet { max-height:90vh; }
-.brs-tabs { display:flex; gap:6px; margin-bottom:10px; }
-.brs-tab { flex:1; padding:9px 2px; border-radius:10px; cursor:pointer; font-family:system-ui,sans-serif; font-weight:700;
-  font-size:12px; color:#b6a884; background:#1a1207; border:1px solid #4a3719; }
-.brs-tab.on { color:#241501; background:linear-gradient(var(--gold-2,#f6d885),#cf9a3c); border-color:#f6dd92; }
-.brs-body { min-height:140px; }
-.brs-row { display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #ffffff0d; }
-.brs-row-id { flex:1; min-width:0; display:flex; flex-direction:column; }
-.brs-row-id b { font-family:var(--text),system-ui,sans-serif; font-size:14px; color:#ece3cd; }
-.brs-row-id small { font-family:var(--text),system-ui,sans-serif; font-size:11.5px; color:#9a8f76; }
-.brs-row-px { text-align:right; display:flex; flex-direction:column; align-items:flex-end; }
-.brs-px { display:inline-flex; align-items:center; gap:3px; font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:16px; color:#f3c768; }
-.brs-px.buy { color:#7fd0a0; }
-.brs-row-px small { font-family:var(--num),system-ui,sans-serif; font-size:10px; color:#8a7f6a; }
-/* доска цен */
-.brs-board-h, .brs-board-row { display:grid; grid-template-columns:1fr 80px 80px; align-items:center; gap:6px; padding:7px 4px; }
-.brs-board-h { font-family:system-ui,sans-serif; font-size:10px; letter-spacing:.6px; text-transform:uppercase; color:#8a7f6a; border-bottom:1px solid #ffffff14; }
-.brs-board-h span:not(:first-child), .brs-board-row span:not(:first-child) { text-align:right; }
-.brs-board-row { border-top:1px solid #ffffff0a; }
-.brs-bg { display:inline-flex; align-items:center; gap:7px; font-family:var(--text),system-ui,sans-serif; font-size:13px; color:#ddd2bb; min-width:0; }
-.brs-bid { font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:14px; color:#7fd0a0; }
-.brs-ask { font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:14px; color:#f3c768; }
-.brs-bid small, .brs-ask small { font-weight:600; font-size:10px; color:#8a7f6a; }
-.brs-sellers { margin-top:14px; }
-.brs-sec-h { font-family:var(--disp),system-ui,sans-serif; font-weight:700; font-size:10.5px; letter-spacing:1.4px; text-transform:uppercase; color:#9a8657; margin-bottom:7px; }
-.brs-seller { display:flex; align-items:center; gap:9px; padding:6px 2px; border-top:1px solid #ffffff0d; }
-.brs-seller.me { background:rgba(231,191,99,.07); border-radius:8px; }
-.brs-medal { width:24px; text-align:center; font-size:14px; }
-.brs-seller-nm { flex:1; min-width:0; font-family:var(--text),system-ui,sans-serif; font-size:13px; color:#ddd2bb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.brs-seller-n { font-family:var(--num),system-ui,sans-serif; font-size:12.5px; color:#b6a169; }
+/* ════ БИРЖА — терминал 2026 (oklch, @property, лента, глубина стакана) ════ */
+@property --brs-a { syntax:'<angle>'; inherits:false; initial-value:0deg; }
+:root {
+  --brs-bid: #43c489; --brs-bid: oklch(0.74 0.15 152);   /* спрос — изумруд (hex-фолбэк для старых WebView) */
+  --brs-ask: #ecc14e; --brs-ask: oklch(0.80 0.14 85);    /* предложение — золото */
+  --brs-ink: #2a241a; --brs-ink: oklch(0.22 0.03 70);
+}
+.brs-sheet { max-height:92vh; padding-top:0; }
+
+/* шапка с бегущей лентой котировок */
+.brs-top { position:sticky; top:0; z-index:4; margin:0 -16px 12px; padding:14px 16px 9px;
+  background:linear-gradient(180deg, oklch(0.20 0.03 72) 60%, transparent);
+  border-bottom:1px solid color-mix(in oklch, var(--brs-ask) 26%, transparent); }
+.brs-title { display:flex; align-items:center; gap:8px; font-family:var(--disp),system-ui,sans-serif; font-weight:800;
+  font-size:17px; letter-spacing:-.2px;
+  background:linear-gradient(92deg, oklch(0.92 0.06 90), oklch(0.78 0.15 78)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.brs-glyph { -webkit-text-fill-color:initial; filter:drop-shadow(0 0 8px color-mix(in oklch, var(--brs-ask) 60%, transparent)); }
+.brs-tape { overflow:hidden; margin-top:7px; -webkit-mask:linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask:linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.brs-tape-run { display:inline-flex; gap:16px; white-space:nowrap; animation:brs-tape 18s linear infinite; will-change:transform; }
+@keyframes brs-tape { to { transform:translateX(-50%); } }
+.brs-tape-q { display:inline-flex; align-items:center; gap:5px; font-size:14px; }
+.brs-tape-q i { font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:13px; color:var(--brs-ask); font-style:normal; }
+
+/* сегмент-таб со скользящим свечением */
+.brs-seg { position:relative; display:flex; padding:4px; border-radius:14px; margin-bottom:12px;
+  background:oklch(0.18 0.02 70); box-shadow:inset 0 0 0 1px #ffffff12, inset 0 2px 6px #0007; }
+.brs-seg-glow { position:absolute; top:4px; bottom:4px; left:4px; width:calc((100% - 8px) / 4);
+  border-radius:11px; background:linear-gradient(180deg, oklch(0.82 0.13 84), oklch(0.62 0.15 70));
+  box-shadow:0 3px 12px color-mix(in oklch, var(--brs-ask) 45%, transparent), inset 0 1px 0 #fff6;
+  transform:translateX(calc(var(--i,0) * 100%)); transition:transform .32s cubic-bezier(.34,1.4,.4,1); }
+.brs-seg-b { position:relative; z-index:1; flex:1; display:flex; align-items:center; justify-content:center; gap:5px;
+  padding:9px 2px; border:none; background:none; cursor:pointer; font-family:system-ui,sans-serif; font-weight:700;
+  font-size:12px; color:#9a8f76; transition:color .2s; }
+.brs-seg-b.on { color:oklch(0.20 0.04 60); }
+.brs-seg-ic { font-size:14px; }
+.brs-body { min-height:150px; }
+
+/* трейд-тикет ордера — глассовая плитка с боковой жилой */
+.brs-tk { position:relative; display:flex; align-items:center; gap:11px; padding:11px 13px 11px 15px; margin-bottom:8px;
+  border-radius:14px; overflow:hidden; background:linear-gradient(120deg, oklch(0.23 0.02 72), oklch(0.18 0.02 60));
+  box-shadow:inset 0 0 0 1px #ffffff10, 0 3px 12px #0006; animation:brs-in .32s both; }
+@keyframes brs-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+.brs-tk::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+  background:linear-gradient(var(--brs-ask), color-mix(in oklch, var(--brs-ask) 40%, transparent)); }
+.brs-tk.buy::before { background:linear-gradient(var(--brs-bid), color-mix(in oklch, var(--brs-bid) 40%, transparent)); }
+.brs-tk-ic { flex:none; display:grid; place-items:center; width:46px; height:46px; border-radius:12px;
+  background:radial-gradient(circle at 50% 35%, color-mix(in oklch, var(--brs-ask) 22%, transparent), transparent 70%), oklch(0.16 0.02 60);
+  box-shadow:inset 0 0 0 1px #ffffff14; }
+.brs-tk.buy .brs-tk-ic { background:radial-gradient(circle at 50% 35%, color-mix(in oklch, var(--brs-bid) 22%, transparent), transparent 70%), oklch(0.16 0.02 60); }
+.brs-tk-mid { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.brs-tk-mid b { font-family:var(--text),system-ui,sans-serif; font-size:14.5px; color:#f0e7d2; }
+.brs-tk-mid small { font-family:var(--text),system-ui,sans-serif; font-size:11.5px; color:#9a8f76; }
+.brs-tk-q { color:#cdbf9c; font-weight:700; }
+.brs-tk-px { text-align:right; display:flex; flex-direction:column; align-items:flex-end; }
+.brs-tk-num { display:inline-flex; align-items:center; gap:3px; font-family:var(--num),system-ui,sans-serif; font-weight:900; font-size:19px;
+  color:var(--brs-ask); text-shadow:0 0 14px color-mix(in oklch, var(--brs-ask) 35%, transparent); }
+.brs-tk.buy .brs-tk-num { color:var(--brs-bid); text-shadow:0 0 14px color-mix(in oklch, var(--brs-bid) 35%, transparent); }
+.brs-tk-px small { font-family:system-ui,sans-serif; font-size:9.5px; letter-spacing:.4px; text-transform:uppercase; color:#7d7256; }
+
+/* глубина стакана — встречные бары bid/ask */
+.brs-depth-leg { display:flex; align-items:center; gap:6px; justify-content:center; margin:2px 0 10px;
+  font-family:system-ui,sans-serif; font-size:10.5px; color:#9a8f76; }
+.brs-depth-leg .dot { width:8px; height:8px; border-radius:50%; }
+.brs-depth-leg .dot.bid { background:var(--brs-bid); } .brs-depth-leg .dot.ask { background:var(--brs-ask); }
+.brs-leg-sp { color:#5a523f; margin:0 2px; }
+.brs-dp { padding:9px 2px; border-top:1px solid #ffffff0c; }
+.brs-dp-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.brs-dp-nm { display:inline-flex; align-items:center; gap:7px; font-family:var(--text),system-ui,sans-serif; font-size:13.5px; color:#e6dcc4; }
+.brs-dp-spread { font-family:var(--num),system-ui,sans-serif; font-size:10.5px; color:#8a7f6a;
+  padding:2px 8px; border-radius:99px; background:#ffffff0c; }
+.brs-dp-bars { display:flex; align-items:center; height:24px; }
+.brs-dp-side { flex:1; display:flex; align-items:center; gap:6px; min-width:0; }
+.brs-dp-side.bid { justify-content:flex-end; }
+.brs-dp-side.ask { justify-content:flex-start; }
+.brs-dp-bar { height:18px; border-radius:5px; }
+.brs-dp-side.bid .brs-dp-bar { background:linear-gradient(90deg, color-mix(in oklch, var(--brs-bid) 18%, transparent), var(--brs-bid));
+  box-shadow:0 0 12px color-mix(in oklch, var(--brs-bid) 30%, transparent); border-radius:5px 2px 2px 5px; }
+.brs-dp-side.ask .brs-dp-bar { background:linear-gradient(90deg, var(--brs-ask), color-mix(in oklch, var(--brs-ask) 18%, transparent));
+  box-shadow:0 0 12px color-mix(in oklch, var(--brs-ask) 30%, transparent); border-radius:2px 5px 5px 2px; }
+.brs-dp-px { flex:none; font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:13px; }
+.brs-dp-side.bid .brs-dp-px { color:var(--brs-bid); } .brs-dp-side.ask .brs-dp-px { color:var(--brs-ask); }
+.brs-dp-px i { font-style:normal; font-weight:600; font-size:9.5px; color:#8a7f6a; margin-left:2px; }
+.brs-dp-mid { width:2px; height:24px; flex:none; margin:0 4px; border-radius:2px; background:#ffffff1c; }
+
+/* рейтинг купцов — мини-бары */
+.brs-lead { margin-top:16px; }
+.brs-sec-h { font-family:var(--disp),system-ui,sans-serif; font-weight:700; font-size:10.5px; letter-spacing:1.4px; text-transform:uppercase; color:#9a8657; margin-bottom:8px; }
+.brs-ld { display:flex; align-items:center; gap:9px; padding:6px 4px; border-radius:9px; }
+.brs-ld.me { background:color-mix(in oklch, var(--brs-ask) 9%, transparent); }
+.brs-ld-rk { flex:none; width:20px; text-align:center; font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:14px; color:#8a7f6a; }
+.brs-ld-rk.r1 { color:oklch(0.84 0.13 90); } .brs-ld-rk.r2 { color:#cfd2da; } .brs-ld-rk.r3 { color:#d49a6a; }
+.brs-ld-nm { flex:none; max-width:38%; font-family:var(--text),system-ui,sans-serif; font-size:12.5px; color:#ddd2bb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.brs-ld-bar { flex:1; height:7px; border-radius:99px; background:#ffffff0e; overflow:hidden; }
+.brs-ld-bar i { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg, oklch(0.62 0.15 70), var(--brs-ask)); }
+.brs-ld-n { flex:none; font-family:var(--num),system-ui,sans-serif; font-size:12px; color:#b6a169; }
 
 /* тест-панель аукциона — рендерится только админу (d.admin), убрать перед общим релизом */
 .auc-test { margin-top:12px; padding:9px 10px; border-radius:12px; border:1px dashed #4a6a8a;

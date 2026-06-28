@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { haptic } from '../telegram'
 import { GoodIcon, ResIcon, fmt } from '../components/icons'
@@ -31,8 +31,9 @@ const DEMO: BState = {
   ],
   board: [
     { key: 'ale1', name: 'Хмельной эль', emoji: '🍺', ask: 6, ask_qty: 30, bid: 4, bid_qty: 15, floor: 3, ceil: 9 },
-    { key: 'mead', name: 'Медовуха', emoji: '🍯', ask: 19, ask_qty: 12, bid: null, bid_qty: null, floor: 7, ceil: 22 },
+    { key: 'mead', name: 'Медовуха', emoji: '🍯', ask: 19, ask_qty: 12, bid: 14, bid_qty: 4, floor: 7, ceil: 22 },
     { key: 'roast', name: 'Жаркое', emoji: '🍖', ask: null, ask_qty: null, bid: 24, bid_qty: 8, floor: 5, ceil: 28 },
+    { key: 'bread', name: 'Хлеб', emoji: '🍞', ask: 7, ask_qty: 50, bid: 5, bid_qty: 22, floor: 4, ceil: 10 },
   ],
   sellers: [
     { name: 'Кривая Кружка', sold: 240, me: false },
@@ -44,17 +45,54 @@ const DEMO: BState = {
 const bourseApi = (): Promise<BState> => DEV ? Promise.resolve(DEMO) : api<BState>('bourse')
 
 type Tab = 'buy' | 'bids' | 'prices' | 'mine'
+const TABS: { id: Tab; ic: string; t: string }[] = [
+  { id: 'buy', ic: '🛒', t: 'Купить' }, { id: 'bids', ic: '📣', t: 'Заявки' },
+  { id: 'prices', ic: '📊', t: 'Стакан' }, { id: 'mine', ic: '📦', t: 'Мои' },
+]
+
+/** Глассовый «трейд-тикет» ордера. buy=зелёный (заявка), sell=золото (продажа). */
+function Ticket({ o, label }: { o: BOrder; label: string }) {
+  const buy = o.side === 'buy'
+  return (
+    <div className={`brs-tk${buy ? ' buy' : ''}`} style={{ ['--d' as string]: '0ms' }}>
+      <div className="brs-tk-ic"><GoodIcon k={o.key} size={34} /></div>
+      <div className="brs-tk-mid">
+        <b>{o.name}</b>
+        <small>{label} <span className="brs-tk-q">×{o.qty}</span>{o.who ? <> · {o.who}</> : null}</small>
+      </div>
+      <div className="brs-tk-px">
+        <span className="brs-tk-num"><ResIcon k="gold" size={13} />{o.unit}</span>
+        <small>за штуку</small>
+      </div>
+    </div>
+  )
+}
 
 export default function BourseSheet({ onClose }: { onClose: () => void }) {
   const [d, setD] = useState<BState | null>(null)
-  const [tab, setTab] = useState<Tab>('buy')
+  const [tab, setTab] = useState<Tab>('prices')
 
   useEffect(() => { bourseApi().then(setD).catch(() => setD({ ok: true, open: false })) }, [])
+
+  // нормировка глубины стакана: бары bid/ask относительно макс. объёма по доске
+  const maxQty = useMemo(() => Math.max(1, ...((d?.board || []).flatMap((b) => [b.ask_qty || 0, b.bid_qty || 0]))), [d])
+  // лента котировок (лучшие цены) для бегущей строки
+  const ticker = useMemo(() => (d?.board || []).filter((b) => b.ask != null || b.bid != null), [d])
+  const tabIdx = TABS.findIndex((t) => t.id === tab)
 
   return (
     <div className="sv-backdrop" onClick={onClose}>
       <div className="auc-sheet brs-sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="auc-head">📈 Биржа Недоливска</div>
+        <div className="brs-top">
+          <div className="brs-title"><span className="brs-glyph">📈</span> Биржа Недоливска</div>
+          {ticker.length > 0 && (
+            <div className="brs-tape"><div className="brs-tape-run">
+              {[...ticker, ...ticker].map((b, i) => (
+                <span key={i} className="brs-tape-q">{b.emoji}<i>{b.ask ?? b.bid}</i></span>
+              ))}
+            </div></div>
+          )}
+        </div>
 
         {d === null ? <div className="center" style={{ padding: '40px 0' }}><div className="spin" /></div>
           : !d.open ? (
@@ -65,52 +103,63 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
             </div>
           ) : (
             <>
-              <div className="brs-tabs">
-                <button className={`brs-tab${tab === 'buy' ? ' on' : ''}`} onClick={() => { haptic('light'); setTab('buy') }}>🛒 Купить</button>
-                <button className={`brs-tab${tab === 'bids' ? ' on' : ''}`} onClick={() => { haptic('light'); setTab('bids') }}>📣 Заявки</button>
-                <button className={`brs-tab${tab === 'prices' ? ' on' : ''}`} onClick={() => { haptic('light'); setTab('prices') }}>📊 Цены</button>
-                <button className={`brs-tab${tab === 'mine' ? ' on' : ''}`} onClick={() => { haptic('light'); setTab('mine') }}>📦 Мои</button>
+              <div className="brs-seg" style={{ ['--i' as string]: tabIdx }}>
+                <div className="brs-seg-glow" />
+                {TABS.map((t) => (
+                  <button key={t.id} className={`brs-seg-b${tab === t.id ? ' on' : ''}`} onClick={() => { haptic('light'); setTab(t.id) }}>
+                    <span className="brs-seg-ic">{t.ic}</span>{t.t}
+                  </button>
+                ))}
               </div>
 
               <div className="brs-body">
                 {tab === 'buy' && (
-                  (d.sells && d.sells.length > 0) ? d.sells.map((o) => (
-                    <div key={o.id} className="brs-row">
-                      <GoodIcon k={o.key} size={30} />
-                      <div className="brs-row-id"><b>{o.name}</b><small>×{o.qty} · {o.who}</small></div>
-                      <div className="brs-row-px"><span className="brs-px"><ResIcon k="gold" size={12} />{o.unit}</span><small>/шт</small></div>
-                    </div>
-                  )) : <p className="auc-empty">«На прилавках пусто — никто не выставил товар на продажу.»</p>
+                  (d.sells && d.sells.length > 0) ? d.sells.map((o) => <Ticket key={o.id} o={o} label="продают" />)
+                    : <p className="auc-empty">«На прилавках пусто — никто не выставил товар на продажу.»</p>
                 )}
 
                 {tab === 'bids' && (
-                  (d.buys && d.buys.length > 0) ? d.buys.map((o) => (
-                    <div key={o.id} className="brs-row">
-                      <GoodIcon k={o.key} size={30} />
-                      <div className="brs-row-id"><b>{o.name}</b><small>хотят ×{o.qty} · {o.who}</small></div>
-                      <div className="brs-row-px"><span className="brs-px buy"><ResIcon k="gold" size={12} />{o.unit}</span><small>/шт</small></div>
-                    </div>
-                  )) : <p className="auc-empty">«Заявок на скупку нет — никто пока не ищет товар.»</p>
+                  (d.buys && d.buys.length > 0) ? d.buys.map((o) => <Ticket key={o.id} o={o} label="ищут" />)
+                    : <p className="auc-empty">«Заявок на скупку нет — никто пока не ищет товар.»</p>
                 )}
 
                 {tab === 'prices' && (
                   <>
-                    <div className="brs-board-h"><span>товар</span><span>покупка</span><span>продажа</span></div>
-                    {(d.board && d.board.length > 0) ? d.board.map((b) => (
-                      <div key={b.key} className="brs-board-row">
-                        <span className="brs-bg"><GoodIcon k={b.key} size={22} />{b.name}</span>
-                        <span className="brs-bid">{b.bid != null ? `${b.bid}` : '—'}{b.bid_qty ? <small> ×{b.bid_qty}</small> : null}</span>
-                        <span className="brs-ask">{b.ask != null ? `${b.ask}` : '—'}{b.ask_qty ? <small> ×{b.ask_qty}</small> : null}</span>
-                      </div>
-                    )) : <p className="auc-empty">«Стакан пуст — ни лотов, ни заявок.»</p>}
+                    <div className="brs-depth-leg"><span className="dot bid" />спрос (купят)<span className="brs-leg-sp">·</span><span className="dot ask" />предложение (продают)</div>
+                    {(d.board && d.board.length > 0) ? d.board.map((b) => {
+                      const bidW = b.bid_qty ? Math.max(7, (b.bid_qty / maxQty) * 100) : 0
+                      const askW = b.ask_qty ? Math.max(7, (b.ask_qty / maxQty) * 100) : 0
+                      const spread = (b.ask != null && b.bid != null) ? b.ask - b.bid : null
+                      return (
+                        <div key={b.key} className="brs-dp">
+                          <div className="brs-dp-head">
+                            <span className="brs-dp-nm"><GoodIcon k={b.key} size={22} />{b.name}</span>
+                            {spread != null && <span className="brs-dp-spread">спред {spread}</span>}
+                          </div>
+                          <div className="brs-dp-bars">
+                            <div className="brs-dp-side bid">
+                              {b.bid != null && <span className="brs-dp-px">{b.bid}{b.bid_qty ? <i>×{b.bid_qty}</i> : null}</span>}
+                              <span className="brs-dp-bar" style={{ width: `${bidW}%` }} />
+                            </div>
+                            <span className="brs-dp-mid" />
+                            <div className="brs-dp-side ask">
+                              <span className="brs-dp-bar" style={{ width: `${askW}%` }} />
+                              {b.ask != null && <span className="brs-dp-px">{b.ask}{b.ask_qty ? <i>×{b.ask_qty}</i> : null}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }) : <p className="auc-empty">«Стакан пуст — ни лотов, ни заявок.»</p>}
+
                     {d.sellers && d.sellers.length > 0 && (
-                      <div className="brs-sellers">
-                        <div className="brs-sec-h">🏆 Лучшие продавцы</div>
-                        {d.sellers.map((s, i) => (
-                          <div key={i} className={`brs-seller${s.me ? ' me' : ''}`}>
-                            <span className="brs-medal">{['🥇', '🥈', '🥉'][i] || `${i + 1}.`}</span>
-                            <span className="brs-seller-nm">{s.name}{s.me ? ' (ты)' : ''}</span>
-                            <span className="brs-seller-n">{fmt(s.sold)} ед.</span>
+                      <div className="brs-lead">
+                        <div className="brs-sec-h">🏆 Лучшие купцы мира</div>
+                        {d.sellers.slice(0, 5).map((s, i) => (
+                          <div key={i} className={`brs-ld${s.me ? ' me' : ''}`}>
+                            <span className={`brs-ld-rk r${i + 1}`}>{['①', '②', '③'][i] || i + 1}</span>
+                            <span className="brs-ld-nm">{s.name}{s.me ? ' · ты' : ''}</span>
+                            <span className="brs-ld-bar"><i style={{ width: `${Math.round((s.sold / (d.sellers![0].sold || 1)) * 100)}%` }} /></span>
+                            <span className="brs-ld-n">{fmt(s.sold)}</span>
                           </div>
                         ))}
                       </div>
@@ -119,17 +168,12 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
                 )}
 
                 {tab === 'mine' && (
-                  (d.mine && d.mine.length > 0) ? d.mine.map((o) => (
-                    <div key={o.id} className="brs-row">
-                      <GoodIcon k={o.key} size={30} />
-                      <div className="brs-row-id"><b>{o.name}</b><small>{o.side === 'sell' ? 'продаю' : 'куплю'} ×{o.qty}</small></div>
-                      <div className="brs-row-px"><span className={`brs-px${o.side === 'buy' ? ' buy' : ''}`}><ResIcon k="gold" size={12} />{o.unit}</span><small>/шт</small></div>
-                    </div>
-                  )) : <p className="auc-empty">«У тебя нет ни лотов, ни заявок на бирже.»</p>
+                  (d.mine && d.mine.length > 0) ? d.mine.map((o) => <Ticket key={o.id} o={o} label={o.side === 'sell' ? 'продаю' : 'куплю'} />)
+                    : <p className="auc-empty">«У тебя нет ни лотов, ни заявок на бирже.»</p>
                 )}
               </div>
 
-              <p className="auc-hint">📈 Биржа — обкатка. Купля-продажа и заявки подключатся следующей волной; сейчас видно стакан и цены.</p>
+              <p className="auc-hint">📡 Стакан в реальном времени. Купля-продажа и заявки — следующей волной.</p>
             </>
           )}
 
