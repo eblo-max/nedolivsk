@@ -84,7 +84,10 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
     <div className="sv-backdrop" onClick={onClose}>
       <div className="auc-sheet brs-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="brs-top">
-          <div className="brs-title"><span className="brs-glyph">📈</span> Биржа Недоливска</div>
+          <div className="brs-title-row">
+            <div className="brs-title"><span className="brs-glyph">📈</span> Биржа Недоливска</div>
+            {d?.open && d.gold != null && <span className="brs-purse"><ResIcon k="gold" size={13} />{fmt(d.gold)}</span>}
+          </div>
           {ticker.length > 0 && (
             <div className="brs-tape"><div className="brs-tape-run">
               {[...ticker, ...ticker].map((b, i) => (
@@ -105,11 +108,15 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
             <>
               <div className="brs-seg" style={{ ['--i' as string]: tabIdx }}>
                 <div className="brs-seg-glow" />
-                {TABS.map((t) => (
-                  <button key={t.id} className={`brs-seg-b${tab === t.id ? ' on' : ''}`} onClick={() => { haptic('light'); setTab(t.id) }}>
-                    <span className="brs-seg-ic">{t.ic}</span>{t.t}
-                  </button>
-                ))}
+                {TABS.map((t) => {
+                  const cnt = t.id === 'buy' ? d.sells?.length : t.id === 'bids' ? d.buys?.length : t.id === 'mine' ? d.mine?.length : 0
+                  return (
+                    <button key={t.id} className={`brs-seg-b${tab === t.id ? ' on' : ''}`} onClick={() => { haptic('light'); setTab(t.id) }}>
+                      <span className="brs-seg-ic">{t.ic}</span>{t.t}
+                      {!!cnt && <span className="brs-seg-n">{cnt}</span>}
+                    </button>
+                  )
+                })}
               </div>
 
               <div className="brs-body">
@@ -138,13 +145,17 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
                           </div>
                           <div className="brs-dp-bars">
                             <div className="brs-dp-side bid">
-                              {b.bid != null && <span className="brs-dp-px">{b.bid}{b.bid_qty ? <i>×{b.bid_qty}</i> : null}</span>}
-                              <span className="brs-dp-bar" style={{ width: `${bidW}%` }} />
+                              {b.bid != null ? (<>
+                                <span className="brs-dp-px">{b.bid}{b.bid_qty ? <i>×{b.bid_qty}</i> : null}</span>
+                                <span className="brs-dp-bar" style={{ width: `${bidW}%` }} />
+                              </>) : <span className="brs-dp-none">нет спроса</span>}
                             </div>
                             <span className="brs-dp-mid" />
                             <div className="brs-dp-side ask">
-                              <span className="brs-dp-bar" style={{ width: `${askW}%` }} />
-                              {b.ask != null && <span className="brs-dp-px">{b.ask}{b.ask_qty ? <i>×{b.ask_qty}</i> : null}</span>}
+                              {b.ask != null ? (<>
+                                <span className="brs-dp-bar" style={{ width: `${askW}%` }} />
+                                <span className="brs-dp-px">{b.ask}{b.ask_qty ? <i>×{b.ask_qty}</i> : null}</span>
+                              </>) : <span className="brs-dp-none">нет лотов</span>}
                             </div>
                           </div>
                         </div>
