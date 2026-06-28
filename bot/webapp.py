@@ -941,6 +941,76 @@ async def _api_auction_settle_now(request: web.Request) -> web.Response:
     return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 
+def _bourse_open(uid: int) -> bool:
+    from bot.game import balance as bal
+    return bool(bal.BOURSE_OPEN) or _is_admin(uid)
+
+
+def _good_dto(k: str) -> dict:
+    from bot.game import production as prod
+    g = prod.GOODS.get(k)
+    return {"key": k, "name": g.name if g else k, "emoji": g.emoji if g else "📦"}
+
+
+async def _api_bourse(request: web.Request) -> web.Response:
+    """Биржа (P2P-ордербук), ФАЗА 1 — доска только для чтения. Гейт: admin/BOURSE_OPEN.
+    Отдаёт: чужие продажи (купить), чужие заявки (продать в них), мои ордера,
+    сводку цен по товарам и топ-продавцов. Действия — следующая фаза."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import bourse, production as prod
+    from sqlalchemy import select
+    from bot.db.models import Player
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not _bourse_open(uid):
+            return web.json_response({"ok": True, "open": False}, headers={"Cache-Control": "no-store"})
+
+        sells = await repo.open_orders(s, p.id, "sell", limit=20)   # чужие продажи → можно купить
+        buys = await repo.open_orders(s, p.id, "buy", limit=20)     # чужие заявки → можно продать в них
+        mine = await repo.seller_orders(s, p.id)
+        board = await repo.market_summary(s)
+        sellers = await repo.top_sellers(s, 10)
+
+        # имена владельцев чужих ордеров (одним запросом)
+        ids = {o.seller_id for o in (*sells, *buys)}
+        names = {}
+        if ids:
+            rows = (await s.execute(
+                select(Player.id, Player.first_name).where(Player.id.in_(ids)))).all()
+            names = {i: n for i, n in rows}
+
+        def _ord(o, who: bool):
+            d = {"id": o.id, "side": o.side, "qty": o.qty, "unit": o.unit_price,
+                 **_good_dto(o.good)}
+            if who:
+                d["who"] = names.get(o.seller_id) or "горожанин"
+            return d
+
+        board_list = []
+        for k, b in sorted(board.items()):
+            board_list.append({**_good_dto(k),
+                               "ask": b.get("ask"), "ask_qty": b.get("ask_qty"),
+                               "bid": b.get("bid"), "bid_qty": b.get("bid_qty"),
+                               "floor": bourse.price_floor(k), "ceil": bourse.price_ceil(k)})
+
+        out = {
+            "ok": True, "open": True, "admin": _is_admin(uid), "gold": p.gold,
+            "sells": [_ord(o, True) for o in sells],
+            "buys": [_ord(o, True) for o in buys],
+            "mine": [_ord(o, False) for o in mine],
+            "board": board_list,
+            "sellers": [{"name": t.name, "sold": int(t.auction_sold or 0),
+                         "me": pl.id == p.id} for t, pl in sellers],
+            "goods": [_good_dto(k) | {"stock": int((p.tavern.products or {}).get(k, 0))}
+                      for k in bourse.sellable_goods(p.tavern)],
+        }
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
 async def _api_chronicle(request: web.Request) -> web.Response:
     """Летопись домашнего города игрока — лента заметных событий (свежие сверху)."""
     uid, body = await _auth(request)
@@ -2510,6 +2580,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/auction/seen", _api_auction_seen)      # погасить финал-экран
     app.router.add_post("/api/auction/seed", _api_auction_seed)          # ТЕСТ(админ): подбросить ставки
     app.router.add_post("/api/auction/settle_now", _api_auction_settle_now)  # ТЕСТ(админ): закрыть сейчас
+    app.router.add_post("/api/bourse", _api_bourse)                      # Биржа: доска (фаза 1, read-only)
     app.router.add_post("/api/referral", _api_referral)          # зазывала (рефералка)
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)

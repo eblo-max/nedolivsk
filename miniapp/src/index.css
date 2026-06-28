@@ -1315,6 +1315,38 @@ body {
 .auc-cc-yes { flex:1; margin:0 !important; color:#f0a08a !important; border-color:#7a3b2e !important; background:linear-gradient(#2c1410,#1a0d08) !important; }
 .auc-hint { font-family:Georgia,serif; font-style:italic; font-size:11.5px; color:#8a7f6a; text-align:center; margin:9px 4px 0; line-height:1.4; }
 
+/* ── Биржа (P2P-ордербук), фаза 1: доска ── */
+.brs-sheet { max-height:90vh; }
+.brs-tabs { display:flex; gap:6px; margin-bottom:10px; }
+.brs-tab { flex:1; padding:9px 2px; border-radius:10px; cursor:pointer; font-family:system-ui,sans-serif; font-weight:700;
+  font-size:12px; color:#b6a884; background:#1a1207; border:1px solid #4a3719; }
+.brs-tab.on { color:#241501; background:linear-gradient(var(--gold-2,#f6d885),#cf9a3c); border-color:#f6dd92; }
+.brs-body { min-height:140px; }
+.brs-row { display:flex; align-items:center; gap:10px; padding:9px 4px; border-top:1px solid #ffffff0d; }
+.brs-row-id { flex:1; min-width:0; display:flex; flex-direction:column; }
+.brs-row-id b { font-family:var(--text),system-ui,sans-serif; font-size:14px; color:#ece3cd; }
+.brs-row-id small { font-family:var(--text),system-ui,sans-serif; font-size:11.5px; color:#9a8f76; }
+.brs-row-px { text-align:right; display:flex; flex-direction:column; align-items:flex-end; }
+.brs-px { display:inline-flex; align-items:center; gap:3px; font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:16px; color:#f3c768; }
+.brs-px.buy { color:#7fd0a0; }
+.brs-row-px small { font-family:var(--num),system-ui,sans-serif; font-size:10px; color:#8a7f6a; }
+/* доска цен */
+.brs-board-h, .brs-board-row { display:grid; grid-template-columns:1fr 80px 80px; align-items:center; gap:6px; padding:7px 4px; }
+.brs-board-h { font-family:system-ui,sans-serif; font-size:10px; letter-spacing:.6px; text-transform:uppercase; color:#8a7f6a; border-bottom:1px solid #ffffff14; }
+.brs-board-h span:not(:first-child), .brs-board-row span:not(:first-child) { text-align:right; }
+.brs-board-row { border-top:1px solid #ffffff0a; }
+.brs-bg { display:inline-flex; align-items:center; gap:7px; font-family:var(--text),system-ui,sans-serif; font-size:13px; color:#ddd2bb; min-width:0; }
+.brs-bid { font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:14px; color:#7fd0a0; }
+.brs-ask { font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:14px; color:#f3c768; }
+.brs-bid small, .brs-ask small { font-weight:600; font-size:10px; color:#8a7f6a; }
+.brs-sellers { margin-top:14px; }
+.brs-sec-h { font-family:var(--disp),system-ui,sans-serif; font-weight:700; font-size:10.5px; letter-spacing:1.4px; text-transform:uppercase; color:#9a8657; margin-bottom:7px; }
+.brs-seller { display:flex; align-items:center; gap:9px; padding:6px 2px; border-top:1px solid #ffffff0d; }
+.brs-seller.me { background:rgba(231,191,99,.07); border-radius:8px; }
+.brs-medal { width:24px; text-align:center; font-size:14px; }
+.brs-seller-nm { flex:1; min-width:0; font-family:var(--text),system-ui,sans-serif; font-size:13px; color:#ddd2bb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.brs-seller-n { font-family:var(--num),system-ui,sans-serif; font-size:12.5px; color:#b6a169; }
+
 /* тест-панель аукциона — рендерится только админу (d.admin), убрать перед общим релизом */
 .auc-test { margin-top:12px; padding:9px 10px; border-radius:12px; border:1px dashed #4a6a8a;
   background:repeating-linear-gradient(45deg,#16202c,#16202c 8px,#131b25 8px,#131b25 16px); }

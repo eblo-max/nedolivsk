@@ -4,6 +4,7 @@ import { haptic, hapticNotify, openTgLink } from '../telegram'
 import { ResIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
 import AuctionSheet from './AuctionSheet'
+import BourseSheet from './BourseSheet'
 
 interface ShopItem { key: string; name: string; emoji: string; price: number; room: number; limit: number; max: number; have: number }
 interface TorgState { ok: boolean; open: boolean; gold?: number; limit?: number; shop?: ShopItem[] }
@@ -28,6 +29,7 @@ export default function Market() {
   const [d, setD] = useState<TorgState | null>(null)
   const [pick, setPick] = useState<ShopItem | null>(null)
   const [aucOpen, setAucOpen] = useState(false)
+  const [brsOpen, setBrsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
   const [avOk, setAvOk] = useState(true)
@@ -116,8 +118,12 @@ export default function Market() {
         <span className="torg-act-body"><b>Выставить лот</b><small>горожане сами набегут перебивать цену</small></span>
         <span className="torg-act-chev">›</span>
       </button>
-      <div className="torg-cap">📈 Биржа<span>скоро</span></div>
-      <div className="torg-soon rise">Котировки в реальном времени и сбыт оптом. На подходе.</div>
+      <div className="torg-cap">📈 Биржа</div>
+      <button className="torg-act rise" onClick={() => { haptic('light'); setBrsOpen(true) }}>
+        <span className="torg-act-emo">📈</span>
+        <span className="torg-act-body"><b>Открыть стакан</b><small>котировки и сбыт оптом между игроками</small></span>
+        <span className="torg-act-chev">›</span>
+      </button>
 
       {pick && (
         <Sheet title={`🛒 ${pick.emoji} ${pick.name}`} onClose={() => setPick(null)}>
@@ -141,6 +147,7 @@ export default function Market() {
         </Sheet>
       )}
       {aucOpen && <AuctionSheet onClose={() => setAucOpen(false)} />}
+      {brsOpen && <BourseSheet onClose={() => setBrsOpen(false)} />}
     </div>
   )
 }
