@@ -68,7 +68,7 @@ export default function Market() {
         </div>
         <div className="torg-minfo">
           <div className="torg-mname">Скупщик</div>
-          <div className="torg-mline">«Беру всё, плачу золотом — да втридорога, не обессудь.»</div>
+          <div className="torg-mline">«Сырьё любое — плати золотом и бери сразу. Дорого, да без ожидания бригад.»</div>
         </div>
         <div className="torg-pouch"><ResIcon k="gold" size={20} /><b>{fmt(d.gold ?? 0)}</b></div>
       </div>
