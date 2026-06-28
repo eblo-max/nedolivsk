@@ -94,6 +94,20 @@ export default function Market() {
         <p className="torg-quote"><span className="torg-q">“</span>Сырьё любое — плати золотом и бери сразу. Дорого, да без ожидания бригад.</p>
       </div>
 
+      {/* рынок игроков — выше лавки скупщика */}
+      <div className="torg-cap">🔨 Аукцион</div>
+      <button className="torg-act rise" onClick={() => { haptic('light'); setAucOpen(true) }}>
+        <span className="torg-act-emo">🏷️</span>
+        <span className="torg-act-body"><b>Выставить лот</b><small>горожане сами набегут перебивать цену</small></span>
+        <span className="torg-act-chev">›</span>
+      </button>
+      <div className="torg-cap">📈 Биржа</div>
+      <button className="torg-act rise" onClick={() => { haptic('light'); setBrsOpen(true) }}>
+        <span className="torg-act-emo">⚖️</span>
+        <span className="torg-act-body"><b>Открыть биржу</b><small>котировки и сбыт оптом между игроками</small></span>
+        <span className="torg-act-chev">›</span>
+      </button>
+
       {/* лавка — ящики с товаром */}
       <div className="torg-cap">🛒 Лавка скупщика<span className="torg-coin"><ResIcon k="gold" size={13} />{fmt(d.gold ?? 0)}</span></div>
       <div className="torg-grid">
@@ -111,19 +125,6 @@ export default function Market() {
           )
         })}
       </div>
-
-      <div className="torg-cap">🔨 Аукцион</div>
-      <button className="torg-act rise" onClick={() => { haptic('light'); setAucOpen(true) }}>
-        <span className="torg-act-emo">🏷️</span>
-        <span className="torg-act-body"><b>Выставить лот</b><small>горожане сами набегут перебивать цену</small></span>
-        <span className="torg-act-chev">›</span>
-      </button>
-      <div className="torg-cap">📈 Биржа</div>
-      <button className="torg-act rise" onClick={() => { haptic('light'); setBrsOpen(true) }}>
-        <span className="torg-act-emo">⚖️</span>
-        <span className="torg-act-body"><b>Открыть биржу</b><small>котировки и сбыт оптом между игроками</small></span>
-        <span className="torg-act-chev">›</span>
-      </button>
 
       {pick && (
         <Sheet title={`🛒 ${pick.emoji} ${pick.name}`} onClose={() => setPick(null)}>
