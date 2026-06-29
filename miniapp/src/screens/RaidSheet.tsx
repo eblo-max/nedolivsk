@@ -245,7 +245,7 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
       }
     } catch (e) {
       const code = (e as { code?: string })?.code
-      if (code === 'gone') { termRef.current = true; setGone(true) }
+      if (code === 'gone') { termRef.current = false; boss.kill(); hapticNotify('success'); load() }  // босса уже добили — показать сводку «ПОВЕРЖЕН» (а не «Босса нет»)
       else if (code === 'not_started') { load() }   // ещё сбор — вернёмся к экрану сбора
       else if (code === 'not_registered') { setToast('Ты не в строю — запишись в следующий сбор'); setTimeout(() => setToast(''), 1800) }
     } finally { setBusy(false) }
