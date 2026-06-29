@@ -28,6 +28,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY bot/ bot/
 COPY assets/ assets/
+# Нарезка пирамиды тайлов мира из assets/world25.jpg → /app/world_tiles (отдаётся под /world).
+# В git только картинка (22 МБ); тайлы (~36 МБ) генерятся здесь и в репозиторий не попадают.
+COPY worldgen/ worldgen/
+RUN python worldgen/tiler.py assets/world25.jpg world_tiles
 COPY --from=miniapp /m/dist miniapp/dist
 
 CMD ["python", "-m", "bot.main"]

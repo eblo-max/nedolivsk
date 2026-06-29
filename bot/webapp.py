@@ -33,6 +33,8 @@ from bot.game import invasion as invmod
 ASSETS_DIR = worldmap.ASSETS_DIR
 # Собранный React-мини-апп (Vite → miniapp/dist; собирается в Docker, отдаётся под /app).
 MINIAPP_DIST = pathlib.Path(__file__).resolve().parent.parent / "miniapp" / "dist"
+# Пирамида тайлов мира (генерится в Docker из assets/world25.jpg тайлером worldgen/tiler.py).
+WORLD_TILES = pathlib.Path(__file__).resolve().parent.parent / "world_tiles"
 
 # initData живёт сутки — отсекаем устаревшие/реплей.
 _INITDATA_MAX_AGE = 24 * 3600
@@ -3027,6 +3029,59 @@ async def _world_png(request: web.Request) -> web.Response:
     return web.FileResponse(worldmap.MAP_FILE)
 
 
+# ── Новый мир-атлас: тайловая Leaflet-карта (огромный бесшовный мир из 25 континентов) ──
+_WORLD_HTML = """<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<title>Мир Недоливска</title>
+<style>html,body{margin:0;height:100%;background:#0b1020;overflow:hidden}
+#map{height:100%}.leaflet-container{background:#0b1020}</style></head>
+<body><div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var tg=window.Telegram&&Telegram.WebApp;
+if(tg){tg.ready();tg.expand();try{tg.setHeaderColor&&tg.setHeaderColor('#0b1020');}catch(e){}}
+var W=11020,H=11020,TILE=256,MAXZ=6;
+var map=L.map('map',{crs:L.CRS.Simple,minZoom:1,maxZoom:MAXZ+1,attributionControl:false});
+function px(x,y){return map.unproject([x,y],MAXZ);}
+var bounds=L.latLngBounds(px(0,H),px(W,0));
+map.setMaxBounds(bounds.pad(0.15));
+L.tileLayer('/world/tiles/{z}/{x}/{y}.jpg',{tileSize:TILE,noWrap:true,bounds:bounds,
+  minZoom:1,maxNativeZoom:MAXZ,maxZoom:MAXZ+1}).addTo(map);
+map.fitBounds(bounds);
+fetch('/world/slots.json').then(function(r){return r.json();}).then(function(s){
+  s.forEach(function(c){
+    L.circleMarker(px(c[1]*W,c[2]*H),{radius:6,color:'#ffd27a',weight:2,
+      fillColor:'#c0392b',fillOpacity:.92}).addTo(map).bindTooltip('Континент '+c[0],{direction:'top'});
+  });
+}).catch(function(){});
+</script></body></html>"""
+
+
+async def _world_page(request: web.Request) -> web.Response:
+    return web.Response(text=_WORLD_HTML, content_type="text/html")
+
+
+async def _world_slots(request: web.Request) -> web.Response:
+    p = worldmap.MAP_FILE.parent / "world25_slots.json"     # assets/world25_slots.json
+    if not p.is_file():
+        return web.json_response([])
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
+
+
+async def _world_tile(request: web.Request) -> web.Response:
+    """Тайл пирамиды мира {z}/{x}/{y}.jpg (статика из world_tiles, сгенерён в Docker)."""
+    try:
+        z = int(request.match_info["z"]); x = int(request.match_info["x"]); y = int(request.match_info["y"])
+    except (ValueError, KeyError):
+        return web.Response(status=404)
+    p = WORLD_TILES / str(z) / str(x) / f"{y}.jpg"
+    if not p.is_file():
+        return web.Response(status=404)
+    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=604800"})
+
+
 _SPRITE_CACHE: dict[int, bytes] = {}
 
 
@@ -3143,6 +3198,9 @@ def build_app() -> web.Application:
     app = web.Application(middlewares=[_api_errors])
     app.router.add_get("/", lambda r: web.Response(text="ok"))
     app.router.add_get("/map", _map_page)
+    app.router.add_get("/world", _world_page)                 # тайловый мир-атлас (Leaflet)
+    app.router.add_get("/world/slots.json", _world_slots)
+    app.router.add_get("/world/tiles/{z}/{x}/{y}.jpg", _world_tile)
     app.router.add_get("/app", _spa)                  # React-мини-апп (каркас игры)
     app.router.add_get("/app/{tail:.*}", _spa)        # SPA-fallback + статика dist
     app.router.add_get("/api/taverns", _api_taverns)
