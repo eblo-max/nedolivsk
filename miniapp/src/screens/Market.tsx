@@ -97,12 +97,13 @@ export default function Market() {
       {/* рынок игроков — компактно, в одну строку, выше лавки скупщика */}
       <div className="torg-pair">
         <button className="torg-tile t-auc rise" onClick={() => { haptic('light'); setAucOpen(true) }}>
-          <span className="torg-tile-ic">🔨</span>
+          <span className="torg-tile-ic"><span className="torg-gavel">🔨</span></span>
           <span className="torg-tile-t">Аукцион</span>
           <span className="torg-tile-s">выставить лот</span>
         </button>
         <button className="torg-tile t-brs rise" onClick={() => { haptic('light'); setBrsOpen(true) }}>
           <span className="torg-tile-live" />
+          <span className="torg-spark" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span>
           <span className="torg-tile-ic">📈</span>
           <span className="torg-tile-t">Биржа</span>
           <span className="torg-tile-s">сбыт оптом</span>
