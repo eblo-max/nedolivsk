@@ -66,11 +66,17 @@ type Act =
 function Ticket({ o, label, onClick }: { o: BOrder; label: string; onClick?: () => void }) {
   const buy = o.side === 'buy'
   return (
-    <button className={`brs-tk${buy ? ' buy' : ''}${onClick ? ' tap' : ''}`} onClick={onClick} disabled={!onClick}>
-      <span className="brs-tk-ic"><GoodIcon k={o.key} size={34} /></span>
-      <span className="brs-tk-mid"><b>{o.name}</b>
-        <small>{label} <span className="brs-tk-q">×{o.qty}</span>{o.who ? <> · {o.who}</> : null}</small></span>
-      <span className="brs-tk-px"><span className="brs-tk-num"><ResIcon k="gold" size={13} />{o.unit}</span><small>за штуку</small></span>
+    <button className={`brs-lot${buy ? ' buy' : ''}${onClick ? ' tap' : ''}`} onClick={onClick} disabled={!onClick}>
+      <span className="brs-lot-ic"><GoodIcon k={o.key} size={38} /></span>
+      <span className="brs-lot-mid">
+        <span className="brs-lot-nm">{o.name}<span className="brs-lot-q">×{o.qty}</span></span>
+        <span className="brs-lot-who">{label}{o.who ? ` · ${o.who}` : ''}</span>
+      </span>
+      <span className="brs-lot-px">
+        <span className="brs-lot-num"><ResIcon k="gold" size={13} />{o.unit}<small>/шт</small></span>
+        <span className="brs-lot-tot">за всё {fmt(o.qty * o.unit)} 🪙</span>
+      </span>
+      {onClick ? <span className="brs-lot-go">›</span> : null}
     </button>
   )
 }

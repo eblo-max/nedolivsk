@@ -1505,7 +1505,37 @@ body {
 .brs-new-row .brs-new { margin-bottom:0; }
 /* строка моего ордера + снять */
 .brs-mine-row { display:flex; align-items:stretch; gap:8px; margin-bottom:8px; }
-.brs-mine-row .brs-tk { flex:1; margin-bottom:0; }
+.brs-mine-row .brs-lot { flex:1; margin-bottom:0; }
+
+/* ── маркетплейс-карточка лота/заявки (Купить/Заявки/Мои) ── */
+.brs-lot { --c:var(--brs-ask); position:relative; overflow:hidden; display:flex; align-items:center; gap:12px;
+  width:100%; padding:11px 13px 11px 14px; margin-bottom:9px; border-radius:15px; text-align:left; color:#eee6d6;
+  background:radial-gradient(130% 120% at 0% 50%, color-mix(in oklch, var(--c) 9%, transparent), transparent 56%),
+    linear-gradient(120deg, oklch(0.24 0.02 70), oklch(0.165 0.02 58));
+  box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--c) 15%, #ffffff0e), 0 4px 14px #0007; }
+.brs-lot.buy { --c:var(--brs-bid); }
+.brs-lot::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
+  background:linear-gradient(var(--c), color-mix(in oklch, var(--c) 35%, transparent)); }
+.brs-lot.tap { cursor:pointer; transition:transform .08s, box-shadow .2s; }
+.brs-lot.tap:active { transform:scale(.99); }
+.brs-lot.tap:hover { box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--c) 28%, transparent), 0 4px 16px #0008; }
+.brs-lot:disabled { cursor:default; }
+.brs-lot-ic { flex:none; display:grid; place-items:center; width:50px; height:50px; border-radius:13px;
+  background:radial-gradient(circle at 50% 35%, color-mix(in oklch, var(--c) 22%, transparent), transparent 70%), oklch(0.13 0.02 58);
+  box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--c) 26%, transparent), 0 2px 8px #0007; }
+.brs-lot-mid { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.brs-lot-nm { display:flex; align-items:center; gap:7px; min-width:0; font-family:var(--text),system-ui,sans-serif; font-weight:600; font-size:14.5px; color:#f0e7d2; }
+.brs-lot-q { flex:none; font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:10.5px; color:color-mix(in oklch, var(--c) 82%, #fff);
+  padding:1px 7px; border-radius:99px; background:color-mix(in oklch, var(--c) 14%, transparent); }
+.brs-lot-who { font-family:var(--text),system-ui,sans-serif; font-size:11.5px; color:#9a8f76; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.brs-lot-px { flex:none; text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:1px; }
+.brs-lot-num { display:inline-flex; align-items:baseline; gap:3px; font-family:var(--num),system-ui,sans-serif; font-weight:900; font-size:20px;
+  color:var(--c); text-shadow:0 0 14px color-mix(in oklch, var(--c) 35%, transparent); }
+.brs-lot-num small { font-weight:700; font-size:10px; color:#8a7f6a; }
+.brs-lot-tot { font-family:var(--num),system-ui,sans-serif; font-size:10px; color:#7d7256; }
+.brs-lot-go { flex:none; display:grid; place-items:center; width:22px; height:22px; border-radius:50%; font-size:15px;
+  color:color-mix(in oklch, var(--c) 80%, #fff); background:color-mix(in oklch, var(--c) 12%, transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--c) 24%, transparent); }
 .brs-mine-x { flex:none; width:46px; border-radius:14px; cursor:pointer; font-size:17px; color:#f0a08a;
   background:linear-gradient(#2c1410,#1a0d08); border:1px solid #7a3b2e; }
 .brs-mine-x:active { transform:scale(.96); }
