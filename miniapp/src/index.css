@@ -1398,7 +1398,7 @@ body {
 .brs-seg-b.on { color:var(--brs-ask); font-weight:700; }
 .brs-seg-ic { font-size:13px; opacity:.85; }
 .brs-seg-b.on .brs-seg-ic { opacity:1; }
-.brs-body { min-height:150px; }
+.brs-body { min-height:150px; flex:none; }   /* не сжимать в flex-листе — иначе контент вываливается под «Закрыть» */
 
 /* трейд-тикет ордера — глассовая плитка с боковой жилой */
 .brs-tk { position:relative; display:flex; align-items:center; gap:11px; padding:11px 13px 11px 15px; margin-bottom:8px;
@@ -1540,7 +1540,7 @@ body {
   background:linear-gradient(#2c1410,#1a0d08); border:1px solid #7a3b2e; }
 .brs-mine-x:active { transform:scale(.96); }
 /* панель действия */
-.brs-act { display:flex; flex-direction:column; gap:9px; animation:sv-rise .25s both; min-height:150px; }
+.brs-act { display:flex; flex-direction:column; gap:9px; animation:sv-rise .25s both; min-height:150px; flex:none; }
 .brs-back { align-self:flex-start; background:none; border:none; color:#9a8657; font-family:system-ui,sans-serif;
   font-size:12.5px; cursor:pointer; padding:2px 0 4px; }
 .brs-act-h { display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:13px;
