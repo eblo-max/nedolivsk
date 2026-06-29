@@ -3103,11 +3103,24 @@ function px(x,y){return map.unproject([x,y],MAXZ);}
 var bounds=L.latLngBounds(px(0,H),px(W,0));
 L.tileLayer('/world/tiles/{z}/{x}/{y}.jpg',{tileSize:TILE,noWrap:true,bounds:bounds,
   maxNativeZoom:MAXZ,maxZoom:MAXZ+1,keepBuffer:4}).addTo(map);
+// стартовый валидный вид сразу (на случай, если cover-расчёт задержится в WebView)
+map.setView(px(W/2,H/2),2);
 map.setMaxBounds(bounds.pad(0.04));
 // «Cover»: мир ЗАПОЛНЯЕТ экран (без чёрных полей). minZoom = зум покрытия, старт по центру.
-function fit(){var s=map.getSize();var cz=MAXZ+Math.log2(Math.max(s.x,s.y)/W*1.02);
-  map.setMinZoom(cz);if(!map._c){map.setView(px(W/2,H/2),cz);map._c=true;}}
-map.whenReady(fit);window.addEventListener('resize',function(){map._c=false;fit();});
+// В WebView/iframe контейнер на whenReady часто ещё нулевой высоты → getSize()=0 →
+// log2(0)=-Infinity ломает карту. Поэтому пересчитываем размер и ждём, пока разложится.
+function fit(){
+  map.invalidateSize(false);
+  var s=map.getSize();
+  if(!s||s.x<40||s.y<40){setTimeout(fit,100);return;}
+  var cz=MAXZ+Math.log2(Math.max(s.x,s.y)/W*1.02);
+  if(!isFinite(cz)){cz=2;}
+  map.setMinZoom(cz);
+  if(!map._c){map.setView(px(W/2,H/2),cz,{animate:false});map._c=true;}
+}
+map.whenReady(fit);window.addEventListener('load',fit);
+setTimeout(fit,350);setTimeout(fit,1200);
+window.addEventListener('resize',function(){map._c=false;fit();});
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
 var uid=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.id)||parseInt(new URLSearchParams(location.search).get('uid')||'0',10)||0;
 // ── подписи континентов (видны на дальнем зуме) ──
