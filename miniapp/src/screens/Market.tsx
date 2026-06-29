@@ -149,8 +149,8 @@ export default function Market() {
           )}
         </Sheet>
       )}
-      {aucOpen && <AuctionSheet onClose={() => setAucOpen(false)} />}
-      {brsOpen && <BourseSheet onClose={() => setBrsOpen(false)} />}
+      {aucOpen && <AuctionSheet onClose={() => { setAucOpen(false); load() }} />}
+      {brsOpen && <BourseSheet onClose={() => { setBrsOpen(false); load() }} />}
     </div>
   )
 }

@@ -892,21 +892,35 @@ def production_kb(player, tavern, building) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def _raid_app_btn(kb: InlineKeyboardBuilder, text: str) -> bool:
+    """Кнопка-дип-линк В МИНИ-АПП на экран рейда (Direct-Link ?startapp=raid).
+    Работает и в группах, и в личке. True — добавлена; False — нет короткого имени
+    мини-аппа (webapp_short_name), тогда вызывающий ставит чатовый фолбэк."""
+    from bot.config import settings
+    short = (getattr(settings, "webapp_short_name", "") or "").strip()
+    if short and _BOT_USERNAME:
+        kb.button(text=text, url=f"https://t.me/{_BOT_USERNAME}/{short}?startapp=raid")
+        return True
+    return False
+
+
 def raid_gather_kb(raid_id: int) -> InlineKeyboardMarkup:
-    """Фаза сбора: записаться в рейд (публичная кнопка)."""
+    """Фаза сбора: вход В МИНИ-АПП (запись/бой — только там). Фолбэк — чатовая кнопка."""
     kb = InlineKeyboardBuilder()
-    kb.button(text="⚔️ Присоединиться", callback_data=f"raidjoin:{raid_id}", style="success")
-    kb.button(text="🔄 Обновить", callback_data=f"raidref:{raid_id}")
-    kb.adjust(1, 1)
+    if not _raid_app_btn(kb, "⚔️ В БОЙ — открыть в игре"):
+        kb.button(text="⚔️ Присоединиться", callback_data=f"raidjoin:{raid_id}", style="success")
+        kb.button(text="🔄 Обновить", callback_data=f"raidref:{raid_id}")
+    kb.adjust(1)
     return kb.as_markup()
 
 
 def raid_kb(raid_id: int) -> InlineKeyboardMarkup:
-    """Фаза битвы: бить босса (публичная — но бьют лишь записавшиеся, см. хендлер)."""
+    """Фаза битвы: вход В МИНИ-АПП (бить там). Фолбэк — чатовая кнопка."""
     kb = InlineKeyboardBuilder()
-    kb.button(text="⚔️ Бить", callback_data=f"raidhit:{raid_id}", style="danger")
-    kb.button(text="🔄 Обновить", callback_data=f"raidref:{raid_id}")
-    kb.adjust(2)
+    if not _raid_app_btn(kb, "⚔️ БИТЬ — открыть в игре"):
+        kb.button(text="⚔️ Бить", callback_data=f"raidhit:{raid_id}", style="danger")
+        kb.button(text="🔄 Обновить", callback_data=f"raidref:{raid_id}")
+    kb.adjust(1)
     return kb.as_markup()
 
 

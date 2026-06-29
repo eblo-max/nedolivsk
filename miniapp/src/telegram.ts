@@ -5,7 +5,7 @@ type HapticStyle = 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'
 
 interface TgWebApp {
   initData: string
-  initDataUnsafe: { user?: { id: number; first_name?: string; username?: string } }
+  initDataUnsafe: { user?: { id: number; first_name?: string; username?: string }; start_param?: string }
   version: string
   colorScheme: 'light' | 'dark'
   themeParams: Record<string, string>
@@ -120,6 +120,19 @@ export const initData = () => {
   return _initCache
 }
 export const tgUser = () => tg?.initDataUnsafe?.user
+
+// Параметр запуска из дип-линка (t.me/<bot>/<app>?startapp=raid → "raid"). Берётся
+// ОДИН раз (consume): чтобы при перемонтировании Таверны рейд не открывался заново.
+let _startTaken = false
+export function takeStartParam(): string | undefined {
+  if (_startTaken) return undefined
+  _startTaken = true
+  const fromTg = tg?.initDataUnsafe?.start_param
+  if (fromTg) return fromTg
+  // фолбэк: некоторые клиенты кладут параметр в URL (а в превью так удобно тестить)
+  const q = new URLSearchParams(location.search)
+  return q.get('tgWebAppStartParam') || q.get('startapp') || undefined
+}
 
 /** Открыть ссылку на канал/чат Telegram изнутри мини-аппа (t.me/...).
  * В Telegram — нативно через openTelegramLink; вне (браузер-превью) — обычное окно. */

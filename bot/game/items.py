@@ -337,6 +337,25 @@ CATALOG: dict[str, Item] = {
             cost={"gold": 9000}, craft_hours=0, craftable=False,
             income_pct=6, yield_pct=5, luck=12,
         ),
+        # 😈 Адский Слизень
+        Item(
+            id="demon_fang", slot="weapon", name="Бесовский клык",
+            description="Выломан из адской пасти, ещё дымится серой. Бьёт — и спорщик кается.",
+            cost={"gold": 6500}, craft_hours=0, craftable=False,
+            damage=23, crit=7, luck=2,
+        ),
+        Item(
+            id="demon_hide", slot="chest", name="Смоляная шкура беса",
+            description="Липкая, горячая, не берёт ни клинок, ни огонь. Чужие удары вязнут.",
+            cost={"gold": 6500}, craft_hours=0, craftable=False,
+            income_pct=5, armor=29,
+        ),
+        Item(
+            id="demon_core", slot="talisman", name="Адское ядро",
+            description="Уголёк из самого нутра твари. Греет мошну и косит удачу на тебя.",
+            cost={"gold": 6500}, craft_hours=0, craftable=False,
+            income_pct=5, yield_pct=4, luck=10,
+        ),
     ]
 }
 

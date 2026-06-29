@@ -96,6 +96,13 @@ async def get_raid(
     return await session.get(RaidBoss, raid_id, with_for_update=lock)
 
 
+async def latest_raid(session: AsyncSession) -> RaidBoss | None:
+    """Самый свежий босс (любой статус) — для пост-боевой сводки на экране рейда
+    (победа/уход) тем, кто не добил сам. Аналог latest_invasion."""
+    return (await session.execute(
+        select(RaidBoss).order_by(RaidBoss.id.desc()).limit(1))).scalar_one_or_none()
+
+
 async def add_raid_panel(
     session: AsyncSession, boss_id: int, key: str, message_id: int
 ) -> None:

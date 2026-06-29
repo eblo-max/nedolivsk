@@ -134,7 +134,7 @@ async def main() -> None:
     port = os.environ.get("PORT")
     if port:
         from bot.webapp import run_webapp
-        webapp_runner = await run_webapp(int(port))
+        webapp_runner = await run_webapp(int(port), bot)   # bot → рассылка в чаты из эндпоинтов
         logging.info("Mini App карта поднята на порту %s", port)
 
     me = await bot.get_me()

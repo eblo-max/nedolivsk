@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
-import { haptic, hapticNotify } from '../telegram'
+import { haptic, hapticNotify, takeStartParam } from '../telegram'
 import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Onboarding from './Onboarding'
 import ActionSheet from './ActionSheet'
@@ -11,6 +11,7 @@ import TradeSheet, { type TradeData } from './TradeSheet'
 import AnimEmoji from '../components/AnimEmoji'
 import ChronicleSheet from './ChronicleSheet'
 import ReferralSheet from './ReferralSheet'
+import RaidSheet from './RaidSheet'
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
@@ -19,6 +20,11 @@ interface WEffect { text: string; good: boolean }
 interface WorldEvent { id: string; emoji: string; name: string; blurb: string; good?: string | null; good_name?: string | null; effects: WEffect[] }
 interface CityFaction { id: string; name: string; power: number }
 interface CityData { mood: number; mood_label: string; situation: { emoji: string; label: string } | null; factions: CityFaction[] }
+interface RaidSummary {
+  id: number; name: string; emoji: string; sprite: string
+  status: 'gathering' | 'active' | 'dead' | 'expired'; me_registered: boolean
+  n: number; left?: number; hp_pct?: number; phase?: number
+}
 interface TavernState {
   ok: boolean
   name: string; level: number; region: string; flavor: string
@@ -32,6 +38,8 @@ interface TavernState {
   world_event?: WorldEvent | null
   city?: CityData | null
   trade?: TradeData | null
+  raid?: RaidSummary | null
+  admin?: boolean
 }
 
 // образец для оффлайн-превью (форма 1:1 как у /api/state)
@@ -59,6 +67,7 @@ const SAMPLE: TavernState = {
   next_upgrade: { gold: 715, wood: 220, grain: 180, hops: 120 }, upgrade_pct: 60,
   world_event: { id: 'fashion', emoji: '🔥', name: 'Ажиотаж', blurb: 'Весь Недоливск помешался на одном товаре — он в цене, налетай!', good: 'butter', good_name: 'Масло', effects: [{ text: 'Масло ×1.5', good: true }] },
   city: { mood: 18, mood_label: '🙂 доброе', situation: { emoji: '💰', label: 'Купеческий бум' }, factions: [{ id: 'merchants', name: 'Купеческая лига', power: 42 }, { id: 'thieves', name: 'Воровская гильдия', power: 20 }, { id: 'watch', name: 'Стража', power: -15 }] },
+  raid: null, admin: true,   // DEV: нет живого рейда → видно админ-кнопку «Призвать босса»
 }
 
 export default function Tavern() {
@@ -70,6 +79,7 @@ export default function Tavern() {
   const [storyOpen, setStoryOpen] = useState(false)
   const [chronOpen, setChronOpen] = useState(false)
   const [refOpen, setRefOpen] = useState(false)
+  const [raidOpen, setRaidOpen] = useState(false)       // экран рейд-босса
   const storySeen = useRef<string | null>(null)        // авто-показ визитёра один раз на его id
   const [trade, setTrade] = useState<TradeData | null>(null)   // заезжий купец (торг)
   const tradeShut = useRef(false)                       // купца закрыли вручную — не нудить повторно
@@ -79,6 +89,9 @@ export default function Tavern() {
     setToast(m); clearTimeout(toastTimer.current)
     toastTimer.current = setTimeout(() => setToast(''), 2200)
   }
+
+  // дип-линк из анонса рейда (?startapp=raid) — сразу открыть экран рейд-босса
+  useEffect(() => { if (takeStartParam() === 'raid') setRaidOpen(true) }, [])
 
   // вернулись в приложение — тихо обновляем состояние (таймеры/доход не висят устаревшими)
   useEffect(() => {
@@ -166,6 +179,33 @@ export default function Tavern() {
             )}
           </div>
         </div>
+      )}
+
+      {/* рейд-босс — срочный CTA (виден, только пока тварь жива) */}
+      {t.raid && (t.raid.status === 'gathering' || t.raid.status === 'active') && (
+        <button className={`raid-cta rise ${t.raid.status}`} style={{ animationDelay: '.03s' }}
+          onClick={() => { haptic('medium'); setRaidOpen(true) }}>
+          <span className="raid-cta-emo">{t.raid.emoji}</span>
+          <span className="raid-cta-body">
+            <b>⚔️ {t.raid.name}</b>
+            <small>
+              {t.raid.status === 'gathering'
+                ? `Сбор войска · в строю ${t.raid.n}${t.raid.me_registered ? ' · ты в строю' : ''}`
+                : `БИТВА! осталось ${t.raid.hp_pct ?? 0}% HP${(t.raid.phase ?? 1) >= 3 ? ' · 🔥 бешенство' : (t.raid.phase ?? 1) === 2 ? ' · 🔥 разъярён' : ''}`}
+            </small>
+          </span>
+          <span className="raid-cta-go">{t.raid.status === 'active' ? 'В БОЙ' : t.raid.me_registered ? 'ОТКРЫТЬ' : 'В СТРОЙ'} ›</span>
+        </button>
+      )}
+
+      {/* админ: призвать босса (видно, только когда живого рейда нет) */}
+      {t.admin && !(t.raid && (t.raid.status === 'gathering' || t.raid.status === 'active')) && (
+        <button className="raid-cta rise summon" style={{ animationDelay: '.03s' }}
+          onClick={() => { haptic('medium'); setRaidOpen(true) }}>
+          <span className="raid-cta-emo">⚔️</span>
+          <span className="raid-cta-body"><b>Призвать рейд-босса</b><small>админ · сбор 20 мин + анонс в чаты и ЛС</small></span>
+          <span className="raid-cta-go">ПРИЗВАТЬ ›</span>
+        </button>
       )}
 
       {/* доход */}
@@ -286,6 +326,7 @@ export default function Tavern() {
       )}
       {chronOpen && <ChronicleSheet onClose={() => setChronOpen(false)} />}
       {refOpen && <ReferralSheet onClose={() => setRefOpen(false)} />}
+      {raidOpen && <RaidSheet onClose={() => { setRaidOpen(false); reload() }} onGold={() => reload()} />}
       {toast && <div className="toast">{toast}</div>}
     </>
   )

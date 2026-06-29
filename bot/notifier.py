@@ -478,6 +478,23 @@ async def _notify_returned(bot: Bot) -> None:
         raidmod.set_active(next(
             (b.id for b in live_raids if b.status in ("gathering", "active")), None))
 
+        # Босса добили В МИНИ-АППЕ → чат об этом сам не узнал (правит только живых).
+        # Подхватываем свежий труп с флагом mini_kill и один раз правим анонсы в
+        # чатах на экран «ПОВЕРЖЕН» (данные победы застешены вебом в boss.state).
+        if not any(b.status == "active" for b in live_raids):
+            recent = await repo.latest_raid(session)
+            rst = (recent.state or {}) if recent else {}
+            if recent and recent.status == "dead" and rst.get("mini_kill") and not rst.get("dead_announced"):
+                top = sorted(((r.get("name", str(p)), r.get("dmg", 0))
+                              for p, r in (recent.contributions or {}).items()
+                              if r.get("dmg", 0) > 0), key=lambda x: -x[1])[:5]
+                rtext = texts.raid_dead(recent, top, rst.get("win_name") or None,
+                                        rst.get("win_drop") or "")
+                spec = raidmod.BOSSES.get(recent.boss_key)
+                is_vid = bool(spec and spec.video and imgmod.named_video(spec.video))
+                raid_edits.append((dict(recent.messages or {}), rtext, None, is_vid))
+                recent.state = dict(rst, dead_announced=True)   # один раз
+
         # Ивент «Орда орков»: сбор → битва → резолв (раздача/штраф). Правки анонсов
         # копим (messages, text, markup|None) и шлём ПОСЛЕ коммита, как у рейда.
         inv_edits: list[tuple[dict, str, object]] = []
