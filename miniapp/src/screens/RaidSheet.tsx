@@ -53,7 +53,7 @@ const DEMO_BOSSES: BossOpt[] = [
   { key: 'bog_troll', name: 'Болотный Тролль', emoji: '👹', sprite: '' },
   { key: 'dragon', name: 'Древний Змей', emoji: '🐲', sprite: '' },
 ]
-function demoApi(path: string, body: Record<string, unknown>): Promise<unknown> {
+function demoApi(path: string, _body: Record<string, unknown>): Promise<unknown> {
   // старт — «босса нет» (admin), чтобы прощёлкать призыв → сбор → бой
   if (path === 'raid') return Promise.resolve({ ok: true, raid: _demo ? { ..._demo } : null, admin: true, bosses: DEMO_BOSSES })
   if (path === 'raid/summon') { _demo = demoBoss(); _fired.clear(); return Promise.resolve({ ok: true, raid: { ..._demo }, admin: true }) }
