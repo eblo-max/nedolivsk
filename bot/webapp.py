@@ -3033,8 +3033,8 @@ async def _world_png(request: web.Request) -> web.Response:
 _WORLD_HTML = """<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
 <title>Мир Недоливска</title>
 <style>html,body{margin:0;height:100%;background:#0b1020;overflow:hidden}
 #map{height:100%}.leaflet-container{background:#0b1020}
@@ -3043,8 +3043,8 @@ _WORLD_HTML = """<!doctype html><html><head><meta charset="utf-8">
   background:radial-gradient(circle,#e7a23c,#b5651d);color:#1a0f04;font:800 14px system-ui;
   border:2px solid #ffe0a0;box-shadow:0 0 10px -2px rgba(255,170,60,.8)}</style></head>
 <body><div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 var tg=window.Telegram&&Telegram.WebApp;
 if(tg){tg.ready();tg.expand();try{tg.setHeaderColor&&tg.setHeaderColor('#0b1020');}catch(e){}}
