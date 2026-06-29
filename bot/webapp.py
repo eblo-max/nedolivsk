@@ -3035,50 +3035,73 @@ _WORLD_HTML = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=PT+Serif:wght@700&display=swap">
 <title>Мир Недоливска</title>
 <style>
+:root{--serif:'PT Serif',Georgia,'Times New Roman',serif}
 html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:system-ui,sans-serif}
 #map{height:100%}.leaflet-container{background:#0f1828;font-family:inherit}
+/* кинематографичное обрамление: виньетка по краям + тёплый световой грейд (статично, без blur) */
+#frame{position:fixed;inset:0;z-index:480;pointer-events:none;transform:translateZ(0);
+  box-shadow:inset 0 0 110px 26px rgba(5,8,16,.82),inset 0 0 280px 70px rgba(5,8,16,.34);
+  background:radial-gradient(125% 95% at 50% 40%,rgba(255,208,128,.05),rgba(8,12,24,0) 46%,rgba(5,8,16,.34) 100%)}
 .leaflet-control-zoom{margin-bottom:16px!important;margin-right:12px!important;border:none!important}
 .leaflet-control-zoom a{background:rgba(16,22,38,.85)!important;color:#f3dca0!important;
   border:1px solid #4a3a1e!important;width:34px!important;height:34px!important;line-height:32px!important}
-/* шапка */
+/* шапка-баннер */
 #hud{position:fixed;left:0;right:0;top:0;z-index:1000;display:flex;align-items:center;gap:8px;
-  padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 9px;pointer-events:none;
-  background:linear-gradient(180deg,rgba(8,12,24,.94),rgba(8,12,24,0))}
-#title{font-weight:800;font-size:14.5px;color:#f3dca0;text-shadow:0 1px 4px #000;
+  padding:calc(env(safe-area-inset-top,0px) + 9px) 12px 12px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(7,10,20,.95),rgba(7,10,20,.5) 62%,rgba(7,10,20,0))}
+#title{font-family:var(--serif);font-weight:700;font-size:16px;color:#f3dca0;text-shadow:0 1px 5px #000;
   flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#title b{color:#ffcf6a}#cnt{color:#caa86a;font-weight:600;font-size:13px}
-#mine{pointer-events:auto;flex:none;white-space:nowrap;border:1px solid #a8772e;border-radius:999px;
-  padding:6px 13px;font-weight:700;font-size:13px;color:#1a0f04;cursor:pointer;
-  background:linear-gradient(180deg,#ffd98a,#e0a23c);box-shadow:0 2px 8px rgba(220,160,40,.4)}
+#title b{color:#ffd57a}#cnt{color:#c0a26a;font-weight:400;font-size:13px}
+#mine{pointer-events:auto;flex:none;white-space:nowrap;border:1px solid #c79a44;border-radius:999px;
+  padding:6px 14px;font-weight:700;font-size:13px;color:#241405;cursor:pointer;font-family:var(--serif);
+  background:linear-gradient(180deg,#ffe09a,#dca03c);box-shadow:0 2px 9px rgba(220,160,40,.45),inset 0 1px 0 rgba(255,255,220,.5)}
 /* баннер рейда */
-#raidbar{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 46px);z-index:1000;
-  display:none;align-items:center;gap:9px;padding:9px 13px;border-radius:14px;cursor:pointer;
+#raidbar{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 48px);z-index:1000;
+  display:none;align-items:center;gap:9px;padding:9px 13px;border-radius:14px;cursor:pointer;font-family:var(--serif);
   color:#fff;font-weight:700;font-size:14px;background:linear-gradient(180deg,#d23a18,#9a2a10);
   border:1px solid #ff7a4a;box-shadow:0 4px 16px rgba(210,58,24,.5);animation:rb 1.6s ease-in-out infinite}
 @keyframes rb{0%,100%{box-shadow:0 4px 16px rgba(210,58,24,.45)}50%{box-shadow:0 4px 26px rgba(255,90,50,.8)}}
 #raidbar .go{margin-left:auto;opacity:.85}
-/* подписи континентов */
-.cont-label{font-weight:800;font-size:14px;letter-spacing:.04em;color:#ffe7b0;text-align:center;
-  text-shadow:0 0 8px #000,0 1px 3px #000;white-space:nowrap;pointer-events:none;width:200px!important}
-/* подписи таверн (на близком зуме) */
-.leaflet-tooltip.tav-label{background:rgba(12,16,28,.82);border:1px solid #6b522e;color:#f3dca0;
-  font-weight:700;font-size:11px;border-radius:6px;padding:1px 6px;box-shadow:none}
+/* подписи континентов — картуш с иконкой биома */
+.cont-label{width:210px!important;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.cl-plate{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-family:var(--serif);
+  font-weight:700;font-size:13.5px;letter-spacing:.01em;color:#f4e3bd;padding:3px 12px;border-radius:999px;
+  background:rgba(10,14,26,.6);border:1px solid rgba(198,162,92,.5);
+  box-shadow:0 2px 10px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,228,170,.1);text-shadow:0 1px 2px #000}
+.cl-plate .ci{font-size:12px;opacity:.95}
+/* подпись таверны (на близком зуме) */
+.leaflet-tooltip.tav-label{background:rgba(10,14,24,.85);border:1px solid #6b522e;color:#f3dca0;
+  font-family:var(--serif);font-weight:700;font-size:11px;border-radius:7px;padding:1px 7px;
+  box-shadow:0 1px 6px rgba(0,0,0,.5)}
 .leaflet-tooltip.tav-label::before{display:none}
-.tav-mine{filter:drop-shadow(0 0 7px #ffd27a)}
+/* пин таверны: спрайт-здание + тень на земле + бейдж уровня */
+.tav-pin .sh{position:absolute;left:50%;bottom:1px;width:60%;height:13%;transform:translateX(-50%);
+  background:radial-gradient(ellipse,rgba(0,0,0,.5),rgba(0,0,0,0) 70%);border-radius:50%}
+.tav-pin img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.55))}
+.tav-pin .lv{position:absolute;top:-3px;right:-3px;min-width:15px;height:15px;padding:0 3px;box-sizing:border-box;
+  display:flex;align-items:center;justify-content:center;border-radius:999px;font:700 10px/1 var(--serif);
+  color:#241405;background:linear-gradient(180deg,#ffe09a,#d99a36);border:1px solid #8a6a22;
+  box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.tav-pin.mine img{filter:drop-shadow(0 0 8px #ffd27a) drop-shadow(0 2px 3px rgba(0,0,0,.6))}
+.tav-pin.mine .lv{background:linear-gradient(180deg,#fff0c0,#f0b840)}
 /* карточка таверны */
-.tav-pop{font:600 13px/1.5 system-ui;color:#e9dcc2;min-width:178px}
-.tav-pop .h{font-weight:800;font-size:15px;color:#ffcf6a;margin-bottom:1px}
+.tav-pop{font-family:var(--serif);font-weight:400;font-size:13px;line-height:1.5;color:#e9dcc2;min-width:178px}
+.tav-pop .h{font-weight:700;font-size:15px;color:#ffcf6a;margin-bottom:1px}
 .tav-pop .o{color:#bfa775;font-size:12px;margin-bottom:6px}
 .tav-pop .loc{color:#8fb0d8;font-size:12px}
 .tav-pop .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;font-size:12px;color:#d8c8a6}
-.tav-pop .mine{margin-top:7px;color:#ffd27a;font-weight:800}
+.tav-pop .mine{margin-top:7px;color:#ffd27a;font-weight:700}
 .leaflet-popup-content-wrapper{background:#1a140c;border:1px solid #6b522e;border-radius:12px}
 .leaflet-popup-tip{background:#1a140c}
+/* кластер — золотая монета */
 .tcl{display:flex;align-items:center;justify-content:center;border-radius:50%;
-  background:radial-gradient(circle,#e7a23c,#b5651d);color:#1a0f04;font:800 14px system-ui;
-  border:2px solid #ffe0a0;box-shadow:0 0 10px -2px rgba(255,170,60,.8)}
+  background:radial-gradient(circle at 38% 30%,#3c2d15,#1a120a);color:#ffd98a;font:700 13px var(--serif);
+  border:2px solid #c9a14e;box-shadow:0 2px 9px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,220,150,.22),0 0 13px -3px rgba(255,190,90,.55)}
 /* лоадер */
 #loader{position:fixed;inset:0;z-index:1500;display:flex;align-items:center;justify-content:center;
   background:#0f1828;color:#caa86a;font-weight:700;font-size:15px;transition:opacity .4s}
@@ -3086,6 +3109,7 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 </style></head>
 <body>
 <div id="map"></div>
+<div id="frame"></div>
 <div id="hud"><div id="title">🗺 <b>Мир Недоливска</b> <span id="cnt"></span></div>
   <button id="mine">🏰 Моя таверна</button></div>
 <div id="raidbar"></div>
@@ -3125,10 +3149,13 @@ function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return{
 var uid=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.id)||parseInt(new URLSearchParams(location.search).get('uid')||'0',10)||0;
 // ── подписи континентов (видны на дальнем зуме) ──
 var contLayer=L.layerGroup();
+var BICON={snow:'❄',green:'🌿',desert:'☀'};
 fetch('/world/slots.json').then(function(r){return r.json();}).then(function(cs){
   cs.forEach(function(c){
+    var bi=BICON[c.biome]||'•';
     L.marker(px(c.x*W,c.y*H),{interactive:false,keyboard:false,
-      icon:L.divIcon({className:'cont-label',html:esc(c.name),iconSize:[200,22],iconAnchor:[100,11]})}).addTo(contLayer);
+      icon:L.divIcon({className:'cont-label',iconSize:[210,24],iconAnchor:[105,12],
+        html:'<span class="cl-plate"><span class="ci">'+bi+'</span>'+esc(c.name)+'</span>'})}).addTo(contLayer);
   });
   syncLabels();
 }).catch(function(){});
@@ -3154,10 +3181,11 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
   document.getElementById('cnt').textContent='· '+(d.total||tv.length)+' таверн';
   tv.forEach(function(t){
     var sz=t.mine?56:42;var ll=px(t.x*W,t.y*H);
-    var icon=L.icon({iconUrl:'/assets/map_tavern_'+t.tier+'.png',iconSize:[sz,sz],
-      iconAnchor:[sz/2,sz*0.88],popupAnchor:[0,-sz*0.78],className:t.mine?'tav-mine':''});
+    var icon=L.divIcon({className:'tav-pin'+(t.mine?' mine':''),iconSize:[sz,sz],
+      iconAnchor:[sz/2,sz*0.9],popupAnchor:[0,-sz*0.82],
+      html:'<div class="sh"></div><img src="/assets/map_tavern_'+t.tier+'.png" alt=""><div class="lv">'+t.level+'</div>'});
     var m=L.marker(ll,{icon:icon,zIndexOffset:t.mine?1000:0}).addTo(layer).bindPopup(card(t));
-    m.bindTooltip(esc(t.name),{permanent:true,direction:'top',className:'tav-label',offset:[0,-sz*0.74]});
+    m.bindTooltip(esc(t.name),{permanent:true,direction:'top',className:'tav-label',offset:[0,-sz*0.78]});
     if(t.mine){myLL=ll;myMarker=m;}
   });
   if(cluster)map.addLayer(cluster);
