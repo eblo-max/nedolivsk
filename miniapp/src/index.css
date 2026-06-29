@@ -1489,6 +1489,45 @@ body {
 .brs-ld-bar i { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg, oklch(0.62 0.15 70), var(--brs-ask)); }
 .brs-ld-n { flex:none; font-family:var(--num),system-ui,sans-serif; font-size:12px; color:#b6a169; }
 
+/* ── Биржа фаза 2: действия ── */
+.brs-tk.tap { cursor:pointer; transition:transform .08s; }
+.brs-tk.tap:active { transform:scale(.99); }
+.brs-tk:disabled { opacity:1; cursor:default; }
+/* кнопки «выставить/куплю» */
+.brs-new { width:100%; margin-bottom:9px; padding:11px; border-radius:12px; cursor:pointer; text-align:center;
+  font-family:var(--disp),system-ui,sans-serif; font-weight:700; font-size:13px; color:oklch(0.20 0.04 60);
+  background:linear-gradient(180deg, oklch(0.80 0.13 84), oklch(0.62 0.14 72)); border:1px solid oklch(0.86 0.1 88);
+  box-shadow:0 3px 12px color-mix(in oklch, var(--brs-ask) 30%, transparent); }
+.brs-new.sell { background:linear-gradient(180deg, oklch(0.76 0.14 152), oklch(0.56 0.13 152)); border-color:oklch(0.82 0.12 152);
+  box-shadow:0 3px 12px color-mix(in oklch, var(--brs-bid) 30%, transparent); color:oklch(0.18 0.04 150); }
+.brs-new:active { transform:scale(.99); }
+.brs-new-row { display:flex; gap:8px; margin-bottom:9px; }
+.brs-new-row .brs-new { margin-bottom:0; }
+/* строка моего ордера + снять */
+.brs-mine-row { display:flex; align-items:stretch; gap:8px; margin-bottom:8px; }
+.brs-mine-row .brs-tk { flex:1; margin-bottom:0; }
+.brs-mine-x { flex:none; width:46px; border-radius:14px; cursor:pointer; font-size:17px; color:#f0a08a;
+  background:linear-gradient(#2c1410,#1a0d08); border:1px solid #7a3b2e; }
+.brs-mine-x:active { transform:scale(.96); }
+/* панель действия */
+.brs-act { display:flex; flex-direction:column; gap:9px; animation:sv-rise .25s both; min-height:150px; }
+.brs-back { align-self:flex-start; background:none; border:none; color:#9a8657; font-family:system-ui,sans-serif;
+  font-size:12.5px; cursor:pointer; padding:2px 0 4px; }
+.brs-act-h { display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:13px;
+  background:linear-gradient(120deg, oklch(0.24 0.02 70), oklch(0.17 0.02 60)); box-shadow:inset 0 0 0 1px #ffffff10; }
+.brs-act-h b { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:16px; color:#f0e7d2; display:block; }
+.brs-act-h small { font-family:var(--text),system-ui,sans-serif; font-size:11.5px; color:#a99c7e; }
+.brs-cap { font-family:var(--disp),system-ui,sans-serif; font-weight:700; font-size:10.5px; letter-spacing:1.4px;
+  text-transform:uppercase; color:#9a8657; margin:6px 2px 1px; }
+.brs-qtys { display:flex; flex-wrap:wrap; gap:7px; }
+.brs-qtys .auc-qty { flex:1 1 auto; min-width:52px; padding:10px 0; font-size:14px; }
+.brs-go { margin-top:8px; color:oklch(0.18 0.04 60) !important; border:1px solid oklch(0.86 0.1 88) !important;
+  background:linear-gradient(180deg, oklch(0.82 0.13 84), oklch(0.62 0.14 72)) !important; font-weight:800 !important; }
+.brs-go.sell { color:oklch(0.16 0.04 150) !important; border-color:oklch(0.82 0.12 152) !important;
+  background:linear-gradient(180deg, oklch(0.76 0.14 152), oklch(0.54 0.13 152)) !important; }
+.brs-go.cancel { color:#f0a08a !important; border-color:#7a3b2e !important; background:linear-gradient(#2c1410,#1a0d08) !important; }
+.brs-go:disabled { opacity:.5; }
+
 /* тест-панель аукциона — рендерится только админу (d.admin), убрать перед общим релизом */
 .auc-test { margin-top:12px; padding:9px 10px; border-radius:12px; border:1px dashed #4a6a8a;
   background:repeating-linear-gradient(45deg,#16202c,#16202c 8px,#131b25 8px,#131b25 16px); }

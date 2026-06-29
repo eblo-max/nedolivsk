@@ -952,63 +952,165 @@ def _good_dto(k: str) -> dict:
     return {"key": k, "name": g.name if g else k, "emoji": g.emoji if g else "📦"}
 
 
+async def _bourse_state(s, p) -> dict:
+    """Снимок биржи для игрока: чужие продажи/заявки, мои ордера, стакан, топ-
+    продавцы и товары с коридором цены/пресетами/лимитом скупки (для форм)."""
+    from bot.game import bourse, production as prod, balance as bal
+    from sqlalchemy import select
+    from bot.db.models import Player
+    sells = await repo.open_orders(s, p.id, "sell", limit=20)   # чужие продажи → купить
+    buys = await repo.open_orders(s, p.id, "buy", limit=20)     # чужие заявки → продать в них
+    mine = await repo.seller_orders(s, p.id)
+    board = await repo.market_summary(s)
+    sellers = await repo.top_sellers(s, 10)
+    ids = {o.seller_id for o in (*sells, *buys)}
+    names = {}
+    if ids:
+        rows = (await s.execute(
+            select(Player.id, Player.first_name).where(Player.id.in_(ids)))).all()
+        names = {i: n for i, n in rows}
+
+    def _ord(o, who: bool):
+        d = {"id": o.id, "side": o.side, "qty": o.qty, "unit": o.unit_price, **_good_dto(o.good)}
+        if who:
+            d["who"] = names.get(o.seller_id) or "горожанин"
+        return d
+
+    board_list = [{**_good_dto(k), "ask": b.get("ask"), "ask_qty": b.get("ask_qty"),
+                   "bid": b.get("bid"), "bid_qty": b.get("bid_qty"),
+                   "floor": bourse.price_floor(k), "ceil": bourse.price_ceil(k)}
+                  for k, b in sorted(board.items())]
+    prods = p.tavern.products or {}
+    goods = [{**_good_dto(k), "stock": int(prods.get(k, 0)),
+              "floor": bourse.price_floor(k), "ceil": bourse.price_ceil(k),
+              "presets": bourse.price_tiers(k), "room": bourse.buy_room(p, k)}
+             for k in prod.GOODS]
+    return {
+        "gold": p.gold,
+        "sells": [_ord(o, True) for o in sells],
+        "buys": [_ord(o, True) for o in buys],
+        "mine": [_ord(o, False) for o in mine],
+        "board": board_list,
+        "sellers": [{"name": t.name, "sold": int(t.auction_sold or 0), "me": pl.id == p.id}
+                    for t, pl in sellers],
+        "goods": goods,
+        "qty_max": bal.BOURSE_QTY_MAX, "max_orders": bal.BOURSE_MAX_ORDERS,
+    }
+
+
 async def _api_bourse(request: web.Request) -> web.Response:
-    """Биржа (P2P-ордербук), ФАЗА 1 — доска только для чтения. Гейт: admin/BOURSE_OPEN.
-    Отдаёт: чужие продажи (купить), чужие заявки (продать в них), мои ордера,
-    сводку цен по товарам и топ-продавцов. Действия — следующая фаза."""
+    """Биржа (P2P-ордербук): доска + товары. Гейт: admin/BOURSE_OPEN."""
     uid, body = await _auth(request)
     if uid is None:
         return body
-    from bot.game import bourse, production as prod
-    from sqlalchemy import select
-    from bot.db.models import Player
     async with session_factory() as s:
         p = await repo.get_player(s, uid)
         if p is None or not p.tavern:
             return web.json_response({"ok": False, "error": "no_tavern"})
         if not _bourse_open(uid):
             return web.json_response({"ok": True, "open": False}, headers={"Cache-Control": "no-store"})
-
-        sells = await repo.open_orders(s, p.id, "sell", limit=20)   # чужие продажи → можно купить
-        buys = await repo.open_orders(s, p.id, "buy", limit=20)     # чужие заявки → можно продать в них
-        mine = await repo.seller_orders(s, p.id)
-        board = await repo.market_summary(s)
-        sellers = await repo.top_sellers(s, 10)
-
-        # имена владельцев чужих ордеров (одним запросом)
-        ids = {o.seller_id for o in (*sells, *buys)}
-        names = {}
-        if ids:
-            rows = (await s.execute(
-                select(Player.id, Player.first_name).where(Player.id.in_(ids)))).all()
-            names = {i: n for i, n in rows}
-
-        def _ord(o, who: bool):
-            d = {"id": o.id, "side": o.side, "qty": o.qty, "unit": o.unit_price,
-                 **_good_dto(o.good)}
-            if who:
-                d["who"] = names.get(o.seller_id) or "горожанин"
-            return d
-
-        board_list = []
-        for k, b in sorted(board.items()):
-            board_list.append({**_good_dto(k),
-                               "ask": b.get("ask"), "ask_qty": b.get("ask_qty"),
-                               "bid": b.get("bid"), "bid_qty": b.get("bid_qty"),
-                               "floor": bourse.price_floor(k), "ceil": bourse.price_ceil(k)})
-
-        out = {
-            "ok": True, "open": True, "admin": _is_admin(uid), "gold": p.gold,
-            "sells": [_ord(o, True) for o in sells],
-            "buys": [_ord(o, True) for o in buys],
-            "mine": [_ord(o, False) for o in mine],
-            "board": board_list,
-            "sellers": [{"name": t.name, "sold": int(t.auction_sold or 0),
-                         "me": pl.id == p.id} for t, pl in sellers],
-            "goods": [_good_dto(k) | {"stock": int((p.tavern.products or {}).get(k, 0))}
-                      for k in bourse.sellable_goods(p.tavern)],
-        }
+        out = {"ok": True, "open": True, "admin": _is_admin(uid), **(await _bourse_state(s, p))}
     return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+def _bourse_chat(p) -> int:
+    """Источник ордеров мини-аппа: домашний чат игрока, иначе его id (матчинг
+    глобальный, chat_id — лишь привязка)."""
+    return p.chat_id if p.chat_id is not None else p.id
+
+
+async def _api_bourse_act(request: web.Request) -> web.Response:
+    """Действия Биржи (ФАЗА 2): {op, ...}. Переиспользует боевые исполнители
+    текст-бота (_do_buy/_do_fill/_do_create_sell/_do_create_buy) — логика и
+    налоги/лимиты/коридор идентичны бирже в чате. Возвращает свежую доску + итог."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import bourse, production as prod
+    from bot.handlers.auction import (_do_buy, _do_fill, _do_create_sell, _do_create_buy)
+    op = str(body.get("op") or "")
+
+    def _int(key):
+        try:
+            return int(body.get(key) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not _bourse_open(uid):
+            return web.json_response({"ok": False, "error": "closed"})
+        chat = _bourse_chat(p)
+        done = None
+
+        if op in ("buy", "fill"):
+            order = await repo.get_order(s, _int("order_id"), lock=True)
+            if order is None or order.qty <= 0 or order.seller_id == p.id:
+                return web.json_response({"ok": False, "error": "gone"})
+            qty = _int("qty")
+            if op == "buy":
+                if order.side != "sell":
+                    return web.json_response({"ok": False, "error": "gone"})
+                cap = min(order.qty, p.gold // order.unit_price if order.unit_price else 0,
+                          bourse.buy_room(p, order.good))
+                qty = max(1, min(qty, cap))
+                if cap <= 0:
+                    return web.json_response({"ok": False, "error": "cant"})
+                done = await _do_buy(s, p, chat, order, qty)
+            else:
+                if order.side != "buy":
+                    return web.json_response({"ok": False, "error": "gone"})
+                buyer = await repo.get_player(s, order.seller_id, for_update=True)
+                if buyer is None or buyer.tavern is None:
+                    await repo.delete_order(s, order.id)
+                    await s.commit()
+                    return web.json_response({"ok": False, "error": "gone"})
+                stock = int((p.tavern.products or {}).get(order.good, 0))
+                qty = max(1, min(qty, order.qty, stock))
+                if stock <= 0:
+                    return web.json_response({"ok": False, "error": "cant"})
+                done = await _do_fill(s, p, chat, order, qty, buyer)
+
+        elif op in ("sell", "bid"):
+            good = str(body.get("good") or "")
+            qty, price = _int("qty"), _int("price")
+            if good not in prod.GOODS or qty <= 0 or not bourse.valid_price(good, price):
+                return web.json_response({"ok": False, "error": "bad"})
+            if op == "sell":
+                stock = int((p.tavern.products or {}).get(good, 0))
+                qty = min(qty, stock, _bal_qty_max())
+                if qty <= 0:
+                    return web.json_response({"ok": False, "error": "empty"})
+                done = await _do_create_sell(s, p, chat, good, qty, price)
+            else:
+                qty = min(qty, _bal_qty_max())
+                done = await _do_create_buy(s, p, chat, good, qty, price)
+
+        elif op == "cancel":
+            order = await repo.get_order(s, _int("order_id"), lock=True)
+            if order is None or order.seller_id != p.id:
+                return web.json_response({"ok": False, "error": "gone"})
+            if order.side == "sell":
+                bourse.unfreeze(p.tavern, order.good, order.qty)
+                done = "Лот снят — товар вернулся в погреб."
+            else:
+                p.gold += order.qty * order.unit_price
+                done = f"Заявка снята — залог {order.qty * order.unit_price} 🪙 вернулся."
+            await repo.delete_order(s, order.id)
+        else:
+            return web.json_response({"ok": False, "error": "bad_op"})
+
+        await s.commit()
+        out = {"ok": True, "open": True, "admin": _is_admin(uid), "done": done,
+               **(await _bourse_state(s, p))}
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+def _bal_qty_max() -> int:
+    from bot.game import balance as bal
+    return bal.BOURSE_QTY_MAX
 
 
 async def _api_chronicle(request: web.Request) -> web.Response:
@@ -2580,7 +2682,8 @@ def build_app() -> web.Application:
     app.router.add_post("/api/auction/seen", _api_auction_seen)      # погасить финал-экран
     app.router.add_post("/api/auction/seed", _api_auction_seed)          # ТЕСТ(админ): подбросить ставки
     app.router.add_post("/api/auction/settle_now", _api_auction_settle_now)  # ТЕСТ(админ): закрыть сейчас
-    app.router.add_post("/api/bourse", _api_bourse)                      # Биржа: доска (фаза 1, read-only)
+    app.router.add_post("/api/bourse", _api_bourse)                      # Биржа: доска
+    app.router.add_post("/api/bourse/act", _api_bourse_act)              # Биржа: сделки (фаза 2)
     app.router.add_post("/api/referral", _api_referral)          # зазывала (рефералка)
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
