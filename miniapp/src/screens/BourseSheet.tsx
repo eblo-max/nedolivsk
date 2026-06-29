@@ -246,17 +246,15 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
               </div>
 
               <div className="brs-body">
-                {tab === 'buy' && (<>
-                  <button className="brs-new sell" onClick={() => { haptic('light'); setAct({ k: 'new', side: 'sell' }) }}>📤 Выставить свой лот на продажу</button>
-                  {(d.sells && d.sells.length > 0) ? d.sells.map((o) => <Ticket key={o.id} o={o} label="продают" onClick={() => { haptic('light'); setQty(0); setAct({ k: 'buy', o }) }} />)
-                    : <p className="auc-empty">«На прилавках пусто — никто не выставил товар.»</p>}
-                </>)}
+                {tab === 'buy' && (
+                  (d.sells && d.sells.length > 0) ? d.sells.map((o) => <Ticket key={o.id} o={o} label="продают" onClick={() => { haptic('light'); setQty(0); setAct({ k: 'buy', o }) }} />)
+                    : <p className="auc-empty">«На прилавках пусто — никто не выставил товар. Свой лот — во вкладке «Мои».»</p>
+                )}
 
-                {tab === 'bids' && (<>
-                  <button className="brs-new" onClick={() => { haptic('light'); setAct({ k: 'new', side: 'bid' }) }}>📣 Разместить заявку «куплю»</button>
-                  {(d.buys && d.buys.length > 0) ? d.buys.map((o) => <Ticket key={o.id} o={o} label="ищут" onClick={() => { haptic('light'); setQty(0); setAct({ k: 'fill', o }) }} />)
-                    : <p className="auc-empty">«Заявок на скупку нет.»</p>}
-                </>)}
+                {tab === 'bids' && (
+                  (d.buys && d.buys.length > 0) ? d.buys.map((o) => <Ticket key={o.id} o={o} label="ищут" onClick={() => { haptic('light'); setQty(0); setAct({ k: 'fill', o }) }} />)
+                    : <p className="auc-empty">«Заявок на скупку нет. Свою заявку «куплю» — во вкладке «Мои».»</p>
+                )}
 
                 {tab === 'prices' && (<>
                   <div className="brs-depth-leg">
