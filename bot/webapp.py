@@ -3034,11 +3034,17 @@ _WORLD_HTML = """<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
 <title>Мир Недоливска</title>
 <style>html,body{margin:0;height:100%;background:#0b1020;overflow:hidden}
-#map{height:100%}.leaflet-container{background:#0b1020}</style></head>
+#map{height:100%}.leaflet-container{background:#0b1020}
+.tav-pop{font:600 13px/1.4 system-ui;color:#3a2a12}.tav-pop b{color:#7a4a12}
+.tcl{display:flex;align-items:center;justify-content:center;border-radius:50%;
+  background:radial-gradient(circle,#e7a23c,#b5651d);color:#1a0f04;font:800 14px system-ui;
+  border:2px solid #ffe0a0;box-shadow:0 0 10px -2px rgba(255,170,60,.8)}</style></head>
 <body><div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 var tg=window.Telegram&&Telegram.WebApp;
 if(tg){tg.ready();tg.expand();try{tg.setHeaderColor&&tg.setHeaderColor('#0b1020');}catch(e){}}
@@ -3050,11 +3056,20 @@ map.setMaxBounds(bounds.pad(0.15));
 L.tileLayer('/world/tiles/{z}/{x}/{y}.jpg',{tileSize:TILE,noWrap:true,bounds:bounds,
   minZoom:1,maxNativeZoom:MAXZ,maxZoom:MAXZ+1}).addTo(map);
 map.fitBounds(bounds);
-fetch('/world/slots.json').then(function(r){return r.json();}).then(function(s){
-  s.forEach(function(c){
-    L.circleMarker(px(c[1]*W,c[2]*H),{radius:6,color:'#ffd27a',weight:2,
-      fillColor:'#c0392b',fillOpacity:.92}).addTo(map).bindTooltip('Континент '+c[0],{direction:'top'});
+var uid=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.id)||0;
+var cluster=L.markerClusterGroup?L.markerClusterGroup({maxClusterRadius:46,showCoverageOnHover:false,
+  iconCreateFunction:function(c){var n=c.getChildCount();var d=30+Math.min(20,n);return L.divIcon({html:'<div class="tcl" style="width:'+d+'px;height:'+d+'px">'+n+'</div>',className:'',iconSize:[d,d]});}}):null;
+var layer=cluster||map;
+fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(function(tv){
+  tv.forEach(function(t){
+    var sz=t.mine?54:44;
+    var icon=L.icon({iconUrl:'/assets/map_tavern_'+t.tier+'.png',iconSize:[sz,sz],
+      iconAnchor:[sz/2,sz*0.9],popupAnchor:[0,-sz*0.8],className:t.mine?'tav-mine':''});
+    L.marker(px(t.x*W,t.y*H),{icon:icon,zIndexOffset:t.mine?1000:0}).addTo(layer)
+     .bindPopup('<div class="tav-pop"><b>'+t.name+'</b><br>уровень '+t.level+
+        (t.region?' · '+t.region:'')+(t.mine?'<br>★ твоя таверна':'')+'</div>');
   });
+  if(cluster)map.addLayer(cluster);
 }).catch(function(){});
 </script></body></html>"""
 
@@ -3068,6 +3083,58 @@ async def _world_slots(request: web.Request) -> web.Response:
     if not p.is_file():
         return web.json_response([])
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
+
+
+_WORLD_CENTERS: list[tuple[float, float]] | None = None
+
+
+def _world_centers() -> list[tuple[float, float]]:
+    """Нормированные центры 25 континентов (из world25_slots.json), кэш."""
+    global _WORLD_CENTERS
+    if _WORLD_CENTERS is None:
+        p = worldmap.MAP_FILE.parent / "world25_slots.json"
+        try:
+            _WORLD_CENTERS = [(c[1], c[2]) for c in json.loads(p.read_text(encoding="utf-8"))]
+        except Exception:   # noqa: BLE001
+            _WORLD_CENTERS = []
+    return _WORLD_CENTERS or [(0.5, 0.5)]
+
+
+async def _world_taverns(request: web.Request) -> web.Response:
+    """Таверны на НОВОМ мире-атласе: позиция ВЫЧИСЛЯЕТСЯ на лету (детерминированно по
+    id игрока) — без миграции БД и без правки игровых регионов. Каждый игрок → континент
+    (pid % 25), внутри — слот спиралью-подсолнухом вокруг центра (ровно, без наложений)."""
+    import math
+    try:
+        uid = int(request.query.get("uid", "0"))
+    except ValueError:
+        uid = 0
+    centers = _world_centers()
+    nc = len(centers)
+    async with session_factory() as s:
+        rows = await repo.get_map_taverns(s)
+    by_c: dict[int, list] = {}
+    for tav, pl in rows:
+        by_c.setdefault(pl.id % nc, []).append((tav, pl))
+    out = []
+    R = 0.095
+    for ci, lst in by_c.items():
+        lst.sort(key=lambda tp: tp[1].id)
+        cx, cy = centers[ci]
+        n = len(lst)
+        for k, (tav, pl) in enumerate(lst):
+            rr = R * math.sqrt((k + 0.5) / n)
+            th = k * 2.39996323                       # золотой угол → подсолнух
+            x = min(0.997, max(0.003, cx + rr * math.cos(th)))
+            y = min(0.997, max(0.003, cy + rr * math.sin(th)))
+            out.append({
+                "x": round(x, 4), "y": round(y, 4),
+                "name": tav.name or pl.first_name or "Таверна",
+                "level": tav.level, "tier": worldmap.sprite_tier(tav.level),
+                "region": balance.REGIONS.get(pl.region or "", ""),
+                "mine": bool(uid) and pl.id == uid,
+            })
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 
 async def _world_tile(request: web.Request) -> web.Response:
@@ -3200,6 +3267,7 @@ def build_app() -> web.Application:
     app.router.add_get("/map", _map_page)
     app.router.add_get("/world", _world_page)                 # тайловый мир-атлас (Leaflet)
     app.router.add_get("/world/slots.json", _world_slots)
+    app.router.add_get("/world/taverns.json", _world_taverns)
     app.router.add_get("/world/tiles/{z}/{x}/{y}.jpg", _world_tile)
     app.router.add_get("/app", _spa)                  # React-мини-апп (каркас игры)
     app.router.add_get("/app/{tail:.*}", _spa)        # SPA-fallback + статика dist
