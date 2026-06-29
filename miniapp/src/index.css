@@ -1536,6 +1536,43 @@ body {
 .brs-lot-go { flex:none; display:grid; place-items:center; width:22px; height:22px; border-radius:50%; font-size:15px;
   color:color-mix(in oklch, var(--c) 80%, #fff); background:color-mix(in oklch, var(--c) 12%, transparent);
   box-shadow:inset 0 0 0 1px color-mix(in oklch, var(--c) 24%, transparent); }
+
+/* ── ЗАЕЗЖИЙ КУПЕЦ (торг готовым товаром) ── */
+.trd-card { max-width:420px; }
+.trd-top { display:flex; align-items:center; gap:13px; margin-bottom:12px; }
+.trd-face { border-radius:13px; object-fit:cover; flex:none; box-shadow:0 2px 8px #0008, inset 0 0 0 1px #ffffff14; background:#221a10; }
+.trd-face-emo { display:inline-flex; align-items:center; justify-content:center; }
+.trd-id { flex:1; min-width:0; }
+.trd-name { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:17px; color:#f0e7d2; }
+.trd-intro { font-family:Georgia,serif; font-style:italic; font-size:12.5px; color:#a99c7e; line-height:1.4; margin-top:2px; }
+.trd-want { display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:13px; margin-bottom:11px;
+  background:linear-gradient(168deg,#2a1d0d,#180f06); box-shadow:inset 0 0 0 1px #ffffff10; }
+.trd-want-t b { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:15px; color:#ece3cd; display:block; }
+.trd-want-t small { font-family:var(--text),system-ui,sans-serif; font-size:11.5px; color:#a99e85; }
+.trd-hint { font-family:Georgia,serif; font-style:italic; font-size:13px; color:#c2b594; text-align:center; margin:0 0 10px; }
+.trd-tiers { display:flex; flex-direction:column; gap:8px; }
+.trd-tier { display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:13px; cursor:pointer; text-align:left;
+  color:#eee6d6; background:linear-gradient(168deg,#241a0e,#180f06); border:1px solid var(--brass-d,#5a4326); transition:transform .08s; }
+.trd-tier:active { transform:scale(.99); } .trd-tier:disabled { opacity:.5; }
+.trd-tier-lbl { font-family:var(--disp),system-ui,sans-serif; font-weight:800; font-size:14px; color:var(--gold,#f0b859); width:96px; }
+.trd-tier-px { font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:14px; color:#ece3cd; }
+.trd-tier-tot { margin-left:auto; font-family:var(--num),system-ui,sans-serif; font-size:12px; color:#b6a169; }
+.trd-react { font-family:Georgia,serif; font-style:italic; font-size:14px; color:#e7c98a; text-align:center; line-height:1.45; margin:4px 6px 10px; }
+.trd-react.walk { color:#caa; } .trd-react.sold { color:#9fd9a8; }
+.trd-counter { text-align:center; font-family:var(--text),system-ui,sans-serif; font-size:13.5px; color:#cbbf9f; margin-bottom:11px; }
+.trd-counter b { font-family:var(--num),system-ui,sans-serif; font-weight:900; font-size:18px; color:#f6d885; }
+.trd-acts { display:flex; flex-direction:column; gap:8px; }
+.trd-acts-row { display:flex; gap:8px; }
+.trd-acts-row .btn { flex:1; margin:0; }
+.trd-yes { color:#0d2417 !important; border-color:#5fd497 !important; background:linear-gradient(#7ff0a8,#2ba35e) !important; font-weight:800 !important; }
+.trd-push { color:#f3d9a0 !important; border-color:#7a5a2e !important; background:linear-gradient(#2c2410,#1a1408) !important; }
+.trd-no { color:#f0a08a !important; border-color:#7a3b2e !important; background:linear-gradient(#2c1410,#1a0d08) !important; }
+.trd-no.full { width:100%; margin-top:9px; }
+.trd-ok { margin-top:12px; color:#241501 !important; border-color:#f6dd92 !important; background:linear-gradient(var(--gold-2,#f6d885),#cf9a3c) !important; font-weight:800 !important; }
+.trd-deal { display:inline-flex; align-items:center; justify-content:center; gap:7px; width:100%; margin-top:4px;
+  font-family:var(--num),system-ui,sans-serif; font-weight:900; font-size:34px; color:#7ff0a8; text-shadow:0 2px 16px #2ba35e66; }
+.trd-deal-sub { text-align:center; font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#a99e85; margin-top:2px; }
+.trd-gone { text-align:center; font-family:Georgia,serif; font-style:italic; font-size:12.5px; color:#8a7f6a; margin:6px 0 2px; }
 .brs-mine-x { flex:none; width:46px; border-radius:14px; cursor:pointer; font-size:17px; color:#f0a08a;
   background:linear-gradient(#2c1410,#1a0d08); border:1px solid #7a3b2e; }
 .brs-mine-x:active { transform:scale(.96); }

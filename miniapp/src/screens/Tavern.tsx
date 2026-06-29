@@ -7,6 +7,7 @@ import Onboarding from './Onboarding'
 import ActionSheet from './ActionSheet'
 import MusicToggle from '../components/MusicToggle'
 import StoryVisitor, { type StoryData } from './StoryVisitor'
+import TradeSheet, { type TradeData } from './TradeSheet'
 import AnimEmoji from '../components/AnimEmoji'
 import ChronicleSheet from './ChronicleSheet'
 import ReferralSheet from './ReferralSheet'
@@ -30,6 +31,7 @@ interface TavernState {
   story?: StoryData | null
   world_event?: WorldEvent | null
   city?: CityData | null
+  trade?: TradeData | null
 }
 
 // образец для оффлайн-превью (форма 1:1 как у /api/state)
@@ -69,6 +71,8 @@ export default function Tavern() {
   const [chronOpen, setChronOpen] = useState(false)
   const [refOpen, setRefOpen] = useState(false)
   const storySeen = useRef<string | null>(null)        // авто-показ визитёра один раз на его id
+  const [trade, setTrade] = useState<TradeData | null>(null)   // заезжий купец (торг)
+  const tradeShut = useRef(false)                       // купца закрыли вручную — не нудить повторно
   const panelCache = useRef<Record<string, unknown>>({})
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const flash = (m: string) => {
@@ -88,6 +92,13 @@ export default function Tavern() {
     const sid = data?.story?.id
     if (sid && storySeen.current !== sid) { storySeen.current = sid; setStoryOpen(true) }
   }, [data?.story?.id])
+
+  // заезжий купец висит (не дорешали) — поднять торг; закрыли вручную — не нудить, пока не уйдёт
+  useEffect(() => {
+    const off = data?.trade
+    if (off && !trade && !tradeShut.current) setTrade(off)
+    if (!off) tradeShut.current = false
+  }, [data?.trade, trade])
 
   // ещё нет таверны — стартовый экран (создание игрока + таверны)
   if (error === 'no_tavern' && !created)
@@ -109,10 +120,11 @@ export default function Tavern() {
     if (busy || t.income_ready <= 0) return
     haptic('medium'); setBusy(true)
     try {
-      const r = await api<{ collected: number; state: TavernState; retail?: boolean }>('collect')
+      const r = await api<{ collected: number; state: TavernState; retail?: boolean; trade?: TradeData | null }>('collect')
       set(r.state); hapticNotify('success')
       flash(r.collected > 0 ? `+${fmt(r.collected)} 🪙 в казну` : 'Касса пуста')
-      if (r.retail) setTimeout(() => setSheet('retail'), 350)   // гости ждут заказ — панель сбыта
+      if (r.retail) setTimeout(() => setSheet('retail'), 350)        // гости ждут заказ — панель сбыта
+      else if (r.trade) setTimeout(() => { tradeShut.current = false; setTrade(r.trade!) }, 350)  // заглянул купец
     } catch { flash('Касса не открылась — попробуй ещё') }
     finally { setBusy(false) }
   }
@@ -266,6 +278,11 @@ export default function Tavern() {
         <StoryVisitor story={t.story}
           onResolved={(s) => { if (s) set(s as TavernState); setStoryOpen(false); reload() }}
           onClose={() => setStoryOpen(false)} />
+      )}
+      {trade && (
+        <TradeSheet offer={trade}
+          onState={(s) => set(s as TavernState)}
+          onClose={() => { tradeShut.current = true; setTrade(null) }} />
       )}
       {chronOpen && <ChronicleSheet onClose={() => setChronOpen(false)} />}
       {refOpen && <ReferralSheet onClose={() => setRefOpen(false)} />}

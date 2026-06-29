@@ -536,6 +536,24 @@ def _tavern_state(p, t) -> dict:
     }
 
 
+def _trade_dto(offer) -> dict | None:
+    """Предложение заезжего купца для мини-аппа: товар, портрет/имя купца, реплика,
+    справедливая цена и ценовые тиры (+ контр-цена, если идёт торг)."""
+    if not offer:
+        return None
+    from bot.game import production as prod
+    g = prod.GOODS.get(offer.get("good"))
+    pool = _AV_BY_ESTATE.get(offer.get("estate") or "")
+    avatar = pool[sum(ord(c) for c in offer.get("name", "")) % len(pool)] if pool else None
+    return {
+        "good": offer.get("good"), "name": g.name if g else offer.get("good"),
+        "emoji": g.emoji if g else "📦", "qty": offer.get("qty"),
+        "merchant": offer.get("name"), "memoji": offer.get("emoji"), "avatar": avatar,
+        "intro": offer.get("intro"), "fv": offer.get("fv"),
+        "prices": offer.get("prices"), "counter": offer.get("counter"),
+    }
+
+
 async def _api_state(request: web.Request) -> web.Response:
     """Снапшот Таверны. При открытии — шанс на внезапного визитёра (story-движок),
     как в текстовом боте при заходе в таверну."""
@@ -561,6 +579,8 @@ async def _api_state(request: web.Request) -> web.Response:
         out["story"] = _story_state(p, city)         # с городом — корректная доступность выборов
         out["world_event"] = _world_event_state()    # баннер активного мирового события
         out["city"] = _city_state(city)              # настроение + фракции + ситуация
+        from bot.game import story_state as _ss
+        out["trade"] = _trade_dto(_ss.get_trade(p))  # незавершённый торг с купцом (если висит)
     return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 
@@ -1244,11 +1264,101 @@ async def _api_collect(request: web.Request) -> web.Response:
         if order:
             from bot.game import story_state
             story_state.set_retail(p, order)
+        # Заезжий купец — как в боте (tavern.py): на сбор дохода заглядывает покупатель
+        # готового товара (чаще/богаче на ярмарке). Розница приоритетнее — тогда не катим.
+        trade_offer = None
+        if not order:
+            import random as _rnd
+            from bot.game import story_state as _ss, trade as _trade, balance as _bal, world as _wld
+            busy = _ss.get_pending(p) or _ss.get_trade(p)
+            if not busy and _trade.has_sellable(p.tavern):
+                chance = _bal.TRADE_FAIR_CHANCE if _wld.is_fair() else _bal.TRADE_CHANCE
+                if _rnd.random() < chance:
+                    world = await repo.get_or_create_world(s)
+                    offer = _trade.make_offer(p.tavern, p, _wld.is_fair(), world=world)
+                    if offer is not None:
+                        _ss.set_trade(p, offer)
+                        trade_offer = offer
         await s.commit()
         st = _tavern_state(p, p.tavern)
     return web.json_response({"ok": True, "collected": collected, "state": st,
-                              "retail": bool(order)},
+                              "retail": bool(order), "trade": _trade_dto(trade_offer)},
                              headers={"Cache-Control": "no-store"})
+
+
+async def _api_trade(request: web.Request) -> web.Response:
+    """Торг с заезжим купцом: {op: offer(idx) | accept | push | decline}.
+    Переиспользует боевую продажу _sell + trade.evaluate/push/reaction — характеры,
+    контр-цены и зачисления идентичны торгу в чате. Возвращает исход + свежий торг/таверну."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    op = str(body.get("op") or "")
+    from bot.game import (story_state as ss, trade as trademod, market,
+                          balance as bal, newbie, production as prod)
+    from bot.handlers.trade import _sell          # боевая продажа (товар/золото/буфы/имя)
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        offer = ss.get_trade(p)
+        if not offer:
+            return web.json_response({"ok": False, "error": "gone"})
+        world = await repo.get_or_create_world(s)
+        st = {"result": None, "react": None, "qty": 0, "gold": 0, "unit": 0}
+
+        def _finish(unit: int, kind: str) -> None:
+            qn, gn = _sell(p, offer, unit)
+            ss.set_trade(p, None)
+            if qn:
+                newbie.mark(p, "nb_sale")
+                gn_name = prod.GOODS[offer["good"]].name if offer["good"] in prod.GOODS else offer["good"]
+                repo.add_log(s, "player", p.id, f"🤝 продал купцу {qn}×{gn_name} за {gn} 🪙 (мини-апп)")
+                market.nudge(world, offer["good"], qn * bal.MARKET_WHOLESALE_WEIGHT)
+                st.update(result="sold", react=trademod.reaction(offer, kind), qty=qn, gold=gn, unit=unit)
+            else:
+                st.update(result="walk", react=trademod.reaction(offer, "walk"))
+
+        if op == "decline":
+            ss.set_trade(p, None)
+            st.update(result="walk", react=trademod.reaction(offer, "walk"))
+        elif op == "accept":                          # согласие на контр-цену
+            unit = int(offer.get("counter", offer["max_unit"]))
+            _finish(unit, "accept_high" if unit >= offer["fv"] * 1.15 else "accept")
+        elif op == "push":                            # дожать контр-цену
+            decision, price = trademod.push(offer)
+            if decision == "walk":
+                ss.set_trade(p, None)
+                st.update(result="walk", react=trademod.reaction(offer, "walk"))
+            else:
+                offer["counter"] = price
+                ss.set_trade(p, offer)
+                st.update(result="counter", react=trademod.reaction(offer, decision, price))
+        elif op == "offer":                           # предложить цену из тира
+            try:
+                idx = int(body.get("idx"))
+            except (TypeError, ValueError):
+                idx = -1
+            if not 0 <= idx < len(offer.get("prices", [])):
+                return web.json_response({"ok": False, "error": "bad"})
+            unit = offer["prices"][idx]
+            decision, price = trademod.evaluate(offer, unit)
+            if decision == "accept":
+                _finish(unit, "accept_high" if unit >= offer["fv"] * 1.15 else "accept")
+            elif decision == "counter":
+                offer["counter"] = price
+                ss.set_trade(p, offer)
+                st.update(result="counter", react=trademod.reaction(offer, "counter", price))
+            else:
+                ss.set_trade(p, None)
+                st.update(result="walk", react=trademod.reaction(offer, "walk"))
+        else:
+            return web.json_response({"ok": False, "error": "bad_op"})
+
+        await s.commit()
+        out = {"ok": True, "gold": p.gold, **st,
+               "trade": _trade_dto(ss.get_trade(p)), "state": _tavern_state(p, p.tavern)}
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 
 async def _api_upgrade(request: web.Request) -> web.Response:
@@ -2644,6 +2754,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/mill/collect", _api_mill_collect)
     app.router.add_post("/api/state", _api_state)        # снапшот Таверны (mini-app)
     app.router.add_post("/api/collect", _api_collect)    # собрать доход
+    app.router.add_post("/api/trade", _api_trade)        # торг с заезжим купцом
     app.router.add_post("/api/upgrade", _api_upgrade)    # улучшить таверну
     app.router.add_post("/api/bonus", _api_bonus)        # активировать бонус дня
     app.router.add_post("/api/newbie", _api_newbie)      # забрать грамоту новосёла
