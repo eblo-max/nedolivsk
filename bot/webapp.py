@@ -3030,47 +3030,128 @@ async def _world_png(request: web.Request) -> web.Response:
 
 
 # ── Новый мир-атлас: тайловая Leaflet-карта (огромный бесшовный мир из 25 континентов) ──
-_WORLD_HTML = """<!doctype html><html><head><meta charset="utf-8">
+_WORLD_HTML = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
 <title>Мир Недоливска</title>
-<style>html,body{margin:0;height:100%;background:#0b1020;overflow:hidden}
-#map{height:100%}.leaflet-container{background:#0b1020}
-.tav-pop{font:600 13px/1.4 system-ui;color:#3a2a12}.tav-pop b{color:#7a4a12}
+<style>
+html,body{margin:0;height:100%;background:#0b1020;overflow:hidden;font-family:system-ui,sans-serif}
+#map{height:100%}.leaflet-container{background:#0b1020;font-family:inherit}
+.leaflet-control-zoom{margin-top:62px!important}
+/* шапка */
+#hud{position:fixed;left:0;right:0;top:0;z-index:1000;display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(8,12,24,.92),rgba(8,12,24,0))}
+#title{font-weight:800;font-size:16px;color:#f3dca0;text-shadow:0 1px 4px #000}
+#title b{color:#ffcf6a}
+#mine{pointer-events:auto;margin-left:auto;border:1px solid #a8772e;border-radius:999px;
+  padding:6px 13px;font-weight:700;font-size:13px;color:#1a0f04;cursor:pointer;
+  background:linear-gradient(180deg,#ffd98a,#e0a23c);box-shadow:0 2px 8px rgba(220,160,40,.4)}
+/* баннер рейда */
+#raidbar{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 46px);z-index:1000;
+  display:none;align-items:center;gap:9px;padding:9px 13px;border-radius:14px;cursor:pointer;
+  color:#fff;font-weight:700;font-size:14px;background:linear-gradient(180deg,#d23a18,#9a2a10);
+  border:1px solid #ff7a4a;box-shadow:0 4px 16px rgba(210,58,24,.5);animation:rb 1.6s ease-in-out infinite}
+@keyframes rb{0%,100%{box-shadow:0 4px 16px rgba(210,58,24,.45)}50%{box-shadow:0 4px 26px rgba(255,90,50,.8)}}
+#raidbar .go{margin-left:auto;opacity:.85}
+/* подписи континентов */
+.cont-label{font-weight:800;font-size:14px;letter-spacing:.04em;color:#ffe7b0;text-align:center;
+  text-shadow:0 0 8px #000,0 1px 3px #000;white-space:nowrap;pointer-events:none;width:200px!important}
+/* подписи таверн (на близком зуме) */
+.leaflet-tooltip.tav-label{background:rgba(12,16,28,.82);border:1px solid #6b522e;color:#f3dca0;
+  font-weight:700;font-size:11px;border-radius:6px;padding:1px 6px;box-shadow:none}
+.leaflet-tooltip.tav-label::before{display:none}
+.tav-mine{filter:drop-shadow(0 0 7px #ffd27a)}
+/* карточка таверны */
+.tav-pop{font:600 13px/1.5 system-ui;color:#e9dcc2;min-width:178px}
+.tav-pop .h{font-weight:800;font-size:15px;color:#ffcf6a;margin-bottom:1px}
+.tav-pop .o{color:#bfa775;font-size:12px;margin-bottom:6px}
+.tav-pop .loc{color:#8fb0d8;font-size:12px}
+.tav-pop .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:5px;font-size:12px;color:#d8c8a6}
+.tav-pop .mine{margin-top:7px;color:#ffd27a;font-weight:800}
+.leaflet-popup-content-wrapper{background:#1a140c;border:1px solid #6b522e;border-radius:12px}
+.leaflet-popup-tip{background:#1a140c}
 .tcl{display:flex;align-items:center;justify-content:center;border-radius:50%;
   background:radial-gradient(circle,#e7a23c,#b5651d);color:#1a0f04;font:800 14px system-ui;
-  border:2px solid #ffe0a0;box-shadow:0 0 10px -2px rgba(255,170,60,.8)}</style></head>
-<body><div id="map"></div>
+  border:2px solid #ffe0a0;box-shadow:0 0 10px -2px rgba(255,170,60,.8)}
+/* лоадер */
+#loader{position:fixed;inset:0;z-index:1500;display:flex;align-items:center;justify-content:center;
+  background:#0b1020;color:#caa86a;font-weight:700;font-size:15px;transition:opacity .4s}
+#loader.hide{opacity:0;pointer-events:none}
+</style></head>
+<body>
+<div id="map"></div>
+<div id="hud"><div id="title">🗺 <b>Мир Недоливска</b> <span id="cnt"></span></div>
+  <button id="mine">🏰 Моя таверна</button></div>
+<div id="raidbar"></div>
+<div id="loader">Разворачиваем карту мира…</div>
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 var tg=window.Telegram&&Telegram.WebApp;
 if(tg){tg.ready();tg.expand();try{tg.setHeaderColor&&tg.setHeaderColor('#0b1020');}catch(e){}}
 var W=11020,H=11020,TILE=256,MAXZ=6;
-var map=L.map('map',{crs:L.CRS.Simple,minZoom:1,maxZoom:MAXZ+1,attributionControl:false});
+var map=L.map('map',{crs:L.CRS.Simple,minZoom:1,maxZoom:MAXZ+1,attributionControl:false,zoomControl:true});
 function px(x,y){return map.unproject([x,y],MAXZ);}
 var bounds=L.latLngBounds(px(0,H),px(W,0));
-map.setMaxBounds(bounds.pad(0.15));
+map.setMaxBounds(bounds.pad(0.12));
 L.tileLayer('/world/tiles/{z}/{x}/{y}.jpg',{tileSize:TILE,noWrap:true,bounds:bounds,
   minZoom:1,maxNativeZoom:MAXZ,maxZoom:MAXZ+1}).addTo(map);
 map.fitBounds(bounds);
+function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
 var uid=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.id)||0;
-var cluster=L.markerClusterGroup?L.markerClusterGroup({maxClusterRadius:46,showCoverageOnHover:false,
-  iconCreateFunction:function(c){var n=c.getChildCount();var d=30+Math.min(20,n);return L.divIcon({html:'<div class="tcl" style="width:'+d+'px;height:'+d+'px">'+n+'</div>',className:'',iconSize:[d,d]});}}):null;
-var layer=cluster||map;
-fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(function(tv){
+// ── подписи континентов (видны на дальнем зуме) ──
+var contLayer=L.layerGroup();
+fetch('/world/slots.json').then(function(r){return r.json();}).then(function(cs){
+  cs.forEach(function(c){
+    L.marker(px(c.x*W,c.y*H),{interactive:false,keyboard:false,
+      icon:L.divIcon({className:'cont-label',html:esc(c.name),iconSize:[200,22],iconAnchor:[100,11]})}).addTo(contLayer);
+  });
+  syncLabels();
+}).catch(function(){});
+function syncLabels(){var z=map.getZoom();
+  if(z<=3){if(!map.hasLayer(contLayer))contLayer.addTo(map);}
+  else{if(map.hasLayer(contLayer))map.removeLayer(contLayer);}}
+map.on('zoomend',syncLabels);
+// ── таверны ──
+var cluster=L.markerClusterGroup?L.markerClusterGroup({maxClusterRadius:48,showCoverageOnHover:false,
+  disableClusteringAtZoom:MAXZ,iconCreateFunction:function(c){var n=c.getChildCount();var d=30+Math.min(22,n);
+    return L.divIcon({html:'<div class="tcl" style="width:'+d+'px;height:'+d+'px">'+n+'</div>',className:'',iconSize:[d,d]});}}):null;
+var layer=cluster||map;var myLL=null;var myMarker=null;
+function card(t){
+  return '<div class="tav-pop"><div class="h">🏰 '+esc(t.name)+'</div>'+
+    '<div class="o">хозяин: '+esc(t.owner)+'</div>'+
+    '<div class="loc">📍 '+esc(t.continent)+'</div>'+
+    '<div class="row"><span>⚜️ ур. '+t.level+'</span><span>⭐ реп. '+t.rep+'</span>'+
+    '<span>👥 '+t.cap+'</span><span>☕ уют '+t.comfort+'</span><span>🏛 '+t.builds+'</span></div>'+
+    (t.mine?'<div class="mine">★ твоя таверна'+(t.income?' · +'+t.income+' 🪙/ч':'')+'</div>':'')+'</div>';
+}
+fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(function(d){
+  var tv=d.taverns||[];
+  document.getElementById('cnt').textContent='· '+(d.total||tv.length)+' таверн';
   tv.forEach(function(t){
-    var sz=t.mine?54:44;
+    var sz=t.mine?56:42;var ll=px(t.x*W,t.y*H);
     var icon=L.icon({iconUrl:'/assets/map_tavern_'+t.tier+'.png',iconSize:[sz,sz],
-      iconAnchor:[sz/2,sz*0.9],popupAnchor:[0,-sz*0.8],className:t.mine?'tav-mine':''});
-    L.marker(px(t.x*W,t.y*H),{icon:icon,zIndexOffset:t.mine?1000:0}).addTo(layer)
-     .bindPopup('<div class="tav-pop"><b>'+t.name+'</b><br>уровень '+t.level+
-        (t.region?' · '+t.region:'')+(t.mine?'<br>★ твоя таверна':'')+'</div>');
+      iconAnchor:[sz/2,sz*0.88],popupAnchor:[0,-sz*0.78],className:t.mine?'tav-mine':''});
+    var m=L.marker(ll,{icon:icon,zIndexOffset:t.mine?1000:0}).addTo(layer).bindPopup(card(t));
+    m.bindTooltip(esc(t.name),{permanent:true,direction:'top',className:'tav-label',offset:[0,-sz*0.74]});
+    if(t.mine){myLL=ll;myMarker=m;}
   });
   if(cluster)map.addLayer(cluster);
-}).catch(function(){});
+  // баннер рейда
+  if(d.raid){var rb=document.getElementById('raidbar');
+    rb.innerHTML=d.raid.emoji+' <span>'+esc(d.raid.name)+' — '+(d.raid.status==='gathering'?'идёт сбор!':'В БОЙ!')+'</span><span class="go">играть ›</span>';
+    rb.style.display='flex';rb.onclick=function(){location.href='/app/?startapp=raid';};}
+  // кнопка «моя таверна»
+  var mb=document.getElementById('mine');
+  if(myMarker){mb.onclick=function(){
+    if(cluster&&cluster.zoomToShowLayer){cluster.zoomToShowLayer(myMarker,function(){myMarker.openPopup();});}
+    else{map.flyTo(myLL,MAXZ-1,{duration:.8});setTimeout(function(){myMarker.openPopup();},850);}};}
+  else{mb.style.display='none';}
+  document.getElementById('loader').classList.add('hide');
+}).catch(function(){document.getElementById('loader').textContent='Карта не загрузилась — обнови';});
 </script></body></html>"""
 
 
@@ -3078,41 +3159,54 @@ async def _world_page(request: web.Request) -> web.Response:
     return web.Response(text=_WORLD_HTML, content_type="text/html")
 
 
-async def _world_slots(request: web.Request) -> web.Response:
-    p = worldmap.MAP_FILE.parent / "world25_slots.json"     # assets/world25_slots.json
-    if not p.is_file():
-        return web.json_response([])
-    return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
+# Названия 25 континентов по биому (порядок = снег ×5 → зелень ×14 → пустыни ×6).
+CONTINENT_NAMES = [
+    "Ледяные Пределы", "Морозный Кряж", "Стылые Фьорды", "Белое Безмолвие", "Снежный Зарубеж",
+    "Зелёные Долы", "Хмельные Луга", "Дубравный Край", "Речные Земли", "Изумрудная Чаща",
+    "Медовые Поля", "Грибная Лощина", "Светлая Пуща", "Холмогорье", "Тихие Поймы",
+    "Вересковый Дол", "Заливные Луга", "Старолесье", "Травяной Простор",
+    "Выжженные Земли", "Красные Пустоши", "Солончак", "Пыльный Предел", "Багровые Дюны", "Сухой Кряж",
+]
+_BIOME_RU = {"snow": "снега", "green": "зелёные земли", "desert": "пустоши"}
+_WORLD_CONT: list[dict] | None = None
 
 
-_WORLD_CENTERS: list[tuple[float, float]] | None = None
-
-
-def _world_centers() -> list[tuple[float, float]]:
-    """Нормированные центры 25 континентов (из world25_slots.json), кэш."""
-    global _WORLD_CENTERS
-    if _WORLD_CENTERS is None:
+def _world_continents() -> list[dict]:
+    """25 континентов: индекс, центр (норм.), биом, ИМЯ. Кэш из world25_slots.json."""
+    global _WORLD_CONT
+    if _WORLD_CONT is None:
         p = worldmap.MAP_FILE.parent / "world25_slots.json"
         try:
-            _WORLD_CENTERS = [(c[1], c[2]) for c in json.loads(p.read_text(encoding="utf-8"))]
+            data = json.loads(p.read_text(encoding="utf-8"))
         except Exception:   # noqa: BLE001
-            _WORLD_CENTERS = []
-    return _WORLD_CENTERS or [(0.5, 0.5)]
+            data = []
+        _WORLD_CONT = [
+            {"i": i, "x": c[1], "y": c[2], "biome": c[3] if len(c) > 3 else "",
+             "name": CONTINENT_NAMES[i] if i < len(CONTINENT_NAMES) else f"Земля {c[0]}"}
+            for i, c in enumerate(data)
+        ]
+    return _WORLD_CONT or [{"i": 0, "x": 0.5, "y": 0.5, "biome": "", "name": "Недоливск"}]
+
+
+async def _world_slots(request: web.Request) -> web.Response:
+    """Континенты с именами/биомом — для подписей на карте."""
+    return web.json_response(_world_continents(), headers={"Cache-Control": "public, max-age=3600"})
 
 
 async def _world_taverns(request: web.Request) -> web.Response:
-    """Таверны на НОВОМ мире-атласе: позиция ВЫЧИСЛЯЕТСЯ на лету (детерминированно по
-    id игрока) — без миграции БД и без правки игровых регионов. Каждый игрок → континент
-    (pid % 25), внутри — слот спиралью-подсолнухом вокруг центра (ровно, без наложений)."""
+    """Таверны на мире-атласе с ПОЛНОЙ инфой (имя/владелец/уровень/репутация/вместимость/
+    уют/пристройки/континент). Позиция ВЫЧИСЛЯЕТСЯ на лету (игрок→континент pid%25, внутри —
+    слот спиралью-подсолнухом) — без миграции БД и правки игровых регионов. + активный рейд."""
     import math
     try:
         uid = int(request.query.get("uid", "0"))
     except ValueError:
         uid = 0
-    centers = _world_centers()
-    nc = len(centers)
+    conts = _world_continents()
+    nc = len(conts)
     async with session_factory() as s:
         rows = await repo.get_map_taverns(s)
+        boss = await repo.get_active_raid(s)
     by_c: dict[int, list] = {}
     for tav, pl in rows:
         by_c.setdefault(pl.id % nc, []).append((tav, pl))
@@ -3120,21 +3214,32 @@ async def _world_taverns(request: web.Request) -> web.Response:
     R = 0.095
     for ci, lst in by_c.items():
         lst.sort(key=lambda tp: tp[1].id)
-        cx, cy = centers[ci]
+        c = conts[ci]
         n = len(lst)
         for k, (tav, pl) in enumerate(lst):
             rr = R * math.sqrt((k + 0.5) / n)
             th = k * 2.39996323                       # золотой угол → подсолнух
-            x = min(0.997, max(0.003, cx + rr * math.cos(th)))
-            y = min(0.997, max(0.003, cy + rr * math.sin(th)))
-            out.append({
+            x = min(0.997, max(0.003, c["x"] + rr * math.cos(th)))
+            y = min(0.997, max(0.003, c["y"] + rr * math.sin(th)))
+            mine = bool(uid) and pl.id == uid
+            d = {
                 "x": round(x, 4), "y": round(y, 4),
-                "name": tav.name or pl.first_name or "Таверна",
+                "name": tav.name or "Таверна", "owner": pl.first_name or "Кабатчик",
                 "level": tav.level, "tier": worldmap.sprite_tier(tav.level),
-                "region": balance.REGIONS.get(pl.region or "", ""),
-                "mine": bool(uid) and pl.id == uid,
-            })
-    return web.json_response(out, headers={"Cache-Control": "no-store"})
+                "rep": tav.reputation, "cap": tav.capacity, "comfort": tav.comfort,
+                "builds": len(tav.buildings or []), "continent": c["name"], "mine": mine,
+            }
+            if mine:
+                d["income"] = tav.income_rate
+            out.append(d)
+    raid = None
+    if boss is not None and boss.status in ("gathering", "active"):
+        from bot.game import raid as rd
+        spec = rd.BOSSES.get(boss.boss_key)
+        if spec is not None:
+            raid = {"name": spec.name, "emoji": spec.emoji, "status": boss.status}
+    return web.json_response({"taverns": out, "raid": raid, "total": len(out)},
+                             headers={"Cache-Control": "no-store"})
 
 
 async def _world_tile(request: web.Request) -> web.Response:
