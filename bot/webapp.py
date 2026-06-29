@@ -3037,16 +3037,19 @@ _WORLD_HTML = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
 <title>Мир Недоливска</title>
 <style>
-html,body{margin:0;height:100%;background:#0b1020;overflow:hidden;font-family:system-ui,sans-serif}
-#map{height:100%}.leaflet-container{background:#0b1020;font-family:inherit}
-.leaflet-control-zoom{margin-top:62px!important}
+html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:system-ui,sans-serif}
+#map{height:100%}.leaflet-container{background:#0f1828;font-family:inherit}
+.leaflet-control-zoom{margin-bottom:16px!important;margin-right:12px!important;border:none!important}
+.leaflet-control-zoom a{background:rgba(16,22,38,.85)!important;color:#f3dca0!important;
+  border:1px solid #4a3a1e!important;width:34px!important;height:34px!important;line-height:32px!important}
 /* шапка */
 #hud{position:fixed;left:0;right:0;top:0;z-index:1000;display:flex;align-items:center;gap:8px;
-  padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;pointer-events:none;
-  background:linear-gradient(180deg,rgba(8,12,24,.92),rgba(8,12,24,0))}
-#title{font-weight:800;font-size:16px;color:#f3dca0;text-shadow:0 1px 4px #000}
-#title b{color:#ffcf6a}
-#mine{pointer-events:auto;margin-left:auto;border:1px solid #a8772e;border-radius:999px;
+  padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 9px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(8,12,24,.94),rgba(8,12,24,0))}
+#title{font-weight:800;font-size:14.5px;color:#f3dca0;text-shadow:0 1px 4px #000;
+  flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#title b{color:#ffcf6a}#cnt{color:#caa86a;font-weight:600;font-size:13px}
+#mine{pointer-events:auto;flex:none;white-space:nowrap;border:1px solid #a8772e;border-radius:999px;
   padding:6px 13px;font-weight:700;font-size:13px;color:#1a0f04;cursor:pointer;
   background:linear-gradient(180deg,#ffd98a,#e0a23c);box-shadow:0 2px 8px rgba(220,160,40,.4)}
 /* баннер рейда */
@@ -3078,7 +3081,7 @@ html,body{margin:0;height:100%;background:#0b1020;overflow:hidden;font-family:sy
   border:2px solid #ffe0a0;box-shadow:0 0 10px -2px rgba(255,170,60,.8)}
 /* лоадер */
 #loader{position:fixed;inset:0;z-index:1500;display:flex;align-items:center;justify-content:center;
-  background:#0b1020;color:#caa86a;font-weight:700;font-size:15px;transition:opacity .4s}
+  background:#0f1828;color:#caa86a;font-weight:700;font-size:15px;transition:opacity .4s}
 #loader.hide{opacity:0;pointer-events:none}
 </style></head>
 <body>
@@ -3091,15 +3094,20 @@ html,body{margin:0;height:100%;background:#0b1020;overflow:hidden;font-family:sy
 <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 var tg=window.Telegram&&Telegram.WebApp;
-if(tg){tg.ready();tg.expand();try{tg.setHeaderColor&&tg.setHeaderColor('#0b1020');}catch(e){}}
+if(tg){tg.ready();tg.expand();try{tg.setHeaderColor&&tg.setHeaderColor('#0f1828');}catch(e){}}
 var W=11020,H=11020,TILE=256,MAXZ=6;
-var map=L.map('map',{crs:L.CRS.Simple,minZoom:1,maxZoom:MAXZ+1,attributionControl:false,zoomControl:true});
+var map=L.map('map',{crs:L.CRS.Simple,maxZoom:MAXZ+1,attributionControl:false,zoomControl:false,
+  zoomSnap:0,zoomDelta:.6,wheelPxPerZoomLevel:90,inertia:true});
+L.control.zoom({position:'bottomright'}).addTo(map);
 function px(x,y){return map.unproject([x,y],MAXZ);}
 var bounds=L.latLngBounds(px(0,H),px(W,0));
-map.setMaxBounds(bounds.pad(0.12));
 L.tileLayer('/world/tiles/{z}/{x}/{y}.jpg',{tileSize:TILE,noWrap:true,bounds:bounds,
-  minZoom:1,maxNativeZoom:MAXZ,maxZoom:MAXZ+1}).addTo(map);
-map.fitBounds(bounds);
+  maxNativeZoom:MAXZ,maxZoom:MAXZ+1,keepBuffer:4}).addTo(map);
+map.setMaxBounds(bounds.pad(0.04));
+// «Cover»: мир ЗАПОЛНЯЕТ экран (без чёрных полей). minZoom = зум покрытия, старт по центру.
+function fit(){var s=map.getSize();var cz=MAXZ+Math.log2(Math.max(s.x,s.y)/W*1.02);
+  map.setMinZoom(cz);if(!map._c){map.setView(px(W/2,H/2),cz);map._c=true;}}
+map.whenReady(fit);window.addEventListener('resize',function(){map._c=false;fit();});
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
 var uid=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.id)||parseInt(new URLSearchParams(location.search).get('uid')||'0',10)||0;
 // ── подписи континентов (видны на дальнем зуме) ──
