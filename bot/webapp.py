@@ -3126,7 +3126,7 @@ function card(t){
     '<div class="loc">📍 '+esc(t.continent)+'</div>'+
     '<div class="row"><span>⚜️ ур. '+t.level+'</span><span>⭐ реп. '+t.rep+'</span>'+
     '<span>👥 '+t.cap+'</span><span>☕ уют '+t.comfort+'</span><span>🏛 '+t.builds+'</span></div>'+
-    (t.mine?'<div class="mine">★ твоя таверна'+(t.income?' · +'+t.income+' 🪙/ч':'')+'</div>':'')+'</div>';
+    (t.mine?'<div class="mine">★ твоя таверна</div>':'')+'</div>';
 }
 fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(function(d){
   var tv=d.taverns||[];
@@ -3143,7 +3143,7 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
   // баннер рейда
   if(d.raid){var rb=document.getElementById('raidbar');
     rb.innerHTML=d.raid.emoji+' <span>'+esc(d.raid.name)+' — '+(d.raid.status==='gathering'?'идёт сбор!':'В БОЙ!')+'</span><span class="go">играть ›</span>';
-    rb.style.display='flex';rb.onclick=function(){location.href='/app/?startapp=raid';};}
+    rb.style.display='flex';rb.onclick=function(){(window.top||window).location.href='/app/?startapp=raid';};}
   // кнопка «моя таверна»
   var mb=document.getElementById('mine');
   if(myMarker){mb.onclick=function(){
@@ -3167,7 +3167,6 @@ CONTINENT_NAMES = [
     "Вересковый Дол", "Заливные Луга", "Старолесье", "Травяной Простор",
     "Выжженные Земли", "Красные Пустоши", "Солончак", "Пыльный Предел", "Багровые Дюны", "Сухой Кряж",
 ]
-_BIOME_RU = {"snow": "снега", "green": "зелёные земли", "desert": "пустоши"}
 _WORLD_CONT: list[dict] | None = None
 
 
@@ -3207,31 +3206,30 @@ async def _world_taverns(request: web.Request) -> web.Response:
     async with session_factory() as s:
         rows = await repo.get_map_taverns(s)
         boss = await repo.get_active_raid(s)
-    by_c: dict[int, list] = {}
-    for tav, pl in rows:
-        by_c.setdefault(pl.id % nc, []).append((tav, pl))
-    out = []
+    # Позиция СТАБИЛЬНА (не зависит от явки соседей — раньше спираль шла по индексу
+    # сортировки и таверны «прыгали» при появлении нового игрока на континенте). Берём
+    # её прямо из ХЭША id игрока, полярно и равномерно по площади диска вокруг центра
+    # континента — без наложений (непрерывно, а не по сетке слотов).
     R = 0.095
-    for ci, lst in by_c.items():
-        lst.sort(key=lambda tp: tp[1].id)
-        c = conts[ci]
-        n = len(lst)
-        for k, (tav, pl) in enumerate(lst):
-            rr = R * math.sqrt((k + 0.5) / n)
-            th = k * 2.39996323                       # золотой угол → подсолнух
-            x = min(0.997, max(0.003, c["x"] + rr * math.cos(th)))
-            y = min(0.997, max(0.003, c["y"] + rr * math.sin(th)))
-            mine = bool(uid) and pl.id == uid
-            d = {
-                "x": round(x, 4), "y": round(y, 4),
-                "name": tav.name or "Таверна", "owner": pl.first_name or "Кабатчик",
-                "level": tav.level, "tier": worldmap.sprite_tier(tav.level),
-                "rep": tav.reputation, "cap": tav.capacity, "comfort": tav.comfort,
-                "builds": len(tav.buildings or []), "continent": c["name"], "mine": mine,
-            }
-            if mine:
-                d["income"] = tav.income_rate
-            out.append(d)
+    out = []
+    for tav, pl in rows:
+        c = conts[pl.id % nc]
+        h1 = (pl.id * 2654435761) & 0xFFFFFFFF
+        h2 = (pl.id * 40503 + 0x9E3779B1) & 0xFFFFFFFF
+        a = (h1 / 4294967296.0) * 6.2831853                  # угол
+        rr = R * math.sqrt(h2 / 4294967296.0)                # радиус (равномерно по площади)
+        x = min(0.997, max(0.003, c["x"] + rr * math.cos(a)))
+        y = min(0.997, max(0.003, c["y"] + rr * math.sin(a)))
+        out.append({
+            # income/доход НЕ отдаём: mine определяется по ?uid (подделываемому на публичном
+            # /world), иначе утекал бы чужой доход. Прочие поля — публичные игровые статы.
+            "x": round(x, 4), "y": round(y, 4),
+            "name": tav.name or "Таверна", "owner": pl.first_name or "Кабатчик",
+            "level": tav.level, "tier": worldmap.sprite_tier(tav.level),
+            "rep": tav.reputation, "cap": tav.capacity, "comfort": tav.comfort,
+            "builds": len(tav.buildings or []), "continent": c["name"],
+            "mine": bool(uid) and pl.id == uid,
+        })
     raid = None
     if boss is not None and boss.status in ("gathering", "active"):
         from bot.game import raid as rd
