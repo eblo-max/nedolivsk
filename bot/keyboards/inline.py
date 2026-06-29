@@ -76,15 +76,20 @@ def tavern_kb(player: Player, private: bool = True) -> InlineKeyboardMarkup:
     # ГЛАВНЫЙ ВХОД в мини-апп (только в личке — web_app группа не принимает).
     # Открываем всем игрокам; внутри доступны готовые разделы (Таверна/Стройка/
     # Персонаж/Вылазки), Торг и Карта пока живут в боте.
-    if private:
-        from bot import webapp
-        _aurl = webapp.base_url()
-        if _aurl:
-            kb.button(text="🏰 Открыть в приложении", web_app=WebAppInfo(url=f"{_aurl}/app"), style="success")
-            sizes.append(1)
+    from bot import webapp
+    _aurl = webapp.base_url()
+    if private and _aurl:
+        kb.button(text="🏰 Открыть в приложении", web_app=WebAppInfo(url=f"{_aurl}/app"), style="success")
+        sizes.append(1)
 
-    if raidmod.active_id() is not None:  # идёт глобальный рейд-босс — в бой!
-        kb.button(text="⚔️ РЕЙД-БОСС — В БОЙ!", callback_data="raidopen", style="danger")
+    if raidmod.active_id() is not None:  # идёт глобальный рейд-босс — В БОЙ (в мини-апп)!
+        _t = "⚔️ РЕЙД-БОСС — В БОЙ!"
+        if private and _aurl:           # личка — web_app сразу на экран рейда
+            kb.button(text=_t, web_app=WebAppInfo(url=f"{_aurl}/app/?startapp=raid"), style="danger")
+        elif _raid_app_btn(kb, _t):     # группа — Direct-Link в мини-апп (?startapp=raid)
+            pass
+        else:                            # нет короткого имени мини-аппа — чатовая панель (фолбэк)
+            kb.button(text=_t, callback_data="raidopen", style="danger")
         sizes.append(1)
     if invmod.gathering_id() is not None:  # идёт сбор на Орду орков — в строй!
         kb.button(text="🪓 ОРДА ОРКОВ — В СТРОЙ!", callback_data="invopen", style="danger")
