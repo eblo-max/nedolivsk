@@ -188,6 +188,14 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
     return () => clearInterval(i)
   }, [load])
 
+  // сбор истекает ровно сейчас — перезагрузить сразу к 0:00 (бэкенд переведёт в бой),
+  // не ждать до 3с следующего поллинга
+  useEffect(() => {
+    if (st?.status !== 'gathering' || (st.gather_left ?? 0) <= 0) return
+    const t = setTimeout(load, ((st.gather_left ?? 0) + 1) * 1000)
+    return () => clearTimeout(t)
+  }, [st?.status, st?.gather_left, load])
+
   // кулдаун-тик
   useEffect(() => {
     if (cd <= 0) return

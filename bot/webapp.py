@@ -441,15 +441,49 @@ def _raid_report_dto(boss, uid: int = 0) -> dict | None:
     }
 
 
+async def _raid_start_if_due(s, boss, now):
+    """Сбор вышел → перевести в БОЙ ПРЯМО СЕЙЧАС (не ждать нотифаер ≤60с — из-за
+    него босс «появлялся» через 20-30с после 0:00). Под локом + повторная проверка
+    (анти-гонка: первый запрос переводит, остальные видят уже active). Чат-анонсы
+    догонит нотифаер на своём тике. Возвращает свежий boss (active/expired)."""
+    if boss is None or boss.status != "gathering" or not boss.gather_until:
+        return boss
+    gu = boss.gather_until if boss.gather_until.tzinfo else boss.gather_until.replace(tzinfo=timezone.utc)
+    if now < gu:
+        return boss
+    from bot.game import raid as rd
+    from bot import texts as _t
+    locked = await repo.get_raid(s, boss.id, lock=True)
+    if locked is None or locked.status != "gathering":
+        return locked or boss            # другой запрос/нотифаер уже перевёл
+    lgu = locked.gather_until if locked.gather_until.tzinfo else locked.gather_until.replace(tzinfo=timezone.utc)
+    if now < lgu:
+        return locked
+    if rd.registered_count(locked) > 0:
+        locked.max_hp = locked.hp = rd.boss_start_hp(locked)
+        locked.status = "active"
+        locked.ends_at = rd.fight_until(now)
+        for pid in list((locked.contributions or {}).keys()):
+            repo.queue_notify(s, int(pid), _t.raid_fight_ping())
+    else:
+        locked.status = "expired"        # никто не пришёл — ушёл
+    await s.commit()
+    return locked
+
+
 async def _api_raid(request: web.Request) -> web.Response:
     """Состояние рейд-босса для мини-аппа: живой босс либо свежая сводка боя."""
     uid, body = await _auth(request)
     if uid is None:
         return body
+    now = datetime.now(timezone.utc)
     async with session_factory() as s:
         boss = await repo.get_active_raid(s)
-        if boss is not None:
+        boss = await _raid_start_if_due(s, boss, now)    # сбор вышел → бой/уход сразу
+        if boss is not None and boss.status in ("gathering", "active"):
             dto = _raid_dto(boss, uid)
+        elif boss is not None and boss.status in ("dead", "expired"):
+            dto = _raid_report_dto(boss, uid)
         else:
             latest = await repo.latest_raid(s)
             dto = (_raid_report_dto(latest, uid)
