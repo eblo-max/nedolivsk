@@ -3101,7 +3101,7 @@ L.tileLayer('/world/tiles/{z}/{x}/{y}.jpg',{tileSize:TILE,noWrap:true,bounds:bou
   minZoom:1,maxNativeZoom:MAXZ,maxZoom:MAXZ+1}).addTo(map);
 map.fitBounds(bounds);
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
-var uid=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.id)||0;
+var uid=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.id)||parseInt(new URLSearchParams(location.search).get('uid')||'0',10)||0;
 // ── подписи континентов (видны на дальнем зуме) ──
 var contLayer=L.layerGroup();
 fetch('/world/slots.json').then(function(r){return r.json();}).then(function(cs){
@@ -3254,6 +3254,15 @@ async def _world_tile(request: web.Request) -> web.Response:
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=604800"})
 
 
+async def _api_whoami(request: web.Request) -> web.Response:
+    """Кто я: флаг админа (для гейта вкладки «Карта» в мини-аппе). Auth — initData."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    return web.json_response({"ok": True, "admin": _is_admin(uid)},
+                             headers={"Cache-Control": "no-store"})
+
+
 _SPRITE_CACHE: dict[int, bytes] = {}
 
 
@@ -3378,6 +3387,7 @@ def build_app() -> web.Application:
     app.router.add_get("/app/{tail:.*}", _spa)        # SPA-fallback + статика dist
     app.router.add_get("/api/taverns", _api_taverns)
     app.router.add_post("/api/invasion/join", _api_invasion_join)
+    app.router.add_post("/api/whoami", _api_whoami)          # флаг админа (гейт вкладки «Карта»)
     app.router.add_post("/api/raid", _api_raid)              # рейд-босс: состояние
     app.router.add_post("/api/raid/join", _api_raid_join)    # записаться (сбор)
     app.router.add_post("/api/raid/hit", _api_raid_hit)      # удар по боссу (битва)

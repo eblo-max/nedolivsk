@@ -1,13 +1,14 @@
 import { NavLink } from 'react-router-dom'
 import { haptic } from '../telegram'
 
-// Карта пока в боте. Торг открыт (закрыт гейтом до запуска — внутри lock-экран).
+// Карта мира: вкладка-заглушка для всех, реальная тайловая карта — пока только админу.
 const TABS = [
   { to: '/', icon: '🏠', label: 'Таверна' },
   { to: '/buildings', icon: '🏗', label: 'Стройка' },
   { to: '/character', icon: '🧍', label: 'Персонаж' },
   { to: '/sorties', icon: '⚔️', label: 'Вылазки' },
   { to: '/market', icon: '💰', label: 'Торг' },
+  { to: '/map', icon: '🗺', label: 'Карта' },
 ]
 
 export default function BottomNav() {

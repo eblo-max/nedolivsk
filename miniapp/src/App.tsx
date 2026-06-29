@@ -10,6 +10,7 @@ import Character from './screens/Character'
 import Sorties from './screens/Sorties'
 import Buildings from './screens/Buildings'
 import Market from './screens/Market'
+import WorldMap from './screens/WorldMap'
 
 export default function App() {
   const [intro, setIntro] = useState(true)
@@ -49,13 +50,14 @@ export default function App() {
       {!intro && notice && <TestAccessModal onClose={() => setNotice(false)} />}
       <div className="app">
         {/* место под фикс. тикер резервируем только на Таверне (он там и рендерится) */}
-        <div className={`scroll${['/buildings', '/character', '/sorties', '/market'].includes(loc.pathname) ? '' : ' with-ticker'}`}>
+        <div className={`scroll${['/buildings', '/character', '/sorties', '/market', '/map'].includes(loc.pathname) ? '' : ' with-ticker'}`}>
           <Routes>
             <Route path="/" element={<Tavern />} />
             <Route path="/buildings" element={<Buildings />} />
             <Route path="/character" element={<Character />} />
             <Route path="/sorties" element={<Sorties />} />
             <Route path="/market" element={<Market />} />
+            <Route path="/map" element={<WorldMap />} />
             {/* Карта пока в боте — любой др. путь ведёт в Таверну */}
             <Route path="*" element={<Tavern />} />
           </Routes>
