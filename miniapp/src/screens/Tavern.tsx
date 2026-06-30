@@ -46,7 +46,7 @@ interface TavernState {
 
 // образец для оффлайн-превью (форма 1:1 как у /api/state)
 const SAMPLE: TavernState = {
-  ok: true, name: 'Кривая Кружка', level: 2, region: 'Северная глушь',
+  ok: true, name: 'Кривая Кружка', level: 2, region: 'Изумрудная Чарка',
   flavor: 'Свечи оплыли, эль выдохся, но гости всё прут — знать, иначе некуда.',
   gold: 1340, income_rate: 18, income_ready: 126, reputation: 27,
   capacity: 24, comfort: 12, luck_pct: 8, gear_worn: 1, gear_slots: 11,

@@ -1077,7 +1077,7 @@ def _tavern_state(p, t) -> dict:
 
     return {
         "ok": True, "name": t.name, "level": int(t.level),
-        "region": bal.REGIONS.get(p.region, p.region or ""),
+        "region": worldmap.continent_name(p.id),   # локация-континент (совпадает с картой мира)
         "flavor": texts._flavor_line(p, t, chat_id, seasonmod, citymod),
         "gold": int(p.gold), "income_rate": int(t.income_rate),
         "income_ready": int(texts._pending_income(t)), "reputation": int(t.reputation or 0),
@@ -3423,13 +3423,7 @@ async def _world_page(request: web.Request) -> web.Response:
 
 
 # Названия 25 континентов по биому (порядок = снег ×5 → зелень ×14 → пустыни ×6).
-CONTINENT_NAMES = [
-    "Ледяные Пределы", "Морозный Кряж", "Стылые Фьорды", "Белое Безмолвие", "Снежный Зарубеж",
-    "Зелёные Долы", "Хмельные Луга", "Дубравный Край", "Речные Земли", "Изумрудная Чаща",
-    "Медовые Поля", "Грибная Лощина", "Светлая Пуща", "Холмогорье", "Тихие Поймы",
-    "Вересковый Дол", "Заливные Луга", "Старолесье", "Травяной Простор",
-    "Выжженные Земли", "Красные Пустоши", "Солончак", "Пыльный Предел", "Багровые Дюны", "Сухой Кряж",
-]
+CONTINENT_NAMES = worldmap.CONTINENT_NAMES   # единый источник имён (см. bot/game/worldmap.py)
 _WORLD_CONT: list[dict] | None = None
 
 
