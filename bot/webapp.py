@@ -1077,7 +1077,7 @@ def _tavern_state(p, t) -> dict:
 
     return {
         "ok": True, "name": t.name, "level": int(t.level),
-        "region": worldmap.continent_name(p.id),   # локация-континент (совпадает с картой мира)
+        "region": worldmap.continent_name(p.region, p.id),   # локация = континент своей зоны
         "flavor": texts._flavor_line(p, t, chat_id, seasonmod, citymod),
         "gold": int(p.gold), "income_rate": int(t.income_rate),
         "income_ready": int(texts._pending_income(t)), "reputation": int(t.reputation or 0),
@@ -1736,7 +1736,7 @@ def _rating_entries(rows: list) -> tuple[list[dict], int]:
         entries.append({
             "id": int(player.id), "name": tavern.name or "Таверна",
             "owner": player.first_name or "Кабатчик", "level": int(tavern.level),
-            "loc": worldmap.continent_name(player.id),
+            "loc": worldmap.continent_name(player.region, player.id),
             "gdp": int(gdp), "rep": int(tavern.reputation or 0),
         })
     return entries, sum(e["gdp"] for e in entries)
@@ -3572,20 +3572,8 @@ _WORLD_CONT: list[dict] | None = None
 
 
 def _world_continents() -> list[dict]:
-    """25 континентов: индекс, центр (норм.), биом, ИМЯ. Кэш из world25_slots.json."""
-    global _WORLD_CONT
-    if _WORLD_CONT is None:
-        p = worldmap.MAP_FILE.parent / "world25_slots.json"
-        try:
-            data = json.loads(p.read_text(encoding="utf-8"))
-        except Exception:   # noqa: BLE001
-            data = []
-        _WORLD_CONT = [
-            {"i": i, "x": c[1], "y": c[2], "biome": c[3] if len(c) > 3 else "",
-             "name": CONTINENT_NAMES[i] if i < len(CONTINENT_NAMES) else f"Земля {c[0]}"}
-            for i, c in enumerate(data)
-        ]
-    return _WORLD_CONT or [{"i": 0, "x": 0.5, "y": 0.5, "biome": "", "name": "Недоливск"}]
+    """25 континентов (центр/биом/имя) — единый источник из worldmap."""
+    return worldmap.continents() or [{"i": 0, "x": 0.5, "y": 0.5, "biome": "", "name": "Недоливск"}]
 
 
 async def _world_slots(request: web.Request) -> web.Response:
@@ -3614,7 +3602,7 @@ async def _world_taverns(request: web.Request) -> web.Response:
     R = 0.095
     out = []
     for tav, pl in rows:
-        c = conts[pl.id % nc]
+        c = worldmap.continent_for(pl.region, pl.id) or conts[pl.id % nc]  # континент ЗОНЫ игрока
         h1 = (pl.id * 2654435761) & 0xFFFFFFFF
         h2 = (pl.id * 40503 + 0x9E3779B1) & 0xFFFFFFFF
         a = (h1 / 4294967296.0) * 6.2831853                  # угол

@@ -12,6 +12,7 @@
 """
 
 import io
+import json
 import math
 import random
 from dataclasses import dataclass
@@ -38,10 +39,10 @@ MIN_DIST = 0.072
 # Размер спрайта таверны = доля от MIN_DIST·сторона (чтобы влезал и не наезжал).
 SPRITE_FRAC = 0.62
 
-# 25 «континентов» карты — именованные локации (визуальные под-области). Порядок
-# совпадает с world25_slots.json. Континент таверны = player.id % 25 — так её
-# раскладывает интерактивная карта (/world/taverns.json), отсюда же берёт и меню бота,
-# чтобы локация в меню и на карте совпадали. Единый источник имён для обоих.
+# 25 «континентов» карты — именованные локации. Порядок совпадает с world25_slots.json:
+# первые 5 — снег (north_wilds), 14 — зелень (green_valleys), 6 — пустыня (red_wastes).
+# Таверна садится в континент СВОЕЙ зоны (player.region), а не по id%25 — так карта и
+# меню визуально соответствуют реальной серверной зоне. Единый источник имён.
 CONTINENT_NAMES = [
     "Холодненькое", "Трясучий Кряж", "Рассольные Фьорды", "Белая Горячка", "Опохмельный Зарубеж",
     "Зелёный Змий", "Хмельное Раздолье", "Дубовый Край", "Пивные Реки", "Изумрудная Чарка",
@@ -50,10 +51,55 @@ CONTINENT_NAMES = [
     "Сушняковые Земли", "Краснорожие Пустоши", "Рассольник", "Сушняк-Предел", "Похмельные Дюны", "Сухой Закон",
 ]
 
+# Биом континента → игровая зона (player.region).
+BIOME_ZONE = {"snow": "north_wilds", "green": "green_valleys",
+              "desert": "red_wastes", "red": "red_wastes"}
 
-def continent_name(player_id: int) -> str:
-    """Имя континента-локации таверны по id игрока — так же раскладывает карта мира."""
-    return CONTINENT_NAMES[player_id % len(CONTINENT_NAMES)]
+_CONTS_CACHE: list[dict] | None = None
+_ZONE_CONTS_CACHE: dict[str, list[dict]] | None = None
+
+
+def continents() -> list[dict]:
+    """25 континентов: индекс, центр (норм. x/y), биом, ИМЯ. Кэш из world25_slots.json."""
+    global _CONTS_CACHE
+    if _CONTS_CACHE is None:
+        p = MAP_FILE.parent / "world25_slots.json"
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except Exception:   # noqa: BLE001
+            data = []
+        _CONTS_CACHE = [
+            {"i": i, "x": c[1], "y": c[2], "biome": c[3] if len(c) > 3 else "",
+             "name": CONTINENT_NAMES[i] if i < len(CONTINENT_NAMES) else f"Земля {c[0]}"}
+            for i, c in enumerate(data)
+        ]
+    return _CONTS_CACHE
+
+
+def zone_continents(region: str) -> list[dict]:
+    """Континенты биома зоны игрока (для размещения таверны в её реальной зоне)."""
+    global _ZONE_CONTS_CACHE
+    if _ZONE_CONTS_CACHE is None:
+        m: dict[str, list[dict]] = {z: [] for z in ZONE_ORDER}
+        for c in continents():
+            z = BIOME_ZONE.get(c["biome"])
+            if z in m:
+                m[z].append(c)
+        _ZONE_CONTS_CACHE = m
+    return (_ZONE_CONTS_CACHE.get(region)
+            or _ZONE_CONTS_CACHE.get("green_valleys") or [])
+
+
+def continent_for(region: str, player_id: int) -> dict | None:
+    """Континент таверны — один из континентов её зоны, стабильно по id игрока."""
+    cs = zone_continents(region or "green_valleys")
+    return cs[player_id % len(cs)] if cs else None
+
+
+def continent_name(region: str, player_id: int) -> str:
+    """Имя локации таверны = континент её ЗОНЫ (совпадает с раскладкой карты мира)."""
+    c = continent_for(region, player_id)
+    return c["name"] if c else CONTINENT_NAMES[player_id % len(CONTINENT_NAMES)]
 
 
 def _zone_index(zone: str) -> int:

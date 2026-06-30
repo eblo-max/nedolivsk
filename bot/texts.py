@@ -1197,7 +1197,7 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
     from bot.game import worldmap as wmap
 
     chat_id = getattr(player, "chat_id", None)
-    region = wmap.continent_name(player.id)   # локация-континент (совпадает с картой мира)
+    region = wmap.continent_name(player.region, player.id)   # локация = континент своей зоны
     flavor = _flavor_line(player, tavern, chat_id, seasonmod, citymod)
 
     # СЕЙЧАС — активные дела
