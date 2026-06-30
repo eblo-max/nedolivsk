@@ -3,7 +3,7 @@ import { api } from '../api'
 import { haptic } from '../telegram'
 
 type MetricKey = 'gdp' | 'rep' | 'level'
-interface Row { place: number; name: string; id?: number; owner: string; level: number; loc: string; gdp: number; rep: number; mine: boolean }
+interface Row { place: number; name: string; id?: number; owner: string; level: number; loc: string; gdp: number; rep: number; mine: boolean; trend?: number | null }
 interface Board { rows: Row[]; me: Row | null }
 interface Rating { boards: Record<MetricKey, Board>; total_gdp: number; total: number }
 
@@ -15,6 +15,14 @@ const METRICS: { key: MetricKey; label: string; icon: string; val: (r: Row) => n
   { key: 'rep', label: 'Слава', icon: '⭐', val: (r) => r.rep, fmt },
   { key: 'level', label: 'Уровень', icon: '🏰', val: (r) => r.level, fmt: (n) => `ур. ${n}` },
 ]
+
+/** Тренд места в реальном времени: ▲N поднялся, ▼N опустился, = на месте, новичок/нет базы — пусто. */
+function Trend({ t }: { t?: number | null }) {
+  if (t == null) return null
+  if (t === 0) return <span className="lb-trend same">=</span>
+  const up = t > 0
+  return <span className={`lb-trend ${up ? 'up' : 'down'}`}>{up ? '▲' : '▼'}{Math.abs(t)}</span>
+}
 
 /** Аватар игрока: фото из ТГ-профиля (/avatar/<id>), при ошибке/без фото — инициал. */
 function Avatar({ id, name, rank, sm }: { id?: number; name: string; rank: number; sm?: boolean }) {
@@ -40,9 +48,10 @@ const DEMO_ROWS: Omit<Row, 'place' | 'mine'>[] = [
   { name: 'Хмельной Кот', id: 7, owner: 'Степан', level: 4, loc: 'Бражные Поля', gdp: 520, rep: 9 },
   { name: 'Дно Бутылки', id: 8, owner: 'Аграфена', level: 3, loc: 'Старый Запой', gdp: 410, rep: 7 },
 ]
+const DEMO_TREND = [1, -1, 0, 2, -2, 1, 0, -1]   // демо-стрелки для превью
 function demoBoard(key: MetricKey): Board {
   const ranked = [...DEMO_ROWS].sort((a, b) => (b[key] as number) - (a[key] as number) || a.name.localeCompare(b.name))
-  return { rows: ranked.map((e, i) => ({ ...e, place: i + 1, mine: e.id === 1 })), me: null }
+  return { rows: ranked.map((e, i) => ({ ...e, place: i + 1, mine: e.id === 1, trend: DEMO_TREND[i] ?? 0 })), me: null }
 }
 const DEMO: Rating = {
   total: 11, total_gdp: 9740,
@@ -105,6 +114,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                     <Avatar id={r.id} name={r.name} rank={r.place} />
                     <div className="lb-pname">{r.name}</div>
                     <div className="lb-pval">{m.fmt(m.val(r))}</div>
+                    <Trend t={r.trend} />
                     <div className="lb-ped"><span>{r.place}</span></div>
                   </div>
                 )
@@ -117,7 +127,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                 return (
                   <div key={r.name + r.owner} className={`lb-row${r.mine ? ' mine' : ''}`}
                     style={{ animationDelay: `${Math.min(r.place, 14) * 0.035}s` }}>
-                    <div className="lb-rank">{r.place}</div>
+                    <div className="lb-rank">{r.place}<Trend t={r.trend} /></div>
                     <Avatar id={r.id} name={r.name} rank={r.place} sm />
                     <div className="lb-info">
                       <div className="lb-name">{r.name}{r.mine && <span className="lb-you">ты</span>}</div>
@@ -132,7 +142,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                 <>
                   <div className="lb-gap">↓ твоё место ↓</div>
                   <div className="lb-row mine">
-                    <div className="lb-rank">{meRow.place}</div>
+                    <div className="lb-rank">{meRow.place}<Trend t={meRow.trend} /></div>
                     <Avatar id={meRow.id} name={meRow.name} rank={99} sm />
                     <div className="lb-info">
                       <div className="lb-name">{meRow.name}<span className="lb-you">ты</span></div>

@@ -1742,12 +1742,51 @@ def _rating_entries(rows: list) -> tuple[list[dict], int]:
     return entries, sum(e["gdp"] for e in entries)
 
 
-def _rating_board(entries: list[dict], metric: str, uid: int) -> dict:
-    """ЧЕСТНЫЙ рейтинг по метрике: сортируем ВСЕ таверны, режем топ; если меня нет
-    в топе — отдаю свою строку с её настоящим местом (не приблизительным)."""
-    ranked = sorted(entries, key=lambda e: (-e[metric], e["name"].lower()))
-    out = [{**e, "place": i, "mine": bool(uid) and e["id"] == uid}
-           for i, e in enumerate(ranked, 1)]
+# ── Тренд мест в реальном времени ──
+# Катящиеся снимки рангов в памяти: пишем не чаще раза в минуту при открытии доски.
+# Тренд строки = ранг в снимке ~_TREND_WINDOW назад − текущий ранг (живой).
+# +N = поднялся на N мест, −N = опустился, 0 = на месте, None = новичок/нет базы.
+# In-memory: после рестарта база отстраивается за несколько минут (тренд = «—»).
+from collections import deque as _deque   # noqa: E402
+
+_RANK_SNAPS: "_deque[tuple[float, dict[str, dict[int, int]]]]" = _deque(maxlen=60)
+_TREND_WINDOW = 600.0   # целевой возраст базлайна (~10 мин «реального времени»)
+_SNAP_MIN = 60.0        # снимок не чаще раза в минуту
+
+
+def _ranked(entries: list[dict], metric: str) -> list[dict]:
+    """Все таверны по убыванию метрики (тай-брейк — имя)."""
+    return sorted(entries, key=lambda e: (-e[metric], e["name"].lower()))
+
+
+def _trend_baseline(now: float) -> dict[str, dict[int, int]] | None:
+    """Снимок-база: самый свежий ИЗ тех, что старше окна; иначе — самый старый."""
+    if not _RANK_SNAPS:
+        return None
+    for ts, snap in reversed(_RANK_SNAPS):
+        if now - ts >= _TREND_WINDOW:
+            return snap
+    return _RANK_SNAPS[0][1]
+
+
+def _trend_record(now: float, cur_ranks: dict[str, dict[int, int]]) -> None:
+    """Запомнить текущие ранги (не чаще _SNAP_MIN); подрезать старьё."""
+    if _RANK_SNAPS and now - _RANK_SNAPS[-1][0] < _SNAP_MIN:
+        return
+    _RANK_SNAPS.append((now, cur_ranks))
+    while len(_RANK_SNAPS) > 1 and now - _RANK_SNAPS[0][0] > 2 * _TREND_WINDOW:
+        _RANK_SNAPS.popleft()
+
+
+def _rating_board(ranked: list[dict], uid: int, base: dict[int, int] | None) -> dict:
+    """Доска из уже отсортированного списка: место + тренд vs базовый снимок."""
+    out = []
+    for i, e in enumerate(ranked, 1):
+        trend = None
+        if base is not None:
+            br = base.get(e["id"])
+            trend = (br - i) if br is not None else None   # +вверх / −вниз / None=новичок
+        out.append({**e, "place": i, "mine": bool(uid) and e["id"] == uid, "trend": trend})
     top = out[:_RATING_TOP]
     me = None
     if uid and not any(r["mine"] for r in top):
@@ -1756,8 +1795,8 @@ def _rating_board(entries: list[dict], metric: str, uid: int) -> dict:
 
 
 async def _api_rating(request: web.Request) -> web.Response:
-    """Доска почёта: ТРИ честно ранжированные доски (ВВП/Слава/Уровень) в одном
-    ответе — переключение на клиенте мгновенное и корректное. ОТКРЫТА ТОЛЬКО АДМИНУ."""
+    """Доска почёта: ТРИ честно ранжированные доски (ВВП/Слава/Уровень) + тренд мест
+    в реальном времени, в одном ответе. ОТКРЫТА ТОЛЬКО АДМИНУ."""
     uid, body = await _auth(request)
     if uid is None:
         return body
@@ -1766,7 +1805,15 @@ async def _api_rating(request: web.Request) -> web.Response:
     async with session_factory() as s:
         rows = await repo.get_map_taverns(s)
     entries, total_gdp = _rating_entries(rows)
-    boards = {k: _rating_board(entries, k, uid) for k in _RATING_METRICS}
+    now = time.time()
+    base = _trend_baseline(now)
+    cur_ranks: dict[str, dict[int, int]] = {}
+    boards: dict[str, dict] = {}
+    for k in _RATING_METRICS:
+        ranked = _ranked(entries, k)
+        cur_ranks[k] = {e["id"]: i for i, e in enumerate(ranked, 1)}
+        boards[k] = _rating_board(ranked, uid, base.get(k) if base else None)
+    _trend_record(now, cur_ranks)
     return web.json_response(
         {"ok": True, "boards": boards, "total_gdp": int(total_gdp),
          "total": len(entries)}, headers={"Cache-Control": "no-store"})
