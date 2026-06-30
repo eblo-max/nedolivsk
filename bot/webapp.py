@@ -3066,13 +3066,13 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
   border:1px solid #ff7a4a;box-shadow:0 4px 16px rgba(210,58,24,.5);animation:rb 1.6s ease-in-out infinite}
 @keyframes rb{0%,100%{box-shadow:0 4px 16px rgba(210,58,24,.45)}50%{box-shadow:0 4px 26px rgba(255,90,50,.8)}}
 #raidbar .go{margin-left:auto;opacity:.85}
-/* подписи континентов — картуш с иконкой биома */
-.cont-label{width:210px!important;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.cl-plate{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-family:var(--serif);
-  font-weight:700;font-size:13.5px;letter-spacing:.01em;color:#f4e3bd;padding:3px 12px;border-radius:999px;
-  background:rgba(10,14,26,.6);border:1px solid rgba(198,162,92,.5);
-  box-shadow:0 2px 10px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,228,170,.1);text-shadow:0 1px 2px #000}
-.cl-plate .ci{font-size:12px;opacity:.95}
+/* названия регионов — «гравировка»: разрядка + halo, без плашки, ПОД пинами */
+.cont-label{width:240px!important;display:flex;align-items:center;justify-content:center;
+  pointer-events:none;transition:opacity .18s}
+.cl-plate{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-family:var(--serif);
+  font-weight:700;font-size:15px;letter-spacing:.10em;color:#f4e7c8;
+  text-shadow:0 0 5px #000,0 0 11px rgba(0,0,0,.95),0 1px 2px #000}
+.cl-plate .ci{font-size:13px;letter-spacing:0;filter:drop-shadow(0 0 3px #000)}
 /* подпись таверны (на близком зуме) */
 .leaflet-tooltip.tav-label{background:rgba(10,14,24,.85);border:1px solid #6b522e;color:#f3dca0;
   font-family:var(--serif);font-weight:700;font-size:11px;border-radius:7px;padding:1px 7px;
@@ -3123,6 +3123,8 @@ var W=11020,H=11020,TILE=256,MAXZ=6;
 var map=L.map('map',{crs:L.CRS.Simple,maxZoom:MAXZ+1,attributionControl:false,zoomControl:false,
   zoomSnap:0,zoomDelta:.6,wheelPxPerZoomLevel:90,inertia:true});
 L.control.zoom({position:'bottomright'}).addTo(map);
+// слой названий регионов — ПОД пинами/монетами (как в стратегиях: имя региона на фоне)
+map.createPane('contPane');map.getPane('contPane').style.zIndex=450;map.getPane('contPane').style.pointerEvents='none';
 function px(x,y){return map.unproject([x,y],MAXZ);}
 var bounds=L.latLngBounds(px(0,H),px(W,0));
 L.tileLayer('/world/tiles/{z}/{x}/{y}.jpg',{tileSize:TILE,noWrap:true,bounds:bounds,
@@ -3148,14 +3150,15 @@ window.addEventListener('resize',function(){map._c=false;fit();});
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
 var uid=(tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user&&tg.initDataUnsafe.user.id)||parseInt(new URLSearchParams(location.search).get('uid')||'0',10)||0;
 // ── подписи континентов (видны на дальнем зуме) ──
-var contLayer=L.layerGroup();
+var contLayer=L.layerGroup();var contMarkers=[];
 var BICON={snow:'❄',green:'🌿',desert:'☀'};
 fetch('/world/slots.json').then(function(r){return r.json();}).then(function(cs){
   cs.forEach(function(c){
     var bi=BICON[c.biome]||'•';
-    L.marker(px(c.x*W,c.y*H),{interactive:false,keyboard:false,
-      icon:L.divIcon({className:'cont-label',iconSize:[210,24],iconAnchor:[105,28],
+    var cm=L.marker(px(c.x*W,c.y*H),{interactive:false,keyboard:false,pane:'contPane',
+      icon:L.divIcon({className:'cont-label',iconSize:[240,26],iconAnchor:[120,13],
         html:'<span class="cl-plate"><span class="ci">'+bi+'</span>'+esc(c.name)+'</span>'})}).addTo(contLayer);
+    contMarkers.push({m:cm});
   });
   queueRelayout();
 }).catch(function(){});
@@ -3168,9 +3171,15 @@ function _box(el,pad){var r=el.getBoundingClientRect();if(!r.width)return null;v
 function _hit(a,b){return a.x0<b.x1&&a.x1>b.x0&&a.y0<b.y1&&a.y1>b.y0;}
 var _rq=false;
 function relayout(){_rq=false;var z=map.getZoom(),i;
-  if(z<=3){if(!map.hasLayer(contLayer))contLayer.addTo(map);}
+  var showCont=z<=3;
+  if(showCont){if(!map.hasLayer(contLayer))contLayer.addTo(map);}
   else{if(map.hasLayer(contLayer))map.removeLayer(contLayer);}
   var showNames=z>=3.6,occ=[],cand=[];
+  // названия регионов: раскладка без ВЗАИМНЫХ наложений (они под пинами/монетами; halo)
+  if(showCont){contMarkers.forEach(function(o){var el=o.m.getElement&&o.m.getElement();if(!el)return;
+    var b=_box(el,4);if(!b){el.style.opacity=0;return;}
+    var ok=true;for(var j=0;j<occ.length;j++){if(_hit(b,occ[j])){ok=false;break;}}
+    if(ok){el.style.opacity=1;occ.push(b);}else{el.style.opacity=0;}});}
   if(showNames){var blk=document.querySelectorAll('.tcl');  // резервируем монеты (не пины: имя над своим пином)
     for(i=0;i<blk.length;i++){var bb=_box(blk[i],1);if(bb)occ.push(bb);}}
   tavMarkers.forEach(function(o){var tt=o.m.getTooltip&&o.m.getTooltip();var el=tt&&tt.getElement&&tt.getElement();
