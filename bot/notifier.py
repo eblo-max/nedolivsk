@@ -377,6 +377,7 @@ async def _notify_returned(bot: Bot) -> None:
             .where(Tavern.auction != {})
             .with_for_update(of=Player, skip_locked=True)
         )
+        auction_chat_posts: list[tuple[int, str]] = []  # анонсы продаж с торгов — в чаты
         for player in result.scalars().all():
             tavern = player.tavern
             if auctionmod.is_due(tavern, now):
@@ -389,6 +390,11 @@ async def _notify_returned(bot: Bot) -> None:
                         repo.add_log(session, "player", player.id,
                                      f"🔨 аукцион: продал {res['qty']}×{gn} "
                                      f"за {res['gold']} 🪙")
+                        if player.chat_id is not None:   # анонс продажи в домашний чат
+                            auction_chat_posts.append(
+                                (player.chat_id,
+                                 texts.auction_sold_chat(
+                                     player.first_name or "Кабатчик", res)))
                     outbox.append((
                         player, texts.auction_settled(res),
                         buildings_notify_kb()))
@@ -789,6 +795,12 @@ async def _notify_returned(bot: Bot) -> None:
                     lambda cid=chat_id, t=bourse_news_text: bot.send_message(cid, t),
                     what=f"биржа→{chat_id}")
                 autoclean.schedule_message(msg, after=600)
+        # Аукцион: анонс продажи с торгов — в домашний чат продавца (флекс общины).
+        for chat_id, atext in auction_chat_posts:
+            msg = await deliver(
+                lambda cid=chat_id, t=atext: bot.send_message(cid, t),
+                what=f"аукцион→{chat_id}")
+            await effects.react_msg(msg, "🔨")
         # Подкидыш — постим после коммита (строка уже сохранена, id известен).
         orphaned: list[int] = []
         for chat_id, drop_id in loot_to_post:

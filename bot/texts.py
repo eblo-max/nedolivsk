@@ -1647,27 +1647,50 @@ def auction_pick_price(good: str, qty: int, world) -> str:
 
 
 def auction_settled(res: dict) -> str:
+    """Личная сводка продавцу — сочно и по делу."""
     from bot.game import npc
     from bot.game import production as prod
     g = prod.GOODS[res["good"]]
     if res["sold"]:
         return "\n".join([
-            "🔨 <b>ЛОТ УШЁЛ!</b>",
+            "🔨 <b>МОЛОТОК СТУКНУЛ — ЛОТ УШЁЛ!</b>",
             "",
-            f"{npc.label(res['npc'])} забрал лот.",
+            f"<i>{npc.label(res['npc'])} уволок твой товар, крякнув от жадности.</i>",
             "",
             *_branch("СДЕЛКА", [
-                f"📦 Продано — {res['qty']} × {g.emoji} {g.name}",
+                f"📦 Ушло — {res['qty']} × {g.emoji} {g.name}",
                 f"💰 Цена — {res['unit']} 🪙/шт",
-                f"🪙 Выручка — +{res['gold']}",
+                f"🪙 В мошну — +{res['gold']} 🪙",
             ]),
+            "",
+            "<i>Куй железо, пока горячо — выставляй новый лот, "
+            "золото само себя не наторгует.</i>",
         ])
     return "\n".join([
-        "🔨 <b>ТОРГИ ОКОНЧЕНЫ</b>",
+        "🔨 <b>ТОРГИ ПШИКНУЛИ</b>",
         "",
-        f"«Никто не дал твоей цены за {g.name} — лот снят, "
-        f"{res['qty']} шт вернулись в погреб»",
+        f"«Скупердяи зажали медяки — никто не дал твоей цены за "
+        f"{g.emoji} {g.name}. Лот снят, {res['qty']} шт пылятся обратно в погребе.»",
+        "",
+        "<i>Сбавь цену али жди ярмарку — на жадину свой дурак найдётся.</i>",
     ])
+
+
+def auction_sold_chat(name: str, res: dict) -> str:
+    """Анонс продажи с торгов в ОБЩИЙ ЧАТ (флекс продавца перед общиной)."""
+    from bot.game import npc
+    from bot.game import production as prod
+    g = prod.GOODS[res["good"]]
+    return (
+        "🔨 <b>МОЛОТОК НА ТОРГАХ!</b>\n\n"
+        f"<b>{escape(name)}</b> сбыл с аукциона "
+        f"<b>{res['qty']} × {g.emoji} {g.name}</b> по {res['unit']} 🪙/шт "
+        f"и набил мошну на <b>+{res['gold']} 🪙</b>.\n"
+        f"<i>{npc.label(res['npc'])} уволок добро, довольный аки кот со сметаной.</i>\n\n"
+        "<blockquote>Вот так барыши и куются, покуда вы тут лясы точите да "
+        "слюни на ус мотаете. Тащи и ты товар на торг, хозяин — злато само "
+        "в карман не запрыгнет.</blockquote>"
+    )
 
 
 def trade_offer(offer: dict) -> str:
@@ -1731,17 +1754,20 @@ def bourse_news(sells: list, buys: list) -> str:
         nm = f"{g.emoji} {g.name}" if g else good
         return f"└ {nm} ×{qty} — по {price}🪙"
 
+    n = len(sells) + len(buys)
     parts = [
-        "🪙 <b>БИРЖА НЕДОЛИВСКА</b>",
-        "свежий товар на торгу",
+        "🪙 <b>БИРЖА НЕДОЛИВСКА ГУДИТ!</b>",
+        f"<i>свежак на торгу (лотов: {n}) — налетай, покуда барыги всё не расхватали</i>",
         "",
         _HRULE,
     ]
     if sells:
-        parts.append("<b>НЕСУТ НА ПРОДАЖУ</b>")
+        parts.append("<b>📤 НЕСУТ НА ПРОДАЖУ</b>")
         parts += [line(*s) for s in sells]
     if buys:
-        parts.append("<b>СКУПАЮТ НА КОРНЮ</b>")
+        if sells:
+            parts.append("")
+        parts.append("<b>📥 СКУПАЮТ НА КОРНЮ</b>")
         parts += [line(*b) for b in buys]
     parts += [
         _HRULE,
