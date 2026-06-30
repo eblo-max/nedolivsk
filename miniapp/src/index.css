@@ -1101,6 +1101,16 @@ body {
 .chron-ago { font-family:system-ui,sans-serif; font-size:10.5px; color:#8a7f6a; }
 .chron-close { margin-top:12px; flex:none; }
 
+/* ── доска почёта (топ таверн) ── */
+.rt-sub { font-family:system-ui,sans-serif; font-size:12px; color:#c2b594; text-align:center; margin:0 0 6px; }
+.rt-sub b { color:var(--gold,#f0b859); }
+.rt-row { align-items:center; }
+.rt-place { flex:none; width:30px; text-align:center; font-family:Georgia,serif; font-size:17px; font-weight:700; color:var(--gold,#f0b859); }
+.rt-loc { font-family:system-ui,sans-serif; font-size:11px; color:#8a7f6a; font-weight:400; }
+.rt-mine { background:rgba(231,191,99,.10); border-radius:9px; outline:1px solid rgba(231,191,99,.30); }
+.rt-gap { text-align:center; color:#6f6450; letter-spacing:3px; padding:4px 0; font-size:13px; }
+.rt-foot { font-family:Georgia,serif; font-style:italic; font-size:12.5px; color:#a99c7e; text-align:center; margin:8px 4px 0; }
+
 /* ── дисклеймер раннего доступа (центр. модалка при каждом входе) ── */
 .ta-backdrop { position:fixed; top:0; left:0; right:0; height:var(--app-h, 100vh); z-index:60; display:flex; align-items:center; justify-content:center;
   background:rgba(6,5,3,.88); animation:sv-fade .22s ease; padding:22px; }   /* blur убран — лагал на Android */

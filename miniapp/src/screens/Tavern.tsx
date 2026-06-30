@@ -10,6 +10,7 @@ import StoryVisitor, { type StoryData } from './StoryVisitor'
 import TradeSheet, { type TradeData } from './TradeSheet'
 import AnimEmoji from '../components/AnimEmoji'
 import ChronicleSheet from './ChronicleSheet'
+import RatingSheet from './RatingSheet'
 import ReferralSheet from './ReferralSheet'
 import RaidSheet from './RaidSheet'
 import NotificationsSheet from './NotificationsSheet'
@@ -81,6 +82,7 @@ export default function Tavern() {
   const [sheet, setSheet] = useState<string | null>(null)
   const [storyOpen, setStoryOpen] = useState(false)
   const [chronOpen, setChronOpen] = useState(false)
+  const [ratingOpen, setRatingOpen] = useState(false)   // доска почёта (топ таверн)
   const [refOpen, setRefOpen] = useState(false)
   const [raidOpen, setRaidOpen] = useState(false)       // экран рейд-босса
   const [notifOpen, setNotifOpen] = useState(false)     // лента уведомлений
@@ -262,6 +264,7 @@ export default function Tavern() {
               </div>
             ) : <div className="muted" style={{ fontStyle: 'italic', fontFamily: 'var(--text)' }}>Тишь да гладь — фракции дремлют. Пока.</div>}
             <button className="chron-open" onClick={() => { haptic('light'); setChronOpen(true) }}>📜 Летопись города →</button>
+            <button className="chron-open" onClick={() => { haptic('light'); setRatingOpen(true) }}>🏆 Топ таверн →</button>
           </div>
         </div>
       )}
@@ -338,6 +341,7 @@ export default function Tavern() {
           onClose={() => { tradeShut.current = true; setTrade(null) }} />
       )}
       {chronOpen && <ChronicleSheet onClose={() => setChronOpen(false)} />}
+      {ratingOpen && <RatingSheet onClose={() => setRatingOpen(false)} />}
       {refOpen && <ReferralSheet onClose={() => setRefOpen(false)} />}
       {raidOpen && <RaidSheet onClose={() => { setRaidOpen(false); reload() }} onGold={() => reload()} />}
       {notifOpen && <NotificationsSheet admin={t.admin} onClose={() => { setNotifOpen(false); reload() }} />}

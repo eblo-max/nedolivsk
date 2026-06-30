@@ -1715,6 +1715,46 @@ async def _api_chronicle(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "entries": entries}, headers={"Cache-Control": "no-store"})
 
 
+async def _api_rating(request: web.Request) -> web.Response:
+    """Доска почёта: топ таверн по ВВП (как «рп топ» в боте). Топ-10 + моё место."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import buildings as bld
+    from bot.game import items as it
+    from bot.game import production as prodmod
+    async with session_factory() as s:
+        rows = await repo.get_map_taverns(s)
+    rated = []
+    for tavern, player in rows:
+        gdp = balance.tavern_gdp(
+            inventory=player.inventory, gold=player.gold, level=tavern.level,
+            income_rate=tavern.income_rate, reputation=tavern.reputation)
+        gdp += it.gear_value(getattr(player, "equipment", None))
+        gdp += bld.invested_value(tavern)
+        gdp += prodmod.products_value(tavern)
+        rated.append((gdp, tavern, player))
+    rated.sort(key=lambda x: (-x[0], x[1].name))
+    total_gdp = sum(g for g, _, _ in rated)
+
+    def row(place: int, gdp: int, t, p) -> dict:
+        return {"place": place, "name": t.name or "Таверна",
+                "owner": p.first_name or "Кабатчик", "level": int(t.level),
+                "loc": worldmap.continent_name(p.id), "gdp": int(gdp),
+                "rep": int(t.reputation or 0), "mine": bool(uid) and p.id == uid}
+
+    top = [row(i, g, t, p) for i, (g, t, p) in enumerate(rated[:10], 1)]
+    me = None
+    if uid and not any(r["mine"] for r in top):           # я ниже топ-10 — отдаю свою строку
+        for i, (g, t, p) in enumerate(rated, 1):
+            if p.id == uid:
+                me = row(i, g, t, p)
+                break
+    return web.json_response(
+        {"ok": True, "rows": top, "me": me, "total_gdp": int(total_gdp),
+         "total": len(rated)}, headers={"Cache-Control": "no-store"})
+
+
 async def _api_referral(request: web.Request) -> web.Response:
     """Зазывала (рефералка): личная ссылка, прогресс по вехам, топ зазывал.
     Зеркало texts.referral_screen / referrers_screen из бота."""
@@ -3684,6 +3724,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/nightrun/bank", _api_nightrun_bank)    # свернуть (банк)
     app.router.add_post("/api/story_choice", _api_story_choice)  # резолв выбора у визитёра
     app.router.add_post("/api/chronicle", _api_chronicle)        # летопись города
+    app.router.add_post("/api/rating", _api_rating)              # доска почёта (топ таверн по ВВП)
     app.router.add_post("/api/reputation", _api_reputation)      # репутация у фракций/NPC
     app.router.add_post("/api/torg", _api_torg)                  # вкладка Торг (скупщик), гейт
     app.router.add_post("/api/torg/buy", _api_torg_buy)          # купить сырьё у скупщика
