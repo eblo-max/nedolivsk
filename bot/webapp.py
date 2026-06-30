@@ -3108,10 +3108,11 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 .tav-pop .mine{margin-top:7px;color:#ffd27a;font-weight:700}
 .leaflet-popup-content-wrapper{background:#1a140c;border:1px solid #6b522e;border-radius:12px}
 .leaflet-popup-tip{background:#1a140c}
-/* кластер — золотая монета */
-.tcl{display:flex;align-items:center;justify-content:center;border-radius:50%;
-  background:radial-gradient(circle at 38% 30%,#3c2d15,#1a120a);color:#ffd98a;font:700 13px var(--serif);
-  border:2px solid #c9a14e;box-shadow:0 2px 9px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,220,150,.22),0 0 13px -3px rgba(255,190,90,.55)}
+/* кластер — тематический «посёлок» (силуэт городка + бейдж числа) */
+.set{position:relative;line-height:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.set-b{position:absolute;top:-2px;right:-3px;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;line-height:1;
+  display:flex;align-items:center;justify-content:center;border-radius:999px;font:700 11px/1 var(--serif);
+  color:#241405;background:linear-gradient(180deg,#ffe09a,#d99a36);border:1px solid #8a6a22;box-shadow:0 1px 3px rgba(0,0,0,.55)}
 /* лоадер */
 #loader{position:fixed;inset:0;z-index:1500;display:flex;align-items:center;justify-content:center;
   background:#0f1828;color:#caa86a;font-weight:700;font-size:15px;transition:opacity .4s}
@@ -3171,7 +3172,7 @@ fetch('/world/slots.json').then(function(r){return r.json();}).then(function(cs)
   cs.forEach(function(c){
     var bi=BICON[c.biome]||'•';
     var cm=L.marker(px(c.x*W,c.y*H),{interactive:false,keyboard:false,pane:'contPane',
-      icon:L.divIcon({className:'cont-label',iconSize:[240,26],iconAnchor:[120,13],
+      icon:L.divIcon({className:'cont-label',iconSize:[240,26],iconAnchor:[120,30],
         html:'<span class="cl-plate"><span class="ci">'+bi+'</span>'+esc(c.name)+'</span>'})}).addTo(contLayer);
     contMarkers.push({m:cm});
   });
@@ -3195,7 +3196,7 @@ function relayout(){_rq=false;var z=map.getZoom(),i;
     var b=_box(el,4);if(!b){el.style.opacity=0;return;}
     var ok=true;for(var j=0;j<occ.length;j++){if(_hit(b,occ[j])){ok=false;break;}}
     if(ok){el.style.opacity=1;occ.push(b);}else{el.style.opacity=0;}});}
-  if(showNames){var blk=document.querySelectorAll('.tcl');  // резервируем монеты (не пины: имя над своим пином)
+  if(showNames){var blk=document.querySelectorAll('.set');  // резервируем посёлки (не пины: имя над своим пином)
     for(i=0;i<blk.length;i++){var bb=_box(blk[i],1);if(bb)occ.push(bb);}}
   tavMarkers.forEach(function(o){var tt=o.m.getTooltip&&o.m.getTooltip();var el=tt&&tt.getElement&&tt.getElement();
     if(!el)return;o._el=el;
@@ -3209,9 +3210,24 @@ function relayout(){_rq=false;var z=map.getZoom(),i;
 function queueRelayout(){if(_rq)return;_rq=true;requestAnimationFrame(relayout);}
 map.on('zoomend moveend',queueRelayout);
 // ── таверны ──
-var cluster=L.markerClusterGroup?L.markerClusterGroup({maxClusterRadius:function(z){return z<=2?120:z<=3?92:z<=4?64:46;},showCoverageOnHover:false,
-  disableClusteringAtZoom:MAXZ,iconCreateFunction:function(c){var n=c.getChildCount();var d=30+Math.min(22,n);
-    return L.divIcon({html:'<div class="tcl" style="width:'+d+'px;height:'+d+'px">'+n+'</div>',className:'',iconSize:[d,d],iconAnchor:[d/2,d/2-8]});}}):null;
+// Кластер = тематический «посёлок»: SVG-силуэт (крыши+башня, окна-огоньки, золотая
+// обводка) + бейдж числа; размер растёт с количеством (хутор→деревня→город). Тап→зум.
+function _house(x,w,bh){var by=44,ty=by-bh,mx=x+w/2,ay=ty-w*0.42;
+  return '<path d="M'+(x-2)+' '+ty+'L'+mx+' '+ay+'L'+(x+w+2)+' '+ty+'Z" fill="#b14328" stroke="#caa14e" stroke-width="1.1" stroke-linejoin="round"/>'+
+    '<rect x="'+x+'" y="'+ty+'" width="'+w+'" height="'+bh+'" fill="#2b1f13" stroke="#caa14e" stroke-width="1.1"/>'+
+    '<rect x="'+(mx-1.6)+'" y="'+(ty+bh*0.42)+'" width="3.2" height="3.6" rx=".5" fill="#f5c95e"/>';}
+var _twr='<rect x="7" y="20" width="8" height="24" fill="#2b1f13" stroke="#caa14e" stroke-width="1.1"/>'+
+  '<path d="M5.5 20L11 11L16.5 20Z" fill="#b14328" stroke="#caa14e" stroke-width="1.1" stroke-linejoin="round"/>'+
+  '<rect x="9.4" y="27" width="3.2" height="4.2" rx=".5" fill="#f5c95e"/>';
+function _settle(c){var n=c.getChildCount();var tier=n>=12?2:(n>=5?1:0);
+  var base=[56,66,78][tier],h=Math.round(base*50/60);
+  var svg='<svg width="'+base+'" height="'+h+'" viewBox="0 0 60 50" xmlns="http://www.w3.org/2000/svg">'+
+    '<ellipse cx="30" cy="46.5" rx="26" ry="4.6" fill="rgba(0,0,0,.42)"/>'+
+    (tier>=1?_twr:'')+_house(3,17,15)+_house(19,23,20)+(tier>=2?_house(40,16,14):'')+'</svg>';
+  return L.divIcon({html:'<div class="set">'+svg+'<div class="set-b">'+n+'</div></div>',className:'',
+    iconSize:[base,h],iconAnchor:[Math.round(base/2),Math.round(h*0.82)]});}
+var cluster=L.markerClusterGroup?L.markerClusterGroup({maxClusterRadius:function(z){return z<=2?120:z<=3?92:z<=4?64:46;},
+  showCoverageOnHover:false,disableClusteringAtZoom:MAXZ,iconCreateFunction:_settle}):null;
 var layer=cluster||map;var myLL=null;var myMarker=null;var tavMarkers=[];
 function card(t){
   return '<div class="tav-pop"><div class="h">🏰 '+esc(t.name)+'</div>'+
