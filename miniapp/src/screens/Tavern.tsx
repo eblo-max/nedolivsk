@@ -340,7 +340,7 @@ export default function Tavern() {
       {chronOpen && <ChronicleSheet onClose={() => setChronOpen(false)} />}
       {refOpen && <ReferralSheet onClose={() => setRefOpen(false)} />}
       {raidOpen && <RaidSheet onClose={() => { setRaidOpen(false); reload() }} onGold={() => reload()} />}
-      {notifOpen && <NotificationsSheet onClose={() => { setNotifOpen(false); reload() }} />}
+      {notifOpen && <NotificationsSheet admin={t.admin} onClose={() => { setNotifOpen(false); reload() }} />}
       {toast && <div className="toast">{toast}</div>}
     </>
   )
