@@ -1,4 +1,5 @@
-"""Свой тайлер: режет world25.jpg в пирамиду 256-тайлов {z}/{x}/{y}.jpg (без vips)."""
+"""Свой тайлер: режет world25.jpg в пирамиду 256-тайлов {z}/{x}/{y}.webp (без vips).
+WebP q84 — резче и на ~20% легче JPEG q82."""
 import math, os, sys
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None
@@ -19,7 +20,7 @@ for z in range(maxZoom,-1,-1):
             t=zimg.crop((tx*TILE,ty*TILE,tx*TILE+TILE,ty*TILE+TILE))
             if t.size!=(TILE,TILE):
                 bg=Image.new('RGB',(TILE,TILE),SEA); bg.paste(t,(0,0)); t=bg
-            t.save(f'{d}/{ty}.jpg',quality=82); total+=1
+            t.save(f'{d}/{ty}.webp','WEBP',quality=84,method=4); total+=1
     print(f'  z{z}: {nx}x{ny}')
 print('тайлов', total, '| maxZoom', maxZoom, '| мир', W, 'x', H)
 # meta.json рядом с тайлами (на будущее; страница сейчас знает размеры константами)

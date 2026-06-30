@@ -3120,6 +3120,7 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 var tg=window.Telegram&&Telegram.WebApp;
 if(tg){tg.ready();tg.expand();try{tg.setHeaderColor&&tg.setHeaderColor('#0f1828');}catch(e){}}
 var W=11020,H=11020,TILE=256,MAXZ=6;
+for(var _i=1;_i<=9;_i++){(new Image()).src='/assets/map_tavern_'+_i+'.png';}  // прелоад спрайтов — без «пыхов»
 var map=L.map('map',{crs:L.CRS.Simple,maxZoom:MAXZ+1,attributionControl:false,zoomControl:false,
   zoomSnap:0,zoomDelta:.6,wheelPxPerZoomLevel:90,inertia:true});
 L.control.zoom({position:'bottomright'}).addTo(map);
@@ -3127,8 +3128,8 @@ L.control.zoom({position:'bottomright'}).addTo(map);
 map.createPane('contPane');map.getPane('contPane').style.zIndex=450;map.getPane('contPane').style.pointerEvents='none';
 function px(x,y){return map.unproject([x,y],MAXZ);}
 var bounds=L.latLngBounds(px(0,H),px(W,0));
-L.tileLayer('/world/tiles/{z}/{x}/{y}.jpg',{tileSize:TILE,noWrap:true,bounds:bounds,
-  maxNativeZoom:MAXZ,maxZoom:MAXZ+1,keepBuffer:4}).addTo(map);
+L.tileLayer('/world/tiles/{z}/{x}/{y}.webp',{tileSize:TILE,noWrap:true,bounds:bounds,
+  maxNativeZoom:MAXZ,maxZoom:MAXZ+1,keepBuffer:6,updateWhenZooming:false,detectRetina:true}).addTo(map);
 // стартовый валидный вид сразу (на случай, если cover-расчёт задержится в WebView)
 map.setView(px(W/2,H/2),2);
 map.setMaxBounds(bounds.pad(0.04));
@@ -3213,7 +3214,7 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
     var sz=t.mine?56:42;var ll=px(t.x*W,t.y*H);
     var icon=L.divIcon({className:'tav-pin'+(t.mine?' mine':''),iconSize:[sz,sz],
       iconAnchor:[sz/2,sz*0.9],popupAnchor:[0,-sz*0.82],
-      html:'<div class="sh"></div><img src="/assets/map_tavern_'+t.tier+'.png" alt=""><div class="lv">'+t.level+'</div>'});
+      html:'<div class="sh"></div><img src="/assets/map_tavern_'+t.tier+'.png" alt="" decoding="async"><div class="lv">'+t.level+'</div>'});
     var m=L.marker(ll,{icon:icon,zIndexOffset:t.mine?1000:0}).addTo(layer).bindPopup(card(t));
     m.bindTooltip(esc(t.name),{permanent:true,direction:'top',className:'tav-label'+(t.mine?' tl-mine':''),offset:[0,-sz*0.78]});
     tavMarkers.push({m:m,mine:!!t.mine,prio:t.mine?1e9:(t.level*1000+(t.rep||0))});
@@ -3322,12 +3323,13 @@ async def _world_taverns(request: web.Request) -> web.Response:
 
 
 async def _world_tile(request: web.Request) -> web.Response:
-    """Тайл пирамиды мира {z}/{x}/{y}.jpg (статика из world_tiles, сгенерён в Docker)."""
+    """Тайл пирамиды мира {z}/{x}/{y}.webp (статика из world_tiles, сгенерён в Docker).
+    Расширение запроса игнорируем — всегда отдаём .webp (плавный переход со старого .jpg-кэша)."""
     try:
         z = int(request.match_info["z"]); x = int(request.match_info["x"]); y = int(request.match_info["y"])
     except (ValueError, KeyError):
         return web.Response(status=404)
-    p = WORLD_TILES / str(z) / str(x) / f"{y}.jpg"
+    p = WORLD_TILES / str(z) / str(x) / f"{y}.webp"
     if not p.is_file():
         return web.Response(status=404)
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=604800"})
@@ -3461,7 +3463,8 @@ def build_app() -> web.Application:
     app.router.add_get("/world", _world_page)                 # тайловый мир-атлас (Leaflet)
     app.router.add_get("/world/slots.json", _world_slots)
     app.router.add_get("/world/taverns.json", _world_taverns)
-    app.router.add_get("/world/tiles/{z}/{x}/{y}.jpg", _world_tile)
+    app.router.add_get("/world/tiles/{z}/{x}/{y}.webp", _world_tile)
+    app.router.add_get("/world/tiles/{z}/{x}/{y}.jpg", _world_tile)   # старый кэш → отдаём webp-байты
     app.router.add_get("/app", _spa)                  # React-мини-апп (каркас игры)
     app.router.add_get("/app/{tail:.*}", _spa)        # SPA-fallback + статика dist
     app.router.add_get("/api/taverns", _api_taverns)
