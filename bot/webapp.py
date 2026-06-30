@@ -1716,10 +1716,13 @@ async def _api_chronicle(request: web.Request) -> web.Response:
 
 
 async def _api_rating(request: web.Request) -> web.Response:
-    """Доска почёта: топ таверн по ВВП (как «рп топ» в боте). Топ-10 + моё место."""
+    """Доска почёта: топ таверн по ВВП (как «рп топ» в боте). Топ-10 + моё место.
+    Пока ОТКРЫТА ТОЛЬКО АДМИНУ (гейт _is_admin) — обкатка перед открытием всем."""
     uid, body = await _auth(request)
     if uid is None:
         return body
+    if not _is_admin(uid):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
     from bot.game import buildings as bld
     from bot.game import items as it
     from bot.game import production as prodmod
