@@ -1131,7 +1131,7 @@ body {
 .lb-pod.r1 { animation-delay:.04s; }
 .lb-pod.r2 { animation-delay:.12s; }
 .lb-pod.r3 { animation-delay:.18s; }
-.lb-crown { font-size:21px; line-height:1; margin-bottom:1px; filter:drop-shadow(0 2px 5px rgba(247,200,90,.6)); animation:lb-bob 2.4s ease-in-out 3; }
+.lb-crown { font-size:20px; line-height:1; margin-bottom:6px; filter:drop-shadow(0 2px 5px rgba(247,200,90,.6)); animation:lb-bob 2.4s ease-in-out 3; }
 .lb-ava { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center;
   font-family:Georgia,serif; font-weight:700; font-size:21px; color:#1c150a; overflow:hidden;
   background:linear-gradient(150deg,#e9dcc0,#b9a883); border:2.5px solid #cdb079;
