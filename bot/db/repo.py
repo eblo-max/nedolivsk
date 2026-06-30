@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
     Chronicle, CityState, Invasion, KnownChat, LogEntry, LootDrop, MarketOrder,
-    Notification, Player, RaidBoss, Tavern, WorldState,
+    Notification, NotifFeed, Player, RaidBoss, Tavern, WorldState,
 )
 from bot.game import balance, economy
 
@@ -322,8 +322,44 @@ async def cleanup_logs(session: AsyncSession, keep: int = 3000) -> None:
 def queue_notify(session: AsyncSession, user_id: int, text: str,
                  photo: str | None = None) -> None:
     """Положить личку игроку в очередь (атомарно со сделкой; шлёт нотифаер).
-    photo — file_id картинки: тогда уйдёт фото с подписью (text)."""
+    photo — file_id картинки: тогда уйдёт фото с подписью (text).
+    Зеркалим в персистентную ленту мини-аппа (раздел «Уведомления»)."""
     session.add(Notification(user_id=user_id, text=text[:1024], photo=photo))
+    feed_push(session, user_id, text)
+
+
+# ── Лента уведомлений мини-аппа (зеркало ВСЕХ DM) ─────────────────────────
+def feed_push(session: AsyncSession, user_id: int, text: str) -> None:
+    """Добавить уведомление в персистентную ленту игрока (раздел «Уведомления»)."""
+    if not text:
+        return
+    session.add(NotifFeed(user_id=user_id, text=text[:1024]))
+
+
+async def feed_list(session: AsyncSession, user_id: int,
+                    limit: int = 60) -> list[NotifFeed]:
+    return list((await session.execute(
+        select(NotifFeed).where(NotifFeed.user_id == user_id)
+        .order_by(NotifFeed.id.desc()).limit(limit))).scalars().all())
+
+
+async def feed_unread(session: AsyncSession, user_id: int) -> int:
+    return await session.scalar(
+        select(func.count(NotifFeed.id)).where(
+            NotifFeed.user_id == user_id, NotifFeed.read.is_(False))) or 0
+
+
+async def feed_mark_read(session: AsyncSession, user_id: int) -> None:
+    await session.execute(
+        update(NotifFeed).where(
+            NotifFeed.user_id == user_id, NotifFeed.read.is_(False)
+        ).values(read=True))
+
+
+async def feed_prune(session: AsyncSession, days: int = 45) -> None:
+    """Чистим старые записи ленты (по возрасту) — таблица не растёт бесконечно."""
+    cut = datetime.now(timezone.utc) - timedelta(days=days)
+    await session.execute(delete(NotifFeed).where(NotifFeed.created_at < cut))
 
 
 async def pop_notifications(

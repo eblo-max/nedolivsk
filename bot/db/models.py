@@ -244,6 +244,22 @@ class Notification(Base):
     )
 
 
+class NotifFeed(Base):
+    """Персистентная ЛЕНТА уведомлений игрока для раздела «Уведомления» в мини-аппе —
+    зеркало ВСЕХ DM-нотификаций (в отличие от notifications-outbox, который чистится
+    после отправки). Хранит историю и флаг прочтения; чистится по возрасту."""
+
+    __tablename__ = "notif_feed"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    text: Mapped[str] = mapped_column(String(1024))
+    read: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class RaidBoss(Base):
     """Глобальный рейд-босс (один живой на весь мир). Две фазы:
       gathering — 20 мин сбор: игроки регистрируются, идёт обратный отсчёт;

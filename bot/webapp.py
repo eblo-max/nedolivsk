@@ -763,6 +763,32 @@ async def _auth(request: web.Request):
     return uid, body
 
 
+async def _api_notifications(request: web.Request) -> web.Response:
+    """Лента уведомлений игрока (раздел «Уведомления») — зеркало ВСЕХ DM + счётчик непрочитанных."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    now = datetime.now(timezone.utc)
+    async with session_factory() as s:
+        rows = await repo.feed_list(s, uid, 60)
+        unread = await repo.feed_unread(s, uid)
+    items = [{"text": r.text, "read": bool(r.read), "ago": _chron_ago(r.created_at, now)}
+             for r in rows]
+    return web.json_response({"ok": True, "items": items, "unread": unread},
+                             headers={"Cache-Control": "no-store"})
+
+
+async def _api_notifications_read(request: web.Request) -> web.Response:
+    """Отметить все уведомления игрока прочитанными (гасит бейдж)."""
+    uid, _body = await _auth(request)
+    if uid is None:
+        return _body
+    async with session_factory() as s:
+        await repo.feed_mark_read(s, uid)
+        await s.commit()
+    return web.json_response({"ok": True}, headers={"Cache-Control": "no-store"})
+
+
 # NPC → аватар (public/npc/N.png). Набор из 20 портретов раскидан по сословиям,
 # женщины/иконичные — отдельно; выбор внутри сословия детерминирован по id.
 _AV_BY_ESTATE = {
@@ -980,6 +1006,7 @@ async def _api_state(request: web.Request) -> web.Response:
         boss = await repo.get_active_raid(s)
         out["raid"] = _raid_summary(boss, uid) if boss else None  # кнопка «⚔️ РЕЙД-БОСС»
         out["admin"] = _is_admin(uid)                # админ-кнопка «Призвать босса» (если босса нет)
+        out["notif_unread"] = await repo.feed_unread(s, uid)  # бейдж колокольчика
     return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 
@@ -3543,6 +3570,8 @@ def build_app() -> web.Application:
     app.router.add_post("/api/bourse/act", _api_bourse_act)              # Биржа: сделки (фаза 2)
     app.router.add_post("/api/referral", _api_referral)          # зазывала (рефералка)
     app.router.add_post("/api/panel", _api_panel)        # данные bottom-sheet панели
+    app.router.add_post("/api/notifications", _api_notifications)       # лента уведомлений (зеркало всех DM)
+    app.router.add_post("/api/notifications/read", _api_notifications_read)  # отметить прочитанными
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания

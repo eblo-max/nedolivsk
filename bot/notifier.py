@@ -668,6 +668,27 @@ async def _notify_returned(bot: Bot) -> None:
             world.media_ids = pending
             common.mark_file_ids_saved()
 
+        # Зеркалим уведомления этого тика в ЛЕНТУ мини-аппа (раздел «Уведомления»).
+        # queue_notify пишет в ленту сам; здесь — прямые send (outbox/нуджи/вести).
+        for _p, _txt, _mk in outbox:
+            repo.feed_push(session, _p.id, _txt)
+        for _pid, _tier in idle_nudges:
+            repo.feed_push(session, _pid, texts.idle_nudge(_tier))
+        for _pid, _ref in onboard_nudges:
+            repo.feed_push(session, _pid, texts.onboard_nudge(_ref))
+        for _pid in bonus_push_targets:
+            repo.feed_push(session, _pid, texts.bonus_ready_push())
+        if world_news:
+            _digest = "🌍 <b>ВЕСТИ ИЗ НЕДОЛИВСКА</b>\n\n" + "\n\n".join(world_news)
+            _news_ids = [r[0] for r in (await session.execute(
+                select(Player.id).where(
+                    Player.chat_id.is_(None), Player.dm_news.is_(True),
+                    Player.last_seen_at >= now - timedelta(days=7)))).all()]
+            for _uid in _news_ids:
+                repo.feed_push(session, _uid, _digest)
+        if now.minute == 0:          # раз в час чистим старые записи ленты
+            await repo.feed_prune(session)
+
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода
         worldevent.set_active(world.event_kind, world.event_until,

@@ -206,6 +206,19 @@ body {
 .music-btn:active { transform:scale(.9); }
 .music-btn.off { opacity:.5; filter:grayscale(.6); }
 .music-btn.on { box-shadow:0 0 12px #e7bf6333, 0 2px 10px #0007; }
+/* колокольчик уведомлений (зеркально музыке — слева) + бейдж непрочитанных */
+.nf-bell { position:absolute; top:0; left:2px; z-index:3;
+  width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:15px; line-height:1; cursor:pointer; -webkit-tap-highlight-color:transparent;
+  background:rgba(16,12,8,.55); border:1px solid #ffffff1c; box-shadow:0 2px 10px #0007; backdrop-filter:blur(6px);
+  transition:transform .14s ease; }
+.nf-bell:active { transform:scale(.9); }
+.nf-badge { position:absolute; top:-4px; right:-4px; min-width:17px; height:17px; padding:0 4px; box-sizing:border-box;
+  display:flex; align-items:center; justify-content:center; border-radius:999px;
+  font-size:10px; font-weight:700; line-height:1; color:#2a0e0e;
+  background:linear-gradient(180deg,#ff6a5a,#d8362c); border:1px solid #ffb0a4; box-shadow:0 1px 4px #0008; }
+.nf-row.nf-unread .chron-dot { background:#ffcf6a; box-shadow:0 0 8px #ffcf6a99; }
+.nf-row.nf-unread .chron-text { color:#fff; }
 
 /* иконки ресурсов (PNG из assets/resurs) */
 .ric { width:22px; height:22px; object-fit:contain; flex:0 0 auto; filter:drop-shadow(0 1px 1px #000a); }

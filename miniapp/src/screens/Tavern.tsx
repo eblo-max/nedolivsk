@@ -12,6 +12,7 @@ import AnimEmoji from '../components/AnimEmoji'
 import ChronicleSheet from './ChronicleSheet'
 import ReferralSheet from './ReferralSheet'
 import RaidSheet from './RaidSheet'
+import NotificationsSheet from './NotificationsSheet'
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
@@ -40,6 +41,7 @@ interface TavernState {
   trade?: TradeData | null
   raid?: RaidSummary | null
   admin?: boolean
+  notif_unread?: number
 }
 
 // образец для оффлайн-превью (форма 1:1 как у /api/state)
@@ -68,6 +70,7 @@ const SAMPLE: TavernState = {
   world_event: { id: 'fashion', emoji: '🔥', name: 'Ажиотаж', blurb: 'Весь Недоливск помешался на одном товаре — он в цене, налетай!', good: 'butter', good_name: 'Масло', effects: [{ text: 'Масло ×1.5', good: true }] },
   city: { mood: 18, mood_label: '🙂 доброе', situation: { emoji: '💰', label: 'Купеческий бум' }, factions: [{ id: 'merchants', name: 'Купеческая лига', power: 42 }, { id: 'thieves', name: 'Воровская гильдия', power: 20 }, { id: 'watch', name: 'Стража', power: -15 }] },
   raid: null, admin: true,   // DEV: нет живого рейда → видно админ-кнопку «Призвать босса»
+  notif_unread: 3,
 }
 
 export default function Tavern() {
@@ -80,6 +83,7 @@ export default function Tavern() {
   const [chronOpen, setChronOpen] = useState(false)
   const [refOpen, setRefOpen] = useState(false)
   const [raidOpen, setRaidOpen] = useState(false)       // экран рейд-босса
+  const [notifOpen, setNotifOpen] = useState(false)     // лента уведомлений
   const storySeen = useRef<string | null>(null)        // авто-показ визитёра один раз на его id
   const [trade, setTrade] = useState<TradeData | null>(null)   // заезжий купец (торг)
   const tradeShut = useRef(false)                       // купца закрыли вручную — не нудить повторно
@@ -154,6 +158,11 @@ export default function Tavern() {
 
       <div className="hero rise">
         <MusicToggle />
+        <button className="nf-bell" aria-label="Уведомления"
+          onClick={() => { haptic('light'); setNotifOpen(true) }}>
+          🔔{(t.notif_unread ?? 0) > 0 &&
+            <span className="nf-badge">{(t.notif_unread ?? 0) > 99 ? '99+' : t.notif_unread}</span>}
+        </button>
         <div className="nm">{t.name}</div>
         <div className="meta">
           <span className="lvl">★ УРОВЕНЬ {t.level}</span>
@@ -327,6 +336,7 @@ export default function Tavern() {
       {chronOpen && <ChronicleSheet onClose={() => setChronOpen(false)} />}
       {refOpen && <ReferralSheet onClose={() => setRefOpen(false)} />}
       {raidOpen && <RaidSheet onClose={() => { setRaidOpen(false); reload() }} onGold={() => reload()} />}
+      {notifOpen && <NotificationsSheet onClose={() => { setNotifOpen(false); reload() }} />}
       {toast && <div className="toast">{toast}</div>}
     </>
   )
