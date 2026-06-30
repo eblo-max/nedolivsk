@@ -3076,10 +3076,8 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 /* подпись таверны (на близком зуме) */
 .leaflet-tooltip.tav-label{background:rgba(10,14,24,.85);border:1px solid #6b522e;color:#f3dca0;
   font-family:var(--serif);font-weight:700;font-size:11px;border-radius:7px;padding:1px 7px;
-  box-shadow:0 1px 6px rgba(0,0,0,.5);transition:opacity .15s}
+  box-shadow:0 1px 6px rgba(0,0,0,.5);opacity:0;transition:opacity .18s}
 .leaflet-tooltip.tav-label::before{display:none}
-/* имена таверн — только на близком зуме (иначе каша из подписей); своя видна всегда */
-body:not(.tt-on) .leaflet-tooltip.tav-label:not(.tl-mine){opacity:0;visibility:hidden}
 /* пин таверны: спрайт-здание + тень на земле + бейдж уровня */
 .tav-pin .sh{position:absolute;left:50%;bottom:1px;width:60%;height:13%;transform:translateX(-50%);
   background:radial-gradient(ellipse,rgba(0,0,0,.5),rgba(0,0,0,0) 70%);border-radius:50%}
@@ -3159,18 +3157,38 @@ fetch('/world/slots.json').then(function(r){return r.json();}).then(function(cs)
       icon:L.divIcon({className:'cont-label',iconSize:[210,24],iconAnchor:[105,28],
         html:'<span class="cl-plate"><span class="ci">'+bi+'</span>'+esc(c.name)+'</span>'})}).addTo(contLayer);
   });
-  syncLabels();
+  queueRelayout();
 }).catch(function(){});
-function syncLabels(){var z=map.getZoom();
+// ── Коллайдер подписей (механика антикаши): имена таверн рисуются по приоритету
+//    (своя > уровень+реп); налезающие на монеты/пины/друг друга — плавно прячутся.
+//    Континенты — на дальнем зуме. Пересчёт на zoomend/moveend и сменах кластеров.
+var mapEl=document.getElementById('map');
+function _box(el,pad){var r=el.getBoundingClientRect();if(!r.width)return null;var m=mapEl.getBoundingClientRect();
+  pad=pad||0;return {x0:r.left-m.left-pad,y0:r.top-m.top-pad,x1:r.right-m.left+pad,y1:r.bottom-m.top+pad};}
+function _hit(a,b){return a.x0<b.x1&&a.x1>b.x0&&a.y0<b.y1&&a.y1>b.y0;}
+var _rq=false;
+function relayout(){_rq=false;var z=map.getZoom(),i;
   if(z<=3){if(!map.hasLayer(contLayer))contLayer.addTo(map);}
   else{if(map.hasLayer(contLayer))map.removeLayer(contLayer);}
-  document.body.classList.toggle('tt-on', z>=4.8);}
-map.on('zoomend',syncLabels);
+  var showNames=z>=3.6,occ=[],cand=[];
+  if(showNames){var blk=document.querySelectorAll('.tcl');  // резервируем монеты (не пины: имя над своим пином)
+    for(i=0;i<blk.length;i++){var bb=_box(blk[i],1);if(bb)occ.push(bb);}}
+  tavMarkers.forEach(function(o){var tt=o.m.getTooltip&&o.m.getTooltip();var el=tt&&tt.getElement&&tt.getElement();
+    if(!el)return;o._el=el;
+    if(!showNames){el.style.opacity=o.mine?1:0;return;}
+    cand.push(o);});
+  if(showNames){cand.sort(function(a,b){return b.prio-a.prio;});
+    cand.forEach(function(o){var b=_box(o._el,2);if(!b){o._el.style.opacity=0;return;}
+      var ok=true;for(var i=0;i<occ.length;i++){if(_hit(b,occ[i])){ok=false;break;}}
+      if(ok||o.mine){o._el.style.opacity=1;occ.push(b);}else{o._el.style.opacity=0;}});}
+}
+function queueRelayout(){if(_rq)return;_rq=true;requestAnimationFrame(relayout);}
+map.on('zoomend moveend',queueRelayout);
 // ── таверны ──
 var cluster=L.markerClusterGroup?L.markerClusterGroup({maxClusterRadius:function(z){return z<=2?120:z<=3?92:z<=4?64:46;},showCoverageOnHover:false,
   disableClusteringAtZoom:MAXZ,iconCreateFunction:function(c){var n=c.getChildCount();var d=30+Math.min(22,n);
     return L.divIcon({html:'<div class="tcl" style="width:'+d+'px;height:'+d+'px">'+n+'</div>',className:'',iconSize:[d,d],iconAnchor:[d/2,d/2-8]});}}):null;
-var layer=cluster||map;var myLL=null;var myMarker=null;
+var layer=cluster||map;var myLL=null;var myMarker=null;var tavMarkers=[];
 function card(t){
   return '<div class="tav-pop"><div class="h">🏰 '+esc(t.name)+'</div>'+
     '<div class="o">хозяин: '+esc(t.owner)+'</div>'+
@@ -3189,9 +3207,11 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
       html:'<div class="sh"></div><img src="/assets/map_tavern_'+t.tier+'.png" alt=""><div class="lv">'+t.level+'</div>'});
     var m=L.marker(ll,{icon:icon,zIndexOffset:t.mine?1000:0}).addTo(layer).bindPopup(card(t));
     m.bindTooltip(esc(t.name),{permanent:true,direction:'top',className:'tav-label'+(t.mine?' tl-mine':''),offset:[0,-sz*0.78]});
+    tavMarkers.push({m:m,mine:!!t.mine,prio:t.mine?1e9:(t.level*1000+(t.rep||0))});
     if(t.mine){myLL=ll;myMarker=m;}
   });
-  if(cluster)map.addLayer(cluster);
+  if(cluster){map.addLayer(cluster);cluster.on('animationend',queueRelayout);}
+  queueRelayout();setTimeout(queueRelayout,300);
   // баннер рейда
   if(d.raid){var rb=document.getElementById('raidbar');
     rb.innerHTML=d.raid.emoji+' <span>'+esc(d.raid.name)+' — '+(d.raid.status==='gathering'?'идёт сбор!':'В БОЙ!')+'</span><span class="go">играть ›</span>';
