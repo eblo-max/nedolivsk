@@ -3148,8 +3148,12 @@ var bounds=L.latLngBounds(px(0,H),px(W,0));
 var _lq=document.getElementById('lqip');if(_lq){_lq.style.backgroundImage="url('/world/tiles/0/0/0.webp')";}
 function _hideLqip(){if(_lq)_lq.classList.add('gone');}
 var tiles=L.tileLayer('/world/tiles/{z}/{x}/{y}.webp',{tileSize:TILE,noWrap:true,bounds:bounds,
-  maxNativeZoom:MAXZ,maxZoom:MAXZ+1,keepBuffer:8,updateWhenZooming:false,updateWhenIdle:false,detectRetina:true}).addTo(map);
+  maxNativeZoom:MAXZ,maxZoom:MAXZ+1,keepBuffer:8,updateWhenZooming:true,updateWhenIdle:false,detectRetina:true}).addTo(map);
 tiles.on('load',_hideLqip);setTimeout(_hideLqip,3500);  // гасим превью после загрузки (или по таймауту)
+// прелоад нижней пирамиды z0-3 (~50 мелких webp) — обзор/зум-аут мгновенные, при зуме всегда есть базовый слой
+function _prefetch(){for(var z=0;z<=3;z++){var n=Math.ceil(W*Math.pow(2,z-MAXZ)/TILE);
+  for(var x=0;x<n;x++)for(var y=0;y<n;y++){(new Image()).src='/world/tiles/'+z+'/'+x+'/'+y+'.webp';}}}
+setTimeout(_prefetch,1400);
 // стартовый валидный вид сразу (на случай, если cover-расчёт задержится в WebView)
 map.setView(px(W/2,H/2),2);
 map.setMaxBounds(bounds.pad(0.04));
