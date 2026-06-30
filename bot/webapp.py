@@ -1837,6 +1837,7 @@ async def snapshot_rating_ranks(session) -> None:
 _AVATAR_CACHE: dict[int, tuple[bytes | None, float]] = {}
 _AVA_TTL = 12 * 3600        # положительный кэш (есть фото)
 _AVA_NEG_TTL = 3600         # негативный кэш (нет фото/приват) — реже дёргаем API
+_AVA_MAX = 4000             # потолок записей: эндпоинт публичный, иначе кэш набьют запросами
 
 
 async def _api_avatar(request: web.Request) -> web.Response:
@@ -1866,6 +1867,9 @@ async def _api_avatar(request: web.Request) -> web.Response:
         except Exception:   # noqa: BLE001 — нет фото/приват/ошибка → фолбэк на инициалы
             data = None
     _AVATAR_CACHE[uid] = (data, now)
+    if len(_AVATAR_CACHE) > _AVA_MAX:        # выкинуть самые старые (порядок вставки)
+        for k in list(_AVATAR_CACHE)[:len(_AVATAR_CACHE) - _AVA_MAX]:
+            _AVATAR_CACHE.pop(k, None)
     if not data:
         return web.Response(status=404)
     return web.Response(body=data, content_type="image/jpeg",

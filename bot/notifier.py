@@ -28,8 +28,8 @@ from bot.game import inventory
 from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import (
-    bonus_push_kb, buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb,
-    idle_nudge_kb, invasion_announce_kb, loot_kb, notif_teaser_kb, onboard_nudge_kb,
+    buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb,
+    idle_nudge_kb, loot_kb, notif_teaser_kb, onboard_nudge_kb,
     raid_gather_kb, raid_kb, story_push_kb,
 )
 
