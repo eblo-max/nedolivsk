@@ -3142,7 +3142,7 @@ var bounds=L.latLngBounds(px(0,H),px(W,0));
 var _lq=document.getElementById('lqip');if(_lq){_lq.style.backgroundImage="url('/world/tiles/0/0/0.webp')";}
 function _hideLqip(){if(_lq)_lq.classList.add('gone');}
 var tiles=L.tileLayer('/world/tiles/{z}/{x}/{y}.webp',{tileSize:TILE,noWrap:true,bounds:bounds,
-  maxNativeZoom:MAXZ,maxZoom:MAXZ+1,keepBuffer:6,updateWhenZooming:false,detectRetina:true}).addTo(map);
+  maxNativeZoom:MAXZ,maxZoom:MAXZ+1,keepBuffer:8,updateWhenZooming:false,updateWhenIdle:false,detectRetina:true}).addTo(map);
 tiles.on('load',_hideLqip);setTimeout(_hideLqip,3500);  // гасим превью после загрузки (или по таймауту)
 // стартовый валидный вид сразу (на случай, если cover-расчёт задержится в WebView)
 map.setView(px(W/2,H/2),2);
