@@ -128,7 +128,18 @@ async def notifier_loop(bot: Bot) -> None:
             await _notify_returned(bot)
         except Exception:  # noqa: BLE001 — цикл не должен умирать
             logger.exception("Сбой в цикле уведомлений")
+        try:
+            await _snapshot_rating()           # тренд лидерборда — база всегда свежая
+        except Exception:  # noqa: BLE001 — снимок не критичен, тик не роняет
+            logger.exception("Сбой снимка рейтинга")
         await asyncio.sleep(CHECK_INTERVAL_SECONDS)
+
+
+async def _snapshot_rating() -> None:
+    """Периодический снимок рангов для тренда доски почёта (ленивый импорт webapp)."""
+    from bot import webapp
+    async with session_factory() as session:
+        await webapp.snapshot_rating_ranks(session)
 
 
 async def _notify_returned(bot: Bot) -> None:

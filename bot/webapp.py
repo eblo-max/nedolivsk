@@ -1819,6 +1819,19 @@ async def _api_rating(request: web.Request) -> web.Response:
          "total": len(entries)}, headers={"Cache-Control": "no-store"})
 
 
+async def snapshot_rating_ranks(session) -> None:
+    """Снимок рангов всех таверн для тренда лидерборда. Зовётся периодически из
+    нотифаера (раз в минуту), чтобы тренд считался ВСЕГДА, а не только при открытии
+    доски. Делит общий _RANK_SNAPS с /api/rating (один процесс/event-loop)."""
+    rows = await repo.get_map_taverns(session)
+    entries, _total = _rating_entries(rows)
+    if not entries:
+        return
+    cur_ranks = {k: {e["id"]: i for i, e in enumerate(_ranked(entries, k), 1)}
+                 for k in _RATING_METRICS}
+    _trend_record(time.time(), cur_ranks)
+
+
 # Аватарки игроков из Telegram-профиля (для лидерборда). Кэш в памяти: фото меняют
 # редко, а getUserProfilePhotos+getFile+download — 3 вызова Bot API на игрока.
 _AVATAR_CACHE: dict[int, tuple[bytes | None, float]] = {}
