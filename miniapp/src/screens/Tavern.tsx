@@ -94,8 +94,12 @@ export default function Tavern() {
     toastTimer.current = setTimeout(() => setToast(''), 2200)
   }
 
-  // дип-линк из анонса рейда (?startapp=raid) — сразу открыть экран рейд-босса
-  useEffect(() => { if (takeStartParam() === 'raid') setRaidOpen(true) }, [])
+  // дип-линк из анонса/тизера (?startapp=raid|notif) — сразу открыть нужный экран
+  useEffect(() => {
+    const sp = takeStartParam()
+    if (sp === 'raid') setRaidOpen(true)
+    else if (sp === 'notif') setNotifOpen(true)
+  }, [])
 
   // вернулись в приложение — тихо обновляем состояние (таймеры/доход не висят устаревшими)
   useEffect(() => {

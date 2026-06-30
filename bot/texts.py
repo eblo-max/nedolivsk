@@ -2051,6 +2051,13 @@ def bonus_ready_push() -> str:
     return random.choice(_BONUS_PUSH)
 
 
+# Тизер «весть в таверну»: бот шлёт ТОЛЬКО его, вся суть — в разделе «Уведомления» мини-аппа.
+NOTIF_TEASER = (
+    "🔔 <b>Весть в таверну!</b>\n"
+    "Тебя дожидаются новости, кабатчик. Загляни в игру — раздел «Уведомления»."
+)
+
+
 def _reward_str(reward: dict) -> str:
     ico = {"gold": "🪙", **RESOURCE_EMOJI}
     return " ".join(f"{ico.get(r, r)}{a}" for r, a in reward.items())

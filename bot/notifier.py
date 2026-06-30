@@ -29,7 +29,7 @@ from bot.game import season, story_engine, story_state
 from bot.game import world as wld
 from bot.keyboards.inline import (
     bonus_push_kb, buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb,
-    idle_nudge_kb, invasion_announce_kb, loot_kb, onboard_nudge_kb,
+    idle_nudge_kb, invasion_announce_kb, loot_kb, notif_teaser_kb, onboard_nudge_kb,
     raid_gather_kb, raid_kb, story_push_kb,
 )
 
@@ -668,14 +668,11 @@ async def _notify_returned(bot: Bot) -> None:
             world.media_ids = pending
             common.mark_file_ids_saved()
 
-        # Зеркалим уведомления этого тика в ЛЕНТУ мини-аппа (раздел «Уведомления»).
-        # queue_notify пишет в ленту сам; здесь — прямые send (outbox/нуджи/вести).
+        # Зеркалим «вести» этого тика в ЛЕНТУ мини-аппа (раздел «Уведомления»).
+        # queue_notify пишет в ленту сам; здесь — outbox/бонус/вести мира.
+        # (idle/onboard — это re-engagement «вернись», не «весть»; шлём как раньше.)
         for _p, _txt, _mk in outbox:
             repo.feed_push(session, _p.id, _txt)
-        for _pid, _tier in idle_nudges:
-            repo.feed_push(session, _pid, texts.idle_nudge(_tier))
-        for _pid, _ref in onboard_nudges:
-            repo.feed_push(session, _pid, texts.onboard_nudge(_ref))
         for _pid in bonus_push_targets:
             repo.feed_push(session, _pid, texts.bonus_ready_push())
         if world_news:
@@ -696,9 +693,8 @@ async def _notify_returned(bot: Bot) -> None:
         for city in cities:
             citymod.refresh_cache(city, now)  # кэш ситуаций для экранов
 
-        # Персональные уведомления — после коммита (локи уже отпущены).
-        for player, text, markup in outbox:
-            await _notify(bot, player, text, markup)
+        # Персональные «вести» (outbox) в Telegram БОЛЬШЕ НЕ шлём полным текстом —
+        # они уже в ленте мини-аппа; игрока зовёт единый тизер ниже (анти-спам).
 
         # Возвращалка — строго в личку (nudge_tier уже зафиксирован: при сбое
         # доставки не долбим каждый тик, ждём следующей ступени/возврата).
@@ -715,14 +711,10 @@ async def _notify_returned(bot: Bot) -> None:
                     p, texts.onboard_nudge(r), reply_markup=onboard_nudge_kb()),
                 what=f"онбординг→{pid}")
 
-        # Утренний пуш «бонус готов» — в личку (маркер дня уже зафиксирован).
-        for pid in bonus_push_targets:
-            await deliver(
-                lambda p=pid: bot.send_message(
-                    p, texts.bonus_ready_push(), reply_markup=bonus_push_kb()),
-                what=f"пуш-бонус→{pid}")
+        # Бонус «готов» уже в ленте — отдельный пуш не шлём (зовёт тизер).
 
-        # Outbox: отложенная личка (биржа: «твой лот купили» и т.п.).
+        # Outbox-очередь: «вести» уже в ленте; в Telegram шлём ТОЛЬКО фото-рассылки
+        # (админ-анонсы), остальное просто гасим — суть игрок увидит в «Уведомлениях».
         notes = await repo.pop_notifications(session, 50)
         if notes:
             for n in notes:
@@ -731,11 +723,19 @@ async def _notify_returned(bot: Bot) -> None:
                         lambda nn=n: bot.send_photo(
                             nn.user_id, nn.photo, caption=nn.text or None),
                         what=f"outbox-photo→{n.user_id}")
-                else:
-                    await deliver(lambda nn=n: bot.send_message(nn.user_id, nn.text),
-                                  what=f"outbox→{n.user_id}")
             await repo.delete_notifications(session, [n.id for n in notes])
             await session.commit()
+
+        # ТИЗЕР «весть в таверну» — единственное, что бот шлёт по личным вестям.
+        # Один на пачку непрочитанных (анти-спам через notif_pinged); суть — в мини-аппе.
+        ping_ids = await repo.feed_ping_targets(session)
+        if ping_ids:
+            await session.commit()                 # фиксируем флаг до сетевых вызовов
+            for pid in ping_ids:
+                await deliver(
+                    lambda p=pid: bot.send_message(
+                        p, texts.NOTIF_TEASER, reply_markup=notif_teaser_kb()),
+                    what=f"тизер→{pid}")
 
         # Мировое событие (погода/экономика) — анонс в чаты + ЛС всем одиночкам.
         if we_text:
@@ -816,17 +816,8 @@ async def _notify_returned(bot: Bot) -> None:
             else:
                 autoclean.schedule(bot, uid, msg.message_id,
                                    after=balance.LOOT_EXPIRE_MINUTES * 60)
-        # Вести мира — в ЛС одиночкам, кто включил (активным за неделю), одним письмом.
-        if world_news:
-            news_cut = now - timedelta(days=7)
-            news_ids = [r[0] for r in (await session.execute(
-                select(Player.id).where(
-                    Player.chat_id.is_(None), Player.dm_news.is_(True),
-                    Player.last_seen_at >= news_cut))).all()]
-            digest = "🌍 <b>ВЕСТИ ИЗ НЕДОЛИВСКА</b>\n\n" + "\n\n".join(world_news)
-            for uid in news_ids:
-                await deliver(lambda u=uid, t=digest: bot.send_message(u, t),
-                              what=f"вести-лс→{uid}")
+        # Вести мира одиночкам — уже зеркалятся в ленту мини-аппа (тизер позовёт);
+        # прямую рассылку полным текстом в ЛС не делаем.
         if orphaned:
             for drop_id in orphaned:
                 await repo.delete_loot(session, drop_id)

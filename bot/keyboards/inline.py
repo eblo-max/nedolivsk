@@ -294,6 +294,20 @@ def story_push_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def notif_teaser_kb() -> InlineKeyboardMarkup:
+    """Тизер «весть в таверну» — открыть раздел «Уведомления» в мини-аппе (WebApp в ЛС)."""
+    from bot.webapp import base_url
+    kb = InlineKeyboardBuilder()
+    b = base_url()
+    if b:
+        kb.button(text="🔔 Открыть уведомления",
+                  web_app=WebAppInfo(url=f"{b}/app/?startapp=notif"))
+    else:
+        kb.button(text="🍺 К таверне", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def claim_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     _app_btn(kb, "🎒 Забрать — в приложении")          # → мини-апп (Таверна)

@@ -354,6 +354,25 @@ async def feed_mark_read(session: AsyncSession, user_id: int) -> None:
         update(NotifFeed).where(
             NotifFeed.user_id == user_id, NotifFeed.read.is_(False)
         ).values(read=True))
+    # игрок заглянул в ленту → разрешаем следующий тизер по будущей пачке
+    await session.execute(
+        update(Player).where(Player.id == user_id).values(notif_pinged=False))
+
+
+async def feed_ping_targets(session: AsyncSession, limit: int = 300) -> list[int]:
+    """Кому слать тизер «весть в таверну»: есть непрочитанные И ещё не пинговали.
+    Сразу ставим флаг notif_pinged (один тизер на пачку — анти-спам)."""
+    rows = await session.execute(
+        select(Player.id).where(
+            Player.notif_pinged.is_(False),
+            Player.id.in_(
+                select(NotifFeed.user_id).where(NotifFeed.read.is_(False)))
+        ).limit(limit))
+    ids = [r[0] for r in rows.all()]
+    if ids:
+        await session.execute(
+            update(Player).where(Player.id.in_(ids)).values(notif_pinged=True))
+    return ids
 
 
 async def feed_prune(session: AsyncSession, days: int = 45) -> None:

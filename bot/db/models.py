@@ -86,6 +86,9 @@ class Player(Base):
     nudge_tier: Mapped[int] = mapped_column(default=0)
     # Одиночке (без домашнего чата) слать вести мира в ЛС — опционально (переключатель).
     dm_news: Mapped[bool] = mapped_column(default=False)
+    # Тизер «весть в таверну» уже отправлен по текущей пачке непрочитанных (анти-спам;
+    # сбрасывается, когда игрок открыл раздел «Уведомления» в мини-аппе).
+    notif_pinged: Mapped[bool] = mapped_column(default=False)
     # Зазывала (рефералка): кто привёл, выдана ли награда пригласившему за этого
     # новичка, и сколько тир-бонусов пригласивший уже получил (как зазывала).
     referred_by: Mapped[int | None] = mapped_column(BigInteger)

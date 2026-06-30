@@ -291,6 +291,11 @@ async def create_tables() -> None:
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "dm_news BOOLEAN NOT NULL DEFAULT FALSE"
         ))
+        # Анти-спам тизера уведомлений: тизер уже отправлен по текущей пачке непрочитанных.
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "notif_pinged BOOLEAN NOT NULL DEFAULT FALSE"
+        ))
         # Зазывала (рефералка): кто привёл, выдана ли награда, сколько тиров взято.
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS referred_by BIGINT"
