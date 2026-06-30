@@ -1746,9 +1746,9 @@ async def _api_rating(request: web.Request) -> web.Response:
                 "loc": worldmap.continent_name(p.id), "gdp": int(gdp),
                 "rep": int(t.reputation or 0), "mine": bool(uid) and p.id == uid}
 
-    top = [row(i, g, t, p) for i, (g, t, p) in enumerate(rated[:10], 1)]
+    top = [row(i, g, t, p) for i, (g, t, p) in enumerate(rated[:50], 1)]
     me = None
-    if uid and not any(r["mine"] for r in top):           # я ниже топ-10 — отдаю свою строку
+    if uid and not any(r["mine"] for r in top):           # я ниже топа — отдаю свою строку
         for i, (g, t, p) in enumerate(rated, 1):
             if p.id == uid:
                 me = row(i, g, t, p)

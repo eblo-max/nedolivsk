@@ -1101,15 +1101,91 @@ body {
 .chron-ago { font-family:system-ui,sans-serif; font-size:10.5px; color:#8a7f6a; }
 .chron-close { margin-top:12px; flex:none; }
 
-/* ── доска почёта (топ таверн) ── */
-.rt-sub { font-family:system-ui,sans-serif; font-size:12px; color:#c2b594; text-align:center; margin:0 0 6px; }
-.rt-sub b { color:var(--gold,#f0b859); }
-.rt-row { align-items:center; }
-.rt-place { flex:none; width:30px; text-align:center; font-family:Georgia,serif; font-size:17px; font-weight:700; color:var(--gold,#f0b859); }
-.rt-loc { font-family:system-ui,sans-serif; font-size:11px; color:#8a7f6a; font-weight:400; }
-.rt-mine { background:rgba(231,191,99,.10); border-radius:9px; outline:1px solid rgba(231,191,99,.30); }
-.rt-gap { text-align:center; color:#6f6450; letter-spacing:3px; padding:4px 0; font-size:13px; }
-.rt-foot { font-family:Georgia,serif; font-style:italic; font-size:12.5px; color:#a99c7e; text-align:center; margin:8px 4px 0; }
+/* ══ доска почёта 2026 (лидерборд) ══ */
+.lb-sheet { max-height:90vh; }
+.lb-top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:11px; }
+.lb-title { font-family:Georgia,serif; font-weight:700; font-size:19px; letter-spacing:.3px;
+  background:linear-gradient(95deg,#ffe6a6,#f0b859 55%,#c98a2e); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.lb-chips { display:flex; gap:6px; }
+.lb-chip { font-family:system-ui,sans-serif; font-size:11.5px; font-weight:600; color:#d8cba8;
+  background:rgba(255,255,255,.05); border:1px solid rgba(231,191,99,.16); border-radius:999px; padding:4px 10px; white-space:nowrap; }
+.lb-chip.gold { color:#1c150a; background:linear-gradient(95deg,#f7d488,#e7a843); border-color:transparent; }
+
+/* сегмент-переключатель метрик */
+.lb-tabs { display:flex; gap:4px; padding:4px; margin-bottom:12px; border-radius:13px;
+  background:rgba(0,0,0,.28); border:1px solid rgba(231,191,99,.12); }
+.lb-tab { flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:9px 4px;
+  border:0; border-radius:10px; background:transparent; cursor:pointer; -webkit-tap-highlight-color:transparent;
+  font-family:system-ui,sans-serif; font-size:12.5px; font-weight:700; color:#9d937c; transition:color .18s, background .18s, transform .12s; }
+.lb-tab .lb-tab-ic { font-size:13.5px; }
+.lb-tab:active { transform:scale(.96); }
+.lb-tab.on { color:#1c150a; background:linear-gradient(160deg,#f6cf86,#e3a23f); box-shadow:0 4px 14px -4px rgba(231,168,67,.6); }
+
+.lb-scroll { flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-right:2px; }
+
+/* подиум топ-3 */
+.lb-podium { display:flex; align-items:flex-end; justify-content:center; gap:9px; padding:18px 2px 14px; }
+.lb-pod { flex:1; max-width:34%; display:flex; flex-direction:column; align-items:center; text-align:center;
+  animation:lb-rise .5s cubic-bezier(.2,.9,.3,1.2) both; }
+.lb-pod.ghost { visibility:hidden; }
+.lb-pod.r1 { animation-delay:.04s; }
+.lb-pod.r2 { animation-delay:.12s; }
+.lb-pod.r3 { animation-delay:.18s; }
+.lb-crown { font-size:21px; line-height:1; margin-bottom:1px; filter:drop-shadow(0 2px 5px rgba(247,200,90,.6)); animation:lb-bob 2.4s ease-in-out 3; }
+.lb-ava { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:Georgia,serif; font-weight:700; font-size:21px; color:#1c150a;
+  background:linear-gradient(150deg,#e9dcc0,#b9a883); border:2.5px solid #cdb079;
+  box-shadow:0 5px 16px -5px rgba(0,0,0,.6); animation:lb-pop .45s ease both; }
+.lb-ava[data-r="1"] { background:linear-gradient(150deg,#ffe7a4,#e7a843); width:60px; height:60px; font-size:25px;
+  border-color:#fff0bf; box-shadow:0 0 0 2px rgba(231,168,67,.3), 0 7px 22px -6px rgba(231,168,67,.75); }
+.lb-ava[data-r="2"] { background:linear-gradient(150deg,#eef2f7,#aeb7c6); border-color:#e4ebf5; }
+.lb-ava[data-r="3"] { background:linear-gradient(150deg,#f2c79a,#cc8748); border-color:#f0c39a; }
+.lb-ava.sm { width:38px; height:38px; font-size:15px; background:linear-gradient(150deg,#3f3424,#2b2316);
+  color:#e7d9b6; border-color:rgba(231,191,99,.3); }
+.lb-pname { margin-top:7px; font-family:system-ui,sans-serif; font-weight:700; font-size:12.5px; color:#f1e6c8;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lb-pval { font-family:Georgia,serif; font-weight:700; font-size:13px; color:var(--gold,#f0b859); margin-top:1px; }
+.lb-ped { margin-top:8px; width:100%; border-radius:9px 9px 4px 4px; display:flex; align-items:flex-start; justify-content:center;
+  padding-top:6px; font-family:Georgia,serif; font-weight:800; font-size:15px; color:#1c150a;
+  background:linear-gradient(180deg,rgba(231,191,99,.5),rgba(231,191,99,.08)); border:1px solid rgba(231,191,99,.25); border-bottom:0; }
+.lb-pod.r1 .lb-ped { height:60px; background:linear-gradient(180deg,#f6cf86,rgba(231,168,67,.15)); }
+.lb-pod.r2 .lb-ped { height:42px; background:linear-gradient(180deg,#d3dae5,rgba(174,183,198,.12)); }
+.lb-pod.r3 .lb-ped { height:30px; background:linear-gradient(180deg,#e6b483,rgba(204,135,72,.12)); }
+.lb-pod.mine .lb-ava { outline:2px solid #ffe9a8; outline-offset:2px; }
+
+/* строки 4+ */
+.lb-list { display:flex; flex-direction:column; gap:6px; padding:4px 0 2px; }
+.lb-row { display:flex; align-items:center; gap:10px; padding:8px 10px 8px 6px; border-radius:13px;
+  background:linear-gradient(100deg,rgba(255,255,255,.045),rgba(255,255,255,.015)); border:1px solid rgba(231,191,99,.09);
+  animation:lb-up .4s ease both; }
+.lb-rank { flex:none; width:24px; text-align:center; font-family:Georgia,serif; font-weight:700; font-size:14px; color:#9d917a; }
+.lb-info { flex:1; min-width:0; }
+.lb-name { font-family:system-ui,sans-serif; font-weight:700; font-size:13.5px; color:#f1e6c8;
+  display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lb-you { flex:none; font-size:9.5px; font-weight:800; letter-spacing:.5px; color:#1c150a; background:linear-gradient(95deg,#f7d488,#e7a843);
+  border-radius:5px; padding:1px 5px; text-transform:uppercase; }
+.lb-meta { font-family:system-ui,sans-serif; font-size:10.5px; color:#8a7f6a; margin-top:1px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lb-bar { margin-top:5px; height:4px; border-radius:3px; background:rgba(0,0,0,.32); overflow:hidden; }
+.lb-bar i { display:block; height:100%; border-radius:3px; background:linear-gradient(90deg,#c98a2e,#f0b859 70%,#ffe6a6);
+  position:relative; animation:lb-grow .55s cubic-bezier(.2,.8,.3,1) both; }
+.lb-bar i::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
+  transform:translateX(-100%); animation:lb-shim 2.4s ease-in-out .5s 2; }
+.lb-val { flex:none; font-family:Georgia,serif; font-weight:700; font-size:14px; color:var(--gold,#f0b859); }
+.lb-row.mine { background:linear-gradient(100deg,rgba(231,191,99,.16),rgba(231,191,99,.05));
+  border-color:rgba(231,191,99,.45); box-shadow:0 0 0 1px rgba(231,191,99,.2), 0 6px 18px -8px rgba(231,168,67,.5); }
+.lb-row.mine .lb-rank, .lb-row.mine .lb-name { color:#ffe9a8; }
+.lb-gap { text-align:center; font-family:system-ui,sans-serif; font-size:10.5px; letter-spacing:1.5px; color:#7a6f59; padding:8px 0 4px; text-transform:uppercase; }
+
+@keyframes lb-rise { from{ opacity:0; transform:translateY(22px) scale(.92);} to{ opacity:1; transform:none;} }
+@keyframes lb-up { from{ opacity:0; transform:translateY(10px);} to{ opacity:1; transform:none;} }
+@keyframes lb-pop { from{ transform:scale(.4); opacity:0;} to{ transform:scale(1); opacity:1;} }
+@keyframes lb-grow { from{ width:0 !important;} }
+@keyframes lb-bob { 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-4px);} }
+@keyframes lb-shim { 0%{ transform:translateX(-100%);} 60%,100%{ transform:translateX(220%);} }
+@media (prefers-reduced-motion: reduce) {
+  .lb-pod,.lb-row,.lb-ava,.lb-bar i,.lb-crown { animation:none !important; }
+}
 
 /* ── дисклеймер раннего доступа (центр. модалка при каждом входе) ── */
 .ta-backdrop { position:fixed; top:0; left:0; right:0; height:var(--app-h, 100vh); z-index:60; display:flex; align-items:center; justify-content:center;
