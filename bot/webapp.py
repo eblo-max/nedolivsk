@@ -1741,7 +1741,7 @@ async def _api_rating(request: web.Request) -> web.Response:
     total_gdp = sum(g for g, _, _ in rated)
 
     def row(place: int, gdp: int, t, p) -> dict:
-        return {"place": place, "name": t.name or "Таверна",
+        return {"place": place, "name": t.name or "Таверна", "id": int(p.id),
                 "owner": p.first_name or "Кабатчик", "level": int(t.level),
                 "loc": worldmap.continent_name(p.id), "gdp": int(gdp),
                 "rep": int(t.reputation or 0), "mine": bool(uid) and p.id == uid}
@@ -1756,6 +1756,46 @@ async def _api_rating(request: web.Request) -> web.Response:
     return web.json_response(
         {"ok": True, "rows": top, "me": me, "total_gdp": int(total_gdp),
          "total": len(rated)}, headers={"Cache-Control": "no-store"})
+
+
+# Аватарки игроков из Telegram-профиля (для лидерборда). Кэш в памяти: фото меняют
+# редко, а getUserProfilePhotos+getFile+download — 3 вызова Bot API на игрока.
+_AVATAR_CACHE: dict[int, tuple[bytes | None, float]] = {}
+_AVA_TTL = 12 * 3600        # положительный кэш (есть фото)
+_AVA_NEG_TTL = 3600         # негативный кэш (нет фото/приват) — реже дёргаем API
+
+
+async def _api_avatar(request: web.Request) -> web.Response:
+    """Фото профиля игрока (uid = Telegram ID). 404 → фронт рисует инициал."""
+    try:
+        uid = int(request.match_info["uid"])
+    except (KeyError, ValueError):
+        return web.Response(status=404)
+    now = time.time()
+    hit = _AVATAR_CACHE.get(uid)
+    if hit is not None:
+        data, ts = hit
+        if now - ts < (_AVA_TTL if data else _AVA_NEG_TTL):
+            if not data:
+                return web.Response(status=404)
+            return web.Response(body=data, content_type="image/jpeg",
+                                headers={"Cache-Control": "public, max-age=43200"})
+    data: bytes | None = None
+    if _BOT is not None:
+        try:
+            photos = await _BOT.get_user_profile_photos(user_id=uid, limit=1)
+            if photos.total_count and photos.photos:
+                size = photos.photos[0][0]        # самый мелкий размер — для кружка хватает
+                f = await _BOT.get_file(size.file_id)
+                buf = await _BOT.download_file(f.file_path)
+                data = buf.read() if hasattr(buf, "read") else bytes(buf)
+        except Exception:   # noqa: BLE001 — нет фото/приват/ошибка → фолбэк на инициалы
+            data = None
+    _AVATAR_CACHE[uid] = (data, now)
+    if not data:
+        return web.Response(status=404)
+    return web.Response(body=data, content_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=43200"})
 
 
 async def _api_referral(request: web.Request) -> web.Response:
@@ -3728,6 +3768,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/story_choice", _api_story_choice)  # резолв выбора у визитёра
     app.router.add_post("/api/chronicle", _api_chronicle)        # летопись города
     app.router.add_post("/api/rating", _api_rating)              # доска почёта (топ таверн по ВВП)
+    app.router.add_get("/avatar/{uid}", _api_avatar)            # фото профиля игрока (лидерборд)
     app.router.add_post("/api/reputation", _api_reputation)      # репутация у фракций/NPC
     app.router.add_post("/api/torg", _api_torg)                  # вкладка Торг (скупщик), гейт
     app.router.add_post("/api/torg/buy", _api_torg_buy)          # купить сырьё у скупщика

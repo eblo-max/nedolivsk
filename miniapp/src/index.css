@@ -1133,9 +1133,10 @@ body {
 .lb-pod.r3 { animation-delay:.18s; }
 .lb-crown { font-size:21px; line-height:1; margin-bottom:1px; filter:drop-shadow(0 2px 5px rgba(247,200,90,.6)); animation:lb-bob 2.4s ease-in-out 3; }
 .lb-ava { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-  font-family:Georgia,serif; font-weight:700; font-size:21px; color:#1c150a;
+  font-family:Georgia,serif; font-weight:700; font-size:21px; color:#1c150a; overflow:hidden;
   background:linear-gradient(150deg,#e9dcc0,#b9a883); border:2.5px solid #cdb079;
   box-shadow:0 5px 16px -5px rgba(0,0,0,.6); animation:lb-pop .45s ease both; }
+.lb-ava-img { width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
 .lb-ava[data-r="1"] { background:linear-gradient(150deg,#ffe7a4,#e7a843); width:60px; height:60px; font-size:25px;
   border-color:#fff0bf; box-shadow:0 0 0 2px rgba(231,168,67,.3), 0 7px 22px -6px rgba(231,168,67,.75); }
 .lb-ava[data-r="2"] { background:linear-gradient(150deg,#eef2f7,#aeb7c6); border-color:#e4ebf5; }

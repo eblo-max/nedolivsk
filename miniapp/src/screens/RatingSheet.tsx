@@ -2,11 +2,23 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { haptic } from '../telegram'
 
-interface Row { place: number; name: string; owner: string; level: number; loc: string; gdp: number; rep: number; mine: boolean }
+interface Row { place: number; name: string; id?: number; owner: string; level: number; loc: string; gdp: number; rep: number; mine: boolean }
 interface Rating { rows: Row[]; me: Row | null; total_gdp: number; total: number }
 
 const fmt = (n: number) => n.toLocaleString('ru-RU').replace(/,/g, ' ')
 const initial = (s: string) => (s.trim()[0] || '?').toUpperCase()
+
+/** Аватар игрока: фото из ТГ-профиля (/avatar/<id>), при ошибке/без фото — инициал. */
+function Avatar({ id, name, rank, sm }: { id?: number; name: string; rank: number; sm?: boolean }) {
+  const [bad, setBad] = useState(false)
+  return (
+    <div className={`lb-ava${sm ? ' sm' : ''}`} data-r={rank}>
+      {id && !bad
+        ? <img className="lb-ava-img" src={`/avatar/${id}`} alt="" loading="lazy" onError={() => setBad(true)} />
+        : initial(name)}
+    </div>
+  )
+}
 
 type MetricKey = 'gdp' | 'rep' | 'level'
 const METRICS: { key: MetricKey; label: string; icon: string; val: (r: Row) => number; fmt: (n: number) => string }[] = [
@@ -20,14 +32,14 @@ const DEV = import.meta.env.DEV
 const DEMO: Rating = {
   total: 11, total_gdp: 9740, me: null,
   rows: [
-    { place: 1, name: 'Кривая Кружка', owner: 'Барон', level: 7, loc: 'Изумрудная Чарка', gdp: 1340, rep: 27, mine: true },
-    { place: 2, name: 'Пьяный Гусь', owner: 'Прохор', level: 6, loc: 'Зелёный Змий', gdp: 1180, rep: 31, mine: false },
-    { place: 3, name: 'Косая Бочка', owner: 'Фёкла', level: 6, loc: 'Сухой Закон', gdp: 1020, rep: 18, mine: false },
-    { place: 4, name: 'Тёплый Подвал', owner: 'Гаврила', level: 5, loc: 'Рассольник', gdp: 880, rep: 22, mine: false },
-    { place: 5, name: 'Сухое Горло', owner: 'Тихон', level: 5, loc: 'Похмельные Дюны', gdp: 760, rep: 12, mine: false },
-    { place: 6, name: 'Бычий Глаз', owner: 'Марфа', level: 4, loc: 'Чекушкины Холмы', gdp: 640, rep: 15, mine: false },
-    { place: 7, name: 'Хмельной Кот', owner: 'Степан', level: 4, loc: 'Бражные Поля', gdp: 520, rep: 9, mine: false },
-    { place: 8, name: 'Дно Бутылки', owner: 'Аграфена', level: 3, loc: 'Старый Запой', gdp: 410, rep: 7, mine: false },
+    { place: 1, name: 'Кривая Кружка', id: 1, owner: 'Барон', level: 7, loc: 'Изумрудная Чарка', gdp: 1340, rep: 27, mine: true },
+    { place: 2, name: 'Пьяный Гусь', id: 2, owner: 'Прохор', level: 6, loc: 'Зелёный Змий', gdp: 1180, rep: 31, mine: false },
+    { place: 3, name: 'Косая Бочка', id: 3, owner: 'Фёкла', level: 6, loc: 'Сухой Закон', gdp: 1020, rep: 18, mine: false },
+    { place: 4, name: 'Тёплый Подвал', id: 4, owner: 'Гаврила', level: 5, loc: 'Рассольник', gdp: 880, rep: 22, mine: false },
+    { place: 5, name: 'Сухое Горло', id: 5, owner: 'Тихон', level: 5, loc: 'Похмельные Дюны', gdp: 760, rep: 12, mine: false },
+    { place: 6, name: 'Бычий Глаз', id: 6, owner: 'Марфа', level: 4, loc: 'Чекушкины Холмы', gdp: 640, rep: 15, mine: false },
+    { place: 7, name: 'Хмельной Кот', id: 7, owner: 'Степан', level: 4, loc: 'Бражные Поля', gdp: 520, rep: 9, mine: false },
+    { place: 8, name: 'Дно Бутылки', id: 8, owner: 'Аграфена', level: 3, loc: 'Старый Запой', gdp: 410, rep: 7, mine: false },
   ],
 }
 
@@ -83,7 +95,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                 return (
                   <div key={r.name + r.owner} className={`lb-pod r${rank}${r.mine ? ' mine' : ''}`}>
                     {rank === 1 && <div className="lb-crown">👑</div>}
-                    <div className="lb-ava" data-r={rank}>{initial(r.name)}</div>
+                    <Avatar id={r.id} name={r.name} rank={rank} />
                     <div className="lb-pname">{r.name}</div>
                     <div className="lb-pval">{m.fmt(m.val(r))}</div>
                     <div className="lb-ped"><span>{rank}</span></div>
@@ -100,7 +112,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                   <div key={r.name + r.owner} className={`lb-row${r.mine ? ' mine' : ''}`}
                     style={{ animationDelay: `${Math.min(rank, 14) * 0.035}s` }}>
                     <div className="lb-rank">{rank}</div>
-                    <div className="lb-ava sm" data-r={rank}>{initial(r.name)}</div>
+                    <Avatar id={r.id} name={r.name} rank={rank} sm />
                     <div className="lb-info">
                       <div className="lb-name">{r.name}{r.mine && <span className="lb-you">ты</span>}</div>
                       <div className="lb-meta">📍 {r.loc} · {r.owner}</div>
@@ -115,7 +127,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                   <div className="lb-gap">↓ твоё место ↓</div>
                   <div className="lb-row mine">
                     <div className="lb-rank">{meRow.place}</div>
-                    <div className="lb-ava sm" data-r={99}>{initial(meRow.name)}</div>
+                    <Avatar id={meRow.id} name={meRow.name} rank={99} sm />
                     <div className="lb-info">
                       <div className="lb-name">{meRow.name}<span className="lb-you">ты</span></div>
                       <div className="lb-meta">📍 {meRow.loc} · {meRow.owner}</div>
