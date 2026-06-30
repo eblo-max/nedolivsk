@@ -3192,7 +3192,7 @@ function _box(el,pad){var r=el.getBoundingClientRect();if(!r.width)return null;v
 function _hit(a,b){return a.x0<b.x1&&a.x1>b.x0&&a.y0<b.y1&&a.y1>b.y0;}
 var _rq=false;
 function relayout(){_rq=false;var z=map.getZoom(),i;
-  document.body.classList.toggle('far', z<3.4);   // далёкий зум → «огни» вместо зданий
+  document.body.classList.toggle('far', z<3.0);   // далёкий зум → «огни»; здания проступают раньше (z>=3.0)
   var showCont=z<=3;
   if(showCont){if(!map.hasLayer(contLayer))contLayer.addTo(map);}
   else{if(map.hasLayer(contLayer))map.removeLayer(contLayer);}
