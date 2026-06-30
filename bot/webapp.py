@@ -3041,7 +3041,17 @@ _WORLD_HTML = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <style>
 :root{--serif:'PT Serif',Georgia,'Times New Roman',serif}
 html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:system-ui,sans-serif}
-#map{height:100%}.leaflet-container{background:#0f1828;font-family:inherit}
+#map{height:100%}.leaflet-container{background:transparent;font-family:inherit}
+/* LQIP: мгновенное размытое превью мира (z0-тайл) — карта появляется без тёмной паузы */
+#lqip{position:fixed;inset:0;z-index:0;pointer-events:none;background:#0f1828 center/cover no-repeat;
+  filter:blur(14px) saturate(1.15) brightness(.92);transform:scale(1.14);transition:opacity .7s ease;will-change:opacity}
+#lqip.gone{opacity:0}
+/* маяк своей таверны — «сонар»-пульс, всегда видно дом (1 объект → перф ок) */
+.tav-pin.mine .beacon{position:absolute;left:50%;top:54%;width:78%;height:78%;transform:translate(-50%,-50%);
+  border-radius:50%;border:2px solid rgba(255,214,130,.85);box-shadow:0 0 10px rgba(255,200,110,.5);
+  animation:ping 2.3s cubic-bezier(.2,.7,.3,1) infinite;pointer-events:none}
+@keyframes ping{0%{transform:translate(-50%,-50%) scale(.45);opacity:.95}70%{opacity:0}100%{transform:translate(-50%,-50%) scale(1.7);opacity:0}}
+@media (prefers-reduced-motion:reduce){.tav-pin.mine .beacon{animation:none;opacity:.45;transform:translate(-50%,-50%) scale(1.1)}}
 /* кинематографичное обрамление: виньетка по краям + тёплый световой грейд (статично, без blur) */
 #frame{position:fixed;inset:0;z-index:480;pointer-events:none;transform:translateZ(0);
   box-shadow:inset 0 0 110px 26px rgba(5,8,16,.82),inset 0 0 280px 70px rgba(5,8,16,.34);
@@ -3108,6 +3118,7 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 #loader.hide{opacity:0;pointer-events:none}
 </style></head>
 <body>
+<div id="lqip"></div>
 <div id="map"></div>
 <div id="frame"></div>
 <div id="hud"><div id="title">🗺 <b>Мир Недоливска</b> <span id="cnt"></span></div>
@@ -3128,8 +3139,11 @@ L.control.zoom({position:'bottomright'}).addTo(map);
 map.createPane('contPane');map.getPane('contPane').style.zIndex=450;map.getPane('contPane').style.pointerEvents='none';
 function px(x,y){return map.unproject([x,y],MAXZ);}
 var bounds=L.latLngBounds(px(0,H),px(W,0));
-L.tileLayer('/world/tiles/{z}/{x}/{y}.webp',{tileSize:TILE,noWrap:true,bounds:bounds,
+var _lq=document.getElementById('lqip');if(_lq){_lq.style.backgroundImage="url('/world/tiles/0/0/0.webp')";}
+function _hideLqip(){if(_lq)_lq.classList.add('gone');}
+var tiles=L.tileLayer('/world/tiles/{z}/{x}/{y}.webp',{tileSize:TILE,noWrap:true,bounds:bounds,
   maxNativeZoom:MAXZ,maxZoom:MAXZ+1,keepBuffer:6,updateWhenZooming:false,detectRetina:true}).addTo(map);
+tiles.on('load',_hideLqip);setTimeout(_hideLqip,3500);  // гасим превью после загрузки (или по таймауту)
 // стартовый валидный вид сразу (на случай, если cover-расчёт задержится в WebView)
 map.setView(px(W/2,H/2),2);
 map.setMaxBounds(bounds.pad(0.04));
@@ -3214,7 +3228,7 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
     var sz=t.mine?56:42;var ll=px(t.x*W,t.y*H);
     var icon=L.divIcon({className:'tav-pin'+(t.mine?' mine':''),iconSize:[sz,sz],
       iconAnchor:[sz/2,sz*0.9],popupAnchor:[0,-sz*0.82],
-      html:'<div class="sh"></div><img src="/assets/map_tavern_'+t.tier+'.png" alt="" decoding="async"><div class="lv">'+t.level+'</div>'});
+      html:(t.mine?'<div class="beacon"></div>':'')+'<div class="sh"></div><img src="/assets/map_tavern_'+t.tier+'.png" alt="" decoding="async"><div class="lv">'+t.level+'</div>'});
     var m=L.marker(ll,{icon:icon,zIndexOffset:t.mine?1000:0}).addTo(layer).bindPopup(card(t));
     m.bindTooltip(esc(t.name),{permanent:true,direction:'top',className:'tav-label'+(t.mine?' tl-mine':''),offset:[0,-sz*0.78]});
     tavMarkers.push({m:m,mine:!!t.mine,prio:t.mine?1e9:(t.level*1000+(t.rep||0))});
