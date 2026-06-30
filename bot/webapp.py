@@ -1715,20 +1715,17 @@ async def _api_chronicle(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "entries": entries}, headers={"Cache-Control": "no-store"})
 
 
-async def _api_rating(request: web.Request) -> web.Response:
-    """Доска почёта: топ таверн по ВВП (как «рп топ» в боте). Топ-10 + моё место.
-    Пока ОТКРЫТА ТОЛЬКО АДМИНУ (гейт _is_admin) — обкатка перед открытием всем."""
-    uid, body = await _auth(request)
-    if uid is None:
-        return body
-    if not _is_admin(uid):
-        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+_RATING_METRICS = ("gdp", "rep", "level")   # ключи метрик доски (по ним же ранжируем)
+_RATING_TOP = 50                              # длина каждой доски
+
+
+def _rating_entries(rows: list) -> tuple[list[dict], int]:
+    """Сводка по всем тавернам: id/имя/владелец/уровень/локация + метрики gdp/rep.
+    ВВП считается ОДИН раз (как «рп топ» в боте) — дальше сортируем по любой метрике."""
     from bot.game import buildings as bld
     from bot.game import items as it
     from bot.game import production as prodmod
-    async with session_factory() as s:
-        rows = await repo.get_map_taverns(s)
-    rated = []
+    entries: list[dict] = []
     for tavern, player in rows:
         gdp = balance.tavern_gdp(
             inventory=player.inventory, gold=player.gold, level=tavern.level,
@@ -1736,26 +1733,43 @@ async def _api_rating(request: web.Request) -> web.Response:
         gdp += it.gear_value(getattr(player, "equipment", None))
         gdp += bld.invested_value(tavern)
         gdp += prodmod.products_value(tavern)
-        rated.append((gdp, tavern, player))
-    rated.sort(key=lambda x: (-x[0], x[1].name))
-    total_gdp = sum(g for g, _, _ in rated)
+        entries.append({
+            "id": int(player.id), "name": tavern.name or "Таверна",
+            "owner": player.first_name or "Кабатчик", "level": int(tavern.level),
+            "loc": worldmap.continent_name(player.id),
+            "gdp": int(gdp), "rep": int(tavern.reputation or 0),
+        })
+    return entries, sum(e["gdp"] for e in entries)
 
-    def row(place: int, gdp: int, t, p) -> dict:
-        return {"place": place, "name": t.name or "Таверна", "id": int(p.id),
-                "owner": p.first_name or "Кабатчик", "level": int(t.level),
-                "loc": worldmap.continent_name(p.id), "gdp": int(gdp),
-                "rep": int(t.reputation or 0), "mine": bool(uid) and p.id == uid}
 
-    top = [row(i, g, t, p) for i, (g, t, p) in enumerate(rated[:50], 1)]
+def _rating_board(entries: list[dict], metric: str, uid: int) -> dict:
+    """ЧЕСТНЫЙ рейтинг по метрике: сортируем ВСЕ таверны, режем топ; если меня нет
+    в топе — отдаю свою строку с её настоящим местом (не приблизительным)."""
+    ranked = sorted(entries, key=lambda e: (-e[metric], e["name"].lower()))
+    out = [{**e, "place": i, "mine": bool(uid) and e["id"] == uid}
+           for i, e in enumerate(ranked, 1)]
+    top = out[:_RATING_TOP]
     me = None
-    if uid and not any(r["mine"] for r in top):           # я ниже топа — отдаю свою строку
-        for i, (g, t, p) in enumerate(rated, 1):
-            if p.id == uid:
-                me = row(i, g, t, p)
-                break
+    if uid and not any(r["mine"] for r in top):
+        me = next((r for r in out if r["id"] == uid), None)
+    return {"rows": top, "me": me}
+
+
+async def _api_rating(request: web.Request) -> web.Response:
+    """Доска почёта: ТРИ честно ранжированные доски (ВВП/Слава/Уровень) в одном
+    ответе — переключение на клиенте мгновенное и корректное. ОТКРЫТА ТОЛЬКО АДМИНУ."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    if not _is_admin(uid):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+    async with session_factory() as s:
+        rows = await repo.get_map_taverns(s)
+    entries, total_gdp = _rating_entries(rows)
+    boards = {k: _rating_board(entries, k, uid) for k in _RATING_METRICS}
     return web.json_response(
-        {"ok": True, "rows": top, "me": me, "total_gdp": int(total_gdp),
-         "total": len(rated)}, headers={"Cache-Control": "no-store"})
+        {"ok": True, "boards": boards, "total_gdp": int(total_gdp),
+         "total": len(entries)}, headers={"Cache-Control": "no-store"})
 
 
 # Аватарки игроков из Telegram-профиля (для лидерборда). Кэш в памяти: фото меняют
