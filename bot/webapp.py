@@ -3076,8 +3076,10 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 /* подпись таверны (на близком зуме) */
 .leaflet-tooltip.tav-label{background:rgba(10,14,24,.85);border:1px solid #6b522e;color:#f3dca0;
   font-family:var(--serif);font-weight:700;font-size:11px;border-radius:7px;padding:1px 7px;
-  box-shadow:0 1px 6px rgba(0,0,0,.5)}
+  box-shadow:0 1px 6px rgba(0,0,0,.5);transition:opacity .15s}
 .leaflet-tooltip.tav-label::before{display:none}
+/* имена таверн — только на близком зуме (иначе каша из подписей); своя видна всегда */
+body:not(.tt-on) .leaflet-tooltip.tav-label:not(.tl-mine){opacity:0;visibility:hidden}
 /* пин таверны: спрайт-здание + тень на земле + бейдж уровня */
 .tav-pin .sh{position:absolute;left:50%;bottom:1px;width:60%;height:13%;transform:translateX(-50%);
   background:radial-gradient(ellipse,rgba(0,0,0,.5),rgba(0,0,0,0) 70%);border-radius:50%}
@@ -3154,19 +3156,20 @@ fetch('/world/slots.json').then(function(r){return r.json();}).then(function(cs)
   cs.forEach(function(c){
     var bi=BICON[c.biome]||'•';
     L.marker(px(c.x*W,c.y*H),{interactive:false,keyboard:false,
-      icon:L.divIcon({className:'cont-label',iconSize:[210,24],iconAnchor:[105,12],
+      icon:L.divIcon({className:'cont-label',iconSize:[210,24],iconAnchor:[105,28],
         html:'<span class="cl-plate"><span class="ci">'+bi+'</span>'+esc(c.name)+'</span>'})}).addTo(contLayer);
   });
   syncLabels();
 }).catch(function(){});
 function syncLabels(){var z=map.getZoom();
   if(z<=3){if(!map.hasLayer(contLayer))contLayer.addTo(map);}
-  else{if(map.hasLayer(contLayer))map.removeLayer(contLayer);}}
+  else{if(map.hasLayer(contLayer))map.removeLayer(contLayer);}
+  document.body.classList.toggle('tt-on', z>=4.8);}
 map.on('zoomend',syncLabels);
 // ── таверны ──
-var cluster=L.markerClusterGroup?L.markerClusterGroup({maxClusterRadius:48,showCoverageOnHover:false,
+var cluster=L.markerClusterGroup?L.markerClusterGroup({maxClusterRadius:function(z){return z<=2?120:z<=3?92:z<=4?64:46;},showCoverageOnHover:false,
   disableClusteringAtZoom:MAXZ,iconCreateFunction:function(c){var n=c.getChildCount();var d=30+Math.min(22,n);
-    return L.divIcon({html:'<div class="tcl" style="width:'+d+'px;height:'+d+'px">'+n+'</div>',className:'',iconSize:[d,d]});}}):null;
+    return L.divIcon({html:'<div class="tcl" style="width:'+d+'px;height:'+d+'px">'+n+'</div>',className:'',iconSize:[d,d],iconAnchor:[d/2,d/2-8]});}}):null;
 var layer=cluster||map;var myLL=null;var myMarker=null;
 function card(t){
   return '<div class="tav-pop"><div class="h">🏰 '+esc(t.name)+'</div>'+
@@ -3185,7 +3188,7 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
       iconAnchor:[sz/2,sz*0.9],popupAnchor:[0,-sz*0.82],
       html:'<div class="sh"></div><img src="/assets/map_tavern_'+t.tier+'.png" alt=""><div class="lv">'+t.level+'</div>'});
     var m=L.marker(ll,{icon:icon,zIndexOffset:t.mine?1000:0}).addTo(layer).bindPopup(card(t));
-    m.bindTooltip(esc(t.name),{permanent:true,direction:'top',className:'tav-label',offset:[0,-sz*0.78]});
+    m.bindTooltip(esc(t.name),{permanent:true,direction:'top',className:'tav-label'+(t.mine?' tl-mine':''),offset:[0,-sz*0.78]});
     if(t.mine){myLL=ll;myMarker=m;}
   });
   if(cluster)map.addLayer(cluster);
