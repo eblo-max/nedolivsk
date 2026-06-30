@@ -1,29 +1,9 @@
-import { useEffect, useState } from 'react'
-import { api } from '../api'
 import { tgUser } from '../telegram'
-import Placeholder from './_Placeholder'
 
-// Вкладка «Карта мира». Полноценная тайловая карта (/world, Leaflet) — пока ТОЛЬКО
-// админу; остальным — заглушка «скоро». Карту грузим в iframe на весь экран между
-// шапкой и навбаром; uid пробрасываем в URL (внутри iframe initData недоступна) —
-// нужен лишь для подсветки своей таверны, доступ гейтит сервер (whoami по initData).
+// Вкладка «Карта мира» — ОТКРЫТА ВСЕМ игрокам. Полноценная тайловая карта (/world,
+// Leaflet) грузится в iframe на весь экран между шапкой и навбаром; uid пробрасываем
+// в URL (внутри iframe initData недоступна) — нужен лишь для подсветки своей таверны.
 export default function WorldMap() {
-  const [admin, setAdmin] = useState<boolean | null>(null)
-
-  useEffect(() => {
-    api<{ admin?: boolean }>('whoami').then((r) => setAdmin(!!r.admin)).catch(() => setAdmin(false))
-  }, [])
-
-  if (admin === null) {
-    return <div className="center" style={{ flex: 1 }}><div className="spin" /></div>
-  }
-  if (!admin) {
-    return (
-      <Placeholder
-        title="Карта мира" sub="скоро"
-        note="Огромная мировая карта Недоливска с таврнами всех игроков — уже в пути. Скоро откроем для всех." />
-    )
-  }
   const uid = tgUser()?.id || 0
   return (
     <div style={{

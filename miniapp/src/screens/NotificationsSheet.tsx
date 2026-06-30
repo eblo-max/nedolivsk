@@ -34,14 +34,26 @@ export default function NotificationsSheet({ admin, onClose }: { admin?: boolean
     finally { setBusy(false) }
   }
 
+  async function patchnote() {
+    if (busy) return
+    setBusy(true); haptic('medium')
+    try { await api('notifications/seed_patchnote'); load() } catch { /* ignore */ }
+    finally { setBusy(false) }
+  }
+
   return (
     <div className="sv-backdrop" onClick={onClose}>
       <div className="chron-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="chron-head">🔔 Уведомления</div>
         {admin && (
-          <button className="btn" disabled={busy} style={{ marginBottom: 10 }} onClick={seedAll}>
-            {busy ? 'Сею…' : '🧪 Засеять все типы (тест)'}
-          </button>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <button className="btn" disabled={busy} style={{ flex: 1 }} onClick={seedAll}>
+              {busy ? '…' : '🧪 Все типы'}
+            </button>
+            <button className="btn" disabled={busy} style={{ flex: 1 }} onClick={patchnote}>
+              {busy ? '…' : '📣 Патчноут'}
+            </button>
+          </div>
         )}
         {items === null ? (
           <div className="center" style={{ padding: '34px 0' }}><div className="spin" /></div>

@@ -873,6 +873,55 @@ async def _api_notifications_seed_all(request: web.Request) -> web.Response:
                              headers={"Cache-Control": "no-store"})
 
 
+# Патчноут «перенос в мини-апп» — 3 части (≤1024 симв.), для доставки админу в ленту.
+_PATCHNOTE_CHUNKS = [
+    "📣 ПАТЧНОУТ (3/3) — дорожная карта\n\n"
+    "🤝 Гильдии — общий чат, цели, помощь\n"
+    "⚔️ Гильдейские войны за регионы на карте\n"
+    "🏆 Рейтинги — топ таверн, короны на карте\n"
+    "🪓 Вторжение Орды орков в приложении\n"
+    "🗺 Карта для всех + действия прямо с карты\n"
+    "🌫 Туман войны — открывай мир исследованием\n"
+    "🎯 Сезоны и награды\n"
+    "🛒 Прямая торговля между игроками\n"
+    "✨ Живая карта — облака, точки интереса, события мира",
+    "📣 ПАТЧНОУТ (2/3) — что нового\n\n"
+    "🗺 Карта мира — общая карта для всех игроков. Таверны отмечены огоньками, "
+    "у регионов есть названия, плавный зум на весь экран. Своя таверна выделена.\n\n"
+    "🔔 Уведомления — все вести собираются прямо в игре (этот раздел). В чат бот "
+    "присылает только короткое напоминание, без спама.\n\n"
+    "🔨 Торги — продажи с аукциона, сводки биржи и ярмарка теперь приходят и в общий "
+    "чат. Тексты обновили — понятнее и с деталями.\n\n"
+    "⚔️ Рейд-босс — бой и призыв прямо в приложении.",
+    "📣 ПАТЧНОУТ (1/3) — Недоливск переехал в приложение\n\n"
+    "Вся игра теперь в Mini App прямо в Telegram. Управление кнопками, команды не нужны.\n\n"
+    "🏰 Уже в приложении:\n"
+    "• Таверна — доход, улучшение, сбыт гостям, бонус дня, грамота новосёла\n"
+    "• Двор и пристройки — стройка и производство\n"
+    "• Персонаж и кузница — статы, снаряжение, ковка, лечение\n"
+    "• Вылазки — бригады, охота, ночные ходки\n"
+    "• Торг, аукцион и биржа\n"
+    "• Рейд-босс\n"
+    "• Город — визитёры, летопись, репутация\n"
+    "• Зазывала",
+]
+
+
+async def _api_notifications_seed_patchnote(request: web.Request) -> web.Response:
+    """АДМИН: прислать себе в ленту патчноут «перенос в мини-апп» (3 части)."""
+    uid, _body = await _auth(request)
+    if uid is None:
+        return _body
+    if not _is_admin(uid):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+    async with session_factory() as s:
+        for txt in _PATCHNOTE_CHUNKS:   # порядок: часть 1 окажется сверху ленты
+            repo.feed_push(s, uid, txt)
+        await s.commit()
+    return web.json_response({"ok": True, "count": len(_PATCHNOTE_CHUNKS)},
+                             headers={"Cache-Control": "no-store"})
+
+
 # NPC → аватар (public/npc/N.png). Набор из 20 портретов раскидан по сословиям,
 # женщины/иконичные — отдельно; выбор внутри сословия детерминирован по id.
 _AV_BY_ESTATE = {
@@ -3657,6 +3706,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/notifications", _api_notifications)       # лента уведомлений (зеркало всех DM)
     app.router.add_post("/api/notifications/read", _api_notifications_read)  # отметить прочитанными
     app.router.add_post("/api/notifications/seed_all", _api_notifications_seed_all)  # АДМИН-тест: засеять все типы
+    app.router.add_post("/api/notifications/seed_patchnote", _api_notifications_seed_patchnote)  # АДМИН: патчноут в ленту
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
     app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
