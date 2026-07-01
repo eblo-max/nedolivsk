@@ -56,7 +56,7 @@ def test_success_p_falls_with_depth_and_rises_with_gear(monkeypatch):
 def test_start_state():
     r = nightrun.start(_player(), "north_wilds")
     assert r["leg"] == 1 and r["state"] == "fork" and r["satchel"] == {}
-    assert r["hp"] == balance.BASE_HP
+    assert r["hp"] == combat.max_hp(_player()) == r["hp_max"]   # HP от уровня/шмота
 
 
 # ── безопасные ноды ─────────────────────────────────────────────────────────
@@ -71,9 +71,9 @@ def test_find_loots_no_bust(monkeypatch):
 def test_rest_heals_capped(monkeypatch):
     _stub(monkeypatch)
     r = nightrun.start(_player(), "green_valleys")
-    r["hp"] = balance.BASE_HP - 5
+    r["hp"] = r["hp_max"] - 5
     out = nightrun.attempt(r, _player(), "rest", FakeRNG())
-    assert out["healed"] == 5 and r["hp"] == balance.BASE_HP        # не выше макс
+    assert out["healed"] == 5 and r["hp"] == r["hp_max"]            # не выше макс
 
 
 # ── 🎲 Лихо (честный кубик) ──────────────────────────────────────────────────
@@ -97,7 +97,7 @@ def test_fight_win_costs_hp(monkeypatch):
     _stub(monkeypatch, armor=80)                                       # высокий шанс
     r = nightrun.start(_player(), "north_wilds")
     out = nightrun.attempt(r, _player(), "fight", FakeRNG(r=0.0, ri=5))
-    assert not out["busted"] and out["hp_cost"] > 0 and r["hp"] < balance.BASE_HP
+    assert not out["busted"] and out["hp_cost"] > 0 and r["hp"] < r["hp_max"]
 
 
 def test_fight_loss_busts(monkeypatch):

@@ -492,11 +492,11 @@ def heal_kb(player) -> InlineKeyboardMarkup:
     from bot.game import production as prod
     prods = (player.tavern.products if player.tavern else None) or {}
     kb = InlineKeyboardBuilder()
-    if combat.current_hp(player) < combat.max_hp():
+    if combat.current_hp(player) < combat.max_hp(player):
         for k in balance.HEAL_VALUES:
             if prods.get(k, 0) > 0:
                 g = prod.GOODS[k]
-                kb.button(text=f"{g.emoji} {g.name} +{balance.HEAL_VALUES[k]}❤",
+                kb.button(text=f"{g.emoji} {g.name} +{combat.heal_amount(player, k)}❤",
                           callback_data=f"heal:{k}", style="success")
     kb.button(text="↩️ К охоте", callback_data="hunt")
     kb.adjust(1)

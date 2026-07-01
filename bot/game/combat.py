@@ -48,40 +48,44 @@ ENEMIES = [
     Enemy("zayac", "👁", "Летучий Глаз", 8, 2, 0, (3, 12),
           (Drop("game", 2, 4),),
           blurb="Мелкая летучая нечисть. Прихлопнёшь и голыми руками.", video=""),
-    Enemy("lisa", "🗿", "Горгулья", 18, 4, 0, (10, 22),
+    Enemy("lisa", "🗿", "Горгулья", 22, 8, 0, (10, 22),
           (Drop("game", 2, 4), Drop("herbs", 2, 3, 22)),
           blurb="Каменная пакость с погоста. Юркая, да хрупкая.", video=""),
-    Enemy("gadyuka", "🐍", "Медуза", 28, 9, 0, (15, 30),
+    Enemy("gadyuka", "🐍", "Медуза", 23, 9, 0, (15, 30),
           (Drop("herbs", 3, 6), Drop("game", 2, 3, 12)),
           blurb="Ядовита — броня не спасёт, только уворот (удача). Яд идёт в зелья.",
           video="", traits=("venom",)),
-    Enemy("olen", "🐎", "Кентавр", 54, 7, 1, (18, 34),
+    Enemy("olen", "🐎", "Кентавр", 99, 17, 1, (22, 40),
           (Drop("game", 6, 10), Drop("herbs", 3, 5, 25),
            Drop("hide", 1, 2, 35), Drop("sinew", 1, 2, 20)),
           blurb="Силён телом, да отпор слабоват. Шкура и жилы идут в дело.", video=""),
-    Enemy("volk", "🐺", "Цербер", 40, 7, 2, (16, 32),
+    Enemy("volk", "🐺", "Цербер", 75, 13, 2, (20, 38),
           (Drop("game", 4, 7), Drop("herbs", 2, 4, 15),
            Drop("fang", 1, 2, 30), Drop("sinew", 1, 2, 25)),
           blurb="Адский пёс — кусает всерьёз и юлит. Броня не добьёт, нужен урон.",
           video="", traits=("evasive",)),
-    Enemy("kaban", "🐂", "Минотавр", 66, 9, 6, (25, 50),
+    Enemy("kaban", "🐂", "Минотавр", 91, 14, 6, (30, 60),
           (Drop("game", 7, 12), Drop("herbs", 3, 5, 20),
            Drop("hide", 1, 2, 30), Drop("fang", 1, 1, 20)),
           blurb="Рога и толстая шкура. Крит пробивает, топор рубит.", video=""),
-    Enemy("vozhak", "💀", "Скелет-латник", 88, 12, 4, (45, 85),
+    Enemy("upyr", "🧟", "Кладбищенский Упырь", 170, 22, 3, (32, 62),
+          (Drop("game", 6, 10), Drop("hide", 1, 2, 30), Drop("sinew", 1, 2, 25)),
+          rep=1, video="",
+          blurb="Мостик к сильным тварям: жилист, но компонентная снаряга берёт."),
+    Enemy("vozhak", "💀", "Скелет-латник", 289, 33, 4, (60, 115),
           (Drop("game", 8, 14), Drop("ore", 3, 5, 18),
            Drop("fang", 1, 2, 60), Drop("hide", 1, 2, 25)),
           rep=1, video="", blurb="Восставший вояка в ржавой броне. Клыки знатные."),
-    Enemy("medved", "🪨", "Каменный Голем", 90, 12, 8, (45, 95),
+    Enemy("medved", "🪨", "Каменный Голем", 418, 42, 8, (70, 140),
           (Drop("game", 10, 16), Drop("honey", 3, 6),
            Drop("hide", 2, 3, 60), Drop("fang", 1, 1, 20)),
           rep=1, blurb="Глыба на ножках. Задавит неподготовленного.",
           video=""),
-    Enemy("razboy", "👺", "Гоблин-головорез", 94, 13, 6, (90, 170),
+    Enemy("razboy", "👺", "Гоблин-головорез", 402, 42, 6, (120, 220),
           (Drop("ore", 4, 8), Drop("herbs", 4, 8),
            Drop("fang", 1, 2, 40)),
           rep=2, video="", blurb="С дубьём и злой. Только для крепкого бойца."),
-    Enemy("ataman", "🐉", "Дракон", 215, 30, 13, (190, 360),
+    Enemy("ataman", "🐉", "Дракон", 848, 83, 13, (280, 520),
           (Drop("ore", 8, 14), Drop("clay", 6, 10, 40),
            Drop("ring", 1, 1, 25)),
           rep=4, blurb="Гроза тракта. С него — перстень-диковина.",
@@ -89,15 +93,29 @@ ENEMIES = [
     # ═══ РЕГИОНАЛЬНЫЕ МОНСТРЫ (Фаза 4): эксклюзив региона, каждый — свой архетип
     # и свой компонент (мех/клык/хитин) для регионального пояса. Сложность
     # паритетная (см. шлюз в симуляторе). Видео нет → фолбэк на картинку охоты.
-    Enemy("lynx", "🦅", "Гарпия", 58, 12, 1, (40, 80),
+    Enemy("lynx", "🦅", "Гарпия", 186, 32, 1, (55, 110),
           (Drop("game", 4, 7), Drop("fang", 1, 2, 30), Drop("pelt", 1, 2, 40)),
           rep=1, region="north_wilds", traits=("evasive",), video="",
           blurb="Тайга. Стремительна — уводит удары; нужен высокий урон/крит."),
-    Enemy("tusker", "🐐", "Сатир-лучник", 88, 9, 8, (45, 90),
+    Enemy("tusker", "🐐", "Сатир-лучник", 315, 27, 8, (60, 120),
           (Drop("game", 8, 12), Drop("hide", 1, 2, 35), Drop("tusk", 1, 2, 40)),
           rep=1, region="green_valleys", video="",
           blurb="Долины. Бронированный лесовик — сырой урон вязнет, крит пробивает."),
-    Enemy("scorpion", "🧙", "Ведьма Пустошей", 66, 8, 7, (40, 85),
+    # ═══ ВЕРХНИЙ ЯРУС (боевой пересмотр): контент для орочьего сета и рейд-BiS.
+    # Раньше после атамана игра «заканчивалась» — топ-билды имели 100% везде.
+    Enemy("ogr", "🗿", "Каменный Огр", 1016, 76, 10, (240, 430),
+          (Drop("stone", 6, 10), Drop("ore", 5, 9), Drop("ring", 1, 1, 12)),
+          rep=3, video="",
+          blurb="Ходячая скала с дубиной-сосной. Только для латников орды."),
+    Enemy("wyvern", "🐲", "Виверна", 1131, 87, 8, (340, 620),
+          (Drop("fang", 2, 3, 80), Drop("herbs", 6, 10), Drop("ring", 1, 1, 18)),
+          rep=4, traits=("evasive",), video="",
+          blurb="Крылатая бестия — юлит в небе, рвёт когтями. Гроза ветеранов."),
+    Enemy("lich", "💀", "Костяной Лич", 888, 58, 14, (420, 760),
+          (Drop("ingot", 2, 3, 60), Drop("herbs", 8, 12), Drop("ring", 1, 1, 22)),
+          rep=5, traits=("venom",), video="",
+          blurb="Древняя нежить: чары бьют сквозь любую броню. Вершина охоты."),
+    Enemy("scorpion", "🧙", "Ведьма Пустошей", 194, 21, 7, (55, 110),
           (Drop("herbs", 3, 6), Drop("fang", 1, 1, 25), Drop("chitin", 1, 2, 45)),
           rep=1, region="red_wastes", traits=("venom",), video="",
           blurb="Пустоши. Зелья ядовиты (броня не спасёт — нужна удача), "
@@ -160,12 +178,15 @@ def player_stats(player) -> dict:
     stats = dict(items.combat_stats(getattr(player, "equipment", None)))
     stats["luck"] = stats.get("luck", 0) + buff.luck_bonus(player)
     stats["dmg_taken_mult"] = buff.tough_mult(player)
+    stats["level"] = int(getattr(player, "level", 1) or 1)
+    stats["armor"] = min(balance.ARMOR_CAP, stats.get("armor", 0))  # бюджет живучести
     return stats
 
 
 def _player_offense(stats: dict) -> tuple[int, int, int]:
     # Крит развязан с удачей (Фаза 1): крит-стат сам по себе, удача → уворот/добыча.
-    dmg = balance.BASE_DAMAGE + stats.get("damage", 0)
+    dmg = (balance.BASE_DAMAGE + stats.get("damage", 0)
+           + balance.LEVEL_DAMAGE * stats.get("level", 0))
     crit_pct = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0))
     return dmg, crit_pct, stats.get("armor", 0)
 
@@ -295,7 +316,13 @@ def _now() -> datetime:
 
 
 def max_hp(player=None) -> int:
-    return balance.BASE_HP
+    """Максимум HP: база + уровень + vitality со шмота (единый каркас персонажа).
+    Без игрока (легаси-вызовы) — прежние 35, чтобы ничего не сломать."""
+    if player is None:
+        return balance.BASE_HP
+    lvl = int(getattr(player, "level", 1) or 1)
+    vit = items.combat_stats(getattr(player, "equipment", None)).get("vitality", 0)
+    return balance.HP_BASE + balance.HP_PER_LEVEL * lvl + vit
 
 
 def _regen_hours(player) -> float:
@@ -303,39 +330,46 @@ def _regen_hours(player) -> float:
     return balance.HP_REGEN_FULL_HOURS * buff.regen_mult(player)
 
 
+def heal_amount(player, key: str) -> int:
+    """Сколько HP вернёт порция: процент от максимума (не обесценивается с ростом)."""
+    return max(1, int(round(max_hp(player) * balance.HEAL_PCT.get(key, 0))))
+
+
 def current_hp(player, now: datetime | None = None) -> int:
-    """Текущее здоровье с регенерацией от hp_at к максимуму."""
-    cur = player.hp if player.hp is not None else balance.BASE_HP
-    if cur >= balance.BASE_HP or player.hp_at is None:
-        return min(balance.BASE_HP, cur)
+    """Текущее здоровье с регенерацией от hp_at к максимуму (max_hp игрока)."""
+    mx = max_hp(player)
+    cur = player.hp if player.hp is not None else mx
+    if cur >= mx or player.hp_at is None:
+        return min(mx, cur)
     now = now or _now()
     t = player.hp_at
     if t.tzinfo is None:
         t = t.replace(tzinfo=timezone.utc)
     elapsed_h = max(0.0, (now - t).total_seconds() / 3600)
-    regen = elapsed_h * balance.BASE_HP / _regen_hours(player)
-    return int(min(balance.BASE_HP, cur + regen))
+    regen = elapsed_h * mx / _regen_hours(player)
+    return int(min(mx, cur + regen))
 
 
-def _min_hp() -> int:
-    return max(1, int(balance.BASE_HP * balance.HUNT_MIN_HP_PCT))
+def _min_hp(player=None) -> int:
+    return max(1, int(max_hp(player) * balance.HUNT_MIN_HP_PCT))
 
 
 def regen_full_minutes(player, now: datetime | None = None) -> int:
     """Минут до полного восстановления HP (0 — уже полное)."""
+    mx = max_hp(player)
     chp = current_hp(player, now)
-    if chp >= balance.BASE_HP:
+    if chp >= mx:
         return 0
-    rate_per_min = (balance.BASE_HP / _regen_hours(player)) / 60
-    return int((balance.BASE_HP - chp) / rate_per_min) + 1
+    rate_per_min = (mx / _regen_hours(player)) / 60
+    return int((mx - chp) / rate_per_min) + 1
 
 
 def _mark_recovery(player, now: datetime) -> None:
     """Если ушёл ниже боевого порога — записать время восстановления (для пинга),
     иначе сбросить. Колонка hunt_ready_at используется только для уведомления."""
-    need = _min_hp()
+    need = _min_hp(player)
     if player.hp < need:
-        rate = balance.BASE_HP / _regen_hours(player)
+        rate = max_hp(player) / _regen_hours(player)
         player.hunt_ready_at = now + timedelta(hours=(need - player.hp) / rate)
     else:
         player.hunt_ready_at = None
@@ -344,16 +378,16 @@ def _mark_recovery(player, now: datetime) -> None:
 def hunt_ready(player, now: datetime | None = None) -> tuple[bool, int]:
     """(в строю?, минут до восстановления до порога). Гейт — по HP, не по таймеру."""
     chp = current_hp(player, now)
-    need = _min_hp()
+    need = _min_hp(player)
     if chp >= need:
         return True, 0
-    rate_per_min = (balance.BASE_HP / _regen_hours(player)) / 60
+    rate_per_min = (max_hp(player) / _regen_hours(player)) / 60
     return False, int((need - chp) / rate_per_min) + 1
 
 
 def can_heal(player, now: datetime | None = None) -> bool:
     """Есть ли чем подлечиться (товар в погребе) и не полон ли уже."""
-    if current_hp(player, now) >= balance.BASE_HP:
+    if current_hp(player, now) >= max_hp(player):
         return False
     prods = (player.tavern.products if player.tavern else None) or {}
     return any(prods.get(k, 0) > 0 for k in balance.HEAL_VALUES)
@@ -367,12 +401,13 @@ def heal(player, key: str, now: datetime | None = None) -> dict | None:
     prods = dict(player.tavern.products or {})
     if prods.get(key, 0) <= 0:
         return None
+    mx = max_hp(player)
     chp = current_hp(player, now)
-    if chp >= balance.BASE_HP:
+    if chp >= mx:
         return None
     prods[key] -= 1
     player.tavern.products = prods
-    new = min(balance.BASE_HP, chp + balance.HEAL_VALUES[key])
+    new = min(mx, chp + heal_amount(player, key))
     player.hp = new
     player.hp_at = now
     _mark_recovery(player, now)

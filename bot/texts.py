@@ -1826,7 +1826,7 @@ def _hp_bar(cur: int, mx: int) -> str:
 def _hp_line(player) -> str:
     """Строка здоровья: текущее/макс + полоска + таймер до полного восстановления."""
     from bot.game import combat
-    chp, mx = combat.current_hp(player), combat.max_hp()
+    chp, mx = combat.current_hp(player), combat.max_hp(player)
     line = f"❤ Здоровье — {chp}/{mx} {_hp_bar(chp, mx)}"
     if chp < mx:
         line += f" · ⏳ до полного {_fmt_minutes(combat.regen_full_minutes(player))}"
@@ -1863,7 +1863,7 @@ def hunt_menu(player) -> str:
 def heal_menu(player) -> str:
     from bot.game import combat
     from bot.game import production as prod
-    chp, mx = combat.current_hp(player), combat.max_hp()
+    chp, mx = combat.current_hp(player), combat.max_hp(player)
     prods = (player.tavern.products if player.tavern else None) or {}
     parts = ["🍖 <b>ПОДЛЕЧИТЬСЯ</b>", "", _hp_line(player), ""]
     avail = [k for k in balance.HEAL_VALUES if prods.get(k, 0) > 0]
@@ -1874,7 +1874,7 @@ def heal_menu(player) -> str:
                      "или налей дешёвого эля.»")
     else:
         parts += _branch("ЧЕМ ПОДЛЕЧИТЬСЯ", [
-            f"{prod.GOODS[k].emoji} {prod.GOODS[k].name} +{balance.HEAL_VALUES[k]} ❤ "
+            f"{prod.GOODS[k].emoji} {prod.GOODS[k].name} +{combat.heal_amount(player, k)} ❤ "
             f"(в погребе {prods.get(k, 0)})" for k in avail])
         parts += ["", "<i>Жаркое сытнее эля. Что съешь — в погреб не вернётся.</i>"]
     return "\n".join(parts)
@@ -1910,9 +1910,9 @@ def hunt_detail(player, enemy) -> str:
     g = [ln for ln, _ in guar] + [f"🪙 Золото {enemy.gold[0]}–{enemy.gold[1]}"]
     if enemy.rep:
         g.append(f"⭐ Репутация +{enemy.rep}")
-    odds = [f"{tcol} {lbl}", f"🎯 Победа ~{wp}% (при ❤{chp}/{combat.max_hp()})"]
+    odds = [f"{tcol} {lbl}", f"🎯 Победа ~{wp}% (при ❤{chp}/{combat.max_hp(player)})"]
     if wp > 0:
-        odds.append(f"❤ Останется ~{avg}/{combat.max_hp()}")
+        odds.append(f"❤ Останется ~{avg}/{combat.max_hp(player)}")
 
     parts = [
         f"🏹 <b>{enemy.emoji} {enemy.name.upper()}</b>",
@@ -2979,7 +2979,7 @@ def _nr_head(run: dict) -> str:
     road = _NR_ROAD.get(run.get("region"), "ночной тракт")
     head = (f"🌙 <b>Ночная ходка</b> · {road}\n"
             f"Этап {run['leg']}/{balance.NIGHTRUN_LEGS} · 🎒 {_nr_loot(run.get('satchel') or {})} "
-            f"· ❤ {run['hp']}/{nightrun.BASE_HP}")
+            f"· ❤ {run['hp']}/{run.get('hp_max', nightrun.BASE_HP)}")
     sit = _NR_SIT.get(run.get("situation"))
     if sit:
         head += f"\n<i>В городе: {sit}</i>"

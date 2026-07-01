@@ -14,7 +14,7 @@ interface CharState {
   hp: { cur: number; max: number; regen: number }
   damage: number; crit: number; armor: number; luck: number; vylazka: number
   equipment: Slot[]; bonuses: { label: string; val: string }[]
-  orc: { damage: number; crit: number; armor: number; luck: number; income: number } | null
+  orc: { damage: number; crit: number; armor: number; luck: number; vitality?: number; income: number } | null
   craft: Craft
   heal: { can: boolean; full: boolean; options: HealOpt[] }
 }
@@ -270,7 +270,7 @@ export default function Character() {
 
       {c.orc && (
         <div className="stat-orc rise" style={{ animationDelay: '.1s' }}>
-          <b>🪓 СЕТ ОРДЫ</b> +{c.orc.damage} урон · +{c.orc.crit}% крит · +{c.orc.armor} броня · +{c.orc.luck} удача · +{c.orc.income}% доход
+          <b>🪓 СЕТ ОРДЫ</b> +{c.orc.damage} урон · +{c.orc.crit}% крит · +{c.orc.armor} броня · +{c.orc.luck} удача{c.orc.vitality ? ` · +${c.orc.vitality} ❤` : ''} · +{c.orc.income}% доход
         </div>
       )}
 

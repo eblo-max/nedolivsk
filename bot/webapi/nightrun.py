@@ -55,7 +55,8 @@ def _nightrun_state(p) -> dict:
         base["run"] = None
         return base
     st = run.get("state")
-    r = {"leg": run["leg"], "state": st, "hp": run["hp"], "hp_max": bal.BASE_HP,
+    r = {"leg": run["leg"], "state": st, "hp": run["hp"],
+         "hp_max": run.get("hp_max", bal.BASE_HP),
          "satchel": _nr_items(run.get("satchel")),
          "satchel_value": nr.satchel_value(run.get("satchel")),
          "situation": run.get("situation"), "can_push": nr.can_push(run),

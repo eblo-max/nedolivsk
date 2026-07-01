@@ -36,11 +36,21 @@ def test_gear_progression_vs_toughest():
     boss = combat.player_stats(make_player(level=10, equipment={
         "weapon": make_entry("dragon_fang", 3), "chest": make_entry("dragon_scale", 3),
         "right_hand": make_entry("rat_tail", 3), "left_hand": make_entry("oak_shield", 3)}))
-    wn, _ = combat.forecast(nogear, at, n=400, rng=random.Random(5))
-    wc, _ = combat.forecast(craft, at, n=400, rng=random.Random(5))
-    wb, _ = combat.forecast(boss, at, n=400, rng=random.Random(5))
-    assert wn < wc < wb                              # прогрессия снаряги
-    assert wb >= 80                                  # боссовый шмот открывает атамана
-    # средне-тяжёлый зверь (Разбойник) берётся уже куётся-сетом
-    wr, _ = combat.forecast(craft, combat.ENEMY["razboy"], n=400, rng=random.Random(5))
-    assert wr >= 50
+    # бой — от РЕАЛЬНОГО максимума HP персонажа (уровень+vitality), не от базы
+    hp_n = combat.max_hp(make_player(level=10, equipment={}))
+    hp_c = combat.max_hp(make_player(level=10, equipment={
+        "weapon": make_entry("kovsh", 3), "right_hand": make_entry("master_axe", 3),
+        "left_hand": make_entry("oak_shield", 3), "chest": make_entry("fartuk", 3)}))
+    hp_b = combat.max_hp(make_player(level=10, equipment={
+        "weapon": make_entry("dragon_fang", 3), "chest": make_entry("dragon_scale", 3),
+        "right_hand": make_entry("rat_tail", 3), "left_hand": make_entry("oak_shield", 3)}))
+    rz = combat.ENEMY["razboy"]
+    wn, _ = combat.forecast(nogear, rz, hp_n, n=400, rng=random.Random(5))
+    wc, _ = combat.forecast(craft, rz, hp_c, n=400, rng=random.Random(5))
+    wb, _ = combat.forecast(boss, rz, hp_b, n=400, rng=random.Random(5))
+    assert wn < wc < wb                    # прогрессия снаряги (по Т3-разбойнику)
+    assert wb >= 90                        # боссовый шмот делает Т3 фармом
+    # атаман (Т4): кузня — стена, боссовый шмот открывает
+    wca, _ = combat.forecast(craft, at, hp_c, n=400, rng=random.Random(5))
+    wba, _ = combat.forecast(boss, at, hp_b, n=400, rng=random.Random(5))
+    assert wca <= 15 < wba

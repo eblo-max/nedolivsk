@@ -33,11 +33,12 @@ class Item:
     yield_wood_pct: int = 0     # +% только к древесине
     speed_pct: int = 0          # -% к времени вылазки
     pay_discount_pct: int = 0   # -% к плате работникам
-    # бой (на будущее)
+    # бой
     damage: int = 0
     crit: int = 0
     armor: int = 0
     luck: int = 0
+    vitality: int = 0       # +HP к максимуму здоровья (ось живучести «мясом»)
 
 
 SLOTS = {
@@ -64,6 +65,67 @@ TIER_NAMES = {1: "обычный", 2: "добротный", 3: "мастерск
 TIER_STARS = {1: "★", 2: "★★", 3: "★★★"}
 TIER_COST_MULT = {1: 1, 2: 3, 3: 8}     # цена ковки данного яруса
 TIER_INVESTED = {1: 1, 2: 4, 3: 12}     # суммарно вложено к ярусу (для ВВП)
+# «Сжатие ярусов» (боевой пересмотр): раньше ярус множил ВСЕ статы ×1/×2/×3 —
+# разрыв ветеран/новичок доходил до 6× и рвал co-op (орда/рейд) и полосы контента.
+# Best practice социальных игр — держать разрыв ~2-3×. Боевые статы растут круче
+# экономических (бой — главная ось яруса, экономика — приятный довесок).
+TIER_COMBAT_MULT = {1: 1.0, 2: 1.6, 3: 2.2}
+TIER_ECON_MULT = {1: 1.0, 2: 1.3, 3: 1.6}
+
+
+def _cmul(v: int, tier: int) -> int:
+    """Боевой стат с учётом яруса (округление вниз, минимум сохраняет знак)."""
+    return int(v * TIER_COMBAT_MULT[tier])
+
+
+def _emul(pct: int, tier: int) -> int:
+    return int(pct * TIER_ECON_MULT[tier])
+
+
+# ===== Бюджет статов предмета (WoW-lite itemization) =====
+# «Очки силы»: сколько бюджета съедает 1 ед. стата. Проверяется тестом
+# tests/test_itemization.py — предмет вне допуска бюджета не пройдёт CI.
+STAT_WEIGHTS = {
+    "damage": 1.0, "crit": 1.2, "armor": 0.7, "luck": 1.0, "vitality": 1.0,
+    "income_pct": 1.5, "yield_pct": 1.2, "yield_wood_pct": 0.6,
+    "speed_pct": 1.2, "pay_discount_pct": 0.8,
+}
+# Бюджет слота на ★ (кузня, множитель источника 1.0).
+SLOT_BUDGET = {
+    "weapon": 26, "chest": 22, "right_hand": 14, "left_hand": 14,
+    "head": 12, "legs": 12, "boots": 12, "belt": 12,
+    "amulet": 12, "talisman": 12, "bag": 10,
+}
+# Множитель источника: чем труднее добыть, тем жирнее бюджет.
+SOURCE_MULT = {
+    "forge": 1.0,        # стартовая кузня
+    "hunt": 1.25,        # компоненты охоты
+    "region": 1.2,       # региональные пояса
+    "orc": 1.45,         # орочий сет (сет-бонус — сверх бюджета, за сбор)
+    "raid_rat": 1.35, "raid_troll": 1.6, "raid_demon": 1.85, "raid_dragon": 2.1,
+}
+ITEM_SOURCE = {
+    "fur_coat": "hunt", "fang_cleaver": "hunt", "swift_boots": "hunt", "prestige_ring": "hunt",
+    "lynx_belt": "region", "tusk_belt": "region", "chitin_belt": "region",
+    "orc_helm": "orc", "orc_plate": "orc", "orc_axe": "orc",
+    "rat_crown": "raid_rat", "rat_pelt": "raid_rat", "rat_tail": "raid_rat",
+    "troll_club": "raid_troll", "troll_hide": "raid_troll", "troll_eye": "raid_troll",
+    "demon_fang": "raid_demon", "demon_hide": "raid_demon", "demon_core": "raid_demon",
+    "dragon_fang": "raid_dragon", "dragon_scale": "raid_dragon", "dragon_heart": "raid_dragon",
+}
+
+
+def item_budget_points(item: "Item") -> float:
+    """Сколько «очков силы» реально сидит в предмете (для теста бюджета)."""
+    pts = 0.0
+    for stat, w in STAT_WEIGHTS.items():
+        pts += getattr(item, stat, 0) * w
+    return pts
+
+
+def item_budget_target(item: "Item") -> float:
+    src = ITEM_SOURCE.get(item.id, "forge")
+    return SLOT_BUDGET.get(item.slot, 12) * SOURCE_MULT[src]
 # Множители цены ковки. Раздельно, чтобы крутить золото и сырьё независимо:
 #   GEAR_COST_MULT  — золото (поднят против инфляции — золото обесценилось);
 #   GEAR_RES_MULT   — ОБЫЧНОЕ сырьё (дерево/зерно/хмель/…): расход выше, чтобы ковка
@@ -83,7 +145,7 @@ _SCARCE = {"ingot", "hide", "fang", "sinew", "ring", "pelt", "tusk", "chitin", "
 # (см. combat_stats) + немного дохода (income_multiplier). Сделан ЯВНО лучшим, т.к.
 # собирается дольше всего (лотерея обрывков с побед над Ордой).
 ORC_SET = ("orc_helm", "orc_plate", "orc_axe")
-ORC_SET_BONUS = {"damage": 10, "crit": 6, "armor": 12, "luck": 6}
+ORC_SET_BONUS = {"damage": 10, "crit": 6, "armor": 12, "luck": 6, "vitality": 10}
 ORC_SET_INCOME_PCT = 5
 
 
@@ -145,20 +207,20 @@ CATALOG: dict[str, Item] = {
             id="leather_cap", slot="head", name="Шапка трактирщика",
             description="Скрывает похмелье и лысину. Постояльцы доверяют.",
             cost={"gold": 300, "wood": 0, "grain": 30, "hops": 10},
-            craft_hours=2, income_pct=5, armor=2, sprite="shapka",
+            craft_hours=2, income_pct=4, armor=3, vitality=3, sprite="shapka",
         ),
         Item(
             id="fartuk", slot="chest", name="Фартук трактирщика",
             description="Пятна эля, жира и чьей-то крови. В основном эля.",
             cost={"gold": 700, "wood": 20, "grain": 40, "hops": 0},
-            craft_hours=4, yield_pct=5, armor=8, sprite="bronya",
+            craft_hours=4, yield_pct=4, armor=12, vitality=6, sprite="bronya",
         ),
         Item(
             id="oak_shield", slot="left_hand", name="Щит дубовый",
             description="Им можно прикрыться, а можно подать на нём жаркое. "
                         "Окован железом — для крепости.",
             cost={"gold": 480, "wood": 40, "ingot": 8},
-            craft_hours=3, pay_discount_pct=5, armor=10,
+            craft_hours=3, pay_discount_pct=4, armor=12, vitality=4,
         ),
         Item(
             id="master_axe", slot="right_hand", name="Топор хозяйский",
@@ -170,31 +232,31 @@ CATALOG: dict[str, Item] = {
             id="kovsh", slot="weapon", name="Ковш боевой",
             description="Черпает эль, проламывает черепа. Шипы — для убедительности.",
             cost={"gold": 1100, "wood": 20, "hops": 20, "ingot": 12},
-            craft_hours=6, yield_pct=10, damage=14, crit=7, sprite="oruzhie",
+            craft_hours=6, yield_pct=5, damage=13, crit=6, sprite="oruzhie",
         ),
         Item(
             id="poyas", slot="belt", name="Пояс мастеровой",
             description="Нож, молоток и кисти — всё хозяйство при себе.",
             cost={"gold": 350, "wood": 0, "grain": 20, "hops": 10},
-            craft_hours=2, speed_pct=5, armor=1,
+            craft_hours=2, speed_pct=5, armor=4, vitality=2,
         ),
         Item(
             id="strong_pants", slot="legs", name="Портки крепкие",
             description="Не рвутся, даже когда бежишь от разбойников.",
             cost={"gold": 400, "wood": 0, "grain": 30, "hops": 5},
-            craft_hours=2, speed_pct=5, armor=3,
+            craft_hours=2, speed_pct=5, armor=5, vitality=2,
         ),
         Item(
             id="sapogi", slot="boots", name="Сапоги рунные",
             description="Руны светятся, носы загнуты. Бегут почти сами.",
             cost={"gold": 800, "wood": 20, "grain": 0, "hops": 15},
-            craft_hours=4, speed_pct=10, armor=4,
+            craft_hours=4, speed_pct=8, armor=3,
         ),
         Item(
             id="kruzhka", slot="amulet", name="Последняя капля",
             description="Кружка-оберег. Последняя капля из неё не прольётся никогда.",
             cost={"gold": 1000, "wood": 0, "grain": 20, "hops": 40},
-            craft_hours=5, income_pct=10, luck=3, sprite="amulet",
+            craft_hours=5, income_pct=6, luck=3, sprite="amulet",
         ),
         Item(
             id="rooster_talisman", slot="talisman", name="Талисман петуха",
@@ -206,7 +268,7 @@ CATALOG: dict[str, Item] = {
             id="sumka", slot="bag", name="Сумка торговца",
             description="Двойное дно, тройная выгода, обереги от налогов.",
             cost={"gold": 750, "wood": 10, "grain": 25, "hops": 20},
-            craft_hours=4, pay_discount_pct=15, luck=2,
+            craft_hours=4, pay_discount_pct=10, luck=2,
         ),
         # ═══════ КОМПОНЕНТНАЯ СНАРЯГА (Фаза 2): куётся из охот-трофеев (шкура/
         # клык/жила/перстень), закрывает разрыв между стартовой кузней и снарягой
@@ -215,25 +277,25 @@ CATALOG: dict[str, Item] = {
             id="fur_coat", slot="chest", name="Меховая доха",
             description="Шкуры зверья мехом внутрь. Тепло, и удар держит — не фартук.",
             cost={"gold": 1500, "ingot": 4, "hide": 6},
-            craft_hours=5, armor=14, income_pct=2,   # свой спрайт assets/items/fur_coat.png
+            craft_hours=5, armor=16, vitality=10, income_pct=2,   # свой спрайт assets/items/fur_coat.png
         ),
         Item(
             id="fang_cleaver", slot="weapon", name="Клычный тесак",
             description="Звериные клыки в рукоять. Рвёт мясо и спор не хуже ковша.",
             cost={"gold": 1800, "ingot": 4, "fang": 5},
-            craft_hours=6, damage=22, crit=5,   # свой спрайт assets/items/fang_cleaver.png
+            craft_hours=6, damage=22, crit=8,   # свой спрайт assets/items/fang_cleaver.png
         ),
         Item(
             id="swift_boots", slot="boots", name="Сапоги-скороходы",
             description="Прошиты звериными жилами. Бегут — не угонишься, и фарт при тебе.",
             cost={"gold": 900, "ingot": 2, "sinew": 4},
-            craft_hours=4, speed_pct=10, luck=4,
+            craft_hours=4, speed_pct=10, luck=3,
         ),
         Item(
             id="prestige_ring", slot="talisman", name="Перстень-диковина",
             description="Снят с атамана. Блестит так, что и удача, и купцы косятся.",
             cost={"gold": 2000, "ingot": 6, "ring": 1},
-            craft_hours=6, income_pct=5, luck=8,
+            craft_hours=6, income_pct=5, luck=7,
         ),
         # ═══════ РЕГИОНАЛЬНЫЕ ПОЯСА (Фаза 4): из компонента зверя СВОЕГО региона.
         # СТАТЫ ИДЕНТИЧНЫ во всех регионах (паритет by-design) — отличается лишь
@@ -242,19 +304,19 @@ CATALOG: dict[str, Item] = {
             id="lynx_belt", slot="belt", name="Пояс гарпьего пуха",
             description="Северная выделка: тугой гарпий пух да крепкая сыромять — лёгок и цепок.",
             cost={"gold": 1200, "ingot": 2, "pelt": 4},
-            craft_hours=4, armor=6, crit=4,
+            craft_hours=4, armor=6, crit=4, vitality=5,
         ),
         Item(
             id="tusk_belt", slot="belt", name="Пояс с рогами",
             description="Долинная работа: витые рога сатира по ремню — и грозно, и крепко.",
             cost={"gold": 1200, "ingot": 2, "tusk": 4},
-            craft_hours=4, armor=6, crit=4,
+            craft_hours=4, armor=6, crit=4, vitality=5,
         ),
         Item(
             id="chitin_belt", slot="belt", name="Чешуйчатый пояс",
             description="Пустошная ковка: змеиная чешуя внахлёст — гибко и прочно.",
             cost={"gold": 1200, "ingot": 2, "chitin": 4},
-            craft_hours=4, armor=6, crit=4,
+            craft_hours=4, armor=6, crit=4, vitality=5,
         ),
         # ═══════ ОРОЧИЙ СЕТ (трофеи Орды): куётся ТОЛЬКО из 🗞 обрывков чертежа,
         # которые редко падают с побеждённого нашествия. Собрал чертежи → скуёшь.
@@ -263,19 +325,19 @@ CATALOG: dict[str, Item] = {
             id="orc_helm", slot="head", name="Шлем орочьего вождя",
             description="Рогатая черепушка с клыками. Постояльцы трезвеют от одного взгляда.",
             cost={"gold": 800, "ingot": 8, "orc_scrap": 2},
-            craft_hours=6, armor=10, income_pct=3, sprite="orc_helm",
+            craft_hours=6, armor=10, vitality=7, income_pct=2, sprite="orc_helm",
         ),
         Item(
             id="orc_plate", slot="chest", name="Доспех орды",
             description="Награблённые пластины на ремнях. Тяжёлый, вонючий, непробиваемый.",
             cost={"gold": 1200, "ingot": 12, "orc_scrap": 3},
-            craft_hours=8, armor=22, sprite="orc_plate",
+            craft_hours=8, armor=24, vitality=15, sprite="orc_plate",
         ),
         Item(
             id="orc_axe", slot="weapon", name="Секира орды",
             description="Зазубренная сталь на древке в человеческий рост. Спор решает с одного маха.",
             cost={"gold": 1500, "ingot": 10, "orc_scrap": 4},
-            craft_hours=8, damage=24, crit=8, sprite="orc_axe",
+            craft_hours=8, damage=26, crit=9, sprite="orc_axe",
         ),
         # ═══════ ЭКСКЛЮЗИВ РЕЙД-БОССОВ (craftable=False, только выбить) ═══════
         # Статы множатся на ярус; падают рандомным ярусом, ★★★ — редчайшее.
@@ -285,76 +347,76 @@ CATALOG: dict[str, Item] = {
             id="rat_crown", slot="head", name="Корона Крысиного Короля",
             description="Жестяной обруч с подвала. Крысы кланялись — теперь кланяйся ты.",
             cost={"gold": 1500}, craft_hours=0, craftable=False,
-            income_pct=3, armor=6, luck=4,
+            income_pct=3, armor=6, luck=3, vitality=4,
         ),
         Item(
             id="rat_pelt", slot="chest", name="Душегрейка крысиного бугра",
             description="Сшита из шкур подвальной знати. Воняет, но греет и держит удар.",
             cost={"gold": 1500}, craft_hours=0, craftable=False,
-            yield_pct=4, armor=12,
+            yield_pct=3, armor=14, vitality=12,
         ),
         Item(
             id="rat_tail", slot="right_hand", name="Плеть из крысиных хвостов",
             description="Свистит и жалит. Гадко, зато по делу.",
             cost={"gold": 1500}, craft_hours=0, craftable=False,
-            damage=10, crit=4,
+            damage=12, crit=5,
         ),
         # 👹 Болотный Тролль
         Item(
             id="troll_club", slot="weapon", name="Дубина болотного тролля",
             description="Бревно с тролльей лапы. Махнул — и спор окончен.",
             cost={"gold": 4000}, craft_hours=0, craftable=False,
-            damage=18, crit=4,
+            damage=30, crit=8,
         ),
         Item(
             id="troll_hide", slot="chest", name="Шкура болотного тролля",
             description="Толстая, склизкая, непробиваемая. Работники боятся — и слушаются.",
             cost={"gold": 4000}, craft_hours=0, craftable=False,
-            pay_discount_pct=5, armor=24,
+            pay_discount_pct=3, armor=22, vitality=17,
         ),
         Item(
             id="troll_eye", slot="amulet", name="Глаз тролля",
             description="Мутный, но видит фарт за версту. Носи — и удача косится на тебя.",
             cost={"gold": 4000}, craft_hours=0, craftable=False,
-            income_pct=4, luck=8,
+            income_pct=4, luck=7, vitality=6,
         ),
         # 🐲 Древний Змей
         Item(
             id="dragon_fang", slot="weapon", name="Клык Древнего Змея",
             description="Длиннее руки, острее совести. Лучшее оружие Недоливска.",
             cost={"gold": 9000}, craft_hours=0, craftable=False,
-            damage=28, crit=10, luck=3,
+            damage=38, crit=13,
         ),
         Item(
             id="dragon_scale", slot="chest", name="Чешуя Древнего Змея",
             description="Не берёт ни клинок, ни топор, ни косой взгляд кредитора.",
             cost={"gold": 9000}, craft_hours=0, craftable=False,
-            income_pct=6, armor=35,
+            armor=30, vitality=24,
         ),
         Item(
             id="dragon_heart", slot="talisman", name="Сердце Древнего Змея",
             description="Тлеет углём по сей день. Удача, деньги и нюх на добычу — при тебе.",
             cost={"gold": 9000}, craft_hours=0, craftable=False,
-            income_pct=6, yield_pct=5, luck=12,
+            income_pct=6, yield_pct=5, luck=10,
         ),
         # 😈 Адский Слизень
         Item(
             id="demon_fang", slot="weapon", name="Бесовский клык",
             description="Выломан из адской пасти, ещё дымится серой. Бьёт — и спорщик кается.",
             cost={"gold": 6500}, craft_hours=0, craftable=False,
-            damage=23, crit=7, luck=2,
+            damage=34, crit=11,
         ),
         Item(
             id="demon_hide", slot="chest", name="Смоляная шкура беса",
             description="Липкая, горячая, не берёт ни клинок, ни огонь. Чужие удары вязнут.",
             cost={"gold": 6500}, craft_hours=0, craftable=False,
-            income_pct=5, armor=29,
+            armor=26, vitality=21,
         ),
         Item(
             id="demon_core", slot="talisman", name="Адское ядро",
             description="Уголёк из самого нутра твари. Греет мошну и косит удачу на тебя.",
             cost={"gold": 6500}, craft_hours=0, craftable=False,
-            income_pct=5, yield_pct=4, luck=10,
+            income_pct=5, yield_pct=4, luck=9,
         ),
     ]
 }
@@ -381,7 +443,7 @@ def equipped_items(equipment: dict | None) -> list[tuple[Item, int]]:
 
 
 def income_multiplier(equipment: dict | None) -> float:
-    pct = sum(i.income_pct * t for i, t in equipped_items(equipment))
+    pct = sum(_emul(i.income_pct, t) for i, t in equipped_items(equipment))
     if orc_set_complete(equipment):              # сет-бонус: + доход за полный комплект
         pct += ORC_SET_INCOME_PCT
     return 1 + pct / 100
@@ -389,19 +451,19 @@ def income_multiplier(equipment: dict | None) -> float:
 
 def yield_multiplier(equipment: dict | None, resource: str) -> float:
     pairs = equipped_items(equipment)
-    pct = sum(i.yield_pct * t for i, t in pairs)
+    pct = sum(_emul(i.yield_pct, t) for i, t in pairs)
     if resource == "wood":
-        pct += sum(i.yield_wood_pct * t for i, t in pairs)
+        pct += sum(_emul(i.yield_wood_pct, t) for i, t in pairs)
     return 1 + pct / 100
 
 
 def speed_multiplier(equipment: dict | None) -> float:
-    pct = min(50, sum(i.speed_pct * t for i, t in equipped_items(equipment)))
+    pct = min(50, sum(_emul(i.speed_pct, t) for i, t in equipped_items(equipment)))
     return 1 - pct / 100
 
 
 def pay_multiplier(equipment: dict | None) -> float:
-    pct = min(50, sum(i.pay_discount_pct * t for i, t in equipped_items(equipment)))
+    pct = min(50, sum(_emul(i.pay_discount_pct, t) for i, t in equipped_items(equipment)))
     return 1 - pct / 100
 
 
@@ -416,14 +478,15 @@ def orc_set_complete(equipment: dict | None) -> bool:
 def combat_stats(equipment: dict | None) -> dict:
     pairs = equipped_items(equipment)
     stats = {
-        "damage": sum(i.damage * t for i, t in pairs),
-        "crit": sum(i.crit * t for i, t in pairs),
-        "armor": sum(i.armor * t for i, t in pairs),
-        "luck": sum(i.luck * t for i, t in pairs),
+        "damage": sum(_cmul(i.damage, t) for i, t in pairs),
+        "crit": sum(_cmul(i.crit, t) for i, t in pairs),
+        "armor": sum(_cmul(i.armor, t) for i, t in pairs),
+        "luck": sum(_cmul(i.luck, t) for i, t in pairs),
+        "vitality": sum(_cmul(i.vitality, t) for i, t in pairs),
     }
     if orc_set_complete(equipment):              # сет-бонус «ярость орды»
         for k, v in ORC_SET_BONUS.items():
-            stats[k] += v
+            stats[k] = stats.get(k, 0) + v
     return stats
 
 

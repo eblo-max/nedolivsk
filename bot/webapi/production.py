@@ -410,6 +410,7 @@ ENEMY_SPRITE = {
     "vozhak": "skeleton", "medved": "golem", "razboy": "goblin",
     "ataman": "dragon", "lynx": "harpy", "tusker": "satyr", "scorpion": "witch",
     "olen_gold": "centaur", "volk_white": "cerberus", "kaban_rabid": "minotaur",
+    "upyr": "skeleton", "ogr": "golem", "wyvern": "dragon", "lich": "skeleton",
 }
 
 
@@ -434,7 +435,7 @@ def _hunt_state(p) -> dict:
     """Меню охоты: HP/реген/готовность, расклад игрока, бестиарий с прогнозом и
     добычей, опции лечения. Прогноз — combat.forecast (все статы, мгновенно)."""
     from bot.game import balance as bal, combat, production as prod
-    chp, mhp = combat.current_hp(p), combat.max_hp()
+    chp, mhp = combat.current_hp(p), combat.max_hp(p)
     ready, mins = combat.hunt_ready(p)
     stats = combat.player_stats(p)
     beasts = []
@@ -451,7 +452,7 @@ def _hunt_state(p) -> dict:
         })
     prods = (p.tavern.products if p.tavern else None) or {}
     heal_opts = [{"key": k, "name": prod.GOODS[k].name, "emoji": prod.GOODS[k].emoji,
-                  "hp": bal.HEAL_VALUES[k], "qty": int(prods.get(k, 0))}
+                  "hp": combat.heal_amount(p, k), "qty": int(prods.get(k, 0))}
                  for k in bal.HEAL_VALUES if k in prod.GOODS and int(prods.get(k, 0)) > 0]
     return {
         "ok": True,
@@ -511,7 +512,7 @@ async def _api_hunt_fight(request: web.Request) -> web.Response:
         "ok": True, "win": res.fight.win, "elite": res.elite,
         "enemy": {"name": res.enemy.name, "emoji": res.enemy.emoji, "hp": res.enemy.hp,
                   "sprite": ENEMY_SPRITE.get(res.enemy.id), "traits": list(res.enemy.traits)},
-        "player_hp0": chp0, "hp_max": combat.max_hp(), "rounds": res.fight.log,
+        "player_hp0": chp0, "hp_max": combat.max_hp(p), "rounds": res.fight.log,
         "rounds_n": res.fight.rounds, "crits": res.fight.crits, "overwhelmed": res.fight.overwhelmed,
         "loot": {"gold": (res.loot or {}).get("gold", 0) if res.fight.win else 0, "res": loot_res,
                  "trophies": (res.loot or {}).get("trophies", []) if res.fight.win else [],

@@ -239,8 +239,9 @@ def player_power(player) -> int:
     """Ожидаемый сырой урон игрока по боссу за удар (база×(1+крит)) — мера «силы»
     для масштаба HP босса. Тот же расчёт, что и средний player_damage без разброса."""
     stats = combat.player_stats(player)
-    base = balance.BASE_DAMAGE + stats.get("damage", 0) + (getattr(player, "level", 1) or 1) * 2
-    crit = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0) + stats.get("luck", 0) // 2) / 100
+    base = (balance.BASE_DAMAGE + stats.get("damage", 0)
+            + (getattr(player, "level", 1) or 1) * balance.LEVEL_DAMAGE)
+    crit = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0)) / 100
     return max(1, round(base * (1 + crit)))
 
 
@@ -248,8 +249,9 @@ def player_damage(player, rng: random.Random | None = None) -> tuple[int, bool]:
     """Урон игрока по боссу за удар: снаряга + уровень, крит ×2, разброс ±20%."""
     rng = rng or random
     stats = combat.player_stats(player)
-    base = balance.BASE_DAMAGE + stats.get("damage", 0) + (player.level or 1) * 2
-    crit_pct = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0) + stats.get("luck", 0) // 2)
+    base = (balance.BASE_DAMAGE + stats.get("damage", 0)
+            + (player.level or 1) * balance.LEVEL_DAMAGE)
+    crit_pct = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0))
     crit = rng.randint(1, 100) <= crit_pct
     dmg = base * (2 if crit else 1) * rng.uniform(0.8, 1.2)
     return max(1, int(dmg)), crit

@@ -170,7 +170,8 @@ def start(player, region: str, situation: str | None = None,
           seed: int | None = None, now: datetime | None = None) -> dict:
     """Завести ходку: этап 1, полное здоровье, пустая котомка."""
     return {
-        "leg": 1, "state": "fork", "hp": BASE_HP, "satchel": {},
+        "leg": 1, "state": "fork", "hp": combat.max_hp(player),
+        "hp_max": combat.max_hp(player), "satchel": {},
         "region": region or "", "situation": situation,
         "seed": seed if seed is not None else random.randint(1, 10**9),
         "started_at": (now or datetime.now(UTC)).isoformat(),
@@ -224,7 +225,8 @@ def attempt(run: dict, player, kind: str, rng: random.Random | None = None,
         return out
 
     if kind == "rest":                                   # безопасно: лечит
-        heal = max(0, min(balance.NIGHTRUN_REST_HEAL, BASE_HP - run["hp"]))
+        _mx = run.get("hp_max", BASE_HP)
+        heal = max(0, min(int(_mx * 0.35), _mx - run["hp"]))   # привал лечит 35% макс.
         run["hp"] += heal
         out["healed"] = heal
         run["state"] = "crossroad"

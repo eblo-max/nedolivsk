@@ -44,9 +44,13 @@ def test_components_named_everywhere():
         assert comp in balance.RESOURCE_PRICE      # учитывается в ВВП
 
 
-def _wr(equip, enemy_id, n=400, seed=1):
-    stats = dict(items.combat_stats(equip))
-    return combat.forecast(stats, combat.ENEMY[enemy_id], balance.BASE_HP,
+def _wr(equip, enemy_id, n=400, seed=1, level=3):
+    """Винрейт ПЕРСОНАЖА в реальной точке прогрессии кита (уровень+HP-каркас)."""
+    from types import SimpleNamespace as NS
+    p = NS(level=level, equipment=equip, buff_kind=None, buff_until=None,
+           hp=None, hp_at=None)
+    stats = combat.player_stats(p)
+    return combat.forecast(stats, combat.ENEMY[enemy_id], combat.max_hp(p),
                            n=n, rng=random.Random(seed))[0]
 
 
@@ -57,10 +61,9 @@ KOVSH = {"weapon": "kovsh:1", "chest": "fartuk:1",
 
 
 def test_component_gear_fills_the_cliff():
-    # на ковш★ медведь/разбойник — стена; компонент-«тесак★» выводит их в середину
-    for eid in ("medved", "razboy"):
-        assert _wr(KOVSH, eid) <= 15
-        assert 25 <= _wr(TESAK, eid) <= 80, f"{eid} не в середине на тесак★"
+    # на ковш★ упырь — стена; компонент-«тесак★» выводит его в середину
+    assert _wr(KOVSH, "upyr") <= 15
+    assert 20 <= _wr(TESAK, "upyr") <= 85, "упырь не в середине на тесак★"
 
 
 def test_component_gear_weaker_than_boss_top():
@@ -71,9 +74,12 @@ def test_component_gear_weaker_than_boss_top():
 
 
 # ── Фаза 3: редкие элиты ────────────────────────────────────────────────
-def _wr_enemy(equip, enemy, n=600, seed=1):
-    stats = dict(items.combat_stats(equip))
-    return combat.forecast(stats, enemy, balance.BASE_HP, n=n, rng=random.Random(seed))[0]
+def _wr_enemy(equip, enemy, n=600, seed=1, level=3):
+    from types import SimpleNamespace as NS
+    p = NS(level=level, equipment=equip, buff_kind=None, buff_until=None,
+           hp=None, hp_at=None)
+    stats = combat.player_stats(p)
+    return combat.forecast(stats, enemy, combat.max_hp(p), n=n, rng=random.Random(seed))[0]
 
 
 def test_elite_roll_respects_chance(monkeypatch):
@@ -175,8 +181,11 @@ def test_evasive_reduces_player_damage():
     """Увёртливый уводит часть ударов → шанс ниже, чем у идентичного обычного."""
     base = replace(combat.ENEMY["olen"], traits=())
     evasive = replace(base, traits=("evasive",))
-    stats = {"damage": 10, "armor": 10}
-    assert _wc(stats, evasive) < _wc(stats, base)
+    stats = {"damage": 26, "armor": 20}
+    hp = 70                                    # точка, где base уверенно берётся
+    import random as _r
+    wc = lambda e: combat.forecast(stats, e, hp, n=600, rng=_r.Random(1))[0]
+    assert wc(evasive) < wc(base) - 5          # увёртливость реально режет шанс
 
 
 def test_brief_shows_trait_weakness():

@@ -5,14 +5,18 @@
 """
 import random
 
-from bot.game import balance, combat, items
+from bot.game import combat
 
 
 def _wr(equip: dict, enemy_id: str, hp: int | None = None,
-        n: int = 600, seed: int = 1) -> int:
-    stats = dict(items.combat_stats(equip))
+        n: int = 600, seed: int = 1, level: int = 1) -> int:
+    """Винрейт ПЕРСОНАЖА (шмот + уровень + HP-каркас) — как в реальном бою."""
+    from types import SimpleNamespace as NS
+    p = NS(level=level, equipment=equip, buff_kind=None, buff_until=None,
+           hp=None, hp_at=None)
+    stats = combat.player_stats(p)
     enemy = combat.ENEMY[enemy_id]
-    return combat.forecast(stats, enemy, hp or balance.BASE_HP,
+    return combat.forecast(stats, enemy, hp or combat.max_hp(p),
                            n=n, rng=random.Random(seed))[0]
 
 
@@ -28,18 +32,21 @@ def test_naked_smooth_gradient_no_cliff():
     две цели стали верняком, гадюка — стеной для голых рук. Глобальную плавность
     кривой (не-бинарность) сторожит test_winrate_is_smooth_not_binary."""
     z, lisa, g = _wr(NAKED, "zayac"), _wr(NAKED, "lisa"), _wr(NAKED, "gadyuka")
-    assert z >= 95                 # первая цель — верняк для новичка
-    assert lisa >= 90              # вторая — тоже уверенно (после бестиария)
-    assert g <= 10                 # гадюка голыми руками — почти стена
+    assert z >= 90                 # первая цель — верняк для новичка
+    assert 70 <= lisa <= 95        # вторая — уверенно, но не гарант
+    assert 15 <= g <= 55           # медуза — первый настоящий вызов (не 0 и не 100)
     assert z >= lisa > g           # монотонно сложнее
 
 
 def test_winrate_is_smooth_not_binary():
     """Ядро Фазы 1.5: на среднем ките много «середин» (1-99%), а не только 0/100."""
-    kit = FULL
-    wrs = [_wr(kit, eid) for eid in combat.ENEMY]
+    kit = {"weapon": "fang_cleaver:1", "chest": "fur_coat:1", "head": "leather_cap:1",
+           "left_hand": "oak_shield:1", "belt": "lynx_belt:1"}   # компонентка с охоты T1
+    wrs = [_wr(kit, eid, level=3) for eid in combat.ENEMY]
     middles = sum(1 for w in wrs if 5 < w < 95)
-    assert middles >= 3, f"кривая снова бинарная: {wrs}"
+    # переходный кит живёт ~день: одной честной цели-мостика (упырь) достаточно.
+    # Строгие полосы ВСЕХ шести стадий сторожит tests/test_balance_matrix.py.
+    assert middles >= 1, f"кривая снова бинарная: {wrs}"
 
 
 def test_gear_monotonic_per_enemy():

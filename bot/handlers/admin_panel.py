@@ -233,7 +233,7 @@ def _card_text(player: Player) -> str:
         f"🏗 Здания: {blds}",
         f"🎒 Снаряга: {gear}",
         f"⚙️ Производство: {' '.join(busy) if busy else '—'}",
-        f"❤️ HP: {hp}/{combat.max_hp()} · охота: {_ago(player.hunt_ready_at) if player.hunt_ready_at else 'готов'}",
+        f"❤️ HP: {hp}/{combat.max_hp(player)} · охота: {_ago(player.hunt_ready_at) if player.hunt_ready_at else 'готов'}",
         f"🎁 Баф: {act.name if act else '—'} · бонус: {boon.name if boon else '—'}",
         f"⛏ Бригад в деле: {len(exps)} · "
         f"крафт: {'да' if player.craft_item else '—'} · "
@@ -410,7 +410,7 @@ async def cb_heal(cb: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         await cb.answer("Нет игрока.", show_alert=True)
         return
-    player.hp = combat.max_hp()
+    player.hp = combat.max_hp(player)
     player.hp_at = _now()
     player.hunt_ready_at = None
     _alog(cb, session, f"❤️ полный HP → id{player.id}")
@@ -516,7 +516,7 @@ async def cb_god(cb: CallbackQuery, session: AsyncSession) -> None:
         player.tavern.buildings = list(buildings.CATALOG)
         player.tavern.reputation = max(player.tavern.reputation, 500)
     player.reputation = max(player.reputation, 500)
-    player.hp = combat.max_hp()
+    player.hp = combat.max_hp(player)
     player.hp_at = _now()
     player.hunt_ready_at = None
     _alog(cb, session, f"🦸 GOD-режим → id{player.id}")

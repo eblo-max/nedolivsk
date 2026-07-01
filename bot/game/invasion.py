@@ -233,7 +233,7 @@ def battle_profile(stats: dict, might: int) -> dict:
         "crit": round(crit, 3),
         "armor": int(stats.get("armor", 0)),
         "dodge": round(dodge, 3),
-        "hp": round(WB_HP_BASE + might * WB_HP_PER_MIGHT),
+        "hp": round(WB_HP_BASE + might * WB_HP_PER_MIGHT + stats.get("vitality", 0)),
     }
 
 

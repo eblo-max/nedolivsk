@@ -13,9 +13,9 @@ def _character_state(p) -> dict:
     from bot.game import balance as bal, combat, items as it, logic
 
     eq = p.equipment or {}
-    cs = it.combat_stats(eq)
-    dmg = bal.BASE_DAMAGE + cs["damage"]
-    crit = min(bal.HUNT_CRIT_CAP, cs["crit"] + cs["luck"] // 2)
+    cs = combat.player_stats(p)          # ЕДИНЫЙ каркас: уровень, кап брони, бафы
+    dmg = bal.BASE_DAMAGE + cs["damage"] + bal.LEVEL_DAMAGE * cs["level"]
+    crit = min(bal.HUNT_CRIT_CAP, cs["crit"])   # крит развязан с удачей (везде)
 
     slots = []
     for slot_key, slot_name in it.SLOTS.items():
@@ -54,10 +54,10 @@ def _character_state(p) -> dict:
 
     # лечение: чем можно подлечиться из погреба (combat.heal)
     from bot.game import production as prod
-    hp_cur, hp_max = combat.current_hp(p), combat.max_hp()
+    hp_cur, hp_max = combat.current_hp(p), combat.max_hp(p)
     prods = (p.tavern.products if p.tavern else None) or {}
     heal_opts = [{"key": k, "name": prod.GOODS[k].name, "emoji": prod.GOODS[k].emoji,
-                  "hp": bal.HEAL_VALUES[k], "qty": int(prods.get(k, 0))}
+                  "hp": combat.heal_amount(p, k), "qty": int(prods.get(k, 0))}
                  for k in bal.HEAL_VALUES if k in prod.GOODS and int(prods.get(k, 0)) > 0]
 
     return {
