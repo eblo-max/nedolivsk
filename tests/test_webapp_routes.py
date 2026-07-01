@@ -113,6 +113,90 @@ def test_route_table_unchanged():
         "роуты разъехались! Пропали: %r Появились: %r" % (missing, extra))
 
 
+def test_webapi_modules_have_no_undefined_names():
+    """Гард распила: в вынесенном модуле не осталось ссылок на имена, живущие в
+    монолите (компиляция такого не ловит — упало бы в рантайме у игрока). Ровно
+    так при выносе nightrun чуть не потерялись _NR_KIND/_NR_HINT."""
+    import ast
+    import builtins
+    import pathlib
+
+    def undefined(path):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        defined, used = {"__file__", "__name__"}, set()
+
+        class V(ast.NodeVisitor):
+            def visit_FunctionDef(self, n):
+                defined.add(n.name)
+                args = n.args.args + n.args.kwonlyargs
+                for extra in (n.args.vararg, n.args.kwarg):
+                    if extra:
+                        args.append(extra)
+                for a in args:
+                    defined.add(a.arg)
+                self.generic_visit(n)
+            visit_AsyncFunctionDef = visit_FunctionDef
+
+            def visit_Lambda(self, n):
+                for a in n.args.args + n.args.kwonlyargs:
+                    defined.add(a.arg)
+                self.generic_visit(n)
+
+            def visit_ClassDef(self, n):
+                defined.add(n.name)
+                self.generic_visit(n)
+
+            def visit_Name(self, n):
+                (defined if isinstance(n.ctx, (ast.Store, ast.Del)) else used).add(n.id)
+
+            def visit_Import(self, n):
+                for a in n.names:
+                    defined.add((a.asname or a.name).split(".")[0])
+
+            def visit_ImportFrom(self, n):
+                for a in n.names:
+                    defined.add(a.asname or a.name)
+
+            def visit_comprehension(self, n):
+                for t in ast.walk(n.target):
+                    if isinstance(t, ast.Name):
+                        defined.add(t.id)
+                self.generic_visit(n)
+
+            def visit_ExceptHandler(self, n):
+                if n.name:
+                    defined.add(n.name)
+                self.generic_visit(n)
+
+            def visit_With(self, n):
+                for item in n.items:
+                    if item.optional_vars:
+                        for t in ast.walk(item.optional_vars):
+                            if isinstance(t, ast.Name):
+                                defined.add(t.id)
+                self.generic_visit(n)
+            visit_AsyncWith = visit_With
+
+            def visit_For(self, n):
+                for t in ast.walk(n.target):
+                    if isinstance(t, ast.Name):
+                        defined.add(t.id)
+                self.generic_visit(n)
+            visit_AsyncFor = visit_For
+
+            def visit_Global(self, n):
+                for nm in n.names:
+                    defined.add(nm)
+
+        V().visit(tree)
+        return sorted(u for u in used - defined if not hasattr(builtins, u))
+
+    pkg = pathlib.Path(__file__).resolve().parent.parent / "bot" / "webapi"
+    problems = {p.name: bad for p in sorted(pkg.glob("*.py"))
+                if (bad := undefined(p))}
+    assert not problems, f"неопределённые имена в webapi: {problems}"
+
+
 def test_facade_exports_for_outside_users():
     """Внешние потребители webapp (main, notifier, тесты) — фасад обязан отдавать."""
     from bot import webapp
