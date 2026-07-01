@@ -152,21 +152,23 @@ from dataclasses import replace  # noqa: E402
 
 
 def _wc(stats, enemy):
-    return combat.win_chance(stats, enemy)
+    """% побед (0-100): win_chance переименован в forecast (Монте-Карло, фикс. сид)."""
+    return combat.forecast(stats, enemy, n=600, rng=random.Random(1))[0]
 
 
 def test_venom_bypasses_player_armor():
     """Ядовитый бьёт сквозь броню: армор НЕ помогает против него (а против
-    обычного — помогает)."""
+    обычного — помогает). Статы в «середине» кривой (damage=20) — на 10 урона
+    после бестиария всё 0% и черты неразличимы."""
     base = replace(combat.ENEMY["kaban"], traits=())
     venom = replace(base, traits=("venom",))
-    naked = {"damage": 10}
-    armored = {"damage": 10, "armor": 30}
-    # против обычного броня заметно поднимает шанс
-    assert _wc(armored, base) > _wc(naked, base) + 0.05
+    naked = {"damage": 20}
+    armored = {"damage": 20, "armor": 30}
+    # против обычного броня заметно поднимает шанс (в п.п.)
+    assert _wc(armored, base) > _wc(naked, base) + 5
     # против ядовитого броня почти не помогает (бьёт сквозь)
     assert _wc(armored, venom) < _wc(armored, base)            # ядовитый опаснее
-    assert abs(_wc(armored, venom) - _wc(naked, venom)) < 0.05  # броня ≈ бесполезна
+    assert abs(_wc(armored, venom) - _wc(naked, venom)) <= 5   # броня ≈ бесполезна
 
 
 def test_evasive_reduces_player_damage():
@@ -209,5 +211,6 @@ def test_forge_hides_other_region_belts():
     from bot.keyboards.inline import forge_kb
     p = SimpleNamespace(equipment={}, region="north_wilds")
     txts = [b.text.lower() for row in forge_kb(p).inline_keyboard for b in row]
-    assert any("рысь" in t for t in txts)                       # свой пояс — есть
-    assert not any("клык" in t or "хитин" in t for t in txts)   # чужих нет
+    # пояса переименованы с бестиарием: гарпий (север) / рога (долины) / чешуя (пустоши)
+    assert any("гарпьего" in t for t in txts)                        # свой пояс — есть
+    assert not any("с рогами" in t or "чешуйчат" in t for t in txts)  # чужих нет

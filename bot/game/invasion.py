@@ -16,7 +16,6 @@
 (repo, notifier, handlers), как у рейдов. Тестируется без БД.
 """
 
-import random
 from datetime import datetime, timedelta, timezone
 
 from bot.game import balance
@@ -255,7 +254,6 @@ def simulate(participants: list[dict], seed: int = 0, escal: float = 1.0) -> dic
                 "army_hp_max": 0, "army_hp_left": 0,
                 "dealt": {}, "stats": {}, "fell": [], "events": [],
                 "timeline": [], "n": 0}
-    rng = random.Random(seed)
     power = sum(_unit_output(p, ORC_ARMOR) for p in participants) or 1.0
     orc_hp_max = max(MIN_ORC_HP, round(HP_PER_POWER * power ** HP_POWER_EXP))
     orc_hp_max = round(orc_hp_max * escal)            # эскалация: толще с каждой победой

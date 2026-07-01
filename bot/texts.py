@@ -2918,7 +2918,6 @@ def raid_cast_push(boss, events: list) -> str:
     from bot.game import raid
     spec = raid.BOSSES.get(boss.boss_key)
     name = spec.name if spec else "Босс"
-    emoji = spec.emoji if spec else "⚔️"
     # Приоритет одного сообщения за тик (самое важное).
     if "enrage3" in events:
         return f"🔥 <b>{name} впал в БЕШЕНСТВО!</b> Лютует и быстро затягивает раны — добивайте, пока не оклемался!"

@@ -110,7 +110,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
               {order.map((r, i) => {
                 if (!r) return <div key={i} className="lb-pod ghost" />
                 return (
-                  <div key={r.name + r.owner} className={`lb-pod r${r.place}${r.mine ? ' mine' : ''}`}>
+                  <div key={r.id ?? r.name + r.owner} className={`lb-pod r${r.place}${r.mine ? ' mine' : ''}`}>
                     {r.place === 1 && <div className="lb-crown">👑</div>}
                     <Avatar ava={r.ava} name={r.name} rank={r.place} />
                     <div className="lb-pname">{r.name}</div>
@@ -126,7 +126,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
               {rest.map((r) => {
                 const pct = Math.max(7, Math.round((m.val(r) / max) * 100))
                 return (
-                  <div key={r.name + r.owner} className={`lb-row${r.mine ? ' mine' : ''}`}
+                  <div key={r.id ?? r.name + r.owner} className={`lb-row${r.mine ? ' mine' : ''}`}
                     style={{ animationDelay: `${Math.min(r.place, 14) * 0.035}s` }}>
                     <div className="lb-rank">{r.place}<Trend t={r.trend} /></div>
                     <Avatar ava={r.ava} name={r.name} rank={r.place} sm />

@@ -1330,7 +1330,7 @@ def _auction_state(p, world) -> dict:
                 "prices": [max(1, round(fv * m)) for m in bal.AUCTION_PRICE_TIERS]}
     goods = [_good(k) for k in auc.sellable_goods(t)]
     tiers = [{"mult": m, "label": lbl}
-             for m, lbl in zip(bal.AUCTION_PRICE_TIERS, ("по рынку", "бодро", "дорого"))]
+             for m, lbl in zip(bal.AUCTION_PRICE_TIERS, ("по рынку", "бодро", "дорого"), strict=True)]
     return {"active": False, "goods": goods, "tiers": tiers,
             "presets": list(bal.AUCTION_QTY_PRESETS), "qty_max": bal.AUCTION_QTY_MAX,
             "duration_h": bal.AUCTION_DURATION_HOURS}
@@ -1466,7 +1466,7 @@ async def _api_auction_seed(request: web.Request) -> web.Response:
     if not _is_admin(uid):
         return web.json_response({"ok": False, "error": "forbidden"}, status=403)
     import random
-    from bot.game import auction as auc, npc as npcmod
+    from bot.game import npc as npcmod
     async with session_factory() as s:
         p = await repo.get_player(s, uid, for_update=True)
         if p is None or not p.tavern:
@@ -2741,7 +2741,6 @@ def _production_state(p, bid: str) -> dict:
         g = prod.GOODS.get(k)
         return g.emoji if g else emojis.get(k)
 
-    is_good = lambda k: k in prod.GOODS                       # товар (GoodIcon) vs сырьё (ResIcon)
     base = {"ok": True, "id": bid, "emoji": b.emoji, "name": b.name,
             "desc": b.description, "image": bid, "level": L}
     braw = (t.production or {}).get(bid) or {}
@@ -3704,12 +3703,12 @@ async def _tavern_sprite(request: web.Request) -> web.Response:
     try:
         n = int(request.match_info["n"])
     except (KeyError, ValueError):
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     if not 1 <= n <= 9:
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     body = _trimmed_sprite_png(n)
     if body is None:
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     return web.Response(body=body, content_type="image/png",
                         headers={"Cache-Control": "public, max-age=86400"})
 
@@ -3722,13 +3721,13 @@ async def _event_sprite(request: web.Request) -> web.Response:
     try:
         n = int(request.match_info["n"])
     except (KeyError, ValueError):
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     anim = request.match_info.get("anim", "idle")
     if not (1 <= n <= 3) or anim not in _EVENT_ANIMS:
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     p = ASSETS_DIR / "boss" / f"ork{n}_{anim}.png"
     if not p.is_file():
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
@@ -3737,13 +3736,13 @@ async def _hero_sprite(request: web.Request) -> web.Response:
     try:
         n = int(request.match_info["n"])
     except (KeyError, ValueError):
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     anim = request.match_info.get("anim", "walk")
     if not (1 <= n <= 6) or anim not in _EVENT_ANIMS:
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     p = ASSETS_DIR / "heroes" / f"hero{n}_{anim}.png"
     if not p.is_file():
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
@@ -3752,10 +3751,10 @@ async def _fx_sprite(request: web.Request) -> web.Response:
     try:
         n = int(request.match_info["n"])
     except (KeyError, ValueError):
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     p = ASSETS_DIR / "fx" / f"fire{n}.png"
     if not (1 <= n <= 10) or not p.is_file():
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
@@ -3889,10 +3888,10 @@ _FARM = {"mill", "miller_sowing", "bed1", "bed2", "bed3", "fence1", "fence2", "c
 async def _farm_sprite(request: web.Request) -> web.Response:
     name = request.match_info.get("name", "")
     if name not in _FARM:
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     p = ASSETS_DIR / "farm" / f"{name}.png"
     if not p.is_file():
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
@@ -3902,24 +3901,24 @@ _ANIMALS = {"horse", "foal", "goat", "goatling", "goose", "gosling", "rabbit", "
 async def _animal_sprite(request: web.Request) -> web.Response:
     name = request.match_info.get("name", "")
     if name not in _ANIMALS:
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     p = ASSETS_DIR / "animals" / f"{name}.png"
     if not p.is_file():
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
 async def _hud_globe(request: web.Request) -> web.Response:
     p = ASSETS_DIR / "hud" / "squad_globe.png"
     if not p.is_file():
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
 async def _audio_track(request: web.Request) -> web.Response:
     p = ASSETS_DIR / "audio" / "festival.mp3"
     if not p.is_file():
-        raise web.HTTPNotFound()
+        raise web.HTTPNotFound() from None
     return web.FileResponse(p, headers={"Cache-Control": "public, max-age=86400"})
 
 
