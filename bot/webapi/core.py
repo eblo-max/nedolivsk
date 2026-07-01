@@ -123,6 +123,22 @@ def _npc_avatar(npc_id: str | None, estate: str | None) -> int | None:
     return pool[sum(ord(c) for c in npc_id) % len(pool)]
 
 
+# «N мин/ч/дн назад» для лент (уведомления, летопись).
+def _chron_ago(ts, now) -> str:
+    if ts is None:
+        return ""
+    if ts.tzinfo is None:
+        from datetime import timezone as _tz
+        ts = ts.replace(tzinfo=_tz.utc)
+    d = (now - ts).total_seconds()
+    if d < 3600:
+        return f"{max(1, int(d // 60))} мин назад"
+    if d < 86400:
+        return f"{int(d // 3600)} ч назад"
+    days = int(d // 86400)
+    return "вчера" if days == 1 else f"{days} дн назад"
+
+
 def base_url() -> str:
     """Публичный https-адрес Mini App (для кнопки web_app). Из WEBAPP_BASE_URL,
     иначе из RAILWAY_PUBLIC_DOMAIN. Пусто → кнопку карты не показываем."""
