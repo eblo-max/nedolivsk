@@ -16,12 +16,9 @@
 import hashlib
 import hmac
 import json
-import logging
-import os
 import pathlib
 import time
 from datetime import datetime, timedelta, timezone
-from urllib.parse import parse_qsl
 
 from aiohttp import web
 
@@ -36,54 +33,12 @@ MINIAPP_DIST = pathlib.Path(__file__).resolve().parent.parent / "miniapp" / "dis
 # Пирамида тайлов мира (генерится в Docker из assets/world25.jpg тайлером worldgen/tiler.py).
 WORLD_TILES = pathlib.Path(__file__).resolve().parent.parent / "world_tiles"
 
-# initData живёт сутки — отсекаем устаревшие/реплей.
-_INITDATA_MAX_AGE = 24 * 3600
-
-_authlog = logging.getLogger("webapp.auth")
-
-_BOT = None   # aiogram-Bot из main (один event-loop) — для рассылки в чаты из эндпоинтов
-
-
-def _verify_init_data(init_data: str) -> int | None:
-    """Проверить Telegram WebApp initData (HMAC-SHA256 по токену бота). Возвращает
-    user_id, если подпись верна и свежая, иначе None. Это аутентификация запросов
-    с карты (без неё нельзя доверять, кто регистрируется).
-
-    На каждый отказ — лог с причиной (empty/no-hash/expired/bad-hash) и НЕдоверенным
-    uid из user (для диагностики «у игрока пустая initData → видит демо-таверну»)."""
-    from bot.config import settings
-    if not init_data:
-        _authlog.warning("auth fail: empty initData")
-        return None
-    try:
-        pairs = dict(parse_qsl(init_data, keep_blank_values=True))
-        recv = pairs.pop("hash", None)
-        try:                                  # untrusted — только для лога
-            _uid_dbg = json.loads(pairs.get("user", "{}")).get("id")
-        except (ValueError, TypeError):
-            _uid_dbg = None
-        if not recv:
-            _authlog.warning("auth fail: no hash (uid~%s)", _uid_dbg)
-            return None
-        age = abs(time.time() - int(pairs.get("auth_date", "0")))
-        if age > _INITDATA_MAX_AGE:
-            _authlog.warning("auth fail: expired %ss (uid~%s)", int(age), _uid_dbg)
-            return None
-        check = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs))
-        secret = hmac.new(b"WebAppData", settings.bot_token.encode(), hashlib.sha256).digest()
-        calc = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(calc, recv):
-            _authlog.warning("auth fail: bad hash (uid~%s)", _uid_dbg)
-            return None
-        user = json.loads(pairs.get("user", "{}"))
-        uid = user.get("id")
-        if not uid:
-            _authlog.warning("auth fail: no user.id")
-            return None
-        return int(uid)
-    except (ValueError, KeyError, TypeError) as e:
-        _authlog.warning("auth fail: parse %r", e)
-        return None
+# Аутентификация/гейты/держатель бота — вынесены в bot/webapi/core.py (распил
+# монолита, move-only). Импорт сюда = ре-экспорт для внешних потребителей.
+from bot.webapi.core import (  # noqa: E402,F401 — фасад
+    _INITDATA_MAX_AGE, _auth, _init_user, _is_admin, _verify_init_data,
+    base_url, get_bot, set_bot,
+)
 
 
 def _tavern_norm_pos(player) -> tuple[float, float]:
@@ -178,18 +133,6 @@ MAP_EVENTS = [
      "name": "Орда орков",
      "blurb": "Дикая орда встала лагерем в северных снегах. Зреет буря."},
 ]
-
-
-def base_url() -> str:
-    """Публичный https-адрес Mini App (для кнопки web_app). Из WEBAPP_BASE_URL,
-    иначе из RAILWAY_PUBLIC_DOMAIN. Пусто → кнопку карты не показываем."""
-    from bot.config import settings
-    b = (getattr(settings, "webapp_base_url", "") or "").strip()
-    if not b:
-        dom = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
-        if dom:
-            b = f"https://{dom}"
-    return b.rstrip("/")
 
 
 async def _api_taverns(request: web.Request) -> web.Response:
@@ -679,10 +622,11 @@ async def _api_raid_summon(request: web.Request) -> web.Response:
         # 1) анонс во все чаты (видео/текст) — если бот доступен
         text = _t.raid_gather_screen(boss)
         msgs: dict[str, int] = {}
-        if _BOT is not None:
+        _bot = get_bot()
+        if _bot is not None:
             for cid in await repo.all_chat_ids(s):
                 sent = await deliver(lambda c=cid: send_raid_announce(
-                    _BOT, c, boss, text, raid_gather_kb(boss.id)), what=f"raid→{cid}")
+                    _bot, c, boss, text, raid_gather_kb(boss.id)), what=f"raid→{cid}")
                 if sent is not None:
                     msgs[str(cid)] = sent.message_id
             boss.messages = msgs
@@ -749,18 +693,6 @@ async def _api_mill_collect(request: web.Request) -> web.Response:
         st = millmod.state(player)
     return web.json_response({"ok": True, "grain": grain, "note": note, "mill": st},
                              headers={"Cache-Control": "no-store"})
-
-
-async def _auth(request: web.Request):
-    """Разобрать тело + проверить initData. -> (uid, body) | (None, Response-ошибка)."""
-    try:
-        body = await request.json()
-    except (json.JSONDecodeError, ValueError):
-        body = {}
-    uid = _verify_init_data(body.get("initData") or "")
-    if not uid:
-        return None, web.json_response({"ok": False, "error": "auth"}, status=401)
-    return uid, body
 
 
 async def _api_notifications(request: web.Request) -> web.Response:
@@ -1288,11 +1220,6 @@ def _auction_open(uid: int) -> bool:
     from bot.game import balance as bal
     from bot.config import settings
     return bool(bal.AUCTION_OPEN) or uid == settings.admin_id
-
-
-def _is_admin(uid: int) -> bool:
-    from bot.config import settings
-    return uid == settings.admin_id
 
 
 def _auc_npc(nid):
@@ -1908,13 +1835,14 @@ async def _api_avatar(request: web.Request) -> web.Response:
             return web.Response(body=data, content_type="image/jpeg",
                                 headers={"Cache-Control": "public, max-age=43200"})
     data: bytes | None = None
-    if _BOT is not None:
+    _bot = get_bot()
+    if _bot is not None:
         try:
-            photos = await _BOT.get_user_profile_photos(user_id=uid, limit=1)
+            photos = await _bot.get_user_profile_photos(user_id=uid, limit=1)
             if photos.total_count and photos.photos:
                 size = photos.photos[0][0]        # самый мелкий размер — для кружка хватает
-                f = await _BOT.get_file(size.file_id)
-                buf = await _BOT.download_file(f.file_path)
+                f = await _bot.get_file(size.file_id)
+                buf = await _bot.download_file(f.file_path)
                 data = buf.read() if hasattr(buf, "read") else bytes(buf)
         except Exception:   # noqa: BLE001 — нет фото/приват/ошибка → фолбэк на инициалы
             data = None
@@ -3351,16 +3279,6 @@ async def _api_nightrun_bank(request: web.Request) -> web.Response:
                              headers={"Cache-Control": "no-store"})
 
 
-def _init_user(init_data: str) -> dict:
-    """Имя/username из (уже проверенного) initData — для создания игрока в онбординге."""
-    try:
-        pairs = dict(parse_qsl(init_data, keep_blank_values=True))
-        u = json.loads(pairs.get("user", "{}"))
-        return {"first_name": u.get("first_name"), "username": u.get("username")}
-    except (ValueError, TypeError):
-        return {}
-
-
 async def _api_onboard(request: web.Request) -> web.Response:
     """Создать игрока (если нет) и таверну — порт cmd_start/cb_create_tavern:
     слот на карте, стартовый сундук, активация зазыва. Идемпотентно."""
@@ -3986,8 +3904,7 @@ async def run_webapp(port: int, bot=None) -> web.AppRunner:
     """Запустить веб-сервер карты (вызывается из main параллельно с поллингом).
     bot — тот же aiogram-Bot (один event-loop): нужен, чтобы мини-апп-эндпоинты
     могли слать в чаты (напр. админский призыв рейд-босса)."""
-    global _BOT
-    _BOT = bot
+    set_bot(bot)
     runner = web.AppRunner(build_app())
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", port).start()
