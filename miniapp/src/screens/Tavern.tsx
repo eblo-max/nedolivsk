@@ -264,7 +264,7 @@ export default function Tavern() {
               </div>
             ) : <div className="muted" style={{ fontStyle: 'italic', fontFamily: 'var(--text)' }}>Тишь да гладь — фракции дремлют. Пока.</div>}
             <button className="chron-open" onClick={() => { haptic('light'); setChronOpen(true) }}>📜 Летопись города →</button>
-            {t.admin && <button className="chron-open" onClick={() => { haptic('light'); setRatingOpen(true) }}>🏆 Топ таверн →</button>}
+            <button className="chron-open" onClick={() => { haptic('light'); setRatingOpen(true) }}>🏆 Топ таверн →</button>
           </div>
         </div>
       )}

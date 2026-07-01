@@ -3,7 +3,7 @@ import { api } from '../api'
 import { haptic } from '../telegram'
 
 type MetricKey = 'gdp' | 'rep' | 'level'
-interface Row { place: number; name: string; id?: number; owner: string; level: number; loc: string; gdp: number; rep: number; mine: boolean; trend?: number | null }
+interface Row { place: number; name: string; id?: number; ava?: string; owner: string; level: number; loc: string; gdp: number; rep: number; mine: boolean; trend?: number | null }
 interface Board { rows: Row[]; me: Row | null }
 interface Rating { boards: Record<MetricKey, Board>; total_gdp: number; total: number }
 
@@ -24,13 +24,14 @@ function Trend({ t }: { t?: number | null }) {
   return <span className={`lb-trend ${up ? 'up' : 'down'}`}>{up ? '▲' : '▼'}{Math.abs(t)}</span>
 }
 
-/** Аватар игрока: фото из ТГ-профиля (/avatar/<id>), при ошибке/без фото — инициал. */
-function Avatar({ id, name, rank, sm }: { id?: number; name: string; rank: number; sm?: boolean }) {
+/** Аватар игрока: фото из ТГ-профиля по подписанной ссылке (/avatar/<uid>.<sig>),
+ *  при ошибке/без фото — инициал. */
+function Avatar({ ava, name, rank, sm }: { ava?: string; name: string; rank: number; sm?: boolean }) {
   const [bad, setBad] = useState(false)
   return (
     <div className={`lb-ava${sm ? ' sm' : ''}`} data-r={rank}>
-      {id && !bad
-        ? <img className="lb-ava-img" src={`/avatar/${id}`} alt="" loading="lazy" onError={() => setBad(true)} />
+      {ava && !bad
+        ? <img className="lb-ava-img" src={`/avatar/${ava}`} alt="" loading="lazy" onError={() => setBad(true)} />
         : initial(name)}
     </div>
   )
@@ -111,7 +112,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                 return (
                   <div key={r.name + r.owner} className={`lb-pod r${r.place}${r.mine ? ' mine' : ''}`}>
                     {r.place === 1 && <div className="lb-crown">👑</div>}
-                    <Avatar id={r.id} name={r.name} rank={r.place} />
+                    <Avatar ava={r.ava} name={r.name} rank={r.place} />
                     <div className="lb-pname">{r.name}</div>
                     <div className="lb-pval">{m.fmt(m.val(r))}</div>
                     <Trend t={r.trend} />
@@ -128,7 +129,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                   <div key={r.name + r.owner} className={`lb-row${r.mine ? ' mine' : ''}`}
                     style={{ animationDelay: `${Math.min(r.place, 14) * 0.035}s` }}>
                     <div className="lb-rank">{r.place}<Trend t={r.trend} /></div>
-                    <Avatar id={r.id} name={r.name} rank={r.place} sm />
+                    <Avatar ava={r.ava} name={r.name} rank={r.place} sm />
                     <div className="lb-info">
                       <div className="lb-name">{r.name}{r.mine && <span className="lb-you">ты</span>}</div>
                       <div className="lb-meta">📍 {r.loc} · {r.owner}</div>
@@ -143,7 +144,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                   <div className="lb-gap">↓ твоё место ↓</div>
                   <div className="lb-row mine">
                     <div className="lb-rank">{meRow.place}<Trend t={meRow.trend} /></div>
-                    <Avatar id={meRow.id} name={meRow.name} rank={99} sm />
+                    <Avatar ava={meRow.ava} name={meRow.name} rank={99} sm />
                     <div className="lb-info">
                       <div className="lb-name">{meRow.name}<span className="lb-you">ты</span></div>
                       <div className="lb-meta">📍 {meRow.loc} · {meRow.owner}</div>

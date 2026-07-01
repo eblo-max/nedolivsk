@@ -1738,6 +1738,7 @@ def _rating_entries(rows: list) -> tuple[list[dict], int]:
             "owner": player.first_name or "Кабатчик", "level": int(tavern.level),
             "loc": worldmap.continent_name(player.region, player.id),
             "gdp": int(gdp), "rep": int(tavern.reputation or 0),
+            "ava": f"{player.id}.{_ava_sig(int(player.id))}",   # подписанная ссылка на аватар
         })
     return entries, sum(e["gdp"] for e in entries)
 
@@ -1796,12 +1797,10 @@ def _rating_board(ranked: list[dict], uid: int, base: dict[int, int] | None) -> 
 
 async def _api_rating(request: web.Request) -> web.Response:
     """Доска почёта: ТРИ честно ранжированные доски (ВВП/Слава/Уровень) + тренд мест
-    в реальном времени, в одном ответе. ОТКРЫТА ТОЛЬКО АДМИНУ."""
+    в реальном времени, в одном ответе. Открыта всем игрокам."""
     uid, body = await _auth(request)
     if uid is None:
         return body
-    if not _is_admin(uid):
-        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
     async with session_factory() as s:
         rows = await repo.get_map_taverns(s)
     entries, total_gdp = _rating_entries(rows)
@@ -1834,6 +1833,14 @@ async def snapshot_rating_ranks(session) -> None:
 
 # Аватарки игроков из Telegram-профиля (для лидерборда). Кэш в памяти: фото меняют
 # редко, а getUserProfilePhotos+getFile+download — 3 вызова Bot API на игрока.
+# Эндпоинт публичный, поэтому ссылка ПОДПИСАНА (/avatar/<uid>.<sig>): без валидной
+# подписи 404 — нельзя перебирать чужие tg_id через нашего бота.
+def _ava_sig(uid: int) -> str:
+    from bot.config import settings
+    key = hashlib.sha256(f"ava:{settings.bot_token}".encode()).digest()
+    return hmac.new(key, str(uid).encode(), hashlib.sha256).hexdigest()[:16]
+
+
 _AVATAR_CACHE: dict[int, tuple[bytes | None, float]] = {}
 _AVA_TTL = 12 * 3600        # положительный кэш (есть фото)
 _AVA_NEG_TTL = 3600         # негативный кэш (нет фото/приват) — реже дёргаем API
@@ -1841,10 +1848,14 @@ _AVA_MAX = 4000             # потолок записей: эндпоинт п
 
 
 async def _api_avatar(request: web.Request) -> web.Response:
-    """Фото профиля игрока (uid = Telegram ID). 404 → фронт рисует инициал."""
+    """Фото профиля игрока по подписанной ссылке <uid>.<sig>. 404 → фронт рисует инициал."""
+    spec = request.match_info.get("uid", "")
+    uid_s, _, sig = spec.partition(".")
     try:
-        uid = int(request.match_info["uid"])
-    except (KeyError, ValueError):
+        uid = int(uid_s)
+    except ValueError:
+        return web.Response(status=404)
+    if not sig or not hmac.compare_digest(sig, _ava_sig(uid)):
         return web.Response(status=404)
     now = time.time()
     hit = _AVATAR_CACHE.get(uid)
