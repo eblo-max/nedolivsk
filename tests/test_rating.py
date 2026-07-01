@@ -7,9 +7,11 @@ import asyncio
 import os
 import time
 
-os.environ.setdefault("BOT_TOKEN", "test:test")   # webapp тянет config при импорте
+os.environ.setdefault("BOT_TOKEN", "test:test")   # config читается при импорте
 
-from bot import webapp as w  # noqa: E402
+# Тестируем РЕАЛЬНЫЙ модуль (не фасад bot.webapp): тесты мутируют состояние
+# (_RANK_SNAPS, _TREND_HYDRATED), а ребинд глобала через фасад не долетел бы.
+from bot.webapi import rating as w  # noqa: E402
 
 
 def _e(pid, name="T", gdp=0, rep=0, level=1):
