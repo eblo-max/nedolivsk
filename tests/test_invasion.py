@@ -278,7 +278,6 @@ def test_weak_turnout_attack_unchanged_floor():
 
 # ── Орочий сет: обрывки чертежа с победы + крафт + сет-бонус ──────────────────
 def test_orc_scrap_drops_on_win_deterministic():
-    from bot.game import items as itm
     reg = {str(i): {"name": f"p{i}", "might": 30, "role": "ratnik"} for i in range(1, 8)}
     iv = _inv(reg)
     sim = {"won": True, "dealt": {i: 100 for i in range(1, 8)}, "n": 7}

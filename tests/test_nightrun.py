@@ -3,7 +3,6 @@
 import random
 from types import SimpleNamespace
 
-import pytest
 
 from bot.game import balance, combat, nightrun
 
