@@ -98,6 +98,31 @@ def _is_admin(uid: int) -> bool:
     return uid == settings.admin_id
 
 
+# Аватары NPC мини-аппа (карточка визитёра, реплики аукциона): фикс для именных
+# персонажей, иначе стабильный выбор из пула сословия по хэшу id.
+_AV_BY_ESTATE = {
+    "nobles": [4, 8, 19, 1], "clergy": [3, 14, 7], "merchants": [19, 5, 18, 20],
+    "guild": [5, 12, 18, 20, 9], "watch": [1, 6, 13, 4], "thieves": [16, 11, 15, 2],
+    "peasants": [7, 12, 17, 9], "vagrants": [16, 17, 2, 15], "oddballs": [11, 14, 2, 6],
+}
+_AV_FIXED = {
+    "countess": 10, "dowager": 10, "nun_smirenna": 10, "paraska": 10, "milkmaid": 10,
+    "herbalist_zel": 10, "vedma": 11, "fortunet_rask": 11,
+    "magnat": 19, "duke_pompad": 19, "heir_prozhig": 8, "baron_darm": 8,
+}
+
+
+def _npc_avatar(npc_id: str | None, estate: str | None) -> int | None:
+    if not npc_id:
+        return None
+    if npc_id in _AV_FIXED:
+        return _AV_FIXED[npc_id]
+    pool = _AV_BY_ESTATE.get(estate or "")
+    if not pool:
+        return None
+    return pool[sum(ord(c) for c in npc_id) % len(pool)]
+
+
 def base_url() -> str:
     """Публичный https-адрес Mini App (для кнопки web_app). Из WEBAPP_BASE_URL,
     иначе из RAILWAY_PUBLIC_DOMAIN. Пусто → кнопку карты не показываем."""
