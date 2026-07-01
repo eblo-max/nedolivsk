@@ -466,10 +466,21 @@ def _hunt_state(p) -> dict:
     }
 
 
+# Охота ВРЕМЕННО закрыта на обкатку боевого пересмотра (плашка в мини-аппе).
+# Админ видит всё — тестирует новые полосы. Открыть всем: HUNT_CLOSED = False.
+HUNT_CLOSED = True
+HUNT_CLOSED_NOTE = ("Ловчие переучиваются: большое обновление механики и новых "
+                    "фич боёвки. Доска розыска откроется в течение 3 часов.")
+
+
 async def _api_hunt(request: web.Request) -> web.Response:
     uid, body = await _auth(request)
     if uid is None:
         return body
+    from bot.webapi.core import _is_admin
+    if HUNT_CLOSED and not _is_admin(uid):
+        return web.json_response({"ok": True, "closed": True, "note": HUNT_CLOSED_NOTE},
+                                 headers={"Cache-Control": "no-store"})
     async with session_factory() as s:
         p = await repo.get_player(s, uid)
         if p is None or not p.tavern:
@@ -483,6 +494,9 @@ async def _api_hunt_fight(request: web.Request) -> web.Response:
     uid, body = await _auth(request)
     if uid is None:
         return body
+    from bot.webapi.core import _is_admin
+    if HUNT_CLOSED and not _is_admin(uid):
+        return web.json_response({"ok": False, "error": "closed"})
     from bot.game import balance as bal, combat, production as prod
     eid = str(body.get("id") or "")
     async with session_factory() as s:

@@ -26,7 +26,8 @@ interface Beast {
 }
 interface HealOpt { key: string; name: string; emoji: string; hp: number; qty: number }
 interface HuntState {
-  ok: boolean; hp: { cur: number; max: number; regen: number }; ready: { can: boolean; minutes: number }
+  ok: boolean; closed?: boolean; note?: string
+  hp: { cur: number; max: number; regen: number }; ready: { can: boolean; minutes: number }
   stats: { damage: number; crit: number; armor: number; luck: number }
   heal: { can: boolean; full: boolean; options: HealOpt[] }; beasts: Beast[]
 }
@@ -154,6 +155,17 @@ export default function Sorties() {
         <div className="flavor" style={{ margin: '6px 14px 0', fontSize: 13.5 }}>«Гляди, кого нынче ищут на тракте. Возьми голову — возьми и награду.»</div>
       </div>
 
+      {data?.closed ? (
+        <div className="board" style={{ textAlign: 'center', padding: '26px 18px' }}>
+          <div style={{ fontSize: 40 }}>🛠</div>
+          <div className="nm" style={{ marginTop: 8 }}>Охота на переучёте</div>
+          <p className="flavor" style={{ margin: '10px 4px 0', fontSize: 14 }}>
+            «{data?.note || 'Обновление механики и новых фич боёвки. Откроется в течение 3 часов.'}»
+          </p>
+        </div>
+      ) : (
+      <>
+
       <div className="board">
         <div className="board-head">
           <img className="board-hero" src={`${import.meta.env.BASE_URL}character/hero_static.png`} alt="" onError={(e) => { e.currentTarget.style.display = 'none' }} />
@@ -213,6 +225,8 @@ export default function Sorties() {
             {!d.heal.options.length && <p className="muted" style={{ fontStyle: 'italic' }}>В погребе пусто — приготовь еду на кухне/в пекарне.</p>}
           </div>
         </Sheet>
+      )}
+      </>
       )}
     </div>
   )
