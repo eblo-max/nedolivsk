@@ -5,3 +5,8 @@ __pycache__/
 venv/
 world_tiles/
 maxzoom.txt
+
+# локальное Claude Code (личные настройки сессий; launch.json коммитим — конфиг превью)
+.claude/settings.local.json
+# черновики превью боя (scratch, не для прода)
+webapp/

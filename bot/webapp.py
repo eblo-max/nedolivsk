@@ -1756,15 +1756,34 @@ def _rating_leaders(entries: list[dict]) -> dict[int, list[str]]:
 
 
 # ── Тренд мест в реальном времени ──
-# Катящиеся снимки рангов в памяти: пишем не чаще раза в минуту при открытии доски.
+# Катящиеся снимки рангов: рабочая копия в памяти, персист — в rank_snaps (пишет
+# нотифаер раз в минуту). После деплоя гидрируемся из БД → тренд ПЕРЕЖИВАЕТ рестарт.
 # Тренд строки = ранг в снимке ~_TREND_WINDOW назад − текущий ранг (живой).
 # +N = поднялся на N мест, −N = опустился, 0 = на месте, None = новичок/нет базы.
-# In-memory: после рестарта база отстраивается за несколько минут (тренд = «—»).
 from collections import deque as _deque   # noqa: E402
 
 _RANK_SNAPS: "_deque[tuple[float, dict[str, dict[int, int]]]]" = _deque(maxlen=60)
 _TREND_WINDOW = 600.0   # целевой возраст базлайна (~10 мин «реального времени»)
 _SNAP_MIN = 60.0        # снимок не чаще раза в минуту
+_TREND_HYDRATED = False  # снимки из БД уже подняты в память (один раз на процесс)
+
+
+async def _trend_hydrate(session) -> None:
+    """Поднять снимки рангов из БД в память (после рестарта). JSONB возвращает
+    ключи-строки — приводим player_id обратно к int."""
+    global _TREND_HYDRATED
+    if _TREND_HYDRATED:
+        return
+    _TREND_HYDRATED = True                     # и при пустой БД второй раз не ходим
+    now = time.time()
+    try:
+        rows = await repo.rank_snaps_load(session, since_ts=now - 2 * _TREND_WINDOW)
+    except Exception:   # noqa: BLE001 — таблица могла ещё не создаться; тренд не критичен
+        return
+    for ts, data in rows:
+        snap = {k: {int(pid): r for pid, r in (v or {}).items()}
+                for k, v in (data or {}).items()}
+        _RANK_SNAPS.append((ts, snap))
 
 
 def _ranked(entries: list[dict], metric: str) -> list[dict]:
@@ -1814,6 +1833,7 @@ async def _api_rating(request: web.Request) -> web.Response:
     if uid is None:
         return body
     async with session_factory() as s:
+        await _trend_hydrate(s)                 # после деплоя поднять снимки из БД
         rows = await repo.get_map_taverns(s)
     entries, total_gdp = _rating_entries(rows)
     now = time.time()
@@ -1833,14 +1853,23 @@ async def _api_rating(request: web.Request) -> web.Response:
 async def snapshot_rating_ranks(session) -> None:
     """Снимок рангов всех таверн для тренда лидерборда. Зовётся периодически из
     нотифаера (раз в минуту), чтобы тренд считался ВСЕГДА, а не только при открытии
-    доски. Делит общий _RANK_SNAPS с /api/rating (один процесс/event-loop)."""
+    доски. Делит общий _RANK_SNAPS с /api/rating (один процесс/event-loop) и
+    персистит снимок в rank_snaps — тренд переживает деплой (коммитит вызывающий)."""
+    await _trend_hydrate(session)
     rows = await repo.get_map_taverns(session)
     entries, _total = _rating_entries(rows)
     if not entries:
         return
+    now = time.time()
     cur_ranks = {k: {e["id"]: i for i, e in enumerate(_ranked(entries, k), 1)}
                  for k in _RATING_METRICS}
-    _trend_record(time.time(), cur_ranks)
+    before = len(_RANK_SNAPS)
+    _trend_record(now, cur_ranks)
+    if len(_RANK_SNAPS) > before or (_RANK_SNAPS and _RANK_SNAPS[-1][0] == now):
+        # снимок реально записан (не отброшен троттлингом) → зеркалим в БД.
+        # JSONB сам превратит int-ключи в строки; гидрация приводит обратно.
+        await repo.rank_snap_add(session, now, cur_ranks,
+                                 prune_before=now - 2 * _TREND_WINDOW)
 
 
 # Аватарки игроков из Telegram-профиля (для лидерборда). Кэш в памяти: фото меняют

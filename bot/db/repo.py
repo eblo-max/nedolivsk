@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
     Chronicle, CityState, Invasion, KnownChat, LogEntry, LootDrop, MarketOrder,
-    Notification, NotifFeed, Player, RaidBoss, Tavern, WorldState,
+    Notification, NotifFeed, Player, RaidBoss, RankSnap, Tavern, WorldState,
 )
 from bot.game import balance, economy
 
@@ -326,6 +326,24 @@ def queue_notify(session: AsyncSession, user_id: int, text: str,
     Зеркалим в персистентную ленту мини-аппа (раздел «Уведомления»)."""
     session.add(Notification(user_id=user_id, text=text[:1024], photo=photo))
     feed_push(session, user_id, text)
+
+
+# ── Снимки рангов для тренда доски почёта (переживают деплой) ─────────────
+async def rank_snaps_load(session: AsyncSession, since_ts: float,
+                          limit: int = 40) -> list[tuple[float, dict]]:
+    """Свежие снимки рангов (старые→новые) для гидрации тренда после рестарта."""
+    rows = (await session.execute(
+        select(RankSnap.ts, RankSnap.data)
+        .where(RankSnap.ts >= since_ts)
+        .order_by(RankSnap.ts.desc()).limit(limit))).all()
+    return [(ts, data) for ts, data in reversed(rows)]
+
+
+async def rank_snap_add(session: AsyncSession, ts: float, data: dict,
+                        prune_before: float) -> None:
+    """Записать снимок рангов и подчистить устаревшие (старше окна тренда)."""
+    session.add(RankSnap(ts=ts, data=data))
+    await session.execute(delete(RankSnap).where(RankSnap.ts < prune_before))
 
 
 # ── Лента уведомлений мини-аппа (зеркало ВСЕХ DM) ─────────────────────────

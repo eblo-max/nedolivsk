@@ -247,6 +247,19 @@ class Notification(Base):
     )
 
 
+class RankSnap(Base):
+    """Снимок рангов таверн для тренда доски почёта (▲/▼). Пишется нотифаером раз
+    в минуту, читается при старте процесса — тренд ПЕРЕЖИВАЕТ деплой (раньше жил
+    только в памяти и обнулялся каждым рестартом). data: {метрика: {player_id: ранг}}.
+    Старые строки (старше 2×окна тренда) подчищаются при записи."""
+
+    __tablename__ = "rank_snaps"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    ts: Mapped[float] = mapped_column(index=True)   # epoch-секунды снимка
+    data: Mapped[dict] = mapped_column(JSONB)
+
+
 class NotifFeed(Base):
     """Персистентная ЛЕНТА уведомлений игрока для раздела «Уведомления» в мини-аппе —
     зеркало ВСЕХ DM-нотификаций (в отличие от notifications-outbox, который чистится

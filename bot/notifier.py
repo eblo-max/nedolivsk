@@ -136,10 +136,12 @@ async def notifier_loop(bot: Bot) -> None:
 
 
 async def _snapshot_rating() -> None:
-    """Периодический снимок рангов для тренда доски почёта (ленивый импорт webapp)."""
+    """Периодический снимок рангов для тренда доски почёта (ленивый импорт webapp).
+    Коммит нужен: снимок зеркалится в rank_snaps — тренд переживает деплой."""
     from bot import webapp
     async with session_factory() as session:
         await webapp.snapshot_rating_ranks(session)
+        await session.commit()
 
 
 async def _notify_returned(bot: Bot) -> None:

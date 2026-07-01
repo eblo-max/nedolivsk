@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "charprev",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8099", "--directory", "webapp_preview"],
+      "port": 8099
+    },
+    {
+      "name": "miniapp",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "miniapp", "run", "dev", "--", "--port", "8100", "--strictPort", "--host"],
+      "port": 8100
+    },
+    {
+      "name": "worldtest",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8126"],
+      "port": 8126
+    }
+  ]
+}
