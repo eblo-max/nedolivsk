@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { useApi } from '../hooks'
 import { api } from '../api'
 import { haptic, hapticNotify, takeStartParam } from '../telegram'
@@ -6,14 +6,19 @@ import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Onboarding from './Onboarding'
 import ActionSheet from './ActionSheet'
 import MusicToggle from '../components/MusicToggle'
-import StoryVisitor, { type StoryData } from './StoryVisitor'
-import TradeSheet, { type TradeData } from './TradeSheet'
+import type { StoryData } from './StoryVisitor'
+import type { TradeData } from './TradeSheet'
 import AnimEmoji from '../components/AnimEmoji'
-import ChronicleSheet from './ChronicleSheet'
-import RatingSheet from './RatingSheet'
-import ReferralSheet from './ReferralSheet'
-import RaidSheet from './RaidSheet'
-import NotificationsSheet from './NotificationsSheet'
+
+// Шторки открываются по клику — ленивые чанки, чтобы не тащить их в стартовый
+// бандл Таверны (RaidSheet со спрайт-боёвкой — самый тяжёлый).
+const StoryVisitor = lazy(() => import('./StoryVisitor'))
+const TradeSheet = lazy(() => import('./TradeSheet'))
+const ChronicleSheet = lazy(() => import('./ChronicleSheet'))
+const RatingSheet = lazy(() => import('./RatingSheet'))
+const ReferralSheet = lazy(() => import('./ReferralSheet'))
+const RaidSheet = lazy(() => import('./RaidSheet'))
+const NotificationsSheet = lazy(() => import('./NotificationsSheet'))
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
@@ -330,21 +335,23 @@ export default function Tavern() {
       {sheet && <ActionSheet kind={sheet} initial={panelCache.current[sheet]}
         onCache={(k, d) => { panelCache.current[k] = d }}
         onState={(s) => set(s as TavernState)} onClose={() => setSheet(null)} flash={flash} />}
-      {storyOpen && t.story && (
-        <StoryVisitor story={t.story}
-          onResolved={(s) => { if (s) set(s as TavernState); setStoryOpen(false); reload() }}
-          onClose={() => setStoryOpen(false)} />
-      )}
-      {trade && (
-        <TradeSheet offer={trade}
-          onState={(s) => set(s as TavernState)}
-          onClose={() => { tradeShut.current = true; setTrade(null) }} />
-      )}
-      {chronOpen && <ChronicleSheet onClose={() => setChronOpen(false)} />}
-      {ratingOpen && <RatingSheet onClose={() => setRatingOpen(false)} />}
-      {refOpen && <ReferralSheet onClose={() => setRefOpen(false)} />}
-      {raidOpen && <RaidSheet onClose={() => { setRaidOpen(false); reload() }} onGold={() => reload()} />}
-      {notifOpen && <NotificationsSheet admin={t.admin} onClose={() => { setNotifOpen(false); reload() }} />}
+      <Suspense fallback={null}>
+        {storyOpen && t.story && (
+          <StoryVisitor story={t.story}
+            onResolved={(s) => { if (s) set(s as TavernState); setStoryOpen(false); reload() }}
+            onClose={() => setStoryOpen(false)} />
+        )}
+        {trade && (
+          <TradeSheet offer={trade}
+            onState={(s) => set(s as TavernState)}
+            onClose={() => { tradeShut.current = true; setTrade(null) }} />
+        )}
+        {chronOpen && <ChronicleSheet onClose={() => setChronOpen(false)} />}
+        {ratingOpen && <RatingSheet onClose={() => setRatingOpen(false)} />}
+        {refOpen && <ReferralSheet onClose={() => setRefOpen(false)} />}
+        {raidOpen && <RaidSheet onClose={() => { setRaidOpen(false); reload() }} onGold={() => reload()} />}
+        {notifOpen && <NotificationsSheet admin={t.admin} onClose={() => { setNotifOpen(false); reload() }} />}
+      </Suspense>
       {toast && <div className="toast">{toast}</div>}
     </>
   )

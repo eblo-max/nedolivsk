@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { pushBack, popBack } from './telegram'
 import BottomNav from './components/BottomNav'
@@ -6,11 +6,16 @@ import { music } from './music'
 import Splash from './screens/Splash'
 import TestAccessModal from './screens/TestAccessModal'
 import Tavern from './screens/Tavern'
-import Character from './screens/Character'
-import Sorties from './screens/Sorties'
-import Buildings from './screens/Buildings'
-import Market from './screens/Market'
-import WorldMap from './screens/WorldMap'
+
+// Под-экраны — ленивые чанки: первый вход грузит только Таверну (быстрее старт
+// на холодном WebView), остальное подтягивается при переходе по вкладкам.
+const Character = lazy(() => import('./screens/Character'))
+const Sorties = lazy(() => import('./screens/Sorties'))
+const Buildings = lazy(() => import('./screens/Buildings'))
+const Market = lazy(() => import('./screens/Market'))
+const WorldMap = lazy(() => import('./screens/WorldMap'))
+
+const LOADING = <div className="center" style={{ flex: 1, paddingTop: 80 }}><div className="spin" /></div>
 
 export default function App() {
   const [intro, setIntro] = useState(true)
@@ -51,16 +56,18 @@ export default function App() {
       <div className="app">
         {/* место под фикс. тикер резервируем только на Таверне (он там и рендерится) */}
         <div className={`scroll${['/buildings', '/character', '/sorties', '/market', '/map'].includes(loc.pathname) ? '' : ' with-ticker'}`}>
-          <Routes>
-            <Route path="/" element={<Tavern />} />
-            <Route path="/buildings" element={<Buildings />} />
-            <Route path="/character" element={<Character />} />
-            <Route path="/sorties" element={<Sorties />} />
-            <Route path="/market" element={<Market />} />
-            <Route path="/map" element={<WorldMap />} />
-            {/* Карта пока в боте — любой др. путь ведёт в Таверну */}
-            <Route path="*" element={<Tavern />} />
-          </Routes>
+          <Suspense fallback={LOADING}>
+            <Routes>
+              <Route path="/" element={<Tavern />} />
+              <Route path="/buildings" element={<Buildings />} />
+              <Route path="/character" element={<Character />} />
+              <Route path="/sorties" element={<Sorties />} />
+              <Route path="/market" element={<Market />} />
+              <Route path="/map" element={<WorldMap />} />
+              {/* любой другой путь ведёт в Таверну */}
+              <Route path="*" element={<Tavern />} />
+            </Routes>
+          </Suspense>
         </div>
         <BottomNav />
       </div>
