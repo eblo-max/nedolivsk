@@ -1738,9 +1738,21 @@ def _rating_entries(rows: list) -> tuple[list[dict], int]:
             "owner": player.first_name or "Кабатчик", "level": int(tavern.level),
             "loc": worldmap.continent_name(player.region, player.id),
             "gdp": int(gdp), "rep": int(tavern.reputation or 0),
+            "cap": int(tavern.capacity or 0), "comfort": int(tavern.comfort or 0),
+            "builds": len(tavern.buildings or []),   # для мини-профиля таверны
             "ava": f"{player.id}.{_ava_sig(int(player.id))}",   # подписанная ссылка на аватар
         })
     return entries, sum(e["gdp"] for e in entries)
+
+
+def _rating_leaders(entries: list[dict]) -> dict[int, list[str]]:
+    """Короны: id топ-1 по каждой метрике → список его титулов (gdp/rep/level)."""
+    crowns: dict[int, list[str]] = {}
+    for k in _RATING_METRICS:
+        ranked = _ranked(entries, k)
+        if ranked:
+            crowns.setdefault(ranked[0]["id"], []).append(k)
+    return crowns
 
 
 # ── Тренд мест в реальном времени ──
@@ -3435,6 +3447,13 @@ body.far .tav-pin img,body.far .tav-pin .sh,body.far .tav-pin .lv,body.far .tav-
 body.far .tav-pin.mine .glow{animation:glowpulse 1.9s ease-in-out infinite}
 @keyframes glowpulse{0%,100%{opacity:1;transform:translate(-50%,-50%) scale(1)}50%{opacity:.7;transform:translate(-50%,-50%) scale(1.22)}}
 @media (prefers-reduced-motion:reduce){body.far .tav-pin.mine .glow{animation:none}}
+/* корона лидера города (топ-1 по ВВП/славе/уровню) — парит над зданием */
+.tav-pin .crown{position:absolute;left:50%;top:-15px;transform:translateX(-50%);font-size:15px;line-height:1;
+  filter:drop-shadow(0 0 5px rgba(255,210,100,.95)) drop-shadow(0 2px 3px rgba(0,0,0,.6));transition:opacity .28s;z-index:3}
+body.far .tav-pin .crown{opacity:0}
+.tav-pin.crowned .glow{width:24px;height:24px;box-shadow:0 0 15px 5px rgba(255,200,95,.85),0 0 6px 2px rgba(255,235,180,1)}
+.leaflet-tooltip.tav-label.tl-crown{border-color:#c9a24f;color:#ffe9a8;box-shadow:0 0 8px rgba(231,180,74,.5)}
+.tav-pop .title{margin:2px 0;font:700 11.5px/1.3 var(--serif);color:#ffd97a}
 .tav-pin .lv{position:absolute;top:-3px;right:-3px;min-width:15px;height:15px;padding:0 3px;box-sizing:border-box;
   display:flex;align-items:center;justify-content:center;border-radius:999px;font:700 10px/1 var(--serif);
   color:#241405;background:linear-gradient(180deg,#ffe09a,#d99a36);border:1px solid #8a6a22;
@@ -3551,9 +3570,12 @@ map.on('zoomend moveend',queueRelayout);
 // ── таверны ── БЕЗ кластеризации: на далёком зуме каждая таверна = «огонёк»
 // (плотность видна густотой огней, без счётчиков), при приближении огонёк → здание-пин.
 var cluster=null;var layer=map;var myLL=null;var myMarker=null;var tavMarkers=[];
+var TITLES={gdp:'👑 Богатейший кабак города',rep:'⭐ Самый славный кабак',level:'🏰 Высочайший кабак'};
+function crownEmoji(cr){return cr.indexOf('gdp')>=0?'👑':(cr.indexOf('rep')>=0?'⭐':'🏆');}
 function card(t){
+  var titles=(t.crowns||[]).map(function(k){return '<div class="title">'+TITLES[k]+'</div>';}).join('');
   return '<div class="tav-pop"><div class="h">🏰 '+esc(t.name)+'</div>'+
-    '<div class="o">хозяин: '+esc(t.owner)+'</div>'+
+    '<div class="o">хозяин: '+esc(t.owner)+'</div>'+titles+
     '<div class="loc">📍 '+esc(t.continent)+'</div>'+
     '<div class="row"><span>⚜️ ур. '+t.level+'</span><span>⭐ реп. '+t.rep+'</span>'+
     '<span>👥 '+t.cap+'</span><span>☕ уют '+t.comfort+'</span><span>🏛 '+t.builds+'</span></div>'+
@@ -3563,13 +3585,16 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
   var tv=d.taverns||[];
   document.getElementById('cnt').textContent='· '+(d.total||tv.length)+' таверн';
   tv.forEach(function(t){
+    var crowned=(t.crowns||[]).length>0;
     var sz=t.mine?56:42;var ll=px(t.x*W,t.y*H);
-    var icon=L.divIcon({className:'tav-pin'+(t.mine?' mine':''),iconSize:[sz,sz],
+    var icon=L.divIcon({className:'tav-pin'+(t.mine?' mine':'')+(crowned?' crowned':''),iconSize:[sz,sz],
       iconAnchor:[sz/2,sz*0.9],popupAnchor:[0,-sz*0.82],
-      html:'<div class="glow"></div>'+(t.mine?'<div class="beacon"></div>':'')+'<div class="sh"></div><img src="/assets/map_tavern_'+t.tier+'.png" alt="" decoding="async"><div class="lv">'+t.level+'</div>'});
-    var m=L.marker(ll,{icon:icon,zIndexOffset:t.mine?1000:0}).addTo(layer).bindPopup(card(t));
-    m.bindTooltip(esc(t.name),{permanent:true,direction:'top',className:'tav-label'+(t.mine?' tl-mine':''),offset:[0,-sz*0.78]});
-    tavMarkers.push({m:m,mine:!!t.mine,prio:t.mine?1e9:(t.level*1000+(t.rep||0))});
+      html:'<div class="glow"></div>'+(t.mine?'<div class="beacon"></div>':'')+
+        (crowned?'<div class="crown">'+crownEmoji(t.crowns)+'</div>':'')+
+        '<div class="sh"></div><img src="/assets/map_tavern_'+t.tier+'.png" alt="" decoding="async"><div class="lv">'+t.level+'</div>'});
+    var m=L.marker(ll,{icon:icon,zIndexOffset:t.mine?1000:(crowned?900:0)}).addTo(layer).bindPopup(card(t));
+    m.bindTooltip(esc(t.name),{permanent:true,direction:'top',className:'tav-label'+(t.mine?' tl-mine':'')+(crowned?' tl-crown':''),offset:[0,-sz*0.78]});
+    tavMarkers.push({m:m,mine:!!t.mine,prio:t.mine?1e9:(crowned?5e8:0)+(t.level*1000+(t.rep||0))});
     if(t.mine){myLL=ll;myMarker=m;}
   });
   if(cluster){map.addLayer(cluster);cluster.on('animationend',queueRelayout);}
@@ -3627,6 +3652,7 @@ async def _world_taverns(request: web.Request) -> web.Response:
     # её прямо из ХЭША id игрока, полярно и равномерно по площади диска вокруг центра
     # континента — без наложений (непрерывно, а не по сетке слотов).
     R = 0.095
+    crown_of = _rating_leaders(_rating_entries(rows)[0])   # короны лидеров (👑/⭐/🏰)
     out = []
     for tav, pl in rows:
         c = worldmap.continent_for(pl.region, pl.id) or conts[pl.id % nc]  # континент ЗОНЫ игрока
@@ -3645,6 +3671,7 @@ async def _world_taverns(request: web.Request) -> web.Response:
             "rep": tav.reputation, "cap": tav.capacity, "comfort": tav.comfort,
             "builds": len(tav.buildings or []), "continent": c["name"],
             "mine": bool(uid) and pl.id == uid,
+            "crowns": crown_of.get(pl.id, []),   # титулы лидера (gdp/rep/level)
         })
     raid = None
     if boss is not None and boss.status in ("gathering", "active"):

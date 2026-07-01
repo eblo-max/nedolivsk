@@ -3,9 +3,11 @@ import { api } from '../api'
 import { haptic } from '../telegram'
 
 type MetricKey = 'gdp' | 'rep' | 'level'
-interface Row { place: number; name: string; id?: number; ava?: string; owner: string; level: number; loc: string; gdp: number; rep: number; mine: boolean; trend?: number | null }
+interface Row { place: number; name: string; id?: number; ava?: string; owner: string; level: number; loc: string; gdp: number; rep: number; cap?: number; comfort?: number; builds?: number; mine: boolean; trend?: number | null }
 interface Board { rows: Row[]; me: Row | null }
 interface Rating { boards: Record<MetricKey, Board>; total_gdp: number; total: number }
+
+const TITLES: Record<MetricKey, string> = { gdp: '👑 Богатейший кабак', rep: '⭐ Самый славный', level: '🏰 Высочайший кабак' }
 
 const fmt = (n: number) => n.toLocaleString('ru-RU').replace(/,/g, ' ')
 const initial = (s: string) => (s.trim()[0] || '?').toUpperCase()
@@ -37,11 +39,47 @@ function Avatar({ ava, name, rank, sm }: { ava?: string; name: string; rank: num
   )
 }
 
+/** Мини-профиль таверны: титулы лидера, статы, места во всех трёх досках. */
+function TavernProfile({ r, boards, onClose }: { r: Row; boards: Record<MetricKey, Board>; onClose: () => void }) {
+  const placeIn = (k: MetricKey): string => {
+    const b = boards[k]
+    const hit = b.rows.find((x) => x.id === r.id) || (b.me?.id === r.id ? b.me : null)
+    return hit ? `#${hit.place}` : '50+'
+  }
+  const titles = (Object.keys(TITLES) as MetricKey[]).filter((k) => boards[k].rows[0]?.id === r.id)
+  return (
+    <div className="tp-backdrop" onClick={(e) => { e.stopPropagation(); onClose() }}>
+      <div className="tp-card" onClick={(e) => e.stopPropagation()}>
+        <Avatar ava={r.ava} name={r.name} rank={titles.length ? 1 : 99} />
+        <div className="tp-name">{r.name}{r.mine && <span className="lb-you">ты</span>}</div>
+        <div className="tp-owner">хозяин: {r.owner} · 📍 {r.loc}</div>
+        {titles.length > 0 && (
+          <div className="tp-titles">{titles.map((k) => <div key={k} className="tp-title">{TITLES[k]}</div>)}</div>
+        )}
+        <div className="tp-grid">
+          <span>⚜️ ур. {r.level}</span><span>⭐ {r.rep}</span>
+          {r.cap != null && <span>👥 {r.cap}</span>}
+          {r.comfort != null && <span>☕ {r.comfort}</span>}
+          {r.builds != null && <span>🏛 {r.builds}</span>}
+          <span>💰 {fmt(r.gdp)}</span>
+        </div>
+        <div className="tp-places">
+          {METRICS.map((x) => (
+            <div key={x.key} className="tp-place"><i>{x.icon} {x.label}</i><b>{placeIn(x.key)}</b></div>
+          ))}
+        </div>
+        <button className="btn gold" style={{ marginTop: 12, width: '100%' }}
+          onClick={() => { haptic('light'); onClose() }}>← Назад к доске</button>
+      </div>
+    </div>
+  )
+}
+
 // Демо ТОЛЬКО в dev-превью (import.meta.env.DEV). В прод-сборке вырезается.
 const DEV = import.meta.env.DEV
 const DEMO_ROWS: Omit<Row, 'place' | 'mine'>[] = [
-  { name: 'Кривая Кружка', id: 1, owner: 'Барон', level: 7, loc: 'Изумрудная Чарка', gdp: 1340, rep: 27 },
-  { name: 'Пьяный Гусь', id: 2, owner: 'Прохор', level: 6, loc: 'Зелёный Змий', gdp: 1180, rep: 31 },
+  { name: 'Кривая Кружка', id: 1, owner: 'Барон', level: 7, loc: 'Изумрудная Чарка', gdp: 1340, rep: 27, cap: 26, comfort: 14, builds: 6 },
+  { name: 'Пьяный Гусь', id: 2, owner: 'Прохор', level: 6, loc: 'Зелёный Змий', gdp: 1180, rep: 31, cap: 22, comfort: 11, builds: 5 },
   { name: 'Косая Бочка', id: 3, owner: 'Фёкла', level: 6, loc: 'Сухой Закон', gdp: 1020, rep: 18 },
   { name: 'Тёплый Подвал', id: 4, owner: 'Гаврила', level: 5, loc: 'Рассольник', gdp: 880, rep: 22 },
   { name: 'Сухое Горло', id: 5, owner: 'Тихон', level: 5, loc: 'Похмельные Дюны', gdp: 760, rep: 12 },
@@ -66,6 +104,7 @@ const EMPTY: Rating = {
 export default function RatingSheet({ onClose }: { onClose: () => void }) {
   const [data, setData] = useState<Rating | null>(null)
   const [metric, setMetric] = useState<MetricKey>('gdp')
+  const [profile, setProfile] = useState<Row | null>(null)   // мини-профиль таверны (тап по строке)
 
   useEffect(() => {
     api<Rating>('rating').then(setData).catch(() => setData(DEV ? DEMO : EMPTY))
@@ -110,7 +149,8 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
               {order.map((r, i) => {
                 if (!r) return <div key={i} className="lb-pod ghost" />
                 return (
-                  <div key={r.id ?? r.name + r.owner} className={`lb-pod r${r.place}${r.mine ? ' mine' : ''}`}>
+                  <div key={r.id ?? r.name + r.owner} className={`lb-pod r${r.place}${r.mine ? ' mine' : ''}`}
+                    onClick={() => { haptic('light'); setProfile(r) }}>
                     {r.place === 1 && <div className="lb-crown">👑</div>}
                     <Avatar ava={r.ava} name={r.name} rank={r.place} />
                     <div className="lb-pname">{r.name}</div>
@@ -127,7 +167,8 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                 const pct = Math.max(7, Math.round((m.val(r) / max) * 100))
                 return (
                   <div key={r.id ?? r.name + r.owner} className={`lb-row${r.mine ? ' mine' : ''}`}
-                    style={{ animationDelay: `${Math.min(r.place, 14) * 0.035}s` }}>
+                    style={{ animationDelay: `${Math.min(r.place, 14) * 0.035}s` }}
+                    onClick={() => { haptic('light'); setProfile(r) }}>
                     <div className="lb-rank">{r.place}<Trend t={r.trend} /></div>
                     <Avatar ava={r.ava} name={r.name} rank={r.place} sm />
                     <div className="lb-info">
@@ -142,7 +183,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
               {meRow && (
                 <>
                   <div className="lb-gap">↓ твоё место ↓</div>
-                  <div className="lb-row mine">
+                  <div className="lb-row mine" onClick={() => { haptic('light'); setProfile(meRow) }}>
                     <div className="lb-rank">{meRow.place}<Trend t={meRow.trend} /></div>
                     <Avatar ava={meRow.ava} name={meRow.name} rank={99} sm />
                     <div className="lb-info">
@@ -157,6 +198,9 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
           </div>
         )}
         <button className="btn gold chron-close" onClick={() => { haptic('light'); onClose() }}>← Закрыть</button>
+        {profile && data && (
+          <TavernProfile r={profile} boards={data.boards} onClose={() => setProfile(null)} />
+        )}
       </div>
     </div>
   )
