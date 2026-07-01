@@ -3846,9 +3846,13 @@ async def _api_errors(request: web.Request, handler):
         raise
 
 
+async def _health(request: web.Request) -> web.Response:
+    return web.Response(text="ok")
+
+
 def build_app() -> web.Application:
     app = web.Application(middlewares=[_api_errors])
-    app.router.add_get("/", lambda r: web.Response(text="ok"))
+    app.router.add_get("/", _health)   # healthcheck Railway
     app.router.add_get("/map", _map_page)
     app.router.add_get("/world", _world_page)                 # тайловый мир-атлас (Leaflet)
     app.router.add_get("/world/slots.json", _world_slots)
