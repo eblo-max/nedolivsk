@@ -10,7 +10,7 @@ from bot.db import repo
 from bot.db.base import session_factory
 from bot.game import balance, worldmap
 from bot.game import invasion as invmod
-from bot.webapi.core import _auth, _verify_init_data
+from bot.webapi.core import _verify_init_data
 
 def _tavern_norm_pos(player) -> tuple[float, float]:
     """Нормированная позиция таверны на карте (слот, иначе по региону)."""
