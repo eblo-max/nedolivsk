@@ -197,6 +197,29 @@ def test_webapi_modules_have_no_undefined_names():
     assert not problems, f"неопределённые имена в webapi: {problems}"
 
 
+def test_real_request_through_middleware():
+    """Живой HTTP-запрос сквозь всю цепочку (middleware → хендлер), без БД.
+    Ловит класс ошибок, невидимый снапшоту: на распиле декоратор @web.middleware
+    уехал с вырезом — app собирался, но КАЖДЫЙ запрос падал 500 в проде."""
+    import asyncio
+
+    from aiohttp.test_utils import TestClient, TestServer
+
+    from bot import webapp
+
+    async def run():
+        async with TestClient(TestServer(webapp.build_app())) as c:
+            r = await c.get("/")                      # health сквозь middleware
+            assert r.status == 200 and (await r.text()) == "ok"
+            r = await c.post("/api/state", json={})   # без initData → чистый 401
+            assert r.status == 401
+            assert (await r.json())["error"] == "auth"
+            r = await c.get("/avatar/1.badsig")       # подпись мимо → 404
+            assert r.status == 404
+
+    asyncio.run(run())
+
+
 def test_facade_exports_for_outside_users():
     """Внешние потребители webapp (main, notifier, тесты) — фасад обязан отдавать."""
     from bot import webapp

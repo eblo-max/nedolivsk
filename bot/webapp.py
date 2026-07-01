@@ -128,6 +128,7 @@ from bot.webapi.assets import (  # noqa: E402,F401 — фасад
 )
 
 
+@web.middleware
 async def _api_errors(request: web.Request, handler):
     """Никаких немых 500 на /api: логируем трейсбек и возвращаем суть ошибки,
     чтобы клиент показал её (а не общее «Не вышло»)."""

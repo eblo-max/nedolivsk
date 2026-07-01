@@ -106,7 +106,6 @@ async def _spa(request: web.Request) -> web.Response:
     return web.FileResponse(MINIAPP_DIST / "index.html", headers={"Cache-Control": "no-store"})
 
 
-@web.middleware
 async def _phaser_page(request: web.Request) -> web.Response:
     return web.Response(text=_PHASER_HTML, content_type="text/html")
 
