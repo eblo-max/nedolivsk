@@ -16,10 +16,13 @@ function plain(t: string): string {
  *  Для админа — кнопка засеять все типы уведомлений (тест ленты). */
 export default function NotificationsSheet({ admin, onClose }: { admin?: boolean; onClose: () => void }) {
   const [items, setItems] = useState<Note[] | null>(null)
+  const [err, setErr] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const load = useCallback(() => {
-    api<{ items: Note[] }>('notifications').then((r) => setItems(r.items || [])).catch(() => setItems([]))
+    setErr(false); setItems(null)
+    api<{ items: Note[] }>('notifications').then((r) => setItems(r.items || []))
+      .catch(() => setErr(true))   // честная ошибка + ретрай вместо молчаливой пустоты
   }, [])
 
   useEffect(() => {
@@ -55,8 +58,23 @@ export default function NotificationsSheet({ admin, onClose }: { admin?: boolean
             </button>
           </div>
         )}
-        {items === null ? (
-          <div className="center" style={{ padding: '34px 0' }}><div className="spin" /></div>
+        {err ? (
+          <div className="lb-err">
+            <p className="chron-empty">«Гонец с вестями провалился в сугроб — не дошли.»</p>
+            <button className="btn" onClick={() => { haptic('light'); load() }}>↻ Попробовать ещё раз</button>
+          </div>
+        ) : items === null ? (
+          <div className="chron-list" aria-hidden>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="chron-row">
+                <span className="chron-dot" />
+                <div className="chron-body">
+                  <div className="skel skel-line" style={{ width: `${78 - i * 9}%` }} />
+                  <div className="skel skel-line" style={{ width: '30%', height: 8, marginTop: 6 }} />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : items.length === 0 ? (
           <p className="chron-empty">«Тихо, как в погребе на рассвете. Ни одной вести — знать, мир тебя пока бережёт.»</p>
         ) : (

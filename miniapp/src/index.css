@@ -1184,6 +1184,16 @@ body {
 .lb-row.mine .lb-rank, .lb-row.mine .lb-name { color:#ffe9a8; }
 .lb-gap { text-align:center; font-family:system-ui,sans-serif; font-size:10.5px; letter-spacing:1.5px; color:#7a6f59; padding:8px 0 4px; text-transform:uppercase; }
 
+/* скелетон загрузки (доска/уведомления) + блок ошибки с ретраем */
+.skel { border-radius:8px; background:linear-gradient(100deg,rgba(255,255,255,.055) 40%,rgba(255,255,255,.12) 50%,rgba(255,255,255,.055) 60%);
+  background-size:220% 100%; animation:skel-sh 1.3s ease-in-out infinite; }
+.skel-circle { border-radius:50%; flex:none; }
+.skel-line { height:11px; }
+@keyframes skel-sh { from{ background-position:130% 0;} to{ background-position:-90% 0;} }
+@media (prefers-reduced-motion: reduce) { .skel { animation:none; } }
+.lb-err { display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 0 6px; }
+.lb-err .btn { width:auto; padding:9px 18px; }
+
 /* мини-профиль таверны (тап по строке доски) */
 .lb-row, .lb-pod { cursor:pointer; -webkit-tap-highlight-color:transparent; }
 .lb-row:active { transform:scale(.985); }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import { haptic } from '../telegram'
 
@@ -96,19 +96,46 @@ const DEMO: Rating = {
   total: 11, total_gdp: 9740,
   boards: { gdp: demoBoard('gdp'), rep: demoBoard('rep'), level: demoBoard('level') },
 }
-const EMPTY: Rating = {
-  total: 0, total_gdp: 0,
-  boards: { gdp: { rows: [], me: null }, rep: { rows: [], me: null }, level: { rows: [], me: null } },
+/** Скелетон доски на время загрузки: контур подиума + строки с шиммером. */
+function Skeleton() {
+  return (
+    <div className="lb-scroll" aria-hidden>
+      <div className="lb-podium">
+        {[44, 56, 44].map((s, i) => (
+          <div key={i} className="lb-pod">
+            <div className="skel skel-circle" style={{ width: s, height: s }} />
+            <div className="skel skel-line" style={{ width: 64, marginTop: 8 }} />
+          </div>
+        ))}
+      </div>
+      <div className="lb-list">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="lb-row" style={{ pointerEvents: 'none' }}>
+            <div className="skel skel-circle" style={{ width: 38, height: 38 }} />
+            <div className="lb-info">
+              <div className="skel skel-line" style={{ width: `${62 - i * 6}%` }} />
+              <div className="skel skel-line" style={{ width: '38%', height: 8, marginTop: 6 }} />
+            </div>
+            <div className="skel skel-line" style={{ width: 42 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function RatingSheet({ onClose }: { onClose: () => void }) {
   const [data, setData] = useState<Rating | null>(null)
+  const [err, setErr] = useState(false)
   const [metric, setMetric] = useState<MetricKey>('gdp')
   const [profile, setProfile] = useState<Row | null>(null)   // мини-профиль таверны (тап по строке)
 
-  useEffect(() => {
-    api<Rating>('rating').then(setData).catch(() => setData(DEV ? DEMO : EMPTY))
+  const load = useCallback(() => {
+    setErr(false); setData(null)
+    api<Rating>('rating').then(setData)
+      .catch(() => { if (DEV) setData(DEMO); else setErr(true) })   // прод: честная ошибка + ретрай
   }, [])
+  useEffect(load, [load])
 
   const m = METRICS.find((x) => x.key === metric)!
   const board = data ? data.boards[metric] : null
@@ -139,8 +166,13 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
-        {data === null ? (
-          <div className="center" style={{ padding: '52px 0' }}><div className="spin" /></div>
+        {err ? (
+          <div className="lb-err">
+            <p className="chron-empty">«Гонец с доской почёта увяз в грязи — вести не дошли.»</p>
+            <button className="btn" onClick={() => { haptic('light'); load() }}>↻ Попробовать ещё раз</button>
+          </div>
+        ) : data === null ? (
+          <Skeleton />
         ) : rows.length === 0 ? (
           <p className="chron-empty">«В Недоливске пока ни одного кабака. Город трезвенников, тоска.»</p>
         ) : (

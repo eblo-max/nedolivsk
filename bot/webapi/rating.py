@@ -2,6 +2,7 @@
 короны лидеров и аватарки из Telegram-профиля. Перенесено из bot/webapp.py
 дословно (move-only)."""
 
+import asyncio
 import hashlib
 import hmac
 import time
@@ -184,6 +185,21 @@ _AVATAR_CACHE: dict[int, tuple[bytes | None, float]] = {}
 _AVA_TTL = 12 * 3600        # положительный кэш (есть фото)
 _AVA_NEG_TTL = 3600         # негативный кэш (нет фото/приват) — реже дёргаем API
 _AVA_MAX = 4000             # потолок записей: эндпоинт публичный, иначе кэш набьют запросами
+_AVA_LOCKS: dict[int, asyncio.Lock] = {}   # дедуп: N параллельных <img> одного uid = 1 фетч
+
+
+def _ava_cached(uid: int, now: float) -> web.Response | None:
+    """Ответ из кэша (200/404), если запись свежая; иначе None (нужен фетч)."""
+    hit = _AVATAR_CACHE.get(uid)
+    if hit is None:
+        return None
+    data, ts = hit
+    if now - ts >= (_AVA_TTL if data else _AVA_NEG_TTL):
+        return None
+    if not data:
+        return web.Response(status=404)
+    return web.Response(body=data, content_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=43200"})
 
 
 async def _api_avatar(request: web.Request) -> web.Response:
@@ -196,28 +212,31 @@ async def _api_avatar(request: web.Request) -> web.Response:
         return web.Response(status=404)
     if not sig or not hmac.compare_digest(sig, _ava_sig(uid)):
         return web.Response(status=404)
-    now = time.time()
-    hit = _AVATAR_CACHE.get(uid)
-    if hit is not None:
-        data, ts = hit
-        if now - ts < (_AVA_TTL if data else _AVA_NEG_TTL):
-            if not data:
-                return web.Response(status=404)
-            return web.Response(body=data, content_type="image/jpeg",
-                                headers={"Cache-Control": "public, max-age=43200"})
-    data: bytes | None = None
-    _bot = get_bot()
-    if _bot is not None:
-        try:
-            photos = await _bot.get_user_profile_photos(user_id=uid, limit=1)
-            if photos.total_count and photos.photos:
-                size = photos.photos[0][0]        # самый мелкий размер — для кружка хватает
-                f = await _bot.get_file(size.file_id)
-                buf = await _bot.download_file(f.file_path)
-                data = buf.read() if hasattr(buf, "read") else bytes(buf)
-        except Exception:   # noqa: BLE001 — нет фото/приват/ошибка → фолбэк на инициалы
-            data = None
-    _AVATAR_CACHE[uid] = (data, now)
+    cached = _ava_cached(uid, time.time())
+    if cached is not None:
+        return cached
+    # Лидерборд рисует десятки <img> разом — без замка каждый промах кэша дал бы
+    # свой тройной вызов Bot API. Замок на uid: первый фетчит, остальные ждут кэш.
+    lock = _AVA_LOCKS.setdefault(uid, asyncio.Lock())
+    async with lock:
+        cached = _ava_cached(uid, time.time())   # пока ждали замок — мог наполниться
+        if cached is not None:
+            return cached
+        data: bytes | None = None
+        _bot = get_bot()
+        if _bot is not None:
+            try:
+                photos = await _bot.get_user_profile_photos(user_id=uid, limit=1)
+                if photos.total_count and photos.photos:
+                    size = photos.photos[0][0]    # самый мелкий размер — для кружка хватает
+                    f = await _bot.get_file(size.file_id)
+                    buf = await _bot.download_file(f.file_path)
+                    data = buf.read() if hasattr(buf, "read") else bytes(buf)
+            except Exception:   # noqa: BLE001 — нет фото/приват/ошибка → фолбэк на инициалы
+                data = None
+        _AVATAR_CACHE[uid] = (data, time.time())
+    if len(_AVA_LOCKS) > 512:                # редкая уборка; гонка = лишний фетч, не беда
+        _AVA_LOCKS.clear()
     if len(_AVATAR_CACHE) > _AVA_MAX:        # выкинуть самые старые (порядок вставки)
         for k in list(_AVATAR_CACHE)[:len(_AVATAR_CACHE) - _AVA_MAX]:
             _AVATAR_CACHE.pop(k, None)
