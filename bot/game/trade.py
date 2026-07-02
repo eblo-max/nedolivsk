@@ -165,11 +165,13 @@ def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
     wealth = max(fv, int(fv * qty * rng.uniform(*arch.wealth_mult) * purse))
 
     prices = [max(1, int(round(fv * t))) for t in balance.TRADE_PRICE_TIERS]
+    from bot.game import factions
     return {
         "good": good, "qty": qty, "arch": cit.arch, "emoji": cit.emoji,
         "name": cit.name, "intro": cit.blurb, "estate": cit.estate,
         "fv": round(fv, 2), "max_unit": round(max_unit, 2), "wealth": wealth,
         "greed": round(greed, 3), "prices": prices, "mkt": round(mkt, 3),
+        "fmul": round(factions.merchant_price_mult(player), 3),  # ранг лиги двигает вилку
     }
 
 
@@ -191,7 +193,8 @@ def deal_options(offer: dict, unit: int, want: int) -> dict | None:
     if afford <= 0:
         return None                          # не тянет ничего (walk решит evaluate)
     full_unit = int(offer["wealth"] // want)
-    floor = max(1, int(round(offer["fv"] * balance.TRADE_MIN_UNDER)))
+    floor = max(1, int(round(offer["fv"] * balance.TRADE_MIN_UNDER
+                             * offer.get("fmul", 1.0))))  # друзьям лиги пол выше
     if full_unit < floor:
         return None                          # даже по полу не осилит весь объём
     return {"mine": {"unit": int(unit), "qty": int(afford)},

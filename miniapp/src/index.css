@@ -1355,6 +1355,8 @@ body {
 .rep-fill.neg { background:linear-gradient(270deg,#a8392a,#d4604a); box-shadow:0 0 8px #cf6a4a44; }
 .rep-fill.neu { background:linear-gradient(90deg,#7a7158,#9a9078); }
 
+.rep-perks { display:flex; flex-direction:column; gap:2px; margin-top:4px; }
+.rep-perk { font-size:11px; color:var(--gold-2); opacity:.9; }
 .rep-val { flex:none; min-width:34px; text-align:right; font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:14px; }
 .rep-val.pos { color:#f3c768; }
 .rep-val.neg { color:#e8836a; }

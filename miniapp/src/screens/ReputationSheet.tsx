@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { haptic } from '../telegram'
 
-interface Faction { id: string; name: string; emoji: string; value: number; rank: string; tone: string; member: boolean }
+interface Faction { id: string; name: string; emoji: string; value: number; rank: string; tone: string; member: boolean; perks?: string[]; rank_title?: string }
 interface NpcRel { id: string; name: string; emoji: string; blurb: string; avatar: number | null; value: number; rank: string; tone: string }
 
 /** Биполярная шкала −100..100: заливка от центра вправо (друг) / влево (враг). */
@@ -51,6 +51,9 @@ export default function ReputationSheet({ onClose }: { onClose: () => void }) {
                       <span className={`rep-rank ${f.tone}`}>{f.rank}</span>
                     </div>
                     <RepBar value={f.value} tone={f.tone} />
+                    {(f.perks?.length ?? 0) > 0 && (
+                      <div className="rep-perks">{f.perks!.map((p, i) => <span key={i} className="rep-perk">◆ {p}</span>)}</div>
+                    )}
                   </div>
                   <span className={`rep-val ${f.tone}`}>{f.value > 0 ? '+' : ''}{f.value}</span>
                 </div>

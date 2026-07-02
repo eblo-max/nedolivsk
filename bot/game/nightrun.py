@@ -136,6 +136,8 @@ def success_p(run: dict, player, kind: str) -> float:
         p += armor * balance.NIGHTRUN_ARMOR_W + 0.03      # броня решает в драке
     elif kind == "sneak":
         p += luck * balance.NIGHTRUN_LUCK_W               # удача — проскользнуть
+        from bot.game import factions
+        p += factions.thief_sneak_bonus(player)           # свои у воров ходят тише
     elif kind == "gamble":
         p -= 0.05                                         # азарт рискованнее
     if any(FLASK_APPROACH.get(k) == kind for k in fl):    # глоток под свой подход
@@ -268,7 +270,7 @@ def attempt(run: dict, player, kind: str, rng: random.Random | None = None,
         out["roll"] = roll
         out["lose_faces"] = faces
         if roll <= faces:                                # БЮСТ
-            return _bust(run, out)
+            return _bust(run, out, player)
         mult = 1.0 + (roll - faces) * 0.35               # чем выше бросок — тем куш
         loot = _bundle(val * mult, run["region"], run["situation"], rng)
         _merge(run["satchel"], loot)
@@ -278,7 +280,7 @@ def attempt(run: dict, player, kind: str, rng: random.Random | None = None,
 
     # fight / sneak — вероятностный исход
     if rng.random() > success_p(run, player, kind):      # провал = одолели/попался
-        return _bust(run, out)
+        return _bust(run, out, player)
     loot = _bundle(val, run["region"], run["situation"], rng)
     if kind == "fight":                                  # победа стоит здоровья
         lo, hi = balance.NIGHTRUN_FIGHT_HP
@@ -287,18 +289,30 @@ def attempt(run: dict, player, kind: str, rng: random.Random | None = None,
         out["hp_cost"] = cost
         if run["hp"] <= 0:                               # победил, но рухнул
             out["collapsed"] = True
-            return _bust(run, out)
+            return _bust(run, out, player)
     _merge(run["satchel"], loot)
     out["loot"] = loot
     run["state"] = "crossroad"
     return out
 
 
-def _bust(run: dict, out: dict) -> dict:
-    """Провал: теряешь незабанканную котомку, ходка кончена."""
+def _bust(run: dict, out: dict, player=None) -> dict:
+    """Провал: теряешь незабанканную котомку (друзьям стражи часть отбивают)."""
     out["busted"] = True
-    out["lost"] = dict(run.get("satchel") or {})
-    run["satchel"] = {}
+    satchel = dict(run.get("satchel") or {})
+    keep_pct = 0.0
+    if player is not None:
+        from bot.game import factions
+        keep_pct = factions.watch_bust_keep_pct(player)
+    kept = {}
+    if keep_pct > 0:
+        kept = {r: int(q * keep_pct) for r, q in satchel.items() if int(q * keep_pct) > 0}
+        for r, q in kept.items():
+            satchel[r] -= q
+    out["lost"] = satchel
+    if kept:
+        out["saved"] = kept                       # стража отбила часть добра
+    run["satchel"] = kept
     run["state"] = "busted"
     return out
 

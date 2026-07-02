@@ -286,6 +286,8 @@ async def _api_story_choice(request: web.Request) -> web.Response:
         shielded = ss.is_shielded(p, now)
         g0, r0 = int(p.gold), int(p.reputation or 0)
         inv0 = dict(p.inventory or {}); cel0 = dict((p.tavern.products or {}))
+        from bot.game import factions as _fac
+        ranks0 = {f: _fac.rank(p, f) for f in _fac.NAMES}
         outcome, ctx = se.resolve(p, city, st, idx, now, shielded=shielded)
         if outcome is None:
             return web.json_response({"ok": False, "error": "unavailable"})
@@ -299,6 +301,14 @@ async def _api_story_choice(request: web.Request) -> web.Response:
         _bits = ([f"{_dg:+d} 🪙"] if _dg else []) + ([f"{_dr:+d} ⭐"] if _dr else [])
         repo.feed_push(s, uid, f"🚪 {st.title}: выбор сделан"
                        + (" — " + ", ".join(_bits) if _bits else ""), kind="story")
+        for f, r1 in {f: _fac.rank(p, f) for f in _fac.NAMES}.items():
+            if r1 != ranks0[f]:                      # смена ранга — громкая весть
+                up = r1 > ranks0[f]
+                repo.feed_push(s, uid, (
+                    f"{'⚖️' if up else '🕳'} {_fac.name(f)} теперь зовёт тебя "
+                    f"«{_fac.rank_label(r1)}»"
+                    + (" — открылись новые милости, загляни в Репутацию."
+                       if up else " — жди худших цен и косых взглядов.")), kind="rep")
         await s.commit()
         # дельты для красивого исхода
         names = {**bal.RESOURCE_NAMES, **bal.GOODS_NAMES}

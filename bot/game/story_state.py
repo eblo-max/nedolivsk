@@ -59,13 +59,18 @@ def faction(player: Player, fac_id: str) -> int:
     return int((player.story or {}).get("faction", {}).get(fac_id, 0))
 
 
-def adjust_faction(player: Player, fac_id: str, delta: int) -> None:
+def adjust_faction(player: Player, fac_id: str, delta: int) -> tuple[int, int]:
+    """Сдвиг репутации фракции. Возвращает (старый ранг, новый ранг) —
+    вызывающий шлёт громкую весть при смене ранга (живой мир, фаза 1)."""
+    from bot.game import factions
     st = _st(player)
     fac = dict(st.get("faction", {}))
+    old = int(fac.get(fac_id, 0))
     fac[fac_id] = max(balance.FACTION_MIN,
-                      min(balance.FACTION_MAX, fac.get(fac_id, 0) + delta))
+                      min(balance.FACTION_MAX, old + delta))
     st["faction"] = fac
     _save(player, st)
+    return factions.rank_of(old), factions.rank_of(fac[fac_id])
 
 
 # ── Текущее событие на решении ─────────────────────────────────────────

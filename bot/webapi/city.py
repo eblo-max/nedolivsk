@@ -42,8 +42,11 @@ async def _api_reputation(request: web.Request) -> web.Response:
         for fid in _FAC_ORDER:
             v = int(fac.get(fid, 0))
             label, tone = _rep_rank(v)
+            r = factions.rank_of(v)
             facs.append({"id": fid, "name": factions.name(fid), "emoji": _FAC_EMOJI.get(fid, "•"),
                          "value": v, "rank": label, "tone": tone,
+                         "rank_n": r, "rank_title": factions.rank_label(r),
+                         "perks": factions.perk_lines(p, fid),
                          "member": fid == "thieves" and ss.has_flag(p, "guild_member")})
         rel = (p.story or {}).get("npc_rel", {})
         npcs = []

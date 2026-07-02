@@ -9,14 +9,14 @@ interface Note { text: string; ago: string; read: boolean; kind?: string; count?
 const KIND_ICON: Record<string, string> = {
   build: '🏗', prod: '🍺', exped: '⛏', craft: '⚒', hunt: '🏹', auction: '🔨',
   bourse: '🪙', raid: '⚔️', invasion: '🪓', mill: '🌾', bonus: '🎁',
-  story: '🚪', world: '🌍', retail: '🍻', ref: '🎟', rating: '🏆',
+  story: '🚪', world: '🌍', retail: '🍻', ref: '🎟', rating: '🏆', rep: '⚖️',
 }
 const KIND_ROUTE: Record<string, string> = {
   build: '/buildings', prod: '/buildings', mill: '/buildings',
   exped: '/sorties', hunt: '/sorties',
   craft: '/character',
   auction: '/market', bourse: '/market',
-  raid: '/', bonus: '/', story: '/', retail: '/', ref: '/', rating: '/',
+  raid: '/', bonus: '/', story: '/', retail: '/', ref: '/', rating: '/', rep: '/character',
 }
 
 // HTML-теги бота (<b>,<a>…) убираем, базовые сущности раскодируем — выводим как текст (без инъекций).

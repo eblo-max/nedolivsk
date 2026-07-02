@@ -547,7 +547,9 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None,
 
     lost = player.gold // balance.HUNT_LOSS_GOLD_DIV  # щепотка золота при поражении
     if "pickpocket" in getattr(enemy, "traits", ()):       # 💰 карманник обчистил тебя
-        lost *= balance.TRAIT_PICKPOCKET_LOSE_MULT
+        from bot.game import factions
+        lost = int(lost * balance.TRAIT_PICKPOCKET_LOSE_MULT
+                   * factions.watch_pickpocket_mult(player))  # друзей стражи щиплют меньше
     player.gold -= lost
     economy.record(player, "hunt", -lost)
     player.hp = balance.HP_LOSS_FLOOR
