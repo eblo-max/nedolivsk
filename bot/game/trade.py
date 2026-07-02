@@ -178,6 +178,26 @@ def _qty_affordable(offer: dict, unit: int) -> int:
     return max(0, min(offer["qty"], by_budget))
 
 
+def deal_options(offer: dict, unit: int, want: int) -> dict | None:
+    """Вилка сделки, когда мошна не тянет ВЕСЬ объём по согласованной цене unit:
+    {'mine': {unit, qty}, 'full': {unit, qty}} — «по-твоему, но меньше» против
+    «уступи, но заберу всё». None — вилка не нужна (тянет всё) или невозможна
+    (купец слишком беден даже для минимальной цены за полный объём).
+    want — реальный целевой объём (заявка, обрезанная по складу игрока)."""
+    want = max(1, int(want))
+    afford = _qty_affordable(offer, unit)
+    if afford >= want:
+        return None                          # тянет всё — вилка не нужна
+    if afford <= 0:
+        return None                          # не тянет ничего (walk решит evaluate)
+    full_unit = int(offer["wealth"] // want)
+    floor = max(1, int(round(offer["fv"] * balance.TRADE_MIN_UNDER)))
+    if full_unit < floor:
+        return None                          # даже по полу не осилит весь объём
+    return {"mine": {"unit": int(unit), "qty": int(afford)},
+            "full": {"unit": full_unit, "qty": want}}
+
+
 def evaluate(offer: dict, unit: int) -> tuple[str, int]:
     """Реакция: ('accept'|'counter'|'walk', цена). Контр — лоуболл от потолка."""
     mx = offer["max_unit"]

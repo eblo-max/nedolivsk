@@ -56,3 +56,23 @@ def test_hunt_accepts_flask_end_to_end():
     res = combat.hunt(p, "zayac", rng=random.Random(1), flask=["ale3"])
     assert res.ok and res.flask == ["+7 урона"]
     assert p.tavern.products["ale3"] == 0
+
+
+# ── Вилка торга (мошна купца не тянет весь объём) ────────────────────────
+def test_trade_deal_options_fork():
+    from bot.game import trade
+    offer = {"good": "ale2", "qty": 6, "wealth": 48, "max_unit": 14.0,
+             "fv": 10.0, "greed": 0.3, "prices": [8, 10, 12, 14]}
+    fork = trade.deal_options(offer, 14, want=6)
+    assert fork == {"mine": {"unit": 14, "qty": 3}, "full": {"unit": 8, "qty": 6}}
+    assert fork["mine"]["unit"] > fork["full"]["unit"]        # дорого/мало vs дешевле/всё
+    assert fork["full"]["unit"] * fork["full"]["qty"] <= offer["wealth"]
+
+
+def test_trade_deal_options_none_when_affordable_or_broke():
+    from bot.game import trade
+    rich = {"good": "ale2", "qty": 6, "wealth": 500, "max_unit": 14.0, "fv": 10.0,
+            "greed": 0.3, "prices": [8, 10, 12, 14]}
+    assert trade.deal_options(rich, 14, want=6) is None       # тянет всё — вилки нет
+    broke = {**rich, "wealth": 20}   # 20//6=3 < пол (6) — вилки нет, лишь частичный
+    assert trade.deal_options(broke, 14, want=6) is None      # всё не осилит даже по полу

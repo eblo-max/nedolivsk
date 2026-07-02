@@ -224,7 +224,7 @@ def _trade_dto(offer) -> dict | None:
         "emoji": g.emoji if g else "📦", "qty": offer.get("qty"),
         "merchant": offer.get("name"), "memoji": offer.get("emoji"), "avatar": avatar,
         "intro": offer.get("intro"), "fv": offer.get("fv"),
-        "prices": offer.get("prices"), "counter": offer.get("counter"),
+        "prices": offer.get("prices"), "counter": offer.get("counter"), "choice": offer.get("choice"),
     }
 
 
@@ -373,8 +373,10 @@ async def _api_trade(request: web.Request) -> web.Response:
         st = {"result": None, "react": None, "qty": 0, "gold": 0, "unit": 0,
               "asked": 0, "short": False}
 
-        def _finish(unit: int, kind: str) -> None:
+        def _finish(unit: int, kind: str, qty_cap: int | None = None) -> None:
             asked = int(offer.get("qty", 0))
+            if qty_cap is not None:          # выбранный вариант вилки: ровно столько
+                offer["qty"] = int(qty_cap)
             qn, gn = _sell(p, offer, unit)
             ss.set_trade(p, None)
             if qn:
@@ -398,7 +400,18 @@ async def _api_trade(request: web.Request) -> web.Response:
             st.update(result="walk", react=trademod.reaction(offer, "walk"))
         elif op == "accept":                          # согласие на контр-цену
             unit = int(offer.get("counter", offer["max_unit"]))
-            _finish(unit, "accept_high" if unit >= offer["fv"] * 1.15 else "accept")
+            stock = int((p.tavern.products or {}).get(offer["good"], 0))
+            want = min(int(offer.get("qty", 0)), stock)
+            fork = trademod.deal_options(offer, unit, want)
+            if fork:
+                offer["choice"] = fork
+                ss.set_trade(p, offer)
+                st.update(result="choice", choice=fork,
+                          react=(f"«По {fork['mine']['unit']} 🪙 утяну лишь "
+                                 f"{fork['mine']['qty']}. По {fork['full']['unit']} 🪙 — "
+                                 f"заберу все {fork['full']['qty']}. Решай»"))
+            else:
+                _finish(unit, "accept_high" if unit >= offer["fv"] * 1.15 else "accept")
         elif op == "push":                            # дожать контр-цену
             decision, price = trademod.push(offer)
             if decision == "walk":
@@ -418,7 +431,19 @@ async def _api_trade(request: web.Request) -> web.Response:
             unit = offer["prices"][idx]
             decision, price = trademod.evaluate(offer, unit)
             if decision == "accept":
-                _finish(unit, "accept_high" if unit >= offer["fv"] * 1.15 else "accept")
+                stock = int((p.tavern.products or {}).get(offer["good"], 0))
+                want = min(int(offer.get("qty", 0)), stock)
+                fork = trademod.deal_options(offer, unit, want)
+                if fork:                      # мошна не тянет всё — честная вилка
+                    offer["choice"] = fork
+                    ss.set_trade(p, offer)
+                    st.update(result="choice", choice=fork,
+                              react=(f"«По {fork['mine']['unit']} 🪙 возьму лишь "
+                                     f"{fork['mine']['qty']} — мошна не резиновая. "
+                                     f"А уступишь по {fork['full']['unit']} 🪙 — "
+                                     f"заберу все {fork['full']['qty']}. Ну?»"))
+                else:
+                    _finish(unit, "accept_high" if unit >= offer["fv"] * 1.15 else "accept")
             elif decision == "counter":
                 offer["counter"] = price
                 ss.set_trade(p, offer)
@@ -426,6 +451,14 @@ async def _api_trade(request: web.Request) -> web.Response:
             else:
                 ss.set_trade(p, None)
                 st.update(result="walk", react=trademod.reaction(offer, "walk"))
+        elif op == "take":                            # выбор из вилки (choice)
+            fork = offer.get("choice") or {}
+            variant = str(body.get("variant") or "")
+            deal = fork.get(variant)
+            if not deal:
+                return web.json_response({"ok": False, "error": "bad"})
+            kind = "accept_high" if deal["unit"] >= offer["fv"] * 1.15 else "accept"
+            _finish(int(deal["unit"]), kind, qty_cap=int(deal["qty"]))
         else:
             return web.json_response({"ok": False, "error": "bad_op"})
 

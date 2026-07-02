@@ -7,9 +7,11 @@ export interface TradeData {
   good: string; name: string; emoji: string; qty: number
   merchant: string; memoji: string; avatar: number | null
   intro: string; fv: number; prices: number[]; counter?: number | null
+  choice?: { mine: { unit: number; qty: number }; full: { unit: number; qty: number } } | null
 }
 interface TradeResp {
-  ok: boolean; result?: 'sold' | 'counter' | 'walk'; react?: string
+  ok: boolean; result?: 'sold' | 'counter' | 'walk' | 'choice'; react?: string
+  choice?: { mine: { unit: number; qty: number }; full: { unit: number; qty: number } } | null
   qty?: number; gold?: number; unit?: number; asked?: number; short?: boolean; trade?: TradeData | null; state?: unknown
 }
 
@@ -18,8 +20,14 @@ const npcSrc = (a: number | null) => a ? `${import.meta.env.BASE_URL}npc/${a}.pn
 
 // DEV: имитация торга для превью (в проде — реальный /api/trade, мок вырезается)
 const DEV = import.meta.env.DEV
-function tradeApi(op: string, idx: number | undefined, d: TradeData): Promise<TradeResp> {
-  if (!DEV) return api<TradeResp>('trade', idx != null ? { op, idx } : { op })
+function tradeApi(op: string, idx: number | undefined, d: TradeData,
+                  variant?: string): Promise<TradeResp> {
+  if (!DEV) return api<TradeResp>('trade', { op, ...(idx != null ? { idx } : {}), ...(variant ? { variant } : {}) })
+  if (op === 'take') {
+    const deal = variant === 'full' ? d.choice?.full : d.choice?.mine
+    const u = deal?.unit || 0, q = deal?.qty || 0
+    return Promise.resolve({ ok: true, result: 'sold', react: '«Уговор дороже денег»', qty: q, gold: u * q, unit: u })
+  }
   if (op === 'decline') return Promise.resolve({ ok: true, result: 'walk', react: '«Тьфу! Грабёж средь бела дня. Бывай»' })
   if (op === 'offer') {
     const unit = d.prices[idx ?? 0]
@@ -46,16 +54,17 @@ export default function TradeSheet({ offer, onClose, onState }: {
   const [sold, setSold] = useState<{ qty: number; gold: number; unit: number; asked: number; short: boolean } | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function act(op: string, idx?: number) {
+  async function act(op: string, idx?: number, variant?: string) {
     if (busy) return
     setBusy(true); haptic('medium')
     try {
-      const r = await tradeApi(op, idx, d)
+      const r = await tradeApi(op, idx, d, variant)
       if (r.state) onState?.(r.state)
       setReact(r.react || '')
       if (r.result === 'sold') { setSold({ qty: r.qty || 0, gold: r.gold || 0, unit: r.unit || 0, asked: r.asked || 0, short: !!r.short }); setPhase('sold'); hapticNotify('success') }
       else if (r.result === 'walk') { setPhase('walk'); hapticNotify('warning') }
       else if (r.result === 'counter' && r.trade) { setD(r.trade); haptic('light') }
+      else if (r.result === 'choice' && r.choice) { setD({ ...d, choice: r.choice }); haptic('light') }
     } catch { setPhase('walk') }
     finally { setBusy(false) }
   }
@@ -93,6 +102,20 @@ export default function TradeSheet({ offer, onClose, onState }: {
             {react && <p className="trd-react walk">{react}</p>}
             <div className="trd-gone">— купец ушёл —</div>
             <button className="btn trd-ok" onClick={() => { haptic('light'); onClose() }}>← Закрыть</button>
+          </>
+        ) : d.choice ? (
+          // ── вилка: мошна не тянет весь объём — «дорого/мало» против «дешевле/всё» ──
+          <>
+            {react && <p className="trd-react">{react}</p>}
+            <div className="trd-acts">
+              <button className="btn trd-yes" disabled={busy} onClick={() => act('take', undefined, 'full')}>
+                🤝 Все {d.choice.full.qty} × {d.choice.full.unit} 🪙 = {fmt(d.choice.full.qty * d.choice.full.unit)}
+              </button>
+              <button className="btn trd-push" disabled={busy} onClick={() => act('take', undefined, 'mine')}>
+                💎 Дорого: {d.choice.mine.qty} × {d.choice.mine.unit} 🪙 = {fmt(d.choice.mine.qty * d.choice.mine.unit)}
+              </button>
+              <button className="btn trd-no full" disabled={busy} onClick={() => act('decline')}>Прогнать</button>
+            </div>
           </>
         ) : haggling ? (
           // ── идёт торг: купец дал контр-цену ──
