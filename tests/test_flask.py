@@ -138,3 +138,16 @@ def test_merchant_can_afford_at_least_one():
             dec, _ = trade.evaluate(offer, unit)
             if dec == "accept":
                 assert trade._qty_affordable(offer, unit) >= 1, (offer, unit)
+
+
+def test_trade_offer_expires():
+    """Заброшенный оффер тихо протухает через TTL (не выскакивает вечно)."""
+    import time as _t
+    from bot.game import trade, balance
+    fresh = {"ts": _t.time()}
+    old = {"ts": _t.time() - (balance.TRADE_OFFER_TTL_MIN * 60 + 5)}
+    legacy = {"good": "ale1"}                    # старый оффер без метки
+    assert trade.is_stale(fresh) is False
+    assert trade.is_stale(old) is True
+    assert trade.is_stale(legacy) is True        # без ts — протухший
+    assert trade.is_stale(None) is False

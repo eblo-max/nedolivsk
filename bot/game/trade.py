@@ -10,6 +10,7 @@
 
 import math
 import random
+import time as _time
 from dataclasses import dataclass
 
 from bot.game import balance, market, npc, production as prod, story_state
@@ -121,6 +122,16 @@ ARCHES = [
 ARCH = {a.id: a for a in ARCHES}
 
 
+def is_stale(offer: dict | None, now: float | None = None) -> bool:
+    """Оффер заброшен дольше TTL — тихо убрать (не выскакивать при перезапуске)."""
+    if not offer:
+        return False
+    ts = offer.get("ts")
+    if not ts:
+        return True                     # старый оффер без метки — считаем протухшим
+    return ((now or _time.time()) - float(ts)) > balance.TRADE_OFFER_TTL_MIN * 60
+
+
 def visit_chance(base: float, now=None) -> float:
     """Ритм города: ночью (23–7 МСК) купцы спят, в пятницу — базарный день.
     Единый источник для спавна купца в аппе и текст-боте."""
@@ -190,7 +201,7 @@ def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
         "fv": round(fv, 2), "max_unit": round(max_unit, 2), "wealth": wealth,
         "greed": round(greed, 3), "prices": prices, "mkt": round(mkt, 3),
         "fmul": round(factions.merchant_price_mult(player), 3),  # ранг лиги двигает вилку
-        "cit": cit.id, "nrel": nrel,
+        "ts": _time.time(), "cit": cit.id, "nrel": nrel,
         "mood_line": ("Он помнит тебя добром — говорит без обиняков, цену держит честную."
                       if nrel >= 3 else
                       "Он щурится: «Помню-помню, как ты в прошлый раз со мной обошёлся…»"

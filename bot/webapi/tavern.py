@@ -259,12 +259,16 @@ async def _api_state(request: web.Request) -> web.Response:
         from bot.game import fgoal as _fg
         _w = await repo.get_or_create_world(s)
         out["fgoal"] = _fg.state(_w)                 # цель недели: прогресс + пир
-        from bot.game import story_state as _ss
-        out["trade"] = _trade_dto(_ss.get_trade(p))  # незавершённый торг с купцом (если висит)
+        from bot.game import story_state as _ss, trade as _trd
+        _off = _ss.get_trade(p)
+        if _trd.is_stale(_off):                      # заброшен дольше TTL — тихо убрать
+            _ss.set_trade(p, None); _off = None
+        out["trade"] = _trade_dto(_off)              # незавершённый торг с купцом (если висит)
         boss = await repo.get_active_raid(s)
         out["raid"] = _raid_summary(boss, uid) if boss else None  # кнопка «⚔️ РЕЙД-БОСС»
         out["admin"] = _is_admin(uid)                # админ-кнопка «Призвать босса» (если босса нет)
         out["notif_unread"] = await repo.feed_unread(s, uid)  # бейдж колокольчика
+        await s.commit()                             # зафиксировать уборку протухшего торга/touch
     return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 
