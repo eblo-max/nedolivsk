@@ -635,6 +635,8 @@ async def _do_buy(session: AsyncSession, player: Player, chat_id: int | None,
     if seller is not None:
         seller.gold += net
         _seller_fame(seller, qty)             # молва + рейтинг продавцу
+        from bot.game import fgoal
+        fgoal.note("gold_trade", net)         # продажа игрока двигает цель недели
         repo.add_log(session, "player", seller.id, f"🏪 продал на бирже {qty}×{nm}")
         repo.queue_notify(session, seller.id,
                           f"🛒 На бирже купили твой товар: {qty}×{nm} → +{net} 🪙", kind="auction")
@@ -654,6 +656,8 @@ async def _do_fill(session: AsyncSession, player: Player, chat_id: int | None,
     bourse.freeze(player.tavern, good, qty)
     player.gold += net
     _seller_fame(player, qty)                 # молва + рейтинг продавцу
+    from bot.game import fgoal
+    fgoal.note("gold_trade", net)             # продажа игрока двигает цель недели
     _give(buyer.tavern, good, qty)
     repo.queue_notify(session, buyer.id,
                       f"📥 По твоей заявке доставили {qty}×{nm} (из залога {gross} 🪙)", kind="auction")

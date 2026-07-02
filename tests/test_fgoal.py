@@ -74,3 +74,18 @@ def test_state_for_ui():
     assert st["pct"] == 50 and st["done"] == g["target"] // 2
     assert st["fac"] == g["fac"] and not st["feast"]
     _reset()
+
+
+def test_bourse_sales_feed_goal():
+    """Продажи игроков на бирже двигают цель (жалоба: «купил — не засчиталось»).
+    Считается сторона ПРОДАВЦА-игрока: покупка сама по себе оборот не удваивает,
+    покупка у NPC-горожанина город не обогащает."""
+    import inspect
+    from bot.handlers import auction as h
+    src_buy = inspect.getsource(h._do_buy)
+    src_fill = inspect.getsource(h._do_fill)
+    assert 'fgoal.note("gold_trade"' in src_buy      # продавцу-игроку при выкупе лота
+    assert 'fgoal.note("gold_trade"' in src_fill     # продавцу при продаже в заявку
+    # у _do_buy запись строго внутри ветки живого продавца (NPC → None → мимо)
+    branch = src_buy.split("if seller is not None:")[1].split("order.qty")[0]
+    assert 'fgoal.note' in branch
