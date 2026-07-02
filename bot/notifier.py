@@ -761,10 +761,11 @@ async def _notify_returned(bot: Bot) -> None:
             _gs = _fg2.state(world, now)
             _goal_line = (f"Цель недели: {_gs['done']}/{_gs['target']} ({_gs['pct']}%)."
                           + (" Город гуляет!" if _gs["feast"] else ""))
+            _rline = _rum.last_text()
             npc_post = town_npc.watchman_post(
                 cnt, any(b.status == "active" for b in live_raids),
                 worldevent.event_name(world) if hasattr(worldevent, "event_name") else None,
-                _goal_line)
+                _goal_line + ((" " + _rline) if _rline else ""))
         elif (now.hour == 9 and now.minute == 5
               and town_npc._once_per_day(world, "dealer", now)):
             from bot.game import production as _pr

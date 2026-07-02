@@ -34,6 +34,7 @@ _TEMPLATES = {
 _pending: deque = deque(maxlen=30)      # (ts, player_id, chat_id, text)
 _last_by_player: dict[int, float] = {}
 _last_flush = 0.0
+_last_text: str | None = None           # последний вышедший слух (цитирует стражник)
 
 
 def note(kind: str, player, gold: int) -> bool:
@@ -55,11 +56,17 @@ def note(kind: str, player, gold: int) -> bool:
 
 async def flush(session, repo) -> str | None:
     """Выпустить один слух в летопись города (зовёт нотифаер каждый тик)."""
-    global _last_flush
+    global _last_flush, _last_text
     now = time.time()
     if not _pending or now - _last_flush < RUMOR_EVERY_MIN * 60:
         return None
     _ts, _pid, chat_id, text = _pending.popleft()
     _last_flush = now
+    _last_text = text
     await repo.add_chronicle(session, chat_id, text)
     return text
+
+
+def last_text() -> str | None:
+    """Последний вышедший слух — для вечерней сводки стражника."""
+    return _last_text

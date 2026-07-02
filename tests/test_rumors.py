@@ -52,3 +52,26 @@ def test_flush_throttles():
     assert out2 is None
     assert len(lines) == 1 and len(rumors._pending) == 1
     _reset()
+
+
+def test_bourse_sales_wired_to_rumors():
+    """Жалоба: продажа на бирже 200+ 🪙 не рождала слух — теперь подключено."""
+    import inspect
+    from bot.handlers import auction as h
+    assert 'rumors.note("trade"' in inspect.getsource(h._do_buy)
+    assert 'rumors.note("trade"' in inspect.getsource(h._do_fill)
+
+
+def test_last_text_remembered():
+    _reset()
+    rumors.note("trade", _pl(pid=77), 400)
+    lines: list = []
+
+    class _Repo:
+        @staticmethod
+        async def add_chronicle(_s, chat_id, text):
+            lines.append(text)
+
+    out = asyncio.run(rumors.flush(None, _Repo))
+    assert out and rumors.last_text() == out
+    _reset()
