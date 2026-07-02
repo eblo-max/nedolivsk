@@ -1194,6 +1194,29 @@ body {
 .lb-err { display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 0 6px; }
 .lb-err .btn { width:auto; padding:9px 18px; }
 
+/* события черт в бою (фаза C): всплывающие бейджи над ареной */
+.ep-events { position:absolute; inset:0; pointer-events:none; z-index:6; }
+.ep-ev { position:absolute; top:34%; padding:4px 10px; border-radius:999px;
+  font-family:system-ui,sans-serif; font-size:12px; font-weight:800; letter-spacing:.2px;
+  background:rgba(12,9,5,.82); border:1px solid rgba(231,191,99,.35); color:#f1e6c8;
+  animation:ep-ev-rise 1.35s cubic-bezier(.2,.8,.3,1) both; white-space:nowrap;
+  box-shadow:0 4px 14px -4px rgba(0,0,0,.7); }
+.ep-ev.foe { left:8%; }
+.ep-ev.hero { right:8%; }
+.ep-ev.hero ~ .ep-ev.hero, .ep-ev.foe ~ .ep-ev.foe { top:46%; }
+.ep-ev.danger { border-color:#e0726a; color:#ffb4ad; }
+.ep-ev.warn { border-color:#e7b54a; color:#ffe9a8; }
+.ep-ev.heal { border-color:#67c97a; color:#a4e0a8; }
+.ep-ev.block { border-color:#9fb4d0; color:#d6e2f5; }
+@keyframes ep-ev-rise {
+  0% { opacity:0; transform:translateY(14px) scale(.85); }
+  18% { opacity:1; transform:translateY(0) scale(1.04); }
+  30% { transform:translateY(0) scale(1); }
+  78% { opacity:1; }
+  100% { opacity:0; transform:translateY(-16px); }
+}
+@media (prefers-reduced-motion: reduce) { .ep-ev { animation:none; opacity:.95; } }
+
 /* фляга (фаза B): выбор порций из погреба перед боем */
 .flask-row { display:flex; flex-wrap:wrap; gap:6px; }
 .flask-opt { flex:1 1 30%; min-width:96px; display:flex; flex-direction:column; align-items:center; gap:2px;

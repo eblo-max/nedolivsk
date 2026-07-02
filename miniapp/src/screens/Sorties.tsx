@@ -33,7 +33,12 @@ interface HuntState {
   flask?: { slots: number; options: FlaskOpt[] }
 }
 interface FlaskOpt { key: string; name: string; emoji: string; label: string; qty: number }
-interface Round { pd: number; crit: boolean; miss: boolean; ed: number; php: number; ehp: number }
+interface Round {
+  pd: number; crit: boolean; miss: boolean; ed: number; php: number; ehp: number
+  burn?: number; stunned?: boolean; stun_next?: boolean; volley?: boolean
+  lifesteal?: number; enrage?: boolean; charge?: boolean; plated?: boolean
+  stoneskin?: boolean; chill?: number
+}
 interface FightRes {
   ok: boolean; win: boolean; elite: boolean; enemy: { name: string; emoji: string; hp: number; sprite?: string; traits?: string[] }
   player_hp0: number; hp_max: number; rounds: Round[]; rounds_n: number; crits: number; overwhelmed: boolean
@@ -41,11 +46,25 @@ interface FightRes {
   gold_lost: number; hp_now: number; hunt: HuntState; flask?: string[]
 }
 
-const TRAIT: Record<string, string> = { venom: '☠ ядовит', evasive: '💨 увёртлив' }
+const TRAIT: Record<string, string> = {
+  venom: '☠ ядовит', evasive: '💨 увёртлив', charge: '📯 наскок', enrage: '💢 ярость',
+  lifesteal: '🧛 кровосос', plated: '🛡 латы', volley: '🏹 дуплет', stoneskin: '🗿 камен. кожа',
+  pickpocket: '💰 карманник', burn: '🔥 жар', stun: '🌀 сотрясение', chill: '🥶 стужа',
+}
 // полные тактические подсказки (как _TRAIT_HINT бота)
 const TRAIT_HINT: Record<string, string> = {
-  venom: '☠ Ядовит — бьёт сквозь броню (она бесполезна). Спасает уворот (удача) или быстрый занос уроном/критом.',
-  evasive: '💨 Увёртлив — уводит часть твоих ударов. Броня не добьёт его: нужен высокий урон/крит.',
+  venom: '☠ Ядовит — бьёт сквозь броню. Спасает сбитень-антидот из фляги, уворот или быстрый занос.',
+  evasive: '💨 Увёртлив — уводит часть твоих ударов. Нужен запас урона/крита.',
+  charge: '📯 Наскок — первые раунды бьёт в полтора раза злее. Возьми запас здоровья и переживи разгон.',
+  enrage: '💢 Ярость — на последней трети здоровья звереет. Добивай быстро: эль и крит в флягу.',
+  lifesteal: '🧛 Кровосос — лечится твоей кровью. Уворачивайся (мёд) и бей на убой.',
+  plated: '🛡 Латы — твои криты о него гаснут. Решает только чистый урон.',
+  volley: '🏹 Дуплет — каждый третий раунд стреляет дважды. Держи броню и уворот.',
+  stoneskin: '🗿 Каменная кожа — криты не множатся. Стакай сырой урон.',
+  pickpocket: '💰 Карманник — проиграешь: обчистит вдвое. Победишь: заберёшь с наваром.',
+  burn: '🔥 Жар — каждый твой удар обжигает сквозь броню. Кончай бой быстро, бери здоровье.',
+  stun: '🌀 Сотрясение — четвёртый удар оглушает (пропустишь свой). Спасает уворот.',
+  chill: '🥶 Стужа — укусы морозят руки: урон тает. Затяжной бой — смерть.',
 }
 const threatCls = (w: number) => (w >= 70 ? 'g' : w >= 40 ? 'y' : w >= 10 ? 'o' : 'r')
 const hm = (m: number) => { const h = Math.floor(m / 60), mm = m % 60; return h ? `${h} ч ${mm} мин` : `${mm} мин` }
@@ -459,10 +478,33 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
     ], { duration: big ? 460 : 200, easing: 'ease-out' })
   }, [step, r, done, fight.win])
 
+  // события черт текущего раунда → всплывающие бейджи (кто: foe|hero)
+  const events: { txt: string; side: 'foe' | 'hero'; cls: string }[] = []
+  if (r) {
+    if (r.charge) events.push({ txt: '📯 наскок!', side: 'foe', cls: 'warn' })
+    if (r.enrage) events.push({ txt: '💢 РАЗЪЯРИЛСЯ!', side: 'foe', cls: 'danger' })
+    if (r.volley) events.push({ txt: '🏹 дуплет ×2', side: 'foe', cls: 'warn' })
+    if (r.lifesteal) events.push({ txt: `🧛 +${r.lifesteal}`, side: 'foe', cls: 'heal' })
+    if (r.plated) events.push({ txt: '🛡 крит погашен', side: 'foe', cls: 'block' })
+    if (r.stoneskin) events.push({ txt: '🗿 крит не множится', side: 'foe', cls: 'block' })
+    if (r.burn) events.push({ txt: `🔥 ожог −${r.burn}`, side: 'hero', cls: 'danger' })
+    if (r.stunned) events.push({ txt: '🌀 оглушён!', side: 'hero', cls: 'danger' })
+    if (r.stun_next) events.push({ txt: '🌀 звенит в голове…', side: 'hero', cls: 'warn' })
+    if (r.chill) events.push({ txt: `🥶 стужа ×${r.chill}`, side: 'hero', cls: 'warn' })
+  }
+
   return (
     <div className="ep">
       <button className="lnk-back" onClick={onClose}>‹ Назад</button>
       <div className={`ep-arena ${fight.elite ? 'elite' : ''}`} ref={arenaRef}>
+        {events.length > 0 && (
+          <div className="ep-events" key={step} aria-hidden>
+            {events.map((e, i) => (
+              <span key={i} className={`ep-ev ${e.side} ${e.cls}`}
+                style={{ animationDelay: `${i * 0.12}s` }}>{e.txt}</span>
+            ))}
+          </div>
+        )}
         <div className="ep-embers" aria-hidden="true">
           {Array.from({ length: 9 }).map((_, i) => <i key={i} style={{ left: `${7 + i * 10.5}%`, animationDelay: `${i * 0.5}s`, animationDuration: `${4 + (i % 3)}s` }} />)}
         </div>

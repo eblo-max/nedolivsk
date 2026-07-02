@@ -51,70 +51,76 @@ ENEMIES = [
     Enemy("lisa", "🗿", "Горгулья", 22, 8, 0, (10, 22),
           (Drop("game", 2, 4), Drop("herbs", 2, 3, 22)),
           blurb="Каменная пакость с погоста. Юркая, да хрупкая.", video=""),
-    Enemy("gadyuka", "🐍", "Медуза", 23, 9, 0, (15, 30),
+    Enemy("gadyuka", "🐍", "Медуза", 22, 9, 0, (15, 30),
           (Drop("herbs", 3, 6), Drop("game", 2, 3, 12)),
           blurb="Ядовита — броня не спасёт, только уворот (удача). Яд идёт в зелья.",
           video="", traits=("venom",)),
-    Enemy("olen", "🐎", "Кентавр", 99, 17, 1, (22, 40),
+    Enemy("olen", "🐎", "Кентавр", 75, 17, 1, (22, 40),
           (Drop("game", 6, 10), Drop("herbs", 3, 5, 25),
            Drop("hide", 1, 2, 35), Drop("sinew", 1, 2, 20)),
-          blurb="Силён телом, да отпор слабоват. Шкура и жилы идут в дело.", video=""),
+          blurb="Наскок: первые раунды бьёт вдвое злее — переживи разгон.",
+          video="", traits=("charge",)),
     Enemy("volk", "🐺", "Цербер", 75, 13, 2, (20, 38),
           (Drop("game", 4, 7), Drop("herbs", 2, 4, 15),
            Drop("fang", 1, 2, 30), Drop("sinew", 1, 2, 25)),
           blurb="Адский пёс — кусает всерьёз и юлит. Броня не добьёт, нужен урон.",
           video="", traits=("evasive",)),
-    Enemy("kaban", "🐂", "Минотавр", 91, 14, 6, (30, 60),
+    Enemy("kaban", "🐂", "Минотавр", 82, 14, 6, (30, 60),
           (Drop("game", 7, 12), Drop("herbs", 3, 5, 20),
            Drop("hide", 1, 2, 30), Drop("fang", 1, 1, 20)),
-          blurb="Рога и толстая шкура. Крит пробивает, топор рубит.", video=""),
-    Enemy("upyr", "🧟", "Кладбищенский Упырь", 170, 22, 3, (32, 62),
+          blurb="Ярость: при последней трети здоровья звереет — добивай быстро.",
+          video="", traits=("enrage",)),
+    Enemy("upyr", "🧟", "Кладбищенский Упырь", 135, 20, 3, (32, 62),
           (Drop("game", 6, 10), Drop("hide", 1, 2, 30), Drop("sinew", 1, 2, 25)),
-          rep=1, video="",
-          blurb="Мостик к сильным тварям: жилист, но компонентная снаряга берёт."),
-    Enemy("vozhak", "💀", "Скелет-латник", 289, 33, 4, (60, 115),
+          rep=1, video="", traits=("lifesteal",),
+          blurb="Кровосос: лечится твоей кровью — уворачивайся и бей на убой."),
+    Enemy("vozhak", "💀", "Скелет-латник", 254, 31, 4, (60, 115),
           (Drop("game", 8, 14), Drop("ore", 3, 5, 18),
            Drop("fang", 1, 2, 60), Drop("hide", 1, 2, 25)),
-          rep=1, video="", blurb="Восставший вояка в ржавой броне. Клыки знатные."),
-    Enemy("medved", "🪨", "Каменный Голем", 418, 42, 8, (70, 140),
+          rep=1, video="", traits=("plated",),
+          blurb="Латы: криты о него гаснут — тут решает чистый урон."),
+    Enemy("medved", "🪨", "Каменный Голем", 368, 39, 8, (70, 140),
           (Drop("game", 10, 16), Drop("honey", 3, 6),
            Drop("hide", 2, 3, 60), Drop("fang", 1, 1, 20)),
-          rep=1, blurb="Глыба на ножках. Задавит неподготовленного.",
+          rep=1, traits=("stoneskin",),
+          blurb="Каменная кожа: криты не множатся — стакай сырой урон.",
           video=""),
     Enemy("razboy", "👺", "Гоблин-головорез", 402, 42, 6, (120, 220),
           (Drop("ore", 4, 8), Drop("herbs", 4, 8),
            Drop("fang", 1, 2, 40)),
-          rep=2, video="", blurb="С дубьём и злой. Только для крепкого бойца."),
-    Enemy("ataman", "🐉", "Дракон", 848, 83, 13, (280, 520),
+          rep=2, video="", traits=("pickpocket",),
+          blurb="Карманник: проиграешь — обчистит вдвое; побьёшь — заберёшь с наваром."),
+    Enemy("ataman", "🐉", "Дракон", 780, 78, 13, (280, 520),
           (Drop("ore", 8, 14), Drop("clay", 6, 10, 40),
            Drop("ring", 1, 1, 25)),
-          rep=4, blurb="Гроза тракта. С него — перстень-диковина.",
+          rep=4, traits=("burn",),
+          blurb="Жар: каждый твой удар обжигает сквозь броню — кончай бой быстро.",
           video=""),
     # ═══ РЕГИОНАЛЬНЫЕ МОНСТРЫ (Фаза 4): эксклюзив региона, каждый — свой архетип
     # и свой компонент (мех/клык/хитин) для регионального пояса. Сложность
     # паритетная (см. шлюз в симуляторе). Видео нет → фолбэк на картинку охоты.
-    Enemy("lynx", "🦅", "Гарпия", 186, 32, 1, (55, 110),
+    Enemy("lynx", "🦅", "Гарпия", 192, 33, 1, (55, 110),
           (Drop("game", 4, 7), Drop("fang", 1, 2, 30), Drop("pelt", 1, 2, 40)),
           rep=1, region="north_wilds", traits=("evasive",), video="",
           blurb="Тайга. Стремительна — уводит удары; нужен высокий урон/крит."),
-    Enemy("tusker", "🐐", "Сатир-лучник", 315, 27, 8, (60, 120),
+    Enemy("tusker", "🐐", "Сатир-лучник", 273, 25, 8, (60, 120),
           (Drop("game", 8, 12), Drop("hide", 1, 2, 35), Drop("tusk", 1, 2, 40)),
-          rep=1, region="green_valleys", video="",
-          blurb="Долины. Бронированный лесовик — сырой урон вязнет, крит пробивает."),
+          rep=1, region="green_valleys", video="", traits=("volley",),
+          blurb="Долины. Дуплет: каждый третий раунд стреляет дважды — держи броню."),
     # ═══ ВЕРХНИЙ ЯРУС (боевой пересмотр): контент для орочьего сета и рейд-BiS.
     # Раньше после атамана игра «заканчивалась» — топ-билды имели 100% везде.
-    Enemy("ogr", "🗿", "Каменный Огр", 1016, 76, 10, (240, 430),
+    Enemy("ogr", "🗿", "Каменный Огр", 963, 73, 10, (240, 430),
           (Drop("stone", 6, 10), Drop("ore", 5, 9), Drop("ring", 1, 1, 12)),
-          rep=3, video="",
-          blurb="Ходячая скала с дубиной-сосной. Только для латников орды."),
+          rep=3, video="", traits=("stun",),
+          blurb="Сотрясение: четвёртый удар оглушает — уворот спасает от гула в голове."),
     Enemy("wyvern", "🐲", "Виверна", 1131, 87, 8, (340, 620),
           (Drop("fang", 2, 3, 80), Drop("herbs", 6, 10), Drop("ring", 1, 1, 18)),
           rep=4, traits=("evasive",), video="",
           blurb="Крылатая бестия — юлит в небе, рвёт когтями. Гроза ветеранов."),
     Enemy("lich", "💀", "Костяной Лич", 888, 58, 14, (420, 760),
           (Drop("ingot", 2, 3, 60), Drop("herbs", 8, 12), Drop("ring", 1, 1, 22)),
-          rep=5, traits=("venom",), video="",
-          blurb="Древняя нежить: чары бьют сквозь любую броню. Вершина охоты."),
+          rep=5, traits=("venom", "chill"), video="",
+          blurb="Яд сквозь броню и стужа, вымораживающая руки. Вершина охоты."),
     Enemy("scorpion", "🧙", "Ведьма Пустошей", 194, 21, 7, (55, 110),
           (Drop("herbs", 3, 6), Drop("fang", 1, 1, 25), Drop("chitin", 1, 2, 45)),
           rep=1, region="red_wastes", traits=("venom",), video="",
@@ -221,29 +227,77 @@ def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
     ehp = enemy.hp
     rounds = crits = dealt = 0
     log: list = []
+    # ── состояние черт (фаза C): каждая читается, контрится и видна в логе ──
+    stunned = False          # 🌀 сотрясение: пропускаешь СВОЙ следующий удар
+    chill_stacks = 0         # 🥶 стужа: −1 урона за её укус (пол — доля от базы)
+    enemy_hits = 0           # счётчик УСПЕШНЫХ ударов зверя (для сотрясения)
+    enraged = False          # 💢 ярость включилась (для лога-вспышки)
     while ehp > 0 and php > 0 and rounds < balance.HUNT_MAX_ROUNDS:
         rounds += 1
+        ev: dict = {}                                     # события раунда для анимации
         # — твой удар —
+        cur_dmg = dmg
+        if chill_stacks:                                  # стужа копится, но есть пол
+            cur_dmg = max(int(dmg * balance.TRAIT_CHILL_MAX_FRAC), dmg - chill_stacks)
         crit = rng.randint(1, 100) <= crit_pct
+        if crit and "plated" in traits:                   # 🛡 латы: крит гаснет целиком
+            crit = False
+            ev["plated"] = True
         miss = "evasive" in traits and rng.random() < balance.HUNT_EVASION   # увёртливый ушёл
-        if miss:
+        if stunned:                                       # оглушён — удар пропал
+            hit, crit, miss = 0, False, False
+            ev["stunned"] = True
+            stunned = False
+        elif miss:
             hit, crit = 0, False
         else:
-            base = dmg if crit else max(1, dmg - enemy.armor)   # КРИТ пробивает броню зверя
+            base = cur_dmg if crit else max(1, cur_dmg - enemy.armor)  # КРИТ пробивает броню
             hit = max(1, round(base * rng.uniform(1 - v, 1 + v)))
             if crit:
-                hit *= 2
+                if "stoneskin" in traits:                 # 🗿 каменная кожа: крит не ×2
+                    ev["stoneskin"] = True
+                else:
+                    hit *= 2
                 crits += 1
+            if "burn" in traits:                          # 🔥 жар: ожог за каждый твой удар
+                php -= balance.TRAIT_BURN
+                ev["burn"] = balance.TRAIT_BURN
         ehp -= hit
         dealt += hit
         # — ответ зверя (только если жив: добил — он уже не бьёт) —
         ed = 0
-        if ehp > 0:
-            if rng.randint(1, 100) > dodge_pct:                 # удача → уворот, иначе бьёт
-                ed = max(1, round(enemy.attack * mit * tmult * rng.uniform(1 - v, 1 + v)))
+        if ehp > 0 and php > 0:
+            atk = enemy.attack
+            if "charge" in traits and rounds <= balance.TRAIT_CHARGE_ROUNDS:   # 📯 наскок
+                atk *= balance.TRAIT_CHARGE_MULT
+                ev["charge"] = True
+            if "enrage" in traits and ehp <= enemy.hp * balance.TRAIT_ENRAGE_PCT:  # 💢 ярость
+                atk *= balance.TRAIT_ENRAGE_MULT
+                if not enraged:
+                    enraged = ev["enrage"] = True
+            strikes = 1
+            if "volley" in traits and rounds % balance.TRAIT_VOLLEY_EVERY == 0:    # 🏹 дуплет
+                strikes = 2
+                ev["volley"] = True
+            for _ in range(strikes):
+                if rng.randint(1, 100) > dodge_pct:       # удача → уворот, иначе бьёт
+                    one = max(1, round(atk * mit * tmult * rng.uniform(1 - v, 1 + v)))
+                    ed += one
+                    enemy_hits += 1
+                    if "lifesteal" in traits:             # 🧛 кровосос: лечится от укуса
+                        heal = int(one * balance.TRAIT_LIFESTEAL)
+                        if heal:
+                            ehp = min(enemy.hp, ehp + heal)
+                            ev["lifesteal"] = ev.get("lifesteal", 0) + heal
+                    if "chill" in traits:                 # 🥶 стужа: укус морозит руки
+                        chill_stacks += 1
+                        ev["chill"] = chill_stacks
+                    if "stun" in traits and enemy_hits % balance.TRAIT_STUN_EVERY == 0:
+                        stunned = True                    # 🌀 следующий твой удар пропадёт
+                        ev["stun_next"] = True
             php -= ed
         log.append({"pd": hit, "crit": crit, "miss": miss, "ed": ed,
-                    "php": max(0, php), "ehp": max(0, ehp)})
+                    "php": max(0, php), "ehp": max(0, ehp), **ev})
     won = ehp <= 0                          # добил зверя (бьёшь первым → при равной гонке твой)
     overwhelmed = (not won) and php > 0     # выжил, но не успел добить за лимит раундов
     hp_left = max(1, php) if won else 0
@@ -473,6 +527,8 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None,
     if fight.win:
         loot = roll_loot(enemy, stats.get("luck", 0), rng)
         loot["gold"] = int(loot["gold"] * buff.hunt_gold_mult(player))  # «Звериный нюх»
+        if "pickpocket" in getattr(enemy, "traits", ()):   # 💰 обчистил карманника — навар
+            loot["gold"] = int(loot["gold"] * (1 + balance.TRAIT_PICKPOCKET_WIN_BONUS))
         player.gold += loot["gold"]
         economy.record(player, "hunt", loot["gold"])
         for r, q in loot["res"].items():
@@ -489,6 +545,8 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None,
                           flask=flask_labels)
 
     lost = player.gold // balance.HUNT_LOSS_GOLD_DIV  # щепотка золота при поражении
+    if "pickpocket" in getattr(enemy, "traits", ()):       # 💰 карманник обчистил тебя
+        lost *= balance.TRAIT_PICKPOCKET_LOSE_MULT
     player.gold -= lost
     economy.record(player, "hunt", -lost)
     player.hp = balance.HP_LOSS_FLOOR
