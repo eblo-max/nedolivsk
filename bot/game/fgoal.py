@@ -14,13 +14,17 @@ from datetime import datetime, timezone
 FEAST_RETAIL_MULT = 1.15      # «город гуляет»: сбыт гостям жирнее
 FEAST_HOURS = 24
 
-# Ротация целей по фракциям: (фракция, вид, цель недели, как звучит)
+# Ротация целей по фракциям:
+# (фракция, вид, цель, эмблема, короткий титул, задача, анонс в чаты)
 GOALS = [
-    ("merchants", "gold_trade", 1500,
+    ("merchants", "gold_trade", 1500, "⚜️", "Неделя оборота",
+     "Наторгуйте {target} 🪙 всем городом — купцы, гости, аукцион",
      "⚜️ Купеческая лига объявила неделю оборота: наторгуйте с купцами и гостями {target} 🪙 всем городом!"),
-    ("watch", "hunt", 40,
+    ("watch", "hunt", 40, "🛡", "Большая облава",
+     "Одолейте {target} тварей на охоте всем городом",
      "🛡 Стража объявила облаву: одолейте {target} тварей на охоте всем городом!"),
-    ("thieves", "night", 600,
+    ("thieves", "night", 600, "🥷", "Ночь длинных теней",
+     "Принесите {target} 🪙 добра из ночных ходок всем городом",
      "🥷 Гильдия скликает тени: принесите из ночных ходок добра на {target} 🪙 всем городом!"),
 ]
 
@@ -38,9 +42,10 @@ def current_goal(now: datetime | None = None) -> dict:
     """Цель этой недели (детерминированная ротация по номеру недели)."""
     now = now or datetime.now(timezone.utc)
     _y, w, _ = now.isocalendar()
-    fac, kind, target, tpl = GOALS[w % len(GOALS)]
-    return {"week": week_key(now), "fac": fac, "kind": kind,
-            "target": target, "text": tpl.format(target=target)}
+    fac, kind, target, emblem, title, task, tpl = GOALS[w % len(GOALS)]
+    return {"week": week_key(now), "fac": fac, "kind": kind, "target": target,
+            "emblem": emblem, "title": title, "task": task.format(target=target),
+            "text": tpl.format(target=target)}
 
 
 def note(kind: str, amount: int) -> None:
@@ -98,6 +103,7 @@ def state(world, now: datetime | None = None) -> dict:
     st = (world.market or {}).get("fgoal") or {}
     done = int(st.get("done", 0)) if st.get("week") == goal["week"] else 0
     return {"fac": goal["fac"], "text": goal["text"],
+            "emblem": goal["emblem"], "title": goal["title"], "task": goal["task"],
             "done": min(done, goal["target"]), "target": goal["target"],
             "pct": min(100, round(done * 100 / goal["target"])),
             "feast": feast_mult() > 1.0}

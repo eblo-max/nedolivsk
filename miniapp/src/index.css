@@ -1100,19 +1100,50 @@ body {
 .cf-val { font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:12px; color:#b7a587; width:34px; text-align:right; flex:none; }
 
 /* ── ссылка «Летопись» в карточке Город ── */
-/* цель недели: гравюра с золотой лентой прогресса; пир — тёплое свечение */
-.fgoal { margin:8px 0 2px; padding:9px 11px; border-radius:12px;
-  background:linear-gradient(180deg, rgba(212,164,76,.07), rgba(0,0,0,.18));
-  border:1px solid rgba(212,164,76,.22); }
-.fgoal.feast { border-color:rgba(212,164,76,.55);
-  box-shadow:0 0 18px rgba(212,164,76,.18), inset 0 0 18px rgba(212,164,76,.07); }
-.fgoal-t { font-size:12.5px; line-height:1.35; color:var(--ink); }
-.fgoal-bar { margin-top:7px; height:6px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; }
-.fgoal-bar i { display:block; height:100%; border-radius:99px;
-  background:linear-gradient(90deg, #8a6420, var(--gold), #ffd98a);
-  box-shadow:0 0 8px rgba(212,164,76,.5); transition:width .6s ease; }
-.fgoal-n { margin-top:4px; font-size:11px; color:var(--gold-2);
-  font-variant-numeric:tabular-nums; text-align:right; }
+/* ЦЕЛЬ НЕДЕЛИ — квест-баннер: медальон фракции, толстая полоса с бегущим
+   бликом и счётом внутри, фракционный акцент; пир — золотая пульсация */
+.fgoal { --fga:#e8a74a; --fga2:#ffd98a; position:relative; margin:10px 0 4px;
+  padding:11px 12px 12px; border-radius:14px; overflow:hidden;
+  background:linear-gradient(135deg, rgba(255,255,255,.045), rgba(0,0,0,.28));
+  border:1px solid rgba(255,255,255,.1); }
+.fgoal::before { content:''; position:absolute; inset:0 auto 0 0; width:3px;
+  background:linear-gradient(180deg, var(--fga), transparent); }
+.fgoal.f-watch { --fga:#7fa7d9; --fga2:#bcd6f5; }
+.fgoal.f-thieves { --fga:#a98be0; --fga2:#d7c6f7; }
+.fg-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.fg-badge { font-size:9.5px; font-weight:800; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--fga2); background:color-mix(in srgb, var(--fga) 16%, transparent);
+  border:1px solid color-mix(in srgb, var(--fga) 45%, transparent);
+  border-radius:999px; padding:3px 9px; }
+.fg-reward { font-size:10.5px; color:var(--ink-dim); }
+.fg-main { display:flex; gap:11px; align-items:center; }
+.fg-emblem { flex:0 0 auto; width:40px; height:40px; display:grid; place-items:center;
+  font-size:21px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--fga) 28%, transparent), rgba(0,0,0,.4));
+  border:1px solid color-mix(in srgb, var(--fga) 55%, transparent);
+  box-shadow:0 0 14px color-mix(in srgb, var(--fga) 30%, transparent); }
+.fg-tx { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.fg-title { font-size:15px; font-weight:800; letter-spacing:.2px; color:#fff; }
+.fg-task { font-size:12px; line-height:1.35; color:var(--ink-dim); }
+.fg-bar { position:relative; margin-top:10px; height:16px; border-radius:99px;
+  background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.08); overflow:hidden; }
+.fg-bar i { position:absolute; inset:0 auto 0 0; border-radius:99px;
+  background:linear-gradient(90deg, color-mix(in srgb, var(--fga) 55%, #000), var(--fga), var(--fga2));
+  box-shadow:0 0 12px color-mix(in srgb, var(--fga) 60%, transparent);
+  transition:width .8s cubic-bezier(.2,.8,.2,1); }
+.fg-bar i::after { content:''; position:absolute; inset:0; border-radius:99px;
+  background:linear-gradient(105deg, transparent 38%, rgba(255,255,255,.35) 50%, transparent 62%);
+  background-size:220% 100%; animation:fgsheen 2.6s linear infinite; }
+@keyframes fgsheen { from { background-position:130% 0 } to { background-position:-90% 0 } }
+.fg-bar em { position:relative; z-index:1; display:grid; place-items:center; height:100%;
+  font-style:normal; font-size:10.5px; font-weight:800; letter-spacing:.4px; color:#fff;
+  text-shadow:0 1px 2px rgba(0,0,0,.8); font-variant-numeric:tabular-nums; }
+.fgoal.feast { border-color:rgba(232,167,74,.6);
+  box-shadow:0 0 22px rgba(232,167,74,.22), inset 0 0 22px rgba(232,167,74,.08);
+  animation:fgfeast 2.4s ease-in-out infinite; }
+@keyframes fgfeast { 0%,100% { box-shadow:0 0 16px rgba(232,167,74,.18), inset 0 0 18px rgba(232,167,74,.06) }
+  50% { box-shadow:0 0 28px rgba(232,167,74,.34), inset 0 0 26px rgba(232,167,74,.12) } }
+@media (prefers-reduced-motion: reduce) { .fg-bar i::after, .fgoal.feast { animation:none } }
 .chron-open { margin-top:12px; width:100%; background:none; border:1px dashed var(--brass-d,#5a4326); border-radius:11px;
   padding:9px; cursor:pointer; font-family:var(--text),system-ui,sans-serif; font-size:13px; color:var(--gold,#f0b859);
   -webkit-tap-highlight-color:transparent; transition:background .14s; }

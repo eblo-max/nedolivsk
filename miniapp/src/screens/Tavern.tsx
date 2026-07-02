@@ -44,7 +44,7 @@ interface TavernState {
   story?: StoryData | null
   world_event?: WorldEvent | null
   city?: CityData | null
-  fgoal?: { fac: string; text: string; done: number; target: number; pct: number; feast: boolean } | null
+  fgoal?: { fac: string; text: string; emblem?: string; title?: string; task?: string; done: number; target: number; pct: number; feast: boolean } | null
   trade?: TradeData | null
   raid?: RaidSummary | null
   admin?: boolean
@@ -75,7 +75,7 @@ const SAMPLE: TavernState = {
   world: ['🍂 Осень — спрос обычный', '🪓 Орда орков точит топоры на севере', '🏛 В городе тихо'],
   next_upgrade: { gold: 715, wood: 220, grain: 180, hops: 120 }, upgrade_pct: 60,
   world_event: { id: 'fashion', emoji: '🔥', name: 'Ажиотаж', blurb: 'Весь Недоливск помешался на одном товаре — он в цене, налетай!', good: 'butter', good_name: 'Масло', effects: [{ text: 'Масло ×1.5', good: true }] },
-  fgoal: { fac: 'merchants', text: '⚜️ Купеческая лига объявила неделю оборота: наторгуйте 1500 🪙 всем городом!', done: 830, target: 1500, pct: 55, feast: false },
+  fgoal: { fac: 'merchants', text: '', emblem: '⚜️', title: 'Неделя оборота', task: 'Наторгуйте 1500 🪙 всем городом — купцы, гости, аукцион', done: 830, target: 1500, pct: 55, feast: false },
   city: { mood: 18, mood_label: '🙂 доброе', situation: { emoji: '💰', label: 'Купеческий бум' }, factions: [{ id: 'merchants', name: 'Купеческая лига', power: 42 }, { id: 'thieves', name: 'Воровская гильдия', power: 20 }, { id: 'watch', name: 'Стража', power: -15 }] },
   raid: null, admin: true,   // DEV: нет живого рейда → видно админ-кнопку «Призвать босса»
   notif_unread: 3,
@@ -271,10 +271,22 @@ export default function Tavern() {
               </div>
             ) : <div className="muted" style={{ fontStyle: 'italic', fontFamily: 'var(--text)' }}>Тишь да гладь — фракции дремлют. Пока.</div>}
             {t.fgoal && (
-              <div className={`fgoal${t.fgoal.feast ? ' feast' : ''}`}>
-                <div className="fgoal-t">{t.fgoal.feast ? '🎉 Цель взята — город гуляет: сбыт +15%!' : t.fgoal.text}</div>
-                <div className="fgoal-bar"><i style={{ width: `${t.fgoal.pct}%` }} /></div>
-                <div className="fgoal-n">{t.fgoal.done} / {t.fgoal.target} · {t.fgoal.pct}%</div>
+              <div className={`fgoal f-${t.fgoal.fac}${t.fgoal.feast ? ' feast' : ''}`}>
+                <div className="fg-head">
+                  <span className="fg-badge">Цель недели</span>
+                  <span className="fg-reward">🍺 сутки пира · сбыт +15%</span>
+                </div>
+                <div className="fg-main">
+                  <span className="fg-emblem">{t.fgoal.emblem || '⚜️'}</span>
+                  <div className="fg-tx">
+                    <b className="fg-title">{t.fgoal.feast ? 'Город гуляет!' : (t.fgoal.title || 'Цель недели')}</b>
+                    <span className="fg-task">{t.fgoal.feast ? 'Цель взята — сутки сбыт гостям +15%. Наливай!' : t.fgoal.task}</span>
+                  </div>
+                </div>
+                <div className="fg-bar">
+                  <i style={{ width: `${Math.max(t.fgoal.pct, 3)}%` }} />
+                  <em>{t.fgoal.done} / {t.fgoal.target} · {t.fgoal.pct}%</em>
+                </div>
               </div>
             )}
             <button className="chron-open" onClick={() => { haptic('light'); setChronOpen(true) }}>📜 Летопись города →</button>
