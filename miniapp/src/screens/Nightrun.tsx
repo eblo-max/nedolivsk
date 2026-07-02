@@ -356,12 +356,17 @@ function NrIntro({ d, busy, onStart, flaskSel, onFlask }: {
       <p className="nr-flavor">«Когда город спит, тракт оживает. Иди во тьму — но знай меру: зарвёшься, и обчистят дочиста.»</p>
       <div className="nr-stats"><i>🛡 {d.stats.armor}</i><i>🍀 {d.stats.luck}</i></div>
       {cd <= 0 && (d.flask?.length ?? 0) > 0 && (
-        <div className="raid-flask">
-          <span className="raid-flask-h">🍺 Глоток на дорожку (до 2):</span>
+        <div className="nrf">
+          <div className="nrf-head">Глоток на дорожку · до двух</div>
           {d.flask!.map((f) => (
-            <button key={f.key} className={`raid-flask-chip${flaskSel.includes(f.key) ? ' on' : ''}`}
+            <button key={f.key} className={`nrf-chip${flaskSel.includes(f.key) ? ' on' : ''}`}
               onClick={() => { haptic('light'); onFlask(f.key) }}>
-              {f.emoji} {f.name} — {f.hint} <em>×{f.qty}</em>
+              <span className="nrf-ic">{f.emoji}</span>
+              <span className="nrf-tx">
+                <span className="nrf-nm">{f.name}</span>
+                <span className="nrf-hint">{f.hint}</span>
+              </span>
+              <em className="nrf-qty">×{f.qty}</em>
             </button>
           ))}
         </div>
