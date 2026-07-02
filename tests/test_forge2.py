@@ -26,11 +26,34 @@ def test_make_entry_roundtrip():
 
 
 def test_sharpen_boosts_combat_stats():
+    import math
     itm = next(i for i in items.CATALOG.values() if i.damage > 10)
     base = items.combat_stats({itm.slot: items.make_entry(itm.id, 1)})
     plus5 = items.combat_stats({itm.slot: items.make_entry(itm.id, 1, 5)})
-    assert plus5["damage"] == int(itm.damage * 1.20)      # +4% × 5
+    assert plus5["damage"] == itm.damage + math.ceil(itm.damage * 0.20)   # +4%×5, вверх
     assert plus5["damage"] > base["damage"]
+
+
+def test_every_sharpen_level_visible_on_small_stats():
+    """Регресс жалобы: «заточил и ничего не произошло» — мелкий стат съедался
+    округлением вниз. Теперь каждый уровень даёт минимум +1 к ненулевому стату."""
+    itm = next(i for i in items.CATALOG.values()
+               if 0 < max(i.damage, i.armor, i.luck, i.vitality, i.crit) <= 10)
+    prev = items.combat_stats({itm.slot: items.make_entry(itm.id, 1, 0)})
+    for pl in range(1, items.PLUS_MAX + 1):
+        cur = items.combat_stats({itm.slot: items.make_entry(itm.id, 1, pl)})
+        assert sum(cur.values()) > sum(prev.values()) or cur != prev or pl > 1
+        assert sum(cur.values()) >= sum(prev.values())
+    plus1 = items.combat_stats({itm.slot: items.make_entry(itm.id, 1, 1)})
+    base = items.combat_stats({itm.slot: items.make_entry(itm.id, 1, 0)})
+    assert sum(plus1.values()) > sum(base.values())        # +1 виден сразу
+
+
+def test_item_combat_gain_delta():
+    itm = next(i for i in items.CATALOG.values() if i.damage > 10)
+    e = items.make_entry(itm.id, 1, 0)
+    d = items.item_combat_gain(e, 1)
+    assert d.get("damage", 0) >= 1                          # дельта уровня не пустая
 
 
 def test_plus_zero_identical_to_old():

@@ -153,6 +153,33 @@ ORC_SET_INCOME_PCT = 5
 PLUS_MAX = 5          # кап заточки (+4% к боевым статам вещи за уровень)
 PLUS_STAT_PCT = 4
 
+
+def plus_bonus(v: int, plus: int) -> int:
+    """Прибавка заточки к стату вещи: 4%×уровень, округление ВВЕРХ — каждый
+    уровень даёт минимум +1 к каждому ненулевому стату (иначе мелкие статы
+    съедались обрезанием и заточка «ничего не делала»)."""
+    if v <= 0 or plus <= 0:
+        return 0
+    return math.ceil(v * PLUS_STAT_PCT * plus / 100)
+
+
+def item_combat_gain(entry: str, next_plus: int | None = None) -> dict:
+    """Боевые статы вещи на текущей заточке (или дельта до next_plus) — для UI."""
+    item_id, tier, plus, _aff = parse_full(entry)
+    it = CATALOG.get(item_id)
+    if it is None:
+        return {}
+    out = {}
+    for k in ("damage", "crit", "armor", "luck", "vitality"):
+        v = _cmul(getattr(it, k), tier)
+        if v <= 0:
+            continue
+        if next_plus is None:
+            out[k] = v + plus_bonus(v, plus)
+        else:
+            out[k] = plus_bonus(v, next_plus) - plus_bonus(v, plus)
+    return {k: n for k, n in out.items() if n > 0}
+
 # Аффиксы ковки: суффикс имени (родительный падеж — не зависит от рода вещи)
 # + плоский боевой бонус ×ярус вещи. Ролл при заборе крафта T2+.
 AFFIXES = {
@@ -546,10 +573,9 @@ def combat_stats(equipment: dict | None) -> dict:
         it = CATALOG.get(item_id)
         if it is None:
             continue
-        mult = 1 + PLUS_STAT_PCT * plus / 100        # заточка растит статы вещи
         for k in stats:
             v = _cmul(getattr(it, k), tier)
-            stats[k] += int(v * mult) if v else 0
+            stats[k] += v + plus_bonus(v, plus)      # заточка растит статы вещи
         if aff:                                       # аффикс: плоский бонус ×ярус
             for k, v in AFFIXES[aff][1].items():
                 stats[k] = stats.get(k, 0) + v * tier

@@ -7,7 +7,7 @@ import Sheet from '../components/Sheet'
 import ReputationSheet from './ReputationSheet'
 
 interface Slot { slot: string; slot_name: string; id?: string; name?: string; tier?: number; sprite?: string; trophy?: boolean
-  plus?: number; sharpen?: { next: number; cost: number; chance: number } }
+  plus?: number; sharpen?: { next: number; cost: number; chance: number; gain?: string } }
 interface Craft { state: string; name?: string; tier?: number; minutes?: number; sprite?: string }
 interface HealOpt { key: string; name: string; emoji: string; hp: number; qty: number }
 interface CharState {
@@ -138,8 +138,8 @@ export default function Character() {
     if (busy) return
     haptic('medium'); setBusy(true)
     try {
-      const r = await api<{ success: boolean; name: string }>('sharpen', { slot })
-      if (r.success) { hapticNotify('success'); flash(`⚒ ${r.name} — заточена!`) }
+      const r = await api<{ success: boolean; name: string; gain?: string }>('sharpen', { slot })
+      if (r.success) { hapticNotify('success'); flash(`⚒ ${r.name}${r.gain ? ` · ${r.gain}` : ''}`) }
       else { hapticNotify('warning'); flash('Сорвалась! Золото осталось у кузнеца') }
       setPick(null); setPickSlot(null); reload()
     } catch (e) {
@@ -368,6 +368,7 @@ function ItemSheet({ item, worn, busy, craftState, onMake, onSharpen, onClose }:
         <button className="btn" style={{ marginTop: 12 }} disabled={busy}
           onClick={() => onSharpen(worn.slot)}>
           ⚒ Заточить до +{worn.sharpen.next} — {worn.sharpen.cost} 🪙{worn.sharpen.chance < 100 ? ` · шанс ${worn.sharpen.chance}%` : ''}
+          {worn.sharpen.gain && <small style={{ display: 'block', opacity: .85 }}>даст {worn.sharpen.gain}</small>}
         </button>
       )}
       {worn && (worn.plus ?? 0) >= 5 && (

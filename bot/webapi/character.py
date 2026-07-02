@@ -7,6 +7,18 @@ from bot.db import repo
 from bot.db.base import session_factory
 from bot.webapi.core import _auth
 
+_GAIN_ICO = {"damage": "⚔", "crit": "💥%", "armor": "🛡", "luck": "🍀", "vitality": "❤"}
+
+
+def _gain_str(g: dict) -> str:
+    """{'armor': 1, 'luck': 1} → «+1 🛡 · +1 🍀» (что даст уровень заточки)."""
+    parts = []
+    for k, v in g.items():
+        ico = _GAIN_ICO.get(k, k)
+        parts.append(f"+{v} {ico.rstrip('%')}" + ("%" if ico.endswith("%") else ""))
+    return " · ".join(parts)
+
+
 def _character_state(p) -> dict:
     """Состояние Персонажа для мини-аппа — статы/снаряжение/кузница из тех же
     функций бота (items/combat/logic)."""
@@ -33,6 +45,7 @@ def _character_state(p) -> dict:
                     "next": nxt,
                     "cost": int(bal.SHARPEN_COST_GOLD[nxt] * it.TIER_ECON_MULT[tier]),
                     "chance": int(bal.SHARPEN_SUCCESS[nxt] * 100),
+                    "gain": _gain_str(it.item_combat_gain(entry, nxt)),
                 }
             slots.append(row)
         else:
@@ -203,9 +216,11 @@ async def _api_sharpen(request: web.Request) -> web.Response:
                      f"⚒ заточка {it.display_name(eq[slot])}: "
                      f"{'удача' if success else 'сорвалась'} (−{cost} 🪙)")
         await s.commit()
+        gain = _gain_str(it.item_combat_gain(entry, nxt)) if success else ""
         return web.json_response({
             "ok": True, "success": success, "plus": nxt if success else plus,
             "gold": int(p.gold), "name": it.display_name(eq[slot]),
+            "gain": gain,
         }, headers={"Cache-Control": "no-store"})
 
 
