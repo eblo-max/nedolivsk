@@ -66,3 +66,23 @@ def test_supply_only_on_deficit_and_price_styles():
     cheap = next(o for o in r3.orders if o["nid"] == -9001)
     fv = auc.fair_value(NS(market={}), cheap["good"])
     assert cheap["side"] == "buy" and cheap["unit"] <= int(fv * npct.CHEAP_MULT) + 1
+
+
+# ── Ф5: NPC-жители чата ──────────────────────────────────────────────────
+def test_watchman_post_facts_and_once_per_day():
+    import random
+    from bot.game import town_npc
+    txt = town_npc.watchman_post(7, True, "ярмарка", "Говорят, эль кислит.",
+                                 rng=random.Random(1))
+    assert "7 живых лотов" in txt and "Тварь у стен" in txt and "ярмарка" in txt
+    w = _world()
+    now = datetime(2026, 7, 1, 18, 15, tzinfo=timezone.utc)
+    assert town_npc._once_per_day(w, "watchman", now) is True
+    assert town_npc._once_per_day(w, "watchman", now) is False   # второй раз — молчит
+
+
+def test_dealer_post_from_real_orders():
+    from bot.game import town_npc
+    assert town_npc.dealer_post([]) is None
+    txt = town_npc.dealer_post([{"good_name": "Эль", "qty": 6, "unit": 14}])
+    assert "Эль" in txt and "14 🪙" in txt and "скупку" in txt

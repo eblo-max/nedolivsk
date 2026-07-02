@@ -720,6 +720,26 @@ async def _notify_returned(bot: Bot) -> None:
             _n = await npc_traders.tick(session, repo, world, now)
             if _n:
                 logger.info("NPC-трейдеры выставили ордеров: %s", _n)
+        # NPC-жители чата: стражник 21:15 МСК (18:15 UTC), перекуп в пятницу 12:05 МСК
+        from bot.game import town_npc
+        npc_post = None
+        if now.hour == 18 and now.minute == 15 and town_npc._once_per_day(world, "watchman", now):
+            cnt = await repo.count_open_orders(session, 0, "sell")                 + await repo.count_open_orders(session, 0, "buy")
+            npc_post = town_npc.watchman_post(
+                cnt, any(b.status == "active" for b in live_raids),
+                worldevent.event_name(world) if hasattr(worldevent, "event_name") else None,
+                None)
+        elif (now.weekday() == 4 and now.hour == 9 and now.minute == 5
+              and town_npc._once_per_day(world, "dealer", now)):
+            from bot.game import production as _pr
+            rows = [{"good_name": _pr.GOODS[o.good].name, "qty": o.qty, "unit": o.unit_price}
+                    for o in await repo.seller_orders(session, -9001)
+                    if o.side == "buy" and o.good in _pr.GOODS]
+            npc_post = town_npc.dealer_post(rows)
+        if npc_post:
+            for _cid in await repo.all_chat_ids(session):
+                await deliver(lambda c=_cid, t=npc_post: bot.send_message(c, t),
+                              what=f"npc-post→{_cid}")
 
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода
