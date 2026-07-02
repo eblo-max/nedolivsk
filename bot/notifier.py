@@ -379,8 +379,8 @@ async def _notify_returned(bot: Bot) -> None:
                         and prod.state(tavern, bname)[0] == "ready"):
                     outbox.append((
                         player,
-                        texts.recipe_ready_notification(rbatch.get("recipe")), "prod",
-                        buildings_notify_kb(),
+                        texts.recipe_ready_notification(rbatch.get("recipe")),
+                        buildings_notify_kb(), "prod",
                     ))
                     new = dict(tavern.production)
                     new[bname] = {**rbatch, "notified": True}
@@ -415,8 +415,8 @@ async def _notify_returned(bot: Bot) -> None:
                                  texts.auction_sold_chat(
                                      player.first_name or "Кабатчик", res)))
                     outbox.append((
-                        player, texts.auction_settled(res), "auction",
-                        buildings_notify_kb()))
+                        player, texts.auction_settled(res),
+                        buildings_notify_kb(), "auction"))
                 continue
             chance = balance.AUCTION_BID_CHANCE * (
                 balance.AUCTION_FAIR_BID_MULT if wld.is_fair() else 1.0)

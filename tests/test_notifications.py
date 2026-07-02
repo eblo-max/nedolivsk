@@ -157,4 +157,8 @@ def test_outbox_appends_are_4_tuples():
             arg = node.args[0]
             if not (isinstance(arg, ast.Tuple) and len(arg.elts) == 4):
                 bad.append(node.lineno)
-    assert not bad, f"outbox.append не 4-кортеж на строках: {bad}"
+                continue
+            last = arg.elts[3]          # порядок: (player, text, markup, KIND-строка)
+            if not (isinstance(last, ast.Constant) and isinstance(last.value, str)):
+                bad.append(node.lineno)
+    assert not bad, f"outbox.append не (player, text, markup, kind-строка): {bad}"
