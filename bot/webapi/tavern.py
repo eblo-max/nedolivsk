@@ -781,6 +781,9 @@ async def _api_onboard(request: web.Request) -> web.Response:
         if p is None:
             u = _init_user(body.get("initData") or "")
             p = await repo.create_player(s, uid, u.get("username"), u.get("first_name") or "Хозяин")
+            await s.refresh(p, ["tavern"])   # свежий объект: связь грузим явно
+            # (ленивый доступ к p.tavern у только что созданного игрока падал
+            # MissingGreenlet — новички НЕ могли завести таверну через мини-апп)
         if p.tavern is not None:                       # уже есть — отдаём состояние
             return web.json_response({"ok": True, "state": _tavern_state(p, p.tavern)})
         t = await repo.create_tavern(s, p, name, region)
