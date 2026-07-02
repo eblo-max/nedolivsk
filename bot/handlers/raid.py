@@ -116,7 +116,8 @@ def _drop_apply(winner, drop: dict | None) -> str:
         slot_item, slot_tier = (items.parse_entry(slot_entry) if slot_entry else (None, 0))
         # слот свободен ИЛИ занят ТЕМ ЖЕ предметом меньшего яруса → надеть/улучшить
         if slot_item is None or (slot_item == item.id and tier > slot_tier):
-            eq[item.slot] = items.make_entry(item.id, tier)
+            _, _, _pl, _af = items.parse_full(eq.get(item.slot) or "")
+            eq[item.slot] = items.make_entry(item.id, tier, _pl, _af)  # заточка/аффикс переезжают
             winner.equipment = eq
             if slot_item == item.id:
                 return (f"🛡 «{item.name}» улучшена "

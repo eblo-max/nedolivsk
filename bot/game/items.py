@@ -150,20 +150,61 @@ ORC_SET_BONUS = {"damage": 10, "crit": 6, "armor": 12, "luck": 6, "vitality": 10
 ORC_SET_INCOME_PCT = 5
 
 
+PLUS_MAX = 5          # кап заточки (+4% к боевым статам вещи за уровень)
+PLUS_STAT_PCT = 4
+
+# Аффиксы ковки: суффикс имени (родительный падеж — не зависит от рода вещи)
+# + плоский боевой бонус ×ярус вещи. Ролл при заборе крафта T2+.
+AFFIXES = {
+    "zloby":      ("злобы",      {"damage": 2}),
+    "kreposti":   ("крепости",   {"armor": 3}),
+    "farta":      ("фарта",      {"luck": 1}),
+    "zhivuchesti": ("живучести", {"vitality": 3}),
+}
+
+
 def parse_entry(entry: str) -> tuple[str, int]:
-    """'kovsh:2' -> (kovsh, 2); старый формат 'kovsh' -> (kovsh, 1)."""
-    if ":" in entry:
-        item_id, _, tier_s = entry.partition(":")
+    """'kovsh:2' -> (kovsh, 2); полный формат см. parse_full."""
+    item_id, tier, _plus, _aff = parse_full(entry)
+    return item_id, tier
+
+
+def parse_full(entry: str) -> tuple[str, int, int, str]:
+    """'kovsh:2:3:zloby' -> (kovsh, ярус 2, заточка +3, аффикс zloby).
+    Старые записи ('kovsh', 'kovsh:2') дополняются нулями — миграция не нужна."""
+    parts = str(entry).split(":")
+
+    def _num(idx: int, lo: int, hi: int) -> int:
         try:
-            tier = max(1, min(TIER_MAX, int(tier_s)))
-        except ValueError:
-            tier = 1
-        return item_id, tier
-    return entry, 1
+            return max(lo, min(hi, int(parts[idx])))
+        except (IndexError, ValueError):
+            return lo
+
+    tier = _num(1, 1, TIER_MAX)
+    plus = _num(2, 0, PLUS_MAX)
+    aff = parts[3] if len(parts) > 3 and parts[3] in AFFIXES else ""
+    return parts[0], tier, plus, aff
 
 
-def make_entry(item_id: str, tier: int) -> str:
-    return f"{item_id}:{tier}"
+def make_entry(item_id: str, tier: int, plus: int = 0, affix: str = "") -> str:
+    e = f"{item_id}:{tier}"
+    if plus or affix:
+        e += f":{plus}"
+    if affix:
+        e += f":{affix}"
+    return e
+
+
+def display_name(entry: str) -> str:
+    """Имя вещи с аффиксом и заточкой: «Сабля стражника фарта +3»."""
+    item_id, _tier, plus, aff = parse_full(entry)
+    it = CATALOG.get(item_id)
+    name = it.name if it else item_id
+    if aff:
+        name = f"{name} {AFFIXES[aff][0]}"
+    if plus:
+        name = f"{name} +{plus}"
+    return name
 
 
 def tier_cost(item: "Item", tier: int) -> dict:
@@ -499,14 +540,19 @@ def orc_set_complete(equipment: dict | None) -> bool:
 
 
 def combat_stats(equipment: dict | None) -> dict:
-    pairs = equipped_items(equipment)
-    stats = {
-        "damage": sum(_cmul(i.damage, t) for i, t in pairs),
-        "crit": sum(_cmul(i.crit, t) for i, t in pairs),
-        "armor": sum(_cmul(i.armor, t) for i, t in pairs),
-        "luck": sum(_cmul(i.luck, t) for i, t in pairs),
-        "vitality": sum(_cmul(i.vitality, t) for i, t in pairs),
-    }
+    stats = {"damage": 0, "crit": 0, "armor": 0, "luck": 0, "vitality": 0}
+    for entry in (equipment or {}).values():
+        item_id, tier, plus, aff = parse_full(entry)
+        it = CATALOG.get(item_id)
+        if it is None:
+            continue
+        mult = 1 + PLUS_STAT_PCT * plus / 100        # заточка растит статы вещи
+        for k in stats:
+            v = _cmul(getattr(it, k), tier)
+            stats[k] += int(v * mult) if v else 0
+        if aff:                                       # аффикс: плоский бонус ×ярус
+            for k, v in AFFIXES[aff][1].items():
+                stats[k] = stats.get(k, 0) + v * tier
     if orc_set_complete(equipment):              # сет-бонус «ярость орды»
         for k, v in ORC_SET_BONUS.items():
             stats[k] = stats.get(k, 0) + v

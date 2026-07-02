@@ -498,6 +498,19 @@ class CraftClaim:
     minutes_left: int = 0
     item: object = None
     tier: int = 1
+    affix: str = ""
+
+
+AFFIX_CHANCE = {2: 0.25, 3: 0.35}     # шанс аффикса при ковке по ярусам (T1 — без)
+
+
+def roll_affix(tier: int, rng=None) -> str:
+    """Кузнечная удача: вещь T2+ может выйти «с характером» (аффиксом)."""
+    import random as _r
+    rng = rng or _r
+    if rng.random() < AFFIX_CHANCE.get(tier, 0.0):
+        return rng.choice(list(items.AFFIXES))
+    return ""
 
 
 def claim_craft(player: Player) -> CraftClaim:
@@ -510,9 +523,10 @@ def claim_craft(player: Player) -> CraftClaim:
 
     item_id, tier = items.parse_entry(player.craft_item)
     item = items.CATALOG[item_id]
+    affix = roll_affix(tier)                      # T2+ может выйти с характером
     equipment = dict(player.equipment or {})
-    equipment[item.slot] = items.make_entry(item_id, tier)
+    equipment[item.slot] = items.make_entry(item_id, tier, 0, affix)
     player.equipment = equipment
     player.craft_item = None
     player.craft_ends_at = None
-    return CraftClaim(ok=True, item=item, tier=tier)
+    return CraftClaim(ok=True, item=item, tier=tier, affix=affix)
