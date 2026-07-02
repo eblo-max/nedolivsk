@@ -84,6 +84,7 @@ ROUTES = [
     "POST /api/reputation _api_reputation",
     "POST /api/retail_hold _api_retail_hold",
     "POST /api/retail_sell _api_retail_sell",
+    "POST /api/sharpen _api_sharpen",
     "POST /api/state _api_state",
     "POST /api/story_choice _api_story_choice",
     "POST /api/torg _api_torg",

@@ -6,7 +6,8 @@ import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
 import ReputationSheet from './ReputationSheet'
 
-interface Slot { slot: string; slot_name: string; id?: string; name?: string; tier?: number; sprite?: string; trophy?: boolean }
+interface Slot { slot: string; slot_name: string; id?: string; name?: string; tier?: number; sprite?: string; trophy?: boolean
+  plus?: number; sharpen?: { next: number; cost: number; chance: number } }
 interface Craft { state: string; name?: string; tier?: number; minutes?: number; sprite?: string }
 interface HealOpt { key: string; name: string; emoji: string; hp: number; qty: number }
 interface CharState {
@@ -89,6 +90,7 @@ export default function Character() {
   const [view, setView] = useState<'doll' | 'forge'>('doll')
   const [forge, setForge] = useState<ForgeState | null>(null)
   const [pick, setPick] = useState<ForgeItem | null>(null)
+  const [pickSlot, setPickSlot] = useState<Slot | null>(null)
   const [healOpen, setHealOpen] = useState(false)
   const [repOpen, setRepOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -129,7 +131,22 @@ export default function Character() {
     haptic('light')
     let f = forge
     if (!f) { try { f = await api<ForgeState>('forge') } catch { f = FORGE_SAMPLE } setForge(f) }
+    setPickSlot(c.equipment.find((x) => x.id === id) ?? null)
     setPick(f.items.find((x) => x.id === id) ?? null)
+  }
+  async function sharpen(slot: string) {
+    if (busy) return
+    haptic('medium'); setBusy(true)
+    try {
+      const r = await api<{ success: boolean; name: string }>('sharpen', { slot })
+      if (r.success) { hapticNotify('success'); flash(`⚒ ${r.name} — заточена!`) }
+      else { hapticNotify('warning'); flash('Сорвалась! Золото осталось у кузнеца') }
+      setPick(null); setPickSlot(null); reload()
+    } catch (e) {
+      hapticNotify('warning')
+      const code = (e as { code?: string })?.code
+      flash(code === 'gold' ? 'Не хватает золота' : code === 'max' ? 'Острее не бывает' : 'Не вышло')
+    } finally { setBusy(false) }
   }
   async function claim() {
     if (busy) return
@@ -279,7 +296,7 @@ export default function Character() {
         <button className="btn gold" onClick={openForge}>⚒ В кузницу</button>
         <button className="btn" onClick={() => { haptic('light'); setRepOpen(true) }}>🤝 Репутация</button>
       </div>
-      {pick && <ItemSheet item={pick} busy={busy} craftState={c.craft.state} onMake={make} onClose={() => setPick(null)} />}
+      {pick && <ItemSheet item={pick} worn={pickSlot} busy={busy} craftState={c.craft.state} onMake={make} onSharpen={sharpen} onClose={() => { setPick(null); setPickSlot(null) }} />}
       {healOpen && <HealSheet full={c.heal.full} options={c.heal.options} busy={busy} onHeal={heal} onClose={() => setHealOpen(false)} />}
       {repOpen && <ReputationSheet onClose={() => setRepOpen(false)} />}
       {toast && <div className="toast">{toast}</div>}
@@ -313,16 +330,17 @@ function HealSheet({ full, options, busy, onHeal, onClose }: {
   )
 }
 
-function ItemSheet({ item, busy, craftState, onMake, onClose }: {
-  item: ForgeItem; busy: boolean; craftState: string; onMake: (i: ForgeItem) => void; onClose: () => void
+function ItemSheet({ item, worn, busy, craftState, onMake, onSharpen, onClose }: {
+  item: ForgeItem; worn?: Slot | null; busy: boolean; craftState: string
+  onMake: (i: ForgeItem) => void; onSharpen?: (slot: string) => void; onClose: () => void
 }) {
   const canForge = !item.trophy && !item.maxed
   return (
-    <Sheet icon={sprite(item.sprite)} title={item.name.toUpperCase()} onClose={onClose}>
+    <Sheet icon={sprite(item.sprite)} title={(worn?.name || item.name).toUpperCase()} onClose={onClose}>
       <div className="item-hero">
         <ItemImg s={item.sprite} />
         <div>
-          <div className="ih-name">{item.name} <span className="stars">{stars(item.trophy || item.maxed ? item.cur : item.next)}</span></div>
+          <div className="ih-name">{worn?.name || item.name} <span className="stars">{stars(item.trophy || item.maxed ? item.cur : item.next)}</span></div>
           <div className="muted" style={{ fontSize: 13 }}>{item.slot_name}{item.cur > 0 && !item.maxed ? ` · перековка ${stars(item.cur)} → ${stars(item.next)} (${TIER_NAME[item.next]})` : !item.maxed ? ` · ${TIER_NAME[item.next]}` : ''}</div>
         </div>
       </div>
@@ -346,6 +364,15 @@ function ItemSheet({ item, busy, craftState, onMake, onClose }: {
         </>
       )}
 
+      {worn?.sharpen && onSharpen && (
+        <button className="btn" style={{ marginTop: 12 }} disabled={busy}
+          onClick={() => onSharpen(worn.slot)}>
+          ⚒ Заточить до +{worn.sharpen.next} — {worn.sharpen.cost} 🪙{worn.sharpen.chance < 100 ? ` · шанс ${worn.sharpen.chance}%` : ''}
+        </button>
+      )}
+      {worn && (worn.plus ?? 0) >= 5 && (
+        <p className="muted" style={{ fontStyle: 'italic', marginTop: 10 }}>Заточена до предела — острее не бывает.</p>
+      )}
       {item.trophy
         ? <p className="muted" style={{ fontStyle: 'italic', marginTop: 12 }}>🏆 Трофей с босса — в кузнице не куётся. Старший ярус только дропом.</p>
         : item.maxed

@@ -61,6 +61,7 @@ from bot.webapi.tavern import (  # noqa: E402,F401 — фасад
 # Персонаж/кузница — bot/webapi/character.py (распил, move-only).
 from bot.webapi.character import (  # noqa: E402,F401 — фасад
     _api_character, _api_craft_claim, _api_forge, _api_forge_make, _api_heal,
+    _api_sharpen,
 )
 # Двор/производство/охота — bot/webapi/production.py (распил, move-only).
 from bot.webapi.production import (  # noqa: E402,F401 — фасад
@@ -186,6 +187,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/forge_make", _api_forge_make)  # заказать ковку
     app.router.add_post("/api/craft_claim", _api_craft_claim)  # забрать готовую вещь
     app.router.add_post("/api/heal", _api_heal)          # подлечиться (еда из погреба)
+    app.router.add_post("/api/sharpen", _api_sharpen)   # заточка вещи (кузница 2.0)
     app.router.add_post("/api/buildings", _api_buildings)    # список пристроек
     app.router.add_post("/api/building", _api_building)       # деталь/производство здания
     app.router.add_post("/api/build_start", _api_build_start)  # заложить пристройку

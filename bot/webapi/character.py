@@ -22,10 +22,19 @@ def _character_state(p) -> dict:
         entry = eq.get(slot_key)
         item = it.CATALOG.get(it.parse_entry(entry)[0]) if entry else None
         if item:
-            _, tier = it.parse_entry(entry)
-            slots.append({"slot": slot_key, "slot_name": slot_name, "id": item.id,
-                          "name": item.name, "tier": tier, "sprite": item.sprite or item.id,
-                          "trophy": not item.craftable})
+            _, tier, plus, aff = it.parse_full(entry)
+            row = {"slot": slot_key, "slot_name": slot_name, "id": item.id,
+                   "name": it.display_name(entry), "tier": tier,
+                   "sprite": item.sprite or item.id, "trophy": not item.craftable,
+                   "plus": plus}
+            if plus < it.PLUS_MAX:                # можно точить дальше
+                nxt = plus + 1
+                row["sharpen"] = {
+                    "next": nxt,
+                    "cost": int(bal.SHARPEN_COST_GOLD[nxt] * it.TIER_ECON_MULT[tier]),
+                    "chance": int(bal.SHARPEN_SUCCESS[nxt] * 100),
+                }
+            slots.append(row)
         else:
             slots.append({"slot": slot_key, "slot_name": slot_name})
 
@@ -157,6 +166,47 @@ async def _api_forge_make(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "character": ch, "forge": fg,
                               "item": r.item.name, "tier": r.tier, "hours": r.hours},
                              headers={"Cache-Control": "no-store"})
+
+
+async def _api_sharpen(request: web.Request) -> web.Response:
+    """Заточить надетую вещь: золото сгорает всегда, уровень растёт по шансу."""
+    import random
+    from bot.game import balance as bal, items as it
+
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    slot = str((body or {}).get("slot") or "")
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None:
+            return web.json_response({"ok": False, "error": "no_player"})
+        eq = dict(p.equipment or {})
+        entry = eq.get(slot)
+        if not entry:
+            return web.json_response({"ok": False, "error": "empty_slot"})
+        item_id, tier, plus, aff = it.parse_full(entry)
+        if plus >= it.PLUS_MAX:
+            return web.json_response({"ok": False, "error": "max"})
+        nxt = plus + 1
+        cost = int(bal.SHARPEN_COST_GOLD[nxt] * it.TIER_ECON_MULT[tier])
+        if (p.gold or 0) < cost:
+            return web.json_response({"ok": False, "error": "gold", "cost": cost})
+        p.gold -= cost                             # плата кузнецу — в обе стороны
+        from bot.game import economy
+        economy.record(p, "sharpen", -cost)
+        success = random.random() < bal.SHARPEN_SUCCESS[nxt]
+        if success:
+            eq[slot] = it.make_entry(item_id, tier, nxt, aff)
+            p.equipment = eq
+        repo.add_log(s, "player", p.id,
+                     f"⚒ заточка {it.display_name(eq[slot])}: "
+                     f"{'удача' if success else 'сорвалась'} (−{cost} 🪙)")
+        await s.commit()
+        return web.json_response({
+            "ok": True, "success": success, "plus": nxt if success else plus,
+            "gold": int(p.gold), "name": it.display_name(eq[slot]),
+        }, headers={"Cache-Control": "no-store"})
 
 
 async def _api_heal(request: web.Request) -> web.Response:
