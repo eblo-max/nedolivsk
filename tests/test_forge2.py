@@ -89,3 +89,44 @@ def test_sharpen_tables_consistent():
     assert max(balance.SHARPEN_COST_GOLD) == items.PLUS_MAX
     costs = [balance.SHARPEN_COST_GOLD[i] for i in sorted(balance.SHARPEN_COST_GOLD)]
     assert costs == sorted(costs)                           # дороже с каждым уровнем
+
+
+# ── Первая ковка новичка — за четверть цены ─────────────────────────────
+def test_first_craft_discount_quote():
+    from types import SimpleNamespace as NS
+    from bot.game import newbie
+    fresh = NS(story={})
+    vet = NS(story={"flags": ["nb_first_craft"]})
+    assert newbie.craft_cost_mult(fresh) == newbie.FIRST_CRAFT_MULT == 0.2
+    assert newbie.craft_cost_mult(vet) == 1.0
+    itm = next(i for i in items.CATALOG.values() if i.craftable)
+    full = items.tier_cost(itm, 1)
+    cheap = items.craft_cost(fresh, itm, 1)
+    for k, v in full.items():
+        if v:
+            assert 0 < cheap[k] <= max(1, int(v * 0.2) + 1), (k, v, cheap[k])
+    assert items.craft_cost(vet, itm, 1) == full     # ветерану — полная цена
+
+
+def test_first_craft_achievable_first_evening():
+    """Цель аудита: первая ковка достижима за вечер — стартовый набор + пара
+    бригад закрывают сырьё, золота хватает на цену и плату работникам."""
+    from types import SimpleNamespace as NS
+    from bot.game import balance, newbie
+    fresh = NS(story={})
+    start_gold = 100 + newbie.STARTER_CHEST["gold"]
+    have = {"wood": 10 + 40, "grain": 10 + 40, "hops": 5 + 20, "ore": 0}
+    cheapest = min(
+        (items.craft_cost(fresh, i, 1) for i in items.CATALOG.values() if i.craftable),
+        key=lambda c: sum(c.values()))
+    gold_needed = cheapest.get("gold", 0)
+    trips = 0
+    for k, v in cheapest.items():
+        if k == "gold" or not v:
+            continue
+        short = max(0, v - have.get(k, 0))
+        y = max(1, balance.expedition_yield(k, 1, "green_valleys"))
+        trips += -(-short // y)                    # бригад до закрытия дефицита
+    pay = trips * balance.worker_pay(1)
+    assert gold_needed + pay <= start_gold, (cheapest, gold_needed, trips, pay)
+    assert trips <= 5, (cheapest, trips)           # «за вечер», не за неделю

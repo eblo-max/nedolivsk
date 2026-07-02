@@ -506,7 +506,7 @@ def start_craft(player: Player, item_id: str) -> CraftStart:
     if tier > items.TIER_MAX:
         return CraftStart(ok=False, reason="max_tier", item=item)
 
-    c = items.tier_cost(item, tier)
+    c = items.craft_cost(player, item, tier)   # первая вещь новичка — за четверть
     hours = items.tier_hours(item, tier)
     if not inventory.can_afford(player, c):
         return CraftStart(ok=False, reason="not_enough", item=item,
@@ -514,6 +514,8 @@ def start_craft(player: Player, item_id: str) -> CraftStart:
 
     inventory.pay(player, c)
     economy.record(player, "forge", -int(c.get("gold", 0)))
+    from bot.game import newbie as _nb
+    _nb.mark_first_craft(player)               # скидка первой ковки сгорает
     player.craft_item = items.make_entry(item_id, tier)
     player.craft_ends_at = _now() + timedelta(hours=hours)
     player.craft_notified = False

@@ -143,6 +143,20 @@ async def main() -> None:
 
     await _setup_commands(bot)
 
+    # Кнопка меню = МИНИ-АПП (а не список команд): главный вход в игру одним
+    # тапом. Требование Telegram Ads: бот должен быть интерактивным сразу.
+    from bot.webapp import base_url
+    _b = base_url()
+    if _b:
+        from aiogram.types import MenuButtonWebApp, WebAppInfo
+        try:
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(
+                    text="Играть", web_app=WebAppInfo(url=f"{_b}/app/")))
+            logging.info("Кнопка меню → мини-апп установлена")
+        except Exception:      # noqa: BLE001 — не валим старт из-за кнопки
+            logging.exception("Не удалось поставить кнопку мини-аппа")
+
     await bot.delete_webhook(drop_pending_updates=True)
     try:
         await dp.start_polling(bot)

@@ -2645,7 +2645,7 @@ def forge_item_screen(item, player, cur_tier: int, next_tier: int) -> str:
             f"Даёт: {_tier_bonus_line(item, it.TIER_MAX)}\n\n"
             "Мастерская работа. Лучше уже не выкуют — даже не проси."
         )
-    c = it.tier_cost(item, next_tier)
+    c = it.craft_cost(player, item, next_tier)
     hours = it.tier_hours(item, next_tier)
     head = f"<b>{item.name} {it.TIER_STARS[next_tier]}</b> · слот: {it.SLOTS[item.slot]}"
     if cur_tier > 0:

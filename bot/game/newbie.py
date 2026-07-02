@@ -24,6 +24,23 @@ NEWBIE_SPEED_MULT = 0.8      # −20% времени ходки
 # Стартовый сундук — разово при создании таверны
 STARTER_CHEST = {"gold": 200, "wood": 40, "grain": 40, "hops": 20}
 
+# Первая ковка — за четверть цены: у новичка есть достижимая цель на первый
+# вечер (аудит 02.07: без скидки первый крафт недоступен днями). Скидка
+# сгорает после первой вещи (флаг nb_first_craft).
+FIRST_CRAFT_MULT = 0.2
+
+
+def craft_cost_mult(player) -> float:
+    """Множитель цены ковки: 0.25 на ПЕРВУЮ вещь новичка, дальше 1.0.
+    Единый источник для показа в кузнице И списания (показ = действие)."""
+    from bot.game import story_state
+    return FIRST_CRAFT_MULT if not story_state.has_flag(player, "nb_first_craft") else 1.0
+
+
+def mark_first_craft(player) -> None:
+    from bot.game import story_state
+    story_state.add_flag(player, "nb_first_craft")
+
 # Задания: (флаг-выполнено, заголовок, награда). nb_build/nb_lvl2 — по состоянию.
 TASKS = [
     ("nb_brigade", "Отправь первую бригаду за добром", {"gold": 50}),

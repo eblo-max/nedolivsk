@@ -233,6 +233,17 @@ def display_name(entry: str) -> str:
     return name
 
 
+def craft_cost(player, item: "Item", tier: int) -> dict:
+    """Цена ковки ДЛЯ ИГРОКА: tier_cost × скидка первой вещи новичка.
+    Показ в кузнице и списание обязаны звать только её."""
+    from bot.game import newbie
+    mult = newbie.craft_cost_mult(player)
+    if mult >= 1.0:
+        return tier_cost(item, tier)
+    return {k: (max(1, int(v * mult)) if v else 0)
+            for k, v in tier_cost(item, tier).items()}
+
+
 def tier_cost(item: "Item", tier: int) -> dict:
     if TEST_FREE_CRAFT:
         return {k: 0 for k in item.cost}

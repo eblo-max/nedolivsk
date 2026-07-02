@@ -111,7 +111,7 @@ def _forge_state(p) -> dict:
         nxt = cur if maxed else min(cur + 1, it.TIER_MAX)
         cost = []
         if not maxed:
-            for k, v in it.tier_cost(item, nxt).items():
+            for k, v in it.craft_cost(p, item, nxt).items():
                 if not v:
                     continue
                 have = int(p.gold) if k == "gold" else int(inv.get(k, 0))
