@@ -200,7 +200,7 @@ def _tavern_state(p, t) -> dict:
         "ok": True, "name": t.name, "level": int(t.level),
         "region": worldmap.continent_name(p.region, p.id),   # локация = континент своей зоны
         "flavor": texts._flavor_line(p, t, chat_id, seasonmod, citymod),
-        "gold": int(p.gold), "income_rate": int(t.income_rate),
+        "gold": int(p.gold), "income_rate": logic.income_rate_quote(p, t),
         "income_ready": int(texts._pending_income(t)), "reputation": int(t.reputation or 0),
         "capacity": int(t.capacity), "comfort": int(t.comfort),
         "luck_pct": int(bal.lucky_chance(cs["luck"] + buffmod.luck_bonus(p))),
@@ -500,7 +500,7 @@ def _panel_data(p, t, kind: str) -> dict:
     """Данные для bottom-sheet панели действия (бонус/грамота/бригады) —
     те же функции/тексты, что и экраны бота, в JSON."""
     from bot import texts
-    from bot.game import balance as bal, buff as buffmod, logic, newbie as nb, season
+    from bot.game import balance as bal, buff as buffmod, logic, newbie as nb
 
     if kind == "bonus":
         act = buffmod.active(p)
@@ -537,7 +537,10 @@ def _panel_data(p, t, kind: str) -> dict:
         gains = [
             {"label": "Места", "frm": int(t.capacity), "to": int(ns["capacity"])},
             {"label": "Уют", "frm": int(t.comfort), "to": int(ns["comfort"])},
-            {"label": "Доход/ч", "frm": int(t.income_rate), "to": int(ns["income_rate"])},
+            {"label": "Доход/ч",
+             "frm": logic.income_rate_quote(p, t),
+             "to": int(logic.income_rate_quote(p, t) / max(1, t.income_rate)
+                       * ns["income_rate"])},
         ]
         return {"kind": "upgrade", "level": int(t.level), "next": int(t.level) + 1,
                 "cost": items, "gains": gains, "affordable": all(i["ok"] for i in items),
@@ -556,7 +559,6 @@ def _panel_data(p, t, kind: str) -> dict:
 
     # expedition — статус бригад, «на что копить», список ресурсов для отправки
     c = logic.expedition_counts(p, t)
-    level = t.level
     goals, _tot = logic.expedition_goals(p, t)
     goal_list = [{"label": label,
                   "items": [{"key": r, "name": bal.RESOURCE_NAMES.get(r, r), "qty": q}
@@ -565,7 +567,7 @@ def _panel_data(p, t, kind: str) -> dict:
     resources = []
     if c.free > 0:
         for res in bal.RESOURCES:
-            amt = int(bal.expedition_yield(res, level, p.region) * season.yield_mult(res))
+            amt = logic.expedition_gain_quote(p, t, res)   # как реальное начисление
             resources.append({"key": res, "name": bal.RESOURCE_NAMES.get(res, res), "amount": amt})
     return {"kind": "expedition", "free": c.free, "total": c.total, "out": c.out,
             "ready": c.ready, "next_minutes": c.next_minutes,

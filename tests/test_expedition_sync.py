@@ -44,3 +44,42 @@ def test_quote_equals_actual_charge():
     r = logic.start_expedition(p, t, "wood")
     assert r.ok and r.pay == pay == g0 - p.gold
     assert hours > 0
+
+
+def test_gain_quote_equals_claimed_amount(monkeypatch):
+    """Показ добычи в панели == реальному начислению (без «фарта»)."""
+    import random as _r
+    from datetime import datetime, timedelta, timezone
+    monkeypatch.setattr(_r, "randint", lambda a, b: 100)   # фарт не выпал
+    p, t = _pl()
+    p.tavern = t
+    q = logic.expedition_gain_quote(p, t, "wood")
+    p.expeditions = [{"resource": "wood",
+                      "ends_at": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(),
+                      "notified": True}]
+    claimed = logic.claim_expeditions(p)
+    assert claimed and claimed[0][0] == "wood" and claimed[0][1] == q
+
+
+def test_nightrun_rest_display_equals_heal():
+    """«Привал лечит N» в стейте == реальному лечению на привале."""
+    from bot.game import nightrun as nr
+    p, _t = _pl()
+    run = nr.start(p, "green_valleys")
+    shown = nr.rest_heal_amount(run)
+    run["hp"] = 1                                   # есть куда лечиться
+    run["state"] = "fork"
+    out = nr.attempt(run, p, "rest")
+    assert out["healed"] == shown > 0
+
+
+def test_income_rate_quote_reflects_gear():
+    """Доход/ч на экране чувствует снарягу с +доходом (как реальный пассив)."""
+    from bot.game import items
+    inc = next(i for i in items.CATALOG.values() if i.income_pct)
+    p0, t0 = _pl()
+    t0.income_rate = 100
+    base = logic.income_rate_quote(p0, t0)
+    p1, t1 = _pl(equipment={inc.slot: items.make_entry(inc.id, 1)})
+    t1.income_rate = 100
+    assert logic.income_rate_quote(p1, t1) > base > 0

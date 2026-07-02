@@ -130,6 +130,27 @@ def expedition_quote(player: Player, tavern: Tavern | None) -> tuple[int, float]
     return pay, hours
 
 
+def expedition_gain_quote(player: Player, tavern: Tavern | None, resource: str) -> int:
+    """Ожидаемая добыча бригады со ВСЕМИ множителями (без «фарта») — единый
+    источник для начисления (claim) и показа в панели."""
+    level = tavern.level if tavern else 1
+    equipment = getattr(player, "equipment", None)
+    amount = balance.expedition_yield(resource, level, player.region)
+    return int(amount * items.yield_multiplier(equipment, resource)
+               * season.yield_mult(resource) * buff.yield_mult(player)
+               * worldevent.harvest_mult(player)
+               * newbie.yield_mult(player))
+
+
+def income_rate_quote(player: Player, tavern: Tavern) -> int:
+    """Реальный пассив «в час» с множителями снаряги/перков/бафа/погоды и
+    вычетом содержания — то, что капает на самом деле (показ = начисление)."""
+    mult = items.income_multiplier(getattr(player, "equipment", None))
+    rate = (tavern.income_rate * mult * perks.passive_mult(player)
+            * buff.gold_mult(player) * worldevent.income_mult(player))
+    return max(0, int(rate - rate * balance.WORKER_UPKEEP_PCT))
+
+
 def start_expedition(player: Player, tavern: Tavern, resource: str) -> ExpeditionStart:
     """Отправить ещё одну бригаду за ресурсом, если есть свободный слот."""
     exps = _exps(player)
@@ -153,7 +174,6 @@ def start_expedition(player: Player, tavern: Tavern, resource: str) -> Expeditio
 def claim_expeditions(player: Player) -> list[tuple[str, int, bool]]:
     """Забрать всех вернувшихся бригад. Возвращает [(ресурс, кол-во, удача)]."""
     now = _now()
-    level = player.tavern.level if player.tavern else 1
     equipment = getattr(player, "equipment", None)
     kept: list = []
     claimed: list[tuple[str, int, bool]] = []
@@ -162,11 +182,7 @@ def claim_expeditions(player: Player) -> list[tuple[str, int, bool]]:
             kept.append(e)
             continue
         resource = e["resource"]
-        amount = balance.expedition_yield(resource, level, player.region)
-        amount = int(amount * items.yield_multiplier(equipment, resource)
-                     * season.yield_mult(resource) * buff.yield_mult(player)
-                     * worldevent.harvest_mult(player)  # погода (Урожай/Стужа/Засуха)
-                     * newbie.yield_mult(player))  # поблажка новичку (с грейс-окном)
+        amount = expedition_gain_quote(player, player.tavern, resource)
         luck = (items.combat_stats(equipment)["luck"] + perks.luck_bonus(player)
                 + buff.luck_bonus(player))  # баф «Фартовый день»
         lucky = random.randint(1, 100) <= balance.lucky_chance(luck)

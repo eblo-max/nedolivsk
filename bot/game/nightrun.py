@@ -210,6 +210,14 @@ def fork(run: dict) -> tuple[str, str]:
     return (a, b)
 
 
+REST_HEAL_PCT = 0.35      # привал лечит долю МАКСИМУМА (не плоское число)
+
+
+def rest_heal_amount(run: dict) -> int:
+    """Сколько лечит привал — единый источник для боя И показа в стейте."""
+    return int(run.get("hp_max", BASE_HP) * REST_HEAL_PCT)
+
+
 def can_push(run: dict) -> bool:
     """Есть ли куда углубляться (последний этап выводит к рассвету — только банк)."""
     return run["leg"] < balance.NIGHTRUN_LEGS
@@ -239,8 +247,8 @@ def attempt(run: dict, player, kind: str, rng: random.Random | None = None,
         return out
 
     if kind == "rest":                                   # безопасно: лечит
-        _mx = run.get("hp_max", BASE_HP)
-        heal = max(0, min(int(_mx * 0.35), _mx - run["hp"]))   # привал лечит 35% макс.
+        heal = max(0, min(rest_heal_amount(run),
+                          run.get("hp_max", BASE_HP) - run["hp"]))
         run["hp"] += heal
         out["healed"] = heal
         run["state"] = "crossroad"

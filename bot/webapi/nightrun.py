@@ -71,7 +71,7 @@ def _nightrun_state(p) -> dict:
          "satchel_value": nr.satchel_value(run.get("satchel")),
          "situation": run.get("situation"), "can_push": nr.can_push(run),
          "flask_drunk": run.get("flask") or [],
-         "rest_heal": bal.NIGHTRUN_REST_HEAL,
+         "rest_heal": nr.rest_heal_amount(run),
          "next_value": round(nr.leg_value(run["leg"] + 1)) if nr.can_push(run) else 0,
          "growth": round(bal.NIGHTRUN_REWARD_GROWTH, 2)}
     if st == "fork":
