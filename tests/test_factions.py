@@ -46,7 +46,7 @@ def test_watch_pickpocket_and_bust_keep():
     friend = _pl(watch=45)
     assert F.watch_pickpocket_mult(friend) == 0.6      # −20%×2 ранга
     assert abs(F.watch_bust_keep_pct(friend) - 0.24) < 1e-9
-    assert F.watch_pickpocket_mult(_pl(watch=-50)) == 1.0   # вражда не помогает
+    assert F.watch_pickpocket_mult(_pl(watch=-50)) == 1.4   # врага щиплют сильнее
 
 
 def test_bust_keeps_share_for_watch_friend():
