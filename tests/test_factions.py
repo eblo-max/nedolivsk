@@ -142,3 +142,28 @@ def test_retail_night_bonus_actually_pays(monkeypatch):
                equipment={}, inventory={}, buff_kind=None, buff_until=None,
                reputation=0, tavern=None, perks={}, econ={})
     assert run(thief) >= run(plain)
+
+
+# ── Санкции вражды ───────────────────────────────────────────────────────
+def test_hostility_sanctions_bite():
+    enemy_w = _pl(watch=-80)     # враг стражи
+    enemy_t = _pl(thieves=-80)   # враг воров
+    assert F.watch_pickpocket_mult(enemy_w) == 1.4     # щиплют на 40% больше
+    assert abs(F.watch_hostile_penalty(enemy_w) - 0.06) < 1e-9
+    assert F.watch_hostile_penalty(_pl(watch=50)) == 0.0
+    assert F.thief_sneak_bonus(enemy_t) == -0.04       # осведомители сдают
+    assert F.thief_night_sale_mult(enemy_t, 23) == 0.96
+    # строки санкций видны на экране
+    assert any("БОЛЬШЕ" in ln for ln in F.perk_lines(enemy_w, "watch"))
+    assert any("-4%" in ln for ln in F.perk_lines(enemy_t, "thieves"))
+
+
+def test_hostile_watch_makes_nightrun_harder():
+    from bot.game import nightrun as nr
+    friend, enemy = _pl(), _pl(watch=-80)
+    for p_ in (friend, enemy):
+        p_.equipment = {}
+    run_f = nr.start(friend, "green_valleys")
+    run_e = nr.start(enemy, "green_valleys")
+    run_f["leg"] = run_e["leg"] = 3
+    assert nr.success_p(run_e, enemy, "fight") < nr.success_p(run_f, friend, "fight")

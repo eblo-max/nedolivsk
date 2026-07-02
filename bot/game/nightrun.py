@@ -142,6 +142,8 @@ def success_p(run: dict, player, kind: str) -> float:
         p -= 0.05                                         # азарт рискованнее
     if any(FLASK_APPROACH.get(k) == kind for k in fl):    # глоток под свой подход
         p += FLASK_P_BONUS
+    from bot.game import factions as _fc
+    p -= _fc.watch_hostile_penalty(player)                # враг стражи: патрули не дремлют
     return max(balance.NIGHTRUN_P_FLOOR, min(balance.NIGHTRUN_P_CAP, p))
 
 

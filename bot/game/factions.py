@@ -68,20 +68,30 @@ def shop_buy_mult(player) -> float:
 
 
 def thief_sneak_bonus(player) -> float:
-    """Воры: прибавка шанса «тишком» в ночной ходке (только дружба)."""
-    return THIEF_SNEAK_P * max(0, rank(player, "thieves"))
+    """Воры: «тишком» в ночной ходке. Дружба помогает, ВРАЖДА мешает —
+    осведомители гильдии сдают тебя первым же патрулям."""
+    return THIEF_SNEAK_P * rank(player, "thieves")
 
 
 def thief_night_sale_mult(player, msk_hour: int) -> float:
     """Воры: ночью (22–6 МСК) лавка берёт дороже у своих (+2%/ранг)."""
     if msk_hour >= 22 or msk_hour < 6:
-        return 1 + THIEF_NIGHT_SALE_PCT * max(0, rank(player, "thieves")) / 100
+        return 1 + THIEF_NIGHT_SALE_PCT * rank(player, "thieves") / 100
     return 1.0
 
 
 def watch_pickpocket_mult(player) -> float:
-    """Стража: карманники крадут меньше у друзей стражи (−20%/ранг, пол 0.2)."""
-    return max(0.2, 1 - WATCH_PICKPOCKET_PCT * max(0, rank(player, "watch")) / 100)
+    """Стража: у друзей карманники крадут меньше (−20%/ранг), у ВРАГОВ — больше
+    (стража «не замечает», как тебя щиплют). Коридор 0.2…1.5."""
+    return min(1.5, max(0.2, 1 - WATCH_PICKPOCKET_PCT * rank(player, "watch") / 100))
+
+
+WATCH_HOSTILE_P = 0.03     # враг стражи: штраф шанса ЛЮБОГО шага ходки за ранг вражды
+
+
+def watch_hostile_penalty(player) -> float:
+    """Враг стражи: патрули знают тебя в лицо — вся ночная ходка опаснее."""
+    return WATCH_HOSTILE_P * max(0, -rank(player, "watch"))
 
 
 def watch_bust_keep_pct(player) -> float:
@@ -97,10 +107,15 @@ def perk_lines(player, fac_id: str) -> list[str]:
         pct = MERCHANT_PRICE_PCT * r
         out.append(f"торг: цена {'выше' if pct > 0 else 'ниже'} на {abs(pct)}%")
         out.append(f"лавка: закуп {'дешевле' if pct > 0 else 'дороже'} на {abs(pct)}%")
-    if fac_id == "thieves" and r > 0:
-        out.append(f"+{int(THIEF_SNEAK_P * r * 100)}% к «тишком» в ночной ходке")
-        out.append(f"+{THIEF_NIGHT_SALE_PCT * r}% к ночной скупке (22–6 МСК)")
-    if fac_id == "watch" and r > 0:
-        out.append(f"карманники крадут на {WATCH_PICKPOCKET_PCT * r}% меньше")
-        out.append(f"при провале ходки стража отбивает {WATCH_BUST_KEEP_PCT * r}% котомки")
+    if fac_id == "thieves" and r != 0:
+        s = int(THIEF_SNEAK_P * r * 100)
+        out.append(f"{'+' if s > 0 else ''}{s}% к «тишком» в ночной ходке")
+        out.append(f"{'+' if r > 0 else ''}{THIEF_NIGHT_SALE_PCT * r}% к ночной скупке (22–6 МСК)")
+    if fac_id == "watch":
+        if r > 0:
+            out.append(f"карманники крадут на {WATCH_PICKPOCKET_PCT * r}% меньше")
+            out.append(f"при провале ходки стража отбивает {WATCH_BUST_KEEP_PCT * r}% котомки")
+        elif r < 0:
+            out.append(f"карманники крадут на {WATCH_PICKPOCKET_PCT * -r}% БОЛЬШЕ — стража не замечает")
+            out.append(f"патрули знают тебя в лицо: вся ночная ходка опаснее на {int(WATCH_HOSTILE_P * -r * 100)}%")
     return out
