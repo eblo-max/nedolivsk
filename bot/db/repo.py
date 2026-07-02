@@ -444,7 +444,7 @@ def create_order(
     return order
 
 
-async def count_open_orders(session: AsyncSession, seller_id: int) -> int:
+async def count_seller_orders(session: AsyncSession, seller_id: int) -> int:
     """Сколько открытых ордеров у продавца (NPC-трейдеры: один за раз)."""
     return await session.scalar(
         select(func.count(MarketOrder.id)).where(
