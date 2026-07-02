@@ -39,13 +39,14 @@ def _character_state(p) -> dict:
                    "name": it.display_name(entry), "tier": tier,
                    "sprite": item.sprite or item.id, "trophy": not item.craftable,
                    "plus": plus}
-            if plus < it.PLUS_MAX:                # можно точить дальше
+            gain_nxt = it.item_combat_gain(entry, plus + 1) if plus < it.PLUS_MAX else {}
+            if gain_nxt:                          # точить есть смысл (боевые статы)
                 nxt = plus + 1
                 row["sharpen"] = {
                     "next": nxt,
                     "cost": int(bal.SHARPEN_COST_GOLD[nxt] * it.TIER_ECON_MULT[tier]),
                     "chance": int(bal.SHARPEN_SUCCESS[nxt] * 100),
-                    "gain": _gain_str(it.item_combat_gain(entry, nxt)),
+                    "gain": _gain_str(gain_nxt),
                 }
             slots.append(row)
         else:

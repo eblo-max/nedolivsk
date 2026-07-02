@@ -150,17 +150,16 @@ ORC_SET_BONUS = {"damage": 10, "crit": 6, "armor": 12, "luck": 6, "vitality": 10
 ORC_SET_INCOME_PCT = 5
 
 
-PLUS_MAX = 5          # кап заточки (+4% к боевым статам вещи за уровень)
-PLUS_STAT_PCT = 4
+PLUS_MAX = 5          # кап заточки
+PLUS_STAT_PCT = 10    # шаг уровня: 10% от стата вещи, минимум +1 (дорого, но ощутимо)
 
 
 def plus_bonus(v: int, plus: int) -> int:
-    """Прибавка заточки к стату вещи: 4%×уровень, округление ВВЕРХ — каждый
-    уровень даёт минимум +1 к каждому ненулевому стату (иначе мелкие статы
-    съедались обрезанием и заточка «ничего не делала»)."""
+    """Прибавка заточки: КАЖДЫЙ уровень даёт max(1, 10% стата) — плоский шаг,
+    видимый на любом стате. +5 на крупном стате ≈ +50%, на мелком — +5."""
     if v <= 0 or plus <= 0:
         return 0
-    return math.ceil(v * PLUS_STAT_PCT * plus / 100)
+    return plus * max(1, round(v * PLUS_STAT_PCT / 100))
 
 
 def item_combat_gain(entry: str, next_plus: int | None = None) -> dict:
