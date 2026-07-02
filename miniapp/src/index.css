@@ -1100,50 +1100,92 @@ body {
 .cf-val { font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:12px; color:#b7a587; width:34px; text-align:right; flex:none; }
 
 /* ── ссылка «Летопись» в карточке Город ── */
-/* ЦЕЛЬ НЕДЕЛИ — квест-баннер: медальон фракции, толстая полоса с бегущим
-   бликом и счётом внутри, фракционный акцент; пир — золотая пульсация */
+/* ЦЕЛЬ НЕДЕЛИ — ультра: кольцо-прогресс (conic) вокруг эмблемы, аврора
+   фракционного цвета, тлеющие угольки, вехи 25/50/75, гигантский процент. */
 .fgoal { --fga:#e8a74a; --fga2:#ffd98a; position:relative; margin:10px 0 4px;
-  padding:11px 12px 12px; border-radius:14px; overflow:hidden;
-  background:linear-gradient(135deg, rgba(255,255,255,.045), rgba(0,0,0,.28));
-  border:1px solid rgba(255,255,255,.1); }
-.fgoal::before { content:''; position:absolute; inset:0 auto 0 0; width:3px;
-  background:linear-gradient(180deg, var(--fga), transparent); }
-.fgoal.f-watch { --fga:#7fa7d9; --fga2:#bcd6f5; }
-.fgoal.f-thieves { --fga:#a98be0; --fga2:#d7c6f7; }
-.fg-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
-.fg-badge { font-size:9.5px; font-weight:800; letter-spacing:.22em; text-transform:uppercase;
-  color:var(--fga2); background:color-mix(in srgb, var(--fga) 16%, transparent);
+  padding:12px 13px 13px; border-radius:16px; overflow:hidden; isolation:isolate;
+  background:linear-gradient(150deg, rgba(255,255,255,.05), rgba(8,8,12,.55));
+  border:1px solid rgba(255,255,255,.11); }
+.fgoal.f-watch { --fga:#7fa7d9; --fga2:#cfe2fb; }
+.fgoal.f-thieves { --fga:#a98be0; --fga2:#e0d2fb; }
+/* аврора: два мягких пятна фракционного цвета медленно дышат за стеклом */
+.fg-aura { position:absolute; inset:-40%; z-index:-1; pointer-events:none;
+  background:
+    radial-gradient(38% 55% at 18% 22%, color-mix(in srgb, var(--fga) 26%, transparent), transparent 70%),
+    radial-gradient(45% 60% at 85% 80%, color-mix(in srgb, var(--fga) 14%, transparent), transparent 72%);
+  animation:fgaura 9s ease-in-out infinite alternate; }
+@keyframes fgaura { from { transform:translate3d(-3%,-2%,0) rotate(-2deg) }
+  to { transform:translate3d(3%,2%,0) rotate(2deg) } }
+/* угольки: три искры всплывают и тают */
+.fg-embers { position:absolute; inset:0; z-index:-1; pointer-events:none; }
+.fg-embers i { position:absolute; bottom:-4px; width:3px; height:3px; border-radius:50%;
+  background:var(--fga2); opacity:0; filter:drop-shadow(0 0 4px var(--fga));
+  animation:fgember 5.2s linear infinite; }
+.fg-embers i:nth-child(1) { left:18%; animation-delay:0s; }
+.fg-embers i:nth-child(2) { left:52%; animation-delay:1.8s; animation-duration:6.4s; }
+.fg-embers i:nth-child(3) { left:81%; animation-delay:3.1s; animation-duration:5.8s; }
+@keyframes fgember { 0% { transform:translateY(0); opacity:0 }
+  12% { opacity:.85 } 70% { opacity:.4 }
+  100% { transform:translateY(-72px) translateX(6px); opacity:0 } }
+.fg-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+.fg-badge { position:relative; overflow:hidden; font-size:9.5px; font-weight:800;
+  letter-spacing:.24em; text-transform:uppercase; color:var(--fga2);
+  background:color-mix(in srgb, var(--fga) 15%, transparent);
   border:1px solid color-mix(in srgb, var(--fga) 45%, transparent);
-  border-radius:999px; padding:3px 9px; }
+  border-radius:999px; padding:3px 10px; }
+.fg-badge::after { content:''; position:absolute; inset:0;
+  background:linear-gradient(105deg, transparent 40%, rgba(255,255,255,.35) 50%, transparent 60%);
+  background-size:250% 100%; animation:fgsheen 3.4s linear infinite; }
 .fg-reward { font-size:10.5px; color:var(--ink-dim); }
-.fg-main { display:flex; gap:11px; align-items:center; }
-.fg-emblem { flex:0 0 auto; width:40px; height:40px; display:grid; place-items:center;
-  font-size:21px; border-radius:50%;
-  background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--fga) 28%, transparent), rgba(0,0,0,.4));
-  border:1px solid color-mix(in srgb, var(--fga) 55%, transparent);
-  box-shadow:0 0 14px color-mix(in srgb, var(--fga) 30%, transparent); }
-.fg-tx { min-width:0; display:flex; flex-direction:column; gap:2px; }
-.fg-title { font-size:15px; font-weight:800; letter-spacing:.2px; color:#fff; }
-.fg-task { font-size:12px; line-height:1.35; color:var(--ink-dim); }
-.fg-bar { position:relative; margin-top:10px; height:16px; border-radius:99px;
-  background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.08); overflow:hidden; }
+.fg-main { display:flex; gap:12px; align-items:center; }
+/* кольцо-прогресс: ободок медальона заполняется conic-градиентом на --p */
+.fg-ring { flex:0 0 auto; width:48px; height:48px; border-radius:50%; padding:3px;
+  background:conic-gradient(var(--fga) var(--p), rgba(255,255,255,.09) 0);
+  box-shadow:0 0 16px color-mix(in srgb, var(--fga) 35%, transparent);
+  transition:background .8s ease; }
+.fg-emblem { display:grid; place-items:center; width:100%; height:100%; border-radius:50%;
+  font-style:normal; font-size:20px;
+  background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.1), rgba(6,6,10,.92));
+  border:1px solid rgba(255,255,255,.08); }
+.fg-tx { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.fg-title { font-size:15.5px; font-weight:800; letter-spacing:.2px;
+  background:linear-gradient(90deg, #fff, var(--fga2));
+  -webkit-background-clip:text; background-clip:text; color:transparent; }
+.fg-task { font-size:11.5px; line-height:1.35; color:var(--ink-dim); }
+/* гигантский процент — как приборная стрелка */
+.fg-pct { flex:0 0 auto; font-size:26px; font-weight:900; line-height:1;
+  font-variant-numeric:tabular-nums; letter-spacing:-1px;
+  background:linear-gradient(180deg, var(--fga2), var(--fga));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 0 10px color-mix(in srgb, var(--fga) 45%, transparent)); }
+.fg-pct small { font-size:13px; font-weight:800; letter-spacing:0; }
+.fg-bar { position:relative; margin-top:11px; height:10px; border-radius:99px;
+  background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.07); overflow:hidden; }
 .fg-bar i { position:absolute; inset:0 auto 0 0; border-radius:99px;
-  background:linear-gradient(90deg, color-mix(in srgb, var(--fga) 55%, #000), var(--fga), var(--fga2));
+  background:linear-gradient(90deg, color-mix(in srgb, var(--fga) 50%, #000), var(--fga), var(--fga2));
   box-shadow:0 0 12px color-mix(in srgb, var(--fga) 60%, transparent);
-  transition:width .8s cubic-bezier(.2,.8,.2,1); }
+  transition:width .9s cubic-bezier(.2,.8,.2,1); }
 .fg-bar i::after { content:''; position:absolute; inset:0; border-radius:99px;
-  background:linear-gradient(105deg, transparent 38%, rgba(255,255,255,.35) 50%, transparent 62%);
+  background:linear-gradient(105deg, transparent 38%, rgba(255,255,255,.4) 50%, transparent 62%);
   background-size:220% 100%; animation:fgsheen 2.6s linear infinite; }
 @keyframes fgsheen { from { background-position:130% 0 } to { background-position:-90% 0 } }
-.fg-bar em { position:relative; z-index:1; display:grid; place-items:center; height:100%;
-  font-style:normal; font-size:10.5px; font-weight:800; letter-spacing:.4px; color:#fff;
-  text-shadow:0 1px 2px rgba(0,0,0,.8); font-variant-numeric:tabular-nums; }
+/* вехи 25/50/75 — засечки на треке */
+.fg-mk { position:absolute; top:2px; bottom:2px; width:1px; z-index:1;
+  background:rgba(255,255,255,.22); }
+.fg-foot { display:flex; align-items:baseline; justify-content:space-between; margin-top:6px; }
+.fg-cnt { font-size:12.5px; font-weight:800; color:#fff; font-variant-numeric:tabular-nums; }
+.fg-cnt em { font-style:normal; font-weight:600; font-size:11px; color:var(--ink-dim); }
+.fg-live { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-dim); }
+.fg-live::before { content:''; display:inline-block; width:5px; height:5px; border-radius:50%;
+  margin-right:5px; vertical-align:1px; background:var(--fga);
+  box-shadow:0 0 6px var(--fga); animation:fglive 1.8s ease-in-out infinite; }
+@keyframes fglive { 0%,100% { opacity:1 } 50% { opacity:.25 } }
 .fgoal.feast { border-color:rgba(232,167,74,.6);
-  box-shadow:0 0 22px rgba(232,167,74,.22), inset 0 0 22px rgba(232,167,74,.08);
   animation:fgfeast 2.4s ease-in-out infinite; }
 @keyframes fgfeast { 0%,100% { box-shadow:0 0 16px rgba(232,167,74,.18), inset 0 0 18px rgba(232,167,74,.06) }
-  50% { box-shadow:0 0 28px rgba(232,167,74,.34), inset 0 0 26px rgba(232,167,74,.12) } }
-@media (prefers-reduced-motion: reduce) { .fg-bar i::after, .fgoal.feast { animation:none } }
+  50% { box-shadow:0 0 30px rgba(232,167,74,.36), inset 0 0 26px rgba(232,167,74,.13) } }
+@media (prefers-reduced-motion: reduce) {
+  .fg-aura, .fg-embers i, .fg-badge::after, .fg-bar i::after, .fg-live::before, .fgoal.feast { animation:none } }
 .chron-open { margin-top:12px; width:100%; background:none; border:1px dashed var(--brass-d,#5a4326); border-radius:11px;
   padding:9px; cursor:pointer; font-family:var(--text),system-ui,sans-serif; font-size:13px; color:var(--gold,#f0b859);
   -webkit-tap-highlight-color:transparent; transition:background .14s; }

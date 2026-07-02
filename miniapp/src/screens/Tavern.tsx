@@ -270,25 +270,7 @@ export default function Tavern() {
                 ))}
               </div>
             ) : <div className="muted" style={{ fontStyle: 'italic', fontFamily: 'var(--text)' }}>Тишь да гладь — фракции дремлют. Пока.</div>}
-            {t.fgoal && (
-              <div className={`fgoal f-${t.fgoal.fac}${t.fgoal.feast ? ' feast' : ''}`}>
-                <div className="fg-head">
-                  <span className="fg-badge">Цель недели</span>
-                  <span className="fg-reward">🍺 сутки пира · сбыт +15%</span>
-                </div>
-                <div className="fg-main">
-                  <span className="fg-emblem">{t.fgoal.emblem || '⚜️'}</span>
-                  <div className="fg-tx">
-                    <b className="fg-title">{t.fgoal.feast ? 'Город гуляет!' : (t.fgoal.title || 'Цель недели')}</b>
-                    <span className="fg-task">{t.fgoal.feast ? 'Цель взята — сутки сбыт гостям +15%. Наливай!' : t.fgoal.task}</span>
-                  </div>
-                </div>
-                <div className="fg-bar">
-                  <i style={{ width: `${Math.max(t.fgoal.pct, 3)}%` }} />
-                  <em>{t.fgoal.done} / {t.fgoal.target} · {t.fgoal.pct}%</em>
-                </div>
-              </div>
-            )}
+            {t.fgoal && <FGoalBanner g={t.fgoal} />}
             <button className="chron-open" onClick={() => { haptic('light'); setChronOpen(true) }}>📜 Летопись города →</button>
             <button className="chron-open" onClick={() => { haptic('light'); setRatingOpen(true) }}>🏆 Топ таверн →</button>
           </div>
@@ -448,3 +430,48 @@ function CostTile({ k, need, have }: { k: string; need: number; have: number }) 
   )
 }
 
+// ЦЕЛЬ НЕДЕЛИ — ультрасовременный квест-баннер: кольцо-прогресс вокруг эмблемы
+// (conic), аврора фракционного цвета, угольки, вехи 25/50/75, докрутка счётчика.
+function FGoalBanner({ g }: { g: NonNullable<TavernState['fgoal']> }) {
+  const [num, setNum] = useState(0)
+  useEffect(() => {
+    let raf = 0
+    const t0 = performance.now()
+    const to = g.done
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / 900)
+      setNum(Math.round(to * (1 - Math.pow(1 - k, 3))))
+      if (k < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [g.done])
+  const pct = Math.max(g.pct, 2)
+  return (
+    <div className={`fgoal f-${g.fac}${g.feast ? ' feast' : ''}`}
+      style={{ ['--p' as string]: `${pct}%` } as React.CSSProperties}>
+      <div className="fg-aura" aria-hidden />
+      <div className="fg-embers" aria-hidden><i /><i /><i /></div>
+      <div className="fg-head">
+        <span className="fg-badge">Цель недели</span>
+        <span className="fg-reward">🍺 сутки пира · сбыт +15%</span>
+      </div>
+      <div className="fg-main">
+        <span className="fg-ring"><b className="fg-emblem">{g.emblem || '⚜️'}</b></span>
+        <div className="fg-tx">
+          <b className="fg-title">{g.feast ? 'Город гуляет!' : (g.title || 'Цель недели')}</b>
+          <span className="fg-task">{g.feast ? 'Цель взята — сутки сбыт гостям +15%. Наливай!' : g.task}</span>
+        </div>
+        <span className="fg-pct">{g.pct}<small>%</small></span>
+      </div>
+      <div className="fg-bar">
+        <s className="fg-mk" style={{ left: '25%' }} /><s className="fg-mk" style={{ left: '50%' }} /><s className="fg-mk" style={{ left: '75%' }} />
+        <i style={{ width: `${pct}%` }} />
+      </div>
+      <div className="fg-foot">
+        <span className="fg-cnt">{num.toLocaleString('ru-RU')} <em>/ {g.target.toLocaleString('ru-RU')}</em></span>
+        <span className="fg-live">город копит</span>
+      </div>
+    </div>
+  )
+}
