@@ -30,13 +30,15 @@ interface HuntState {
   hp: { cur: number; max: number; regen: number }; ready: { can: boolean; minutes: number }
   stats: { damage: number; crit: number; armor: number; luck: number }
   heal: { can: boolean; full: boolean; options: HealOpt[] }; beasts: Beast[]
+  flask?: { slots: number; options: FlaskOpt[] }
 }
+interface FlaskOpt { key: string; name: string; emoji: string; label: string; qty: number }
 interface Round { pd: number; crit: boolean; miss: boolean; ed: number; php: number; ehp: number }
 interface FightRes {
   ok: boolean; win: boolean; elite: boolean; enemy: { name: string; emoji: string; hp: number; sprite?: string; traits?: string[] }
   player_hp0: number; hp_max: number; rounds: Round[]; rounds_n: number; crits: number; overwhelmed: boolean
   loot: { gold: number; res: { key: string; name: string; emoji: string; qty: number }[]; trophies: string[]; rep: number }
-  gold_lost: number; hp_now: number; hunt: HuntState
+  gold_lost: number; hp_now: number; hunt: HuntState; flask?: string[]
 }
 
 const TRAIT: Record<string, string> = { venom: '☠ ядовит', evasive: '💨 увёртлив' }
@@ -65,6 +67,7 @@ export default function Sorties() {
   const [fight, setFight] = useState<FightRes | null>(null)
   const [step, setStep] = useState(-1)
   const [healOpen, setHealOpen] = useState(false)
+  const [flaskSel, setFlaskSel] = useState<string[]>([])   // фляга: до 2 порций на бой
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
   const [mode, setMode] = useState<'hunt' | 'night'>('hunt')
@@ -106,7 +109,7 @@ export default function Sorties() {
     if (busy) return
     setBusy(true); haptic('medium'); setPick(null)
     try {
-      const r = await api<FightRes>('hunt_fight', { id: b.id })
+      const r = await api<FightRes>('hunt_fight', { id: b.id, flask: flaskSel })
       set(r.hunt); setFight(r)
     } catch (e) {
       if (import.meta.env.DEV && !initData()) { setFight(synthFight(b, d)); return }   // dev-превью: демо-бой
@@ -209,8 +212,9 @@ export default function Sorties() {
       </div>
 
       {pick && (
-        <Sheet title={`${pick.emoji} ${pick.name}`} onClose={() => setPick(null)}>
-          <BeastBrief b={pick} hp={d.hp} ready={d.ready} busy={busy} onHunt={() => hunt(pick)} />
+        <Sheet title={`${pick.emoji} ${pick.name}`} onClose={() => { setPick(null); setFlaskSel([]) }}>
+          <BeastBrief b={pick} hp={d.hp} ready={d.ready} busy={busy} onHunt={() => hunt(pick)}
+            flask={d.flask} sel={flaskSel} setSel={setFlaskSel} />
         </Sheet>
       )}
       {healOpen && (
@@ -233,7 +237,12 @@ export default function Sorties() {
 }
 
 // ── Бриф зверя ───────────────────────────────────────────────────────────
-function BeastBrief({ b, hp, ready, busy, onHunt }: { b: Beast; hp: { cur: number; max: number }; ready: { can: boolean; minutes: number }; busy: boolean; onHunt: () => void }) {
+function BeastBrief({ b, hp, ready, busy, onHunt, flask, sel, setSel }: { b: Beast; hp: { cur: number; max: number }; ready: { can: boolean; minutes: number }; busy: boolean; onHunt: () => void; flask?: { slots: number; options: FlaskOpt[] }; sel: string[]; setSel: (s: string[]) => void }) {
+  const toggle = (k: string) => {
+    const i = sel.indexOf(k)
+    if (i >= 0) setSel(sel.filter((_, j) => j !== i))
+    else if (sel.length < (flask?.slots ?? 2)) setSel([...sel, k])
+  }
   return (
     <>
       {b.sprite && MONSTERS[b.sprite]
@@ -268,6 +277,25 @@ function BeastBrief({ b, hp, ready, busy, onHunt }: { b: Beast; hp: { cur: numbe
         ))}
         {b.rep > 0 && <div className="kv"><span>⭐ Репутация</span><b className="win-g">+{b.rep}</b></div>}
       </div>
+
+      {flask && flask.options.length > 0 && (
+        <>
+          <div className="cap">фляга — в бой ({sel.length}/{flask.slots})</div>
+          <div className="flask-row">
+            {flask.options.map((o) => {
+              const n = sel.filter((k) => k === o.key).length
+              return (
+                <button key={o.key} className={`flask-opt${n ? ' on' : ''}`} disabled={busy || (!n && sel.length >= flask.slots) || n >= o.qty}
+                  onClick={() => { haptic('light'); toggle(o.key) }}>
+                  <span className="fo-emo">{o.emoji}{n > 1 ? `×${n}` : ''}</span>
+                  <span className="fo-nm">{o.name}</span>
+                  <span className="fo-eff">{o.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
 
       <button className="btn danger" style={{ marginTop: 14 }} disabled={busy || !ready.can} onClick={onHunt}>
         {ready.can ? '⚔ Охотиться!' : `Ранен — ${hm(ready.minutes)}`}
@@ -498,6 +526,7 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
           <div className={`ep-res-h${fight.win && fight.elite ? ' rare' : ''}`}>{fight.win ? (fight.elite ? '✨ РЕДКАЯ ДОБЫЧА' : 'ПОБЕДА') : 'ПОРАЖЕНИЕ'}</div>
           {fight.win ? (
             <>
+              {fight.flask && fight.flask.length > 0 && <div className="ep-flask">🍺 Фляга: {fight.flask.join(' · ')}</div>}
               <div className="ep-tally">🗡 Уложил за {fight.rounds_n} р.{fight.crits > 0 ? ` · ${fight.crits} крит.` : ''} · осталось ❤{fight.hp_now}/{fight.hp_max}</div>
               <div className="ep-loot">
                 {fight.loot.gold > 0 && <span className="ep-loot-i" style={{ animationDelay: '0s' }}><ResIcon k="gold" size={22} />+{fmt(fight.loot.gold)}</span>}

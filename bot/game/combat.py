@@ -192,9 +192,11 @@ def _player_offense(stats: dict) -> tuple[int, int, int]:
 
 
 def _dodge_pct(stats: dict) -> int:
-    """Шанс уворота от удара зверя (роль удачи): % = удача × коэф, до потолка."""
-    return int(min(balance.HUNT_LUCK_DODGE_CAP,
-                   stats.get("luck", 0) * balance.HUNT_LUCK_DODGE_PER))
+    """Шанс уворота от удара зверя (роль удачи): % = удача × коэф, до потолка.
+    Плюс плоский бонус фляги (мёд) — поверх, общий потолок чуть выше."""
+    base = min(balance.HUNT_LUCK_DODGE_CAP,
+               stats.get("luck", 0) * balance.HUNT_LUCK_DODGE_PER)
+    return int(min(balance.HUNT_LUCK_DODGE_CAP + 15, base + stats.get("dodge_flat", 0)))
 
 
 def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
@@ -211,8 +213,10 @@ def resolve(stats: dict, enemy: Enemy, start_hp: int | None = None,
     v = balance.HUNT_DMG_VARIANCE
     traits = getattr(enemy, "traits", ())
     parmor = stats.get("armor", 0)
-    # твоя броня смягчает урон зверя (убыв. отдача); ЯДОВИТЫЙ бьёт сквозь броню
-    mit = 1.0 if "venom" in traits else balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + parmor)
+    # твоя броня смягчает урон зверя (убыв. отдача); ЯДОВИТЫЙ бьёт сквозь броню,
+    # если не выпит сбитень-антидот (фляга) — контрпик из производства таверны
+    venom_active = "venom" in traits and not stats.get("antidote")
+    mit = 1.0 if venom_active else balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + parmor)
     tmult = stats.get("dmg_taken_mult", 1.0)
     ehp = enemy.hp
     rounds = crits = dealt = 0
@@ -309,6 +313,7 @@ class HuntResult:
     gold_lost: int = 0
     hp_now: int = 0
     elite: bool = False        # попалась редкая элита (Фаза 3)
+    flask: list | None = None  # подписи эффектов выпитого перед боем (фаза B)
 
 
 def _now() -> datetime:
@@ -414,8 +419,39 @@ def heal(player, key: str, now: datetime | None = None) -> dict | None:
     return {"key": key, "healed": new - chp, "hp": new}
 
 
-def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
-    """Сходить на охоту: гейт по HP, бой от текущего HP, добыча/утомление/раны."""
+def flask_apply(player, keys: list[str] | None,
+                stats: dict, chp: int) -> tuple[int, list[str], list[str]]:
+    """Выпить/съесть до FLASK_SLOTS порций ИЗ ПОГРЕБА перед боем: списывает
+    продукты, мутирует stats (dmg/crit/dodge/antidote), возвращает
+    (hp_на_бой, применённые_ключи, подписи_эффектов). Нет в погребе — порция
+    просто пропускается (фронт шлёт актуальное, гонка не валит бой)."""
+    if not keys or player.tavern is None:
+        return chp, [], []
+    prods = dict(player.tavern.products or {})
+    used: list[str] = []
+    labels: list[str] = []
+    for key in list(keys)[:balance.FLASK_SLOTS]:
+        eff = balance.FLASK_EFFECTS.get(key)
+        if eff is None or prods.get(key, 0) <= 0:
+            continue
+        prods[key] -= 1
+        used.append(key)
+        labels.append(eff["label"])
+        stats["damage"] = stats.get("damage", 0) + eff.get("dmg", 0)
+        stats["crit"] = stats.get("crit", 0) + eff.get("crit", 0)
+        stats["dodge_flat"] = stats.get("dodge_flat", 0) + eff.get("dodge", 0)
+        if eff.get("antidote"):
+            stats["antidote"] = True
+        chp += eff.get("hp", 0)
+    if used:
+        player.tavern.products = prods
+    return chp, used, labels
+
+
+def hunt(player, enemy_id: str, rng: random.Random | None = None,
+         flask: list[str] | None = None) -> HuntResult:
+    """Сходить на охоту: гейт по HP, фляга (порции из погреба на бой), бой от
+    текущего HP, добыча/утомление/раны."""
     rng = rng or random
     enemy = ENEMY.get(enemy_id)
     if enemy is None:
@@ -431,6 +467,7 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
         enemy = elite
 
     stats = player_stats(player)  # снаряга + бафы (удача, толстая шкура)
+    chp, _used, flask_labels = flask_apply(player, flask, stats, chp)  # фляга (фаза B)
     fight = resolve(stats, enemy, chp, rng)
     player.hp_at = now
     if fight.win:
@@ -448,7 +485,8 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
         player.hp = max(1, min(fight.hp_left, chp - balance.HUNT_EXERTION))
         _mark_recovery(player, now)
         return HuntResult(ok=True, enemy=enemy, fight=fight, loot=loot,
-                          hp_now=player.hp, elite=elite is not None)
+                          hp_now=player.hp, elite=elite is not None,
+                          flask=flask_labels)
 
     lost = player.gold // balance.HUNT_LOSS_GOLD_DIV  # щепотка золота при поражении
     player.gold -= lost
@@ -457,4 +495,4 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None) -> HuntResult:
     _mark_recovery(player, now)
     return HuntResult(ok=True, enemy=enemy, fight=fight, gold_lost=lost,
                       elite=elite is not None,
-                      hp_now=player.hp)
+                      hp_now=player.hp, flask=flask_labels)

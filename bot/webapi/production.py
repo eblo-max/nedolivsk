@@ -462,6 +462,11 @@ def _hunt_state(p) -> dict:
                   "crit": min(bal.HUNT_CRIT_CAP, stats.get("crit", 0)),
                   "armor": stats.get("armor", 0), "luck": stats.get("luck", 0)},
         "heal": {"can": chp < mhp, "full": chp >= mhp, "options": heal_opts},
+        "flask": {"slots": bal.FLASK_SLOTS, "options": [
+            {"key": k, "name": prod.GOODS[k].name, "emoji": prod.GOODS[k].emoji,
+             "label": bal.FLASK_EFFECTS[k]["label"], "qty": int(prods.get(k, 0))}
+            for k in bal.FLASK_EFFECTS
+            if k in prod.GOODS and int(prods.get(k, 0)) > 0]},
         "beasts": beasts,
     }
 
@@ -499,12 +504,13 @@ async def _api_hunt_fight(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "error": "closed"})
     from bot.game import balance as bal, combat, production as prod
     eid = str(body.get("id") or "")
+    flask = [str(k) for k in (body.get("flask") or [])][:bal.FLASK_SLOTS]
     async with session_factory() as s:
         p = await repo.get_player(s, uid, for_update=True)
         if p is None or not p.tavern:
             return web.json_response({"ok": False, "error": "no_tavern"})
         chp0 = combat.current_hp(p)                  # HP на старте — для шкалы анимации
-        res = combat.hunt(p, eid)
+        res = combat.hunt(p, eid, flask=flask)
         if not res.ok:                               # unknown | lowhp
             return web.json_response({"ok": False, "error": res.reason, "minutes": res.minutes_left})
         if res.fight.win:
@@ -527,6 +533,7 @@ async def _api_hunt_fight(request: web.Request) -> web.Response:
         "enemy": {"name": res.enemy.name, "emoji": res.enemy.emoji, "hp": res.enemy.hp,
                   "sprite": ENEMY_SPRITE.get(res.enemy.id), "traits": list(res.enemy.traits)},
         "player_hp0": chp0, "hp_max": combat.max_hp(p), "rounds": res.fight.log,
+        "flask": res.flask or [],
         "rounds_n": res.fight.rounds, "crits": res.fight.crits, "overwhelmed": res.fight.overwhelmed,
         "loot": {"gold": (res.loot or {}).get("gold", 0) if res.fight.win else 0, "res": loot_res,
                  "trophies": (res.loot or {}).get("trophies", []) if res.fight.win else [],

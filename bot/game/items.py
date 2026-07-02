@@ -105,6 +105,7 @@ SOURCE_MULT = {
     "raid_rat": 1.35, "raid_troll": 1.6, "raid_demon": 1.85, "raid_dragon": 2.1,
 }
 ITEM_SOURCE = {
+    "skinner_knife": "hunt", "wolf_totem": "hunt",
     "fur_coat": "hunt", "fang_cleaver": "hunt", "swift_boots": "hunt", "prestige_ring": "hunt",
     "lynx_belt": "region", "tusk_belt": "region", "chitin_belt": "region",
     "orc_helm": "orc", "orc_plate": "orc", "orc_axe": "orc",
@@ -296,6 +297,28 @@ CATALOG: dict[str, Item] = {
             description="Снят с атамана. Блестит так, что и удача, и купцы косятся.",
             cost={"gold": 2000, "ingot": 6, "ring": 1},
             craft_hours=6, income_pct=5, luck=7,
+        ),
+        # ═══════ АЛЬТЕРНАТИВЫ В «МЁРТВЫЕ» СЛОТЫ (боевой пересмотр, фаза B):
+        # в слотах был один предмет — выбора билда не существовало. Теперь ось:
+        # правая рука — добытчик vs лесоруб; ноги — танк vs скороход;
+        # амулет — фарт-боевой vs доходный. ═══════
+        Item(
+            id="skinner_knife", slot="right_hand", name="Нож-свежевальщик",
+            description="Лёгкий, злой, всегда при деле. Добыче не нравится — тебе в самый раз.",
+            cost={"gold": 1400, "ingot": 3, "fang": 3},
+            craft_hours=4, damage=8, crit=4, luck=4,
+        ),
+        Item(
+            id="chain_skirt", slot="legs", name="Кольчужные штаны",
+            description="Тяжелей портков, зато колено не подломят. Ходишь как крепость.",
+            cost={"gold": 900, "ingot": 6, "grain": 20},
+            craft_hours=3, armor=7, vitality=7,
+        ),
+        Item(
+            id="wolf_totem", slot="amulet", name="Тотем зверолова",
+            description="Клык на жиле — на удачу в лесу и твёрдость руки в драке.",
+            cost={"gold": 1300, "ingot": 2, "sinew": 3, "fang": 2},
+            craft_hours=5, crit=3, luck=6, vitality=5,
         ),
         # ═══════ РЕГИОНАЛЬНЫЕ ПОЯСА (Фаза 4): из компонента зверя СВОЕГО региона.
         # СТАТЫ ИДЕНТИЧНЫ во всех регионах (паритет by-design) — отличается лишь
