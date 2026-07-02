@@ -600,7 +600,10 @@ async def _notify_returned(bot: Bot) -> None:
         # затем впитывание перекоса + редкий пульс — двигает цену всего мира сразу.
         # Молва о скачке цен идёт во ВСЕ чаты (это мировая новость).
         world.market_scale = max(1, await repo.count_known_chats(session))
-        marketmod.decay(world, now)
+        try:
+            marketmod.decay(world, now)
+        except Exception:      # noqa: BLE001 — рынок не должен убивать тик
+            logger.exception("тик: market.decay")
         if random.random() < balance.MARKET_PULSE_CHANCE:
             cit = npc.random_pulser()
             good, delta, _verb = cit.pulse
@@ -725,58 +728,73 @@ async def _notify_returned(bot: Bot) -> None:
                 repo.feed_push(session, _uid, _digest, kind="world")
         if now.minute == 0:          # раз в час чистим старые записи ленты
             await repo.feed_prune(session)
+        # ── ЖИВОЙ МИР: блоки изолированы — сбой одного не убивает тик
+        # (урок трёх крашлупов 02.07: outbox-кортеж, kind-порядок, decay).
         from bot.game import rumors as _rum
-        await _rum.flush(session, repo)      # сарафанное радио (сам троттлит)
-        from bot.game import fgoal as _fg
-        if not getattr(_fg, "_hydrated", False):   # после деплоя: пир из world
-            _fg.hydrate(world)
-            _fg._hydrated = True
-        _goal_done = _fg.flush(world, now)
-        if _goal_done:                        # цель недели взята — город гуляет
-            for _cid in await repo.all_chat_ids(session):
-                await deliver(lambda c=_cid, t=_goal_done: bot.send_message(c, t),
-                              what=f"fgoal→{_cid}")
-        # понедельник 12:10 МСК (9:10 UTC): фракция объявляет цель недели
-        from bot.game import town_npc as _tn
-        if (now.weekday() == 0 and now.hour == 9 and now.minute == 10
-                and _tn._once_per_day(world, "fgoal_announce", now)):
-            _g = _fg.current_goal(now)
-            _txt = ("📯 <b>ЦЕЛЬ НЕДЕЛИ</b>" + chr(10) + _g["text"] + chr(10)
-                    + "Награда: сутки городского пира (+15% к сбыту).")
-            for _cid in await repo.all_chat_ids(session):
-                await deliver(lambda c=_cid, t=_txt: bot.send_message(c, t),
-                              what=f"fgoal-week→{_cid}")
-        if now.minute % 15 == 0:             # NPC-трейдеры выходят 4 раза в час
-            from bot.game import npc_traders
-            _n = await npc_traders.tick(session, repo, world, now)
-            if _n:
-                logger.info("NPC-трейдеры выставили ордеров: %s", _n)
-        # NPC-жители чата: стражник 21:15 МСК (18:15 UTC), перекуп в пятницу 12:05 МСК
-        from bot.game import town_npc
-        npc_post = None
-        _wm_key = "watchman_am" if now.hour < 12 else "watchman_pm"
-        if (now.hour, now.minute) in ((6, 15), (18, 15))                 and town_npc._once_per_day(world, _wm_key, now):
-            cnt = await repo.count_open_orders(session, 0, "sell")                 + await repo.count_open_orders(session, 0, "buy")
-            from bot.game import fgoal as _fg2
-            _gs = _fg2.state(world, now)
-            _goal_line = (f"Цель недели: {_gs['done']}/{_gs['target']} ({_gs['pct']}%)."
-                          + (" Город гуляет!" if _gs["feast"] else ""))
-            _rline = _rum.last_text()
-            npc_post = town_npc.watchman_post(
-                cnt, any(b.status == "active" for b in live_raids),
-                worldevent.event_name(world) if hasattr(worldevent, "event_name") else None,
-                _goal_line + ((" " + _rline) if _rline else ""))
-        elif (now.hour == 9 and now.minute == 5
-              and town_npc._once_per_day(world, "dealer", now)):
-            from bot.game import production as _pr
-            rows = [{"good_name": _pr.GOODS[o.good].name, "qty": o.qty, "unit": o.unit_price}
-                    for o in await repo.seller_orders(session, -9001)
-                    if o.side == "buy" and o.good in _pr.GOODS]
-            npc_post = town_npc.dealer_post(rows)
-        if npc_post:
-            for _cid in await repo.all_chat_ids(session):
-                await deliver(lambda c=_cid, t=npc_post: bot.send_message(c, t),
-                              what=f"npc-post→{_cid}")
+        try:
+            await _rum.flush(session, repo)      # сарафанное радио (сам троттлит)
+        except Exception:      # noqa: BLE001
+            logger.exception("живой мир: слухи")
+        try:
+            from bot.game import fgoal as _fg
+            if not getattr(_fg, "_hydrated", False):   # после деплоя: пир из world
+                _fg.hydrate(world)
+                _fg._hydrated = True
+            _goal_done = _fg.flush(world, now)
+            if _goal_done:                        # цель недели взята — город гуляет
+                for _cid in await repo.all_chat_ids(session):
+                    await deliver(lambda c=_cid, t=_goal_done: bot.send_message(c, t),
+                                  what=f"fgoal→{_cid}")
+            # понедельник 12:10 МСК (9:10 UTC): фракция объявляет цель недели
+            from bot.game import town_npc as _tn
+            if (now.weekday() == 0 and now.hour == 9 and now.minute == 10
+                    and _tn._once_per_day(world, "fgoal_announce", now)):
+                _g = _fg.current_goal(now)
+                _txt = ("📯 <b>ЦЕЛЬ НЕДЕЛИ</b>" + chr(10) + _g["text"] + chr(10)
+                        + "Награда: сутки городского пира (+15% к сбыту).")
+                for _cid in await repo.all_chat_ids(session):
+                    await deliver(lambda c=_cid, t=_txt: bot.send_message(c, t),
+                                  what=f"fgoal-week→{_cid}")
+        except Exception:      # noqa: BLE001
+            logger.exception("живой мир: цель недели")
+        try:
+            if now.minute % 15 == 0:             # NPC-трейдеры выходят 4 раза в час
+                from bot.game import npc_traders
+                _n = await npc_traders.tick(session, repo, world, now)
+                if _n:
+                    logger.info("NPC-трейдеры выставили ордеров: %s", _n)
+        except Exception:      # noqa: BLE001
+            logger.exception("живой мир: NPC-трейдеры")
+        try:
+            # NPC-жители чата: стражник 9:15/21:15 МСК, перекуп 12:05 МСК
+            from bot.game import town_npc
+            npc_post = None
+            _wm_key = "watchman_am" if now.hour < 12 else "watchman_pm"
+            if ((now.hour, now.minute) in ((6, 15), (18, 15))
+                    and town_npc._once_per_day(world, _wm_key, now)):
+                cnt = (await repo.count_open_orders(session, 0, "sell")
+                       + await repo.count_open_orders(session, 0, "buy"))
+                from bot.game import fgoal as _fg2
+                _gs = _fg2.state(world, now)
+                _goal_line = (f"Цель недели: {_gs['done']}/{_gs['target']} ({_gs['pct']}%)."
+                              + (" Город гуляет!" if _gs["feast"] else ""))
+                _rline = _rum.last_text()
+                npc_post = town_npc.watchman_post(
+                    cnt, any(b.status == "active" for b in live_raids),
+                    None, _goal_line + ((" " + _rline) if _rline else ""))
+            elif (now.hour == 9 and now.minute == 5
+                  and town_npc._once_per_day(world, "dealer", now)):
+                from bot.game import production as _pr
+                rows = [{"good_name": _pr.GOODS[o.good].name, "qty": o.qty, "unit": o.unit_price}
+                        for o in await repo.seller_orders(session, -9001)
+                        if o.side == "buy" and o.good in _pr.GOODS]
+                npc_post = town_npc.dealer_post(rows)
+            if npc_post:
+                for _cid in await repo.all_chat_ids(session):
+                    await deliver(lambda c=_cid, t=npc_post: bot.send_message(c, t),
+                                  what=f"npc-post→{_cid}")
+        except Exception:      # noqa: BLE001
+            logger.exception("живой мир: NPC-посты")
 
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода
