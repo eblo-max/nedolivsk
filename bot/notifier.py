@@ -334,7 +334,7 @@ async def _notify_returned(bot: Bot) -> None:
                         texts.brew_ready_notification(tier) if phase == "ready"
                         else texts.brew_aged_notification(tier)
                     )
-                    outbox.append((player, msg, buildings_notify_kb()))
+                    outbox.append((player, msg, buildings_notify_kb(), "prod"))
                     new = dict(tavern.production)
                     new["brewery"] = {**bbatch, "notified": stage}
                     tavern.production = new

@@ -142,3 +142,19 @@ def test_urgent_dm_kb_routes(monkeypatch):
     assert btn.web_app and btn.web_app.url.endswith("/app/?startapp=raid")
     kb = urgent_dm_kb("invasion")
     assert kb.inline_keyboard[0][0].callback_data == "invopen"
+
+
+def test_outbox_appends_are_4_tuples():
+    """Регресс: 3-элементный outbox.append уронил нотифаер в проде (02.07)."""
+    import ast
+    tree = ast.parse(open("bot/notifier.py", encoding="utf-8").read())
+    bad = []
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "append"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "outbox"):
+            arg = node.args[0]
+            if not (isinstance(arg, ast.Tuple) and len(arg.elts) == 4):
+                bad.append(node.lineno)
+    assert not bad, f"outbox.append не 4-кортеж на строках: {bad}"
