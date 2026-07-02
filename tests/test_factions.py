@@ -124,15 +124,12 @@ def test_retail_night_bonus_actually_pays(monkeypatch):
     from datetime import datetime, timezone
     from bot.game import logic
 
-    class _T:
-        products = {"ale1": 10}
-        reputation = 50
-        rep_progress = 0
-        auction_sold = 0
-        level = 5
+    def _mk_t():
+        return NS(products={"ale1": 10}, reputation=50, rep_progress=0,
+                  auction_sold=0, level=5)
 
     def run(player):
-        t = _T(); t.products = {"ale1": 10}
+        t = _mk_t()
         monkeypatch.setattr(logic, "_now",
                             lambda: datetime(2026, 7, 1, 20, 30, tzinfo=timezone.utc))  # 23:30 МСК
         _sold, gold, _rep = logic.apply_retail(player, t, {"ale1": 5})
