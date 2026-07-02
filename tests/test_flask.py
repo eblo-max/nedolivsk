@@ -117,3 +117,24 @@ def test_nightrun_sbiten_clears_situation_penalty():
     dirty = nr.start(p, "", situation=sit)
     clean = nr.start(p, "", situation=sit, flask=["sbiten"])
     assert nr.success_p(clean, p, "fight") > nr.success_p(dirty, p, "fight")
+
+
+# ── Торг: купец всегда платёжеспособен (жалоба «соглашается и уходит») ────
+def test_merchant_can_afford_at_least_one():
+    """make_offer не рождает купца, который жмёт руку на цену, но не тянет
+    даже 1 штуку (wealth >= потолок цены за единицу)."""
+    import math
+    from bot.game import trade
+    for seed in range(500):
+        r = random.Random(seed)
+        tav = NS(products={"ale1": r.randint(3, 30)}, level=r.randint(1, 6), reputation=50)
+        pl = NS(story={"faction": {}, "npc_rel": {}}, gold=0)
+        offer = trade.make_offer(tav, pl, False, rng=r)
+        if not offer:
+            continue
+        assert offer["wealth"] >= math.ceil(offer["max_unit"]), offer
+        # на любую accept-цену покупает хотя бы 1
+        for unit in offer["prices"]:
+            dec, _ = trade.evaluate(offer, unit)
+            if dec == "accept":
+                assert trade._qty_affordable(offer, unit) >= 1, (offer, unit)

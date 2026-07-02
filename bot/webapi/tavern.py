@@ -444,6 +444,10 @@ async def _api_trade(request: web.Request) -> web.Response:
                           react=(f"«По {fork['mine']['unit']} 🪙 утяну лишь "
                                  f"{fork['mine']['qty']}. По {fork['full']['unit']} 🪙 — "
                                  f"заберу все {fork['full']['qty']}. Решай»"))
+            elif trademod._qty_affordable(offer, unit) <= 0:
+                ss.set_trade(p, None)
+                st.update(result="walk",
+                          react="«Эх, губу раскатал, да мошна пуста — не по карману. Бывай.»")
             else:
                 _finish(unit, "accept_high" if unit >= offer["fv"] * 1.15 else "accept")
         elif op == "push":                            # дожать контр-цену
@@ -476,6 +480,12 @@ async def _api_trade(request: web.Request) -> web.Response:
                                      f"{fork['mine']['qty']} — мошна не резиновая. "
                                      f"А уступишь по {fork['full']['unit']} 🪙 — "
                                      f"заберу все {fork['full']['qty']}. Ну?»"))
+                elif trademod._qty_affordable(offer, unit) <= 0:
+                    # ремень: купец согласился, но не тянет даже 1 — честный отказ,
+                    # не «продажа нулём» (иначе «соглашается и уходит» — жалоба 02.07)
+                    ss.set_trade(p, None)
+                    st.update(result="walk",
+                              react="«Эх, губа раскатал, да мошна пуста — не по карману. Бывай.»")
                 else:
                     _finish(unit, "accept_high" if unit >= offer["fv"] * 1.15 else "accept")
             elif decision == "counter":

@@ -8,6 +8,7 @@
 бюджет покупателя, ограниченная партия, случайный приход (без монополии).
 """
 
+import math
 import random
 from dataclasses import dataclass
 
@@ -178,6 +179,8 @@ def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
     # Бюджет: и архетип, и личный достаток горожанина (0..5 → 0.6×..1.35×).
     purse = (0.6 + cit.wealth * 0.15)
     wealth = max(fv, int(fv * qty * rng.uniform(*arch.wealth_mult) * purse))
+    wealth = max(wealth, math.ceil(max_unit))   # тянет ≥1 по потолку —
+    # иначе купец жмёт руку на цену, которую не может оплатить (уходит с нулём)
 
     prices = [max(1, int(round(fv * t))) for t in balance.TRADE_PRICE_TIERS]
     from bot.game import factions
