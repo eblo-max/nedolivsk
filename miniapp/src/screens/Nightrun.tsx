@@ -90,11 +90,20 @@ function Typewriter({ text, speed = 20 }: { text: string; speed?: number }) {
 
 const SAMPLE: NState = {
   ok: true, cooldown: 0, active: false, max_legs: 6, stats: { armor: 12, luck: 4 }, run: null,
+  flask: [
+    { key: 'ale2', name: 'Эль крепкий', emoji: '🍺', hint: 'смелее в драке', qty: 4 },
+    { key: 'mead', name: 'Медовуха', emoji: '🍯', hint: 'легче тишком', qty: 2 },
+    { key: 'sbiten', name: 'Сбитень', emoji: '🫖', hint: 'гасит дурноту города', qty: 1 },
+  ],
 }
 
 // ── Офлайн-движок для превью (вне Telegram): мок поведения бэка ──
 function offState(run: NRun | null, cooldown = 0): NState {
-  return { ...SAMPLE, cooldown, active: !!run, run }
+  return { ...SAMPLE, cooldown, active: !!run, run, flask: [
+    { key: 'ale2', name: 'Эль крепкий', emoji: '🍺', hint: 'смелее в драке', qty: 4 },
+    { key: 'mead', name: 'Медовуха', emoji: '🍯', hint: 'легче тишком', qty: 2 },
+    { key: 'sbiten', name: 'Сбитень', emoji: '🫖', hint: 'гасит дурноту города', qty: 1 },
+  ] }
 }
 function offStart(): NRun {
   return { leg: 1, state: 'fork', hp: 35, hp_max: 35, satchel: [], satchel_value: 0, situation: 'merchant_boom', can_push: true, rest_heal: 14, next_value: Math.round(25 * 1.45), growth: 1.45, fork: offFork(1) }

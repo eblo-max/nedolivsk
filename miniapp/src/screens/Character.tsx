@@ -68,8 +68,8 @@ const SAMPLE: CharState = {
   ok: true, name: 'ХОЗЯИН', worn: 3, slots_total: 11,
   hp: { cur: 78, max: 100, regen: 44 }, damage: 25, crit: 12, armor: 18, luck: 8, vylazka: 16,
   equipment: [
-    { slot: 'head', slot_name: 'Голова', id: 'leather_cap', name: 'Шапка трактирщика', tier: 2, sprite: 'shapka' },
-    { slot: 'chest', slot_name: 'Грудь', id: 'fartuk', name: 'Фартук трактирщика', tier: 1, sprite: 'bronya' },
+    { slot: 'head', slot_name: 'Голова', id: 'leather_cap', name: 'Шапка трактирщика фарта +2', tier: 2, sprite: 'shapka', plus: 2, sharpen: { next: 3, cost: 195, chance: 90 } },
+    { slot: 'chest', slot_name: 'Грудь', id: 'fartuk', name: 'Фартук трактирщика', tier: 1, sprite: 'bronya', plus: 0, sharpen: { next: 1, cost: 30, chance: 100 } },
     { slot: 'left_hand', slot_name: 'Левая рука' },
     { slot: 'right_hand', slot_name: 'Правая рука', id: 'master_axe', name: 'Топор хозяйский', tier: 1, sprite: 'master_axe' },
     { slot: 'weapon', slot_name: 'Оружие' }, { slot: 'belt', slot_name: 'Пояс' },

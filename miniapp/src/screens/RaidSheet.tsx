@@ -37,6 +37,11 @@ const DEV = import.meta.env.DEV
 // в памяти, чтобы прощёлкать сбор → битву → победу. В прод-сборке вырезается. ──
 const demoBoss = (): RaidState => ({
   id: 1, key: 'demon_slime', name: 'Адский Слизень', emoji: '😈', sprite: 'demon_slime',
+  flask: { drunk: null, options: [
+    { key: 'ale3', name: 'Эль выдержанный', emoji: '🍺', label: '+7 урона', qty: 3 },
+    { key: 'wine', name: 'Вино', emoji: '🍷', label: '+6% крита', qty: 2 },
+    { key: 'sbiten', name: 'Сбитень', emoji: '🫖', label: 'снимает проклятье', qty: 1 },
+  ] },
   blurb: 'Выперло из преисподней прямо посреди торга — туша смолы с рогами, харкает огнём и плодит из себя мелких бесов. Ползёт на кабаки, оставляя выжженный след.',
   armor: 11, status: 'gathering', n: 3, me_registered: false,
   roster: [{ name: 'Гриша Кабан', dmg: 0, hits: 0, mine: false }, { name: 'Авдотья', dmg: 0, hits: 0, mine: false }, { name: 'Прохор', dmg: 0, hits: 0, mine: false }],
