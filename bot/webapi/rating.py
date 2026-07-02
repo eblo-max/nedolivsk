@@ -65,6 +65,7 @@ _RANK_SNAPS: "_deque[tuple[float, dict[str, dict[int, int]]]]" = _deque(maxlen=6
 _TREND_WINDOW = 600.0   # целевой возраст базлайна (~10 мин «реального времени»)
 _SNAP_MIN = 60.0        # снимок не чаще раза в минуту
 _TREND_HYDRATED = False  # снимки из БД уже подняты в память (один раз на процесс)
+_OVERTAKEN_AT: dict[int, float] = {}   # анти-спам «тебя подвинули» (uid → epoch)
 
 
 async def _trend_hydrate(session) -> None:
@@ -162,6 +163,20 @@ async def snapshot_rating_ranks(session) -> None:
     now = time.time()
     cur_ranks = {k: {e["id"]: i for i, e in enumerate(_ranked(entries, k), 1)}
                  for k in _RATING_METRICS}
+    # «Тебя подвинули»: вылетел из топ-3 по ВВП со времени прошлого снимка →
+    # весть в ленту (kind=rating). Анти-спам: не чаще раза в 6ч на игрока.
+    prev = _RANK_SNAPS[-1][1] if _RANK_SNAPS else None
+    if prev and prev.get("gdp"):
+        old_top3 = {pid for pid, r in prev["gdp"].items() if r <= 3}
+        new_ranks = cur_ranks["gdp"]
+        for pid in old_top3:
+            new_r = new_ranks.get(pid)
+            if new_r is not None and new_r > 3 and                now - _OVERTAKEN_AT.get(pid, 0.0) > 6 * 3600:
+                _OVERTAKEN_AT[pid] = now
+                repo.feed_push(session, int(pid),
+                               f"🏆 Тебя подвинули с пьедестала — теперь #{new_r}. "
+                               "Пора напомнить, чей это город!", kind="rating")
+
     before = len(_RANK_SNAPS)
     _trend_record(now, cur_ranks)
     if len(_RANK_SNAPS) > before or (_RANK_SNAPS and _RANK_SNAPS[-1][0] == now):

@@ -3,20 +3,20 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { haptic } from '../telegram'
 
-interface Note { text: string; ago: string; read: boolean; kind?: string }
+interface Note { text: string; ago: string; read: boolean; kind?: string; count?: number }
 
 // тип вести → иконка и экран механики (тап по вести ведёт «к делу»)
 const KIND_ICON: Record<string, string> = {
   build: '🏗', prod: '🍺', exped: '⛏', craft: '⚒', hunt: '🏹', auction: '🔨',
   bourse: '🪙', raid: '⚔️', invasion: '🪓', mill: '🌾', bonus: '🎁',
-  story: '🚪', world: '🌍',
+  story: '🚪', world: '🌍', retail: '🍻', ref: '🎟', rating: '🏆',
 }
 const KIND_ROUTE: Record<string, string> = {
   build: '/buildings', prod: '/buildings', mill: '/buildings',
   exped: '/sorties', hunt: '/sorties',
   craft: '/character',
   auction: '/market', bourse: '/market',
-  raid: '/', bonus: '/', story: '/',
+  raid: '/', bonus: '/', story: '/', retail: '/', ref: '/', rating: '/',
 }
 
 // HTML-теги бота (<b>,<a>…) убираем, базовые сущности раскодируем — выводим как текст (без инъекций).
@@ -107,7 +107,7 @@ export default function NotificationsSheet({ admin, onClose }: { admin?: boolean
                   onClick={go}>
                   <span className="nf-ic">{(e.kind && KIND_ICON[e.kind]) || '🔔'}</span>
                   <div className="chron-body">
-                    <p className="chron-text">{plain(e.text)}</p>
+                    <p className="chron-text">{plain(e.text)}{(e.count || 1) > 1 && <b className="nf-count"> ×{e.count}</b>}</p>
                     {e.ago && <span className="chron-ago">{e.ago}{route ? ' · открыть →' : ''}</span>}
                   </div>
                 </div>

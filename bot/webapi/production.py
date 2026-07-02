@@ -395,6 +395,7 @@ async def _api_prod_claim(request: web.Request) -> web.Response:
         else:
             return web.json_response({"ok": False, "error": "unknown"})
         repo.add_log(s, "player", p.id, f"📦 забрал производство: {building}")
+        await repo.feed_mark_read_kind(s, uid, ["prod", "build"])
         await s.commit()
         st = _production_state(p, building)
     return web.json_response({"ok": True, "production": st, "toast": toast},

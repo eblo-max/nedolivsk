@@ -60,6 +60,7 @@ async def _api_mill_collect(request: web.Request) -> web.Response:
             return web.json_response({"ok": False, "error": "nothing", "mill": millmod.state(player)})
         inventory.add(player, "grain", grain)
         repo.add_log(s, "player", player.id, f"🌾 телега привезла зерно +{grain}")
+        await repo.feed_mark_read_kind(s, uid, ["mill"])
         await s.commit()
         note = "rich" if grain >= base * 1.3 else ("mishap" if grain <= base * 0.75 else "")
         st = millmod.state(player)
@@ -294,6 +295,10 @@ async def _api_story_choice(request: web.Request) -> web.Response:
             for line in ctx.chat_echo:               # эхо в группу — через очередь нотифаера
                 repo.queue_notify(s, p.chat_id, line)
         repo.add_log(s, "player", p.id, f"🚪 {st.title}")
+        _dg, _dr = int(p.gold) - g0, int(p.reputation or 0) - r0
+        _bits = ([f"{_dg:+d} 🪙"] if _dg else []) + ([f"{_dr:+d} ⭐"] if _dr else [])
+        repo.feed_push(s, uid, f"🚪 {st.title}: выбор сделан"
+                       + (" — " + ", ".join(_bits) if _bits else ""), kind="story")
         await s.commit()
         # дельты для красивого исхода
         names = {**bal.RESOURCE_NAMES, **bal.GOODS_NAMES}
@@ -626,6 +631,7 @@ async def _api_bonus(request: web.Request) -> web.Response:
             return web.json_response({"ok": False, "error": res.reason or "none",
                                       "state": _tavern_state(p, p.tavern)})
         repo.add_log(s, "player", p.id, f"🎁 активировал баф «{res.boon.name}»")
+        await repo.feed_mark_read_kind(s, uid, ["bonus"])
         await s.commit()
         st = _tavern_state(p, p.tavern)
     return web.json_response({"ok": True, "state": st,
@@ -670,6 +676,7 @@ async def _api_expedition(request: web.Request) -> web.Response:
             return web.json_response({"ok": False, "error": "nothing"})
         total = sum(amount for _, amount, _ in claimed)
         repo.add_log(s, "player", p.id, f"🎒 забрал добычу бригад: {total} ед.")
+        await repo.feed_mark_read_kind(s, uid, ["exped"])   # весть погашена делом
         await s.commit()
         st = _tavern_state(p, p.tavern)
         panel = _panel_data(p, p.tavern, "expedition")
@@ -695,6 +702,7 @@ async def _api_retail_sell(request: web.Request) -> web.Response:
         if sold:
             newbie.mark(p, "nb_sale")          # веха грамоты новосёла
             repo.add_log(s, "player", p.id, f"🍺 налил гостям: +{gold} 🪙, +{rep} репутации")
+            repo.feed_push(s, uid, f"🍻 Налил гостям: +{gold} 🪙, +{rep} ⭐", kind="retail")
         await s.commit()
         st = _tavern_state(p, p.tavern)
     return web.json_response({"ok": True, "state": st, "gold": gold, "rep": rep, "sold": bool(sold)},

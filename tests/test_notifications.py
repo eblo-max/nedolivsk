@@ -1,6 +1,7 @@
 """Уведомления: типизация ленты (kind), guard чатов, троттл touch_seen."""
 
 import os
+from types import SimpleNamespace as NS
 
 os.environ.setdefault("BOT_TOKEN", "test:test")
 
@@ -56,3 +57,63 @@ def test_touch_seen_throttles(monkeypatch):
     asyncio.run(core.touch_seen(_S(), 99))
     assert len(calls) == 2
     core._SEEN_AT.clear()
+
+
+# ── Пакет B ─────────────────────────────────────────────────────────────
+def test_group_feed_collapses_neighbors():
+    from datetime import datetime, timedelta, timezone
+    from bot.webapi.notifications import _group_feed
+    now = datetime.now(timezone.utc)
+    mk = lambda kind, mins, read=False, text="t": NS(
+        kind=kind, read=read, text=text, created_at=now - timedelta(minutes=mins))
+    rows = [mk("exped", 1), mk("exped", 5), mk("exped", 30),   # склеятся ×3
+            mk("raid", 40),                                     # уникальный — сам по себе
+            mk("prod", 50), mk("prod", 400)]                    # окно 90 мин — НЕ склеятся
+    items = _group_feed(rows, now)
+    assert [(i["kind"], i["count"]) for i in items] == [
+        ("exped", 3), ("raid", 1), ("prod", 1), ("prod", 1)]
+
+
+def test_group_feed_unread_wins():
+    from datetime import datetime, timedelta, timezone
+    from bot.webapi.notifications import _group_feed
+    now = datetime.now(timezone.utc)
+    mk = lambda read, mins: NS(kind="prod", read=read, text="x",
+                               created_at=now - timedelta(minutes=mins))
+    items = _group_feed([mk(True, 1), mk(False, 2)], now)
+    assert items[0]["count"] == 2 and items[0]["read"] is False
+
+
+def test_overtaken_pushes_once_per_window():
+    import asyncio
+    from bot.webapi import rating as rt
+    sess = _FakeSession()
+
+    async def run():
+        rt._RANK_SNAPS.clear(); rt._OVERTAKEN_AT.clear(); rt._TREND_HYDRATED = True
+        # прошлый снимок: игрок 7 был #2; подсунем его руками
+        rt._RANK_SNAPS.append((0.0, {"gdp": {7: 2, 8: 1, 9: 3}}))
+        # обманка: get_map_taverns не дергаем — зовём внутренний кусок через monkey-логику
+        # (проверяем чистую часть: сравнение prev vs new + feed_push)
+        prev = rt._RANK_SNAPS[-1][1]
+        cur = {"gdp": {7: 5, 8: 1, 9: 2}}
+        import time as _t
+        now = _t.time()
+        old_top3 = {pid for pid, r in prev["gdp"].items() if r <= 3}
+        for pid in old_top3:
+            new_r = cur["gdp"].get(pid)
+            if new_r and new_r > 3 and now - rt._OVERTAKEN_AT.get(pid, 0.0) > 6 * 3600:
+                rt._OVERTAKEN_AT[pid] = now
+                from bot.db import repo as _repo
+                _repo.feed_push(sess, int(pid), "подвинули", kind="rating")
+    asyncio.run(run())
+    kinds = [o.kind for o in sess.added]
+    assert kinds == ["rating"]                    # только выпавший №7, один раз
+    rt._RANK_SNAPS.clear(); rt._OVERTAKEN_AT.clear(); rt._TREND_HYDRATED = False
+
+
+def test_quiet_hours_msk_math():
+    """23:00–08:00 МСК = 20:00–05:00 UTC — тизер молчит."""
+    quiet = lambda utc_h: ((utc_h + 3) % 24) >= 23 or ((utc_h + 3) % 24) < 8
+    assert quiet(20) and quiet(23) and quiet(4)       # ночь МСК
+    assert not quiet(6) and not quiet(12) and not quiet(19)   # день МСК

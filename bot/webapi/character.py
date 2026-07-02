@@ -195,6 +195,7 @@ async def _api_craft_claim(request: web.Request) -> web.Response:
         if not r.ok:                           # none | not_ready
             return web.json_response({"ok": False, "error": r.reason, "minutes": r.minutes_left})
         repo.add_log(s, "player", p.id, f"🎁 выковал «{r.item.name}» ★{r.tier}")
+        await repo.feed_mark_read_kind(s, uid, ["craft"])
         await s.commit()
         ch, fg = _character_state(p), _forge_state(p)
     return web.json_response({"ok": True, "character": ch, "forge": fg,

@@ -9,6 +9,33 @@ from bot.db import repo
 from bot.db.base import session_factory
 from bot.webapi.core import _auth, _chron_ago, _is_admin, touch_seen
 
+# Какие типы склеиваем в ленте («⛏ Бригады вернулись ×3»): массовые повторы
+# одного дела; уникальные события (рейд/аукцион/мир) не трогаем.
+_GROUP_KINDS = {"exped", "prod", "build", "craft", "hunt", "retail", "mill"}
+_GROUP_WINDOW_MIN = 90
+
+
+def _group_feed(rows: list, now) -> list[dict]:
+    """Схлопнуть СОСЕДНИЕ записи одного типа в пределах окна: item.count ≥ 1.
+    rows — свежие→старые (как отдаёт feed_list)."""
+    out: list[dict] = []
+    for r in rows:
+        prev = out[-1] if out else None
+        same = (prev is not None and r.kind and prev["kind"] == r.kind
+                and r.kind in _GROUP_KINDS
+                and (prev["_ts"] - r.created_at).total_seconds() <= _GROUP_WINDOW_MIN * 60)
+        if same:
+            prev["count"] += 1
+            prev["read"] = prev["read"] and bool(r.read)
+        else:
+            out.append({"text": r.text, "read": bool(r.read), "kind": r.kind or "",
+                        "count": 1, "_ts": r.created_at,
+                        "ago": _chron_ago(r.created_at, now)})
+    for it in out:
+        it.pop("_ts", None)
+    return out
+
+
 async def _api_notifications(request: web.Request) -> web.Response:
     """Лента уведомлений игрока (раздел «Уведомления») — зеркало ВСЕХ DM + счётчик непрочитанных."""
     uid, body = await _auth(request)
@@ -20,9 +47,7 @@ async def _api_notifications(request: web.Request) -> web.Response:
         rows = await repo.feed_list(s, uid, 60)
         unread = await repo.feed_unread(s, uid)
         await s.commit()
-    items = [{"text": r.text, "read": bool(r.read), "kind": r.kind or "",
-              "ago": _chron_ago(r.created_at, now)}
-             for r in rows]
+    items = _group_feed(rows, now)
     return web.json_response({"ok": True, "items": items, "unread": unread},
                              headers={"Cache-Control": "no-store"})
 

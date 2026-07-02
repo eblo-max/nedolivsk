@@ -750,7 +750,10 @@ async def _notify_returned(bot: Bot) -> None:
 
         # ТИЗЕР «весть в таверну» — единственное, что бот шлёт по личным вестям.
         # Один на пачку непрочитанных (анти-спам через notif_pinged); суть — в мини-аппе.
-        ping_ids = await repo.feed_ping_targets(session)
+        # Тихие часы (МСК 23–8): ночью не будим — флаг не ставится, утром догоним.
+        msk_hour = (now.hour + 3) % 24
+        quiet = msk_hour >= 23 or msk_hour < 8
+        ping_ids = [] if quiet else await repo.feed_ping_targets(session)
         if ping_ids:
             await session.commit()                 # фиксируем флаг до сетевых вызовов
             for pid in ping_ids:

@@ -398,6 +398,20 @@ async def feed_ping_targets(session: AsyncSession, limit: int = 300) -> list[int
     return ids
 
 
+async def feed_mark_read_kind(session: AsyncSession, user_id: int,
+                              kinds: list[str]) -> None:
+    """Погасить вести типов kinds действием в механике: забрал постройку —
+    весть «достроена» больше не «непрочитанная» (и бейдж честный)."""
+    if not kinds:
+        return
+    await session.execute(
+        update(NotifFeed)
+        .where(NotifFeed.user_id == user_id,
+               NotifFeed.read.is_(False),
+               NotifFeed.kind.in_(kinds))
+        .values(read=True))
+
+
 async def feed_prune(session: AsyncSession, days: int = 45) -> None:
     """Чистим старые записи ленты (по возрасту) — таблица не растёт бесконечно."""
     cut = datetime.now(timezone.utc) - timedelta(days=days)
@@ -710,7 +724,8 @@ async def grant_referral_rewards(session: AsyncSession, invitee: Player) -> dict
         referrer.tavern.reputation += balance.REFERRAL_INVITER_REP
     queue_notify(session, referrer.id,
                  f"🍻 Твой зазыв сработал — новый кабатчик в Недоливске! "
-                 f"+{balance.REFERRAL_INVITER_GOLD} 🪙 и +{balance.REFERRAL_INVITER_REP} ⭐.")
+                 f"+{balance.REFERRAL_INVITER_GOLD} 🪙 и +{balance.REFERRAL_INVITER_REP} ⭐.",
+                 kind="ref")
     activated = await count_referrals(session, referrer.id)   # включая этого (уже помечен)
     while (referrer.ref_tier < len(balance.REFERRAL_TIERS)
            and activated >= balance.REFERRAL_TIERS[referrer.ref_tier][0]):
@@ -719,5 +734,6 @@ async def grant_referral_rewards(session: AsyncSession, invitee: Player) -> dict
         economy.record(referrer, "referral", bonus)
         referrer.ref_tier += 1
         queue_notify(session, referrer.id,
-                     f"🏅 Зазывала: {need} друзей в деле — жирный бонус +{bonus} 🪙!")
+                     f"🏅 Зазывала: {need} друзей в деле — жирный бонус +{bonus} 🪙!",
+                     kind="ref")
     return {"invitee_gold": balance.REFERRAL_INVITEE_GOLD}
