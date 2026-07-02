@@ -245,13 +245,26 @@ def player_power(player) -> int:
     return max(1, round(base * (1 + crit)))
 
 
-def player_damage(player, rng: random.Random | None = None) -> tuple[int, bool]:
-    """Урон игрока по боссу за удар: снаряга + уровень, крит ×2, разброс ±20%."""
+def flask_mods(keys: list[str] | None) -> dict:
+    """Суммарный боевой эффект выпитого на рейд: урон/крит/противоядие."""
+    out = {"dmg": 0, "crit": 0, "antidote": False}
+    for k in keys or []:
+        eff = balance.FLASK_EFFECTS.get(k) or {}
+        out["dmg"] += eff.get("dmg", 0)
+        out["crit"] += eff.get("crit", 0)
+        out["antidote"] = out["antidote"] or bool(eff.get("antidote"))
+    return out
+
+
+def player_damage(player, rng: random.Random | None = None,
+                  flask: dict | None = None) -> tuple[int, bool]:
+    """Урон игрока по боссу за удар: снаряга + уровень + фляга, крит ×2, разброс ±20%."""
     rng = rng or random
+    fl = flask or {}
     stats = combat.player_stats(player)
     base = (balance.BASE_DAMAGE + stats.get("damage", 0)
-            + (player.level or 1) * balance.LEVEL_DAMAGE)
-    crit_pct = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0))
+            + (player.level or 1) * balance.LEVEL_DAMAGE + fl.get("dmg", 0))
+    crit_pct = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0) + fl.get("crit", 0))
     crit = rng.randint(1, 100) <= crit_pct
     dmg = base * (2 if crit else 1) * rng.uniform(0.8, 1.2)
     return max(1, int(dmg)), crit
@@ -470,7 +483,8 @@ def apply_hit(boss, player, dmg: int, now: datetime | None = None,
 
 
 def resolve_hit(boss, player, now: datetime | None = None,
-                rng: random.Random | None = None) -> dict:
+                rng: random.Random | None = None,
+                flask_keys: list[str] | None = None) -> dict:
     """Единый расчёт удара по боссу со всеми механиками и запись результата.
     Порядок: урон игрока → 💀 проклятье (×CURSE) → 🛡 щит (×WARD) → толща-броня
     → 👹 миньоны (сперва их щит, остаток — боссу). Мутирует boss; коммит снаружи.
@@ -478,9 +492,11 @@ def resolve_hit(boss, player, now: datetime | None = None,
     curse/ward (активны ли), adds_dmg, adds_left, adds_cleared, casts (сработавшие
     на этом ударе HP-пороговые заклинания — для пуша бойцам)."""
     now = now or _now()
-    raw, crit = player_damage(player, rng)
+    mods = flask_mods(flask_keys)
+    raw, crit = player_damage(player, rng, mods)
 
-    curse = curse_left(boss, now) > 0
+    # сбитень отпаивает от проклятья босса — урон не режется
+    curse = curse_left(boss, now) > 0 and not mods["antidote"]
     if curse:
         raw = max(1, round(raw * CURSE_FACTOR))
 

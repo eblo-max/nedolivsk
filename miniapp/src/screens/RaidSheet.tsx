@@ -17,6 +17,7 @@ export interface RaidState {
   stun_left?: number; ward_left?: number; curse_left?: number; adds_hp?: number; adds_pct?: number
   my_cd?: number; my_stunned?: boolean
   report?: boolean; won?: boolean; top?: Fighter[]; my_gold?: number; i_fought?: boolean
+  flask?: { drunk?: string[] | null; options: { key: string; name: string; emoji: string; label: string; qty: number }[] }
 }
 interface Victory {
   name: string; emoji: string; sprite: string; top: Fighter[]
@@ -149,6 +150,7 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
   const [stunned, setStunned] = useState(false)
   const [floats, setFloats] = useState<Float[]>([])
   const [toast, setToast] = useState<string>('')
+  const [flaskSel, setFlaskSel] = useState<string[]>([])
   // диапазон хода босса к краям — от ширины экрана (босс реально доходит до бортов)
   const [paceRange] = useState(() => Math.round(Math.min(window.innerWidth, 640) * 0.3))
   const boss = useBossDirector(paceRange)
@@ -235,7 +237,7 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
     if (busy || cd > 0 || boss.dead) return
     setBusy(true); haptic('rigid')
     try {
-      const r = await raidApi<HitResp>('raid/hit', {})
+      const r = await raidApi<HitResp>('raid/hit', st?.flask?.drunk == null && flaskSel.length ? { flask: flaskSel } : {})
       if (r.dead && r.victory) {
         termRef.current = true; boss.kill(); thud(true); hapticNotify('success')
         setTimeout(() => { setVictory(r.victory!); onGold?.() }, 1100)
@@ -335,6 +337,7 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
     <BattleView
       st={st} cd={cd} stunned={stunned} busy={busy} floats={floats} toast={toast}
       boss={boss} onHit={hit} onClose={() => { haptic('light'); onClose() }} sprite={sprite} emoji={emoji}
+      flaskSel={flaskSel} onFlask={(k) => setFlaskSel((cur) => cur.includes(k) ? cur.filter((x) => x !== k) : cur.length < 2 ? [...cur, k] : cur)}
     />
   )
 }
@@ -382,9 +385,10 @@ function GatherView({ st, busy, onJoin, onClose, sprite, emoji }: {
 }
 
 // ── Экран битвы ──────────────────────────────────────────────────────────────
-function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose, sprite, emoji }: {
+function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose, sprite, emoji, flaskSel, onFlask }: {
   st: RaidState; cd: number; stunned: boolean; busy: boolean; floats: Float[]; toast: string
   boss: ReturnType<typeof useBossDirector>; onHit: () => void; onClose: () => void; sprite: string; emoji: string
+  flaskSel: string[]; onFlask: (k: string) => void
 }) {
   const ends = useTicker(st.ends_left)
   const phase = st.phase ?? 1
@@ -539,6 +543,20 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
               <span key={i} className={`raid-mini-i${f.mine ? ' mine' : ''}`}>{i + 1}. {f.name} · {fmt(f.dmg)}</span>
             ))}
           </div>
+        )}
+        {st.flask && st.flask.drunk == null && st.flask.options.length > 0 && (
+          <div className="raid-flask">
+            <span className="raid-flask-h">🍺 Хлебнуть на бой (до 2):</span>
+            {st.flask.options.map((f) => (
+              <button key={f.key} className={`raid-flask-chip${flaskSel.includes(f.key) ? ' on' : ''}`}
+                onClick={() => { haptic('light'); onFlask(f.key) }}>
+                {f.emoji} {f.label} <em>×{f.qty}</em>
+              </button>
+            ))}
+          </div>
+        )}
+        {st.flask && (st.flask.drunk?.length ?? 0) > 0 && (
+          <div className="raid-flask drunk">🍺 Выпито на бой: {st.flask.drunk!.length} порц. — действует до конца битвы</div>
         )}
         {cd > 0 ? (
           <button className="btn raid-hit wait" disabled>

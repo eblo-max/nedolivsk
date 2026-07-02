@@ -76,3 +76,22 @@ def test_trade_deal_options_none_when_affordable_or_broke():
     assert trade.deal_options(rich, 14, want=6) is None       # тянет всё — вилки нет
     broke = {**rich, "wealth": 20}   # 20//6=3 < пол (6) — вилки нет, лишь частичный
     assert trade.deal_options(broke, 14, want=6) is None      # всё не осилит даже по полу
+
+
+# ── Фляга в рейде ────────────────────────────────────────────────────────
+def test_raid_flask_mods_aggregate():
+    from bot.game import raid
+    m = raid.flask_mods(["ale3", "wine"])
+    assert m == {"dmg": 7, "crit": 6, "antidote": False}
+    assert raid.flask_mods(["sbiten"])["antidote"] is True
+    assert raid.flask_mods(None) == {"dmg": 0, "crit": 0, "antidote": False}
+
+
+def test_raid_player_damage_flask_boost():
+    from bot.game import raid
+    p = _pl({}, level=5)
+    rng = random.Random(3)
+    base, _ = raid.player_damage(p, rng)
+    rng = random.Random(3)                         # тот же ролл — чистая разница
+    boosted, _ = raid.player_damage(p, rng, raid.flask_mods(["ale3"]))
+    assert boosted > base                          # +7 к базе до разброса

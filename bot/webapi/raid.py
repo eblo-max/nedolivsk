@@ -182,6 +182,20 @@ async def _api_raid(request: web.Request) -> web.Response:
         boss = await _raid_start_if_due(s, boss, now)    # сбор вышел → бой/уход сразу
         if boss is not None and boss.status in ("gathering", "active"):
             dto = _raid_dto(boss, uid)
+            # фляга: что уже выпито на этот бой + что есть в погребе (эль/вино/сбитень)
+            from bot.game import balance as bal, production as prodm
+            p = await repo.get_player(s, uid)
+            prods = (p.tavern.products if p and p.tavern else None) or {}
+            me = (boss.contributions or {}).get(str(uid)) or {}
+            dto["flask"] = {
+                "drunk": me.get("flask"),
+                "options": [{"key": k, "name": prodm.GOODS[k].name,
+                             "emoji": prodm.GOODS[k].emoji,
+                             "label": bal.FLASK_EFFECTS[k]["label"],
+                             "qty": int(prods.get(k, 0))}
+                            for k in ("ale1", "ale2", "ale3", "wine", "sbiten")
+                            if k in prodm.GOODS and int(prods.get(k, 0)) > 0],
+            }
         elif boss is not None and boss.status in ("dead", "expired"):
             dto = _raid_report_dto(boss, uid)
         else:
@@ -255,7 +269,18 @@ async def _api_raid_hit(request: web.Request) -> web.Response:
                  "stunned": rd.stunned(boss, player.id, now), "raid": _raid_dto(boss, uid)},
                 headers={"Cache-Control": "no-store"})
 
-        res = rd.resolve_hit(boss, player, now)        # урон + проклятье/щит/толща/миньоны
+        # Фляга на рейд: первый удар списывает порции из погреба, дальше — весь бой.
+        from bot.game import combat as cb
+        cons = dict(boss.contributions or {})
+        me = dict(cons.get(str(uid)) or {})
+        fl = me.get("flask")
+        if fl is None:
+            keys = [str(k) for k in ((body or {}).get("flask") or [])]
+            _, fl, _ = cb.flask_apply(player, keys, {}, 0) if keys else (0, [], [])
+            me["flask"] = fl
+            cons[str(uid)] = me
+            boss.contributions = cons
+        res = rd.resolve_hit(boss, player, now, flask_keys=fl)  # урон + фляга + проклятье/щит/толща/миньоны
         repo.add_log(s, "player", player.id, f"⚔️ рейд: −{res['dmg']} HP боссу (мини-апп)")
         second_wind = rd.maybe_second_wind(boss, now)  # хил+рык на 30% HP (один раз)
 
