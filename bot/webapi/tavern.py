@@ -370,9 +370,11 @@ async def _api_trade(request: web.Request) -> web.Response:
         if not offer:
             return web.json_response({"ok": False, "error": "gone"})
         world = await repo.get_or_create_world(s)
-        st = {"result": None, "react": None, "qty": 0, "gold": 0, "unit": 0}
+        st = {"result": None, "react": None, "qty": 0, "gold": 0, "unit": 0,
+              "asked": 0, "short": False}
 
         def _finish(unit: int, kind: str) -> None:
+            asked = int(offer.get("qty", 0))
             qn, gn = _sell(p, offer, unit)
             ss.set_trade(p, None)
             if qn:
@@ -380,7 +382,14 @@ async def _api_trade(request: web.Request) -> web.Response:
                 gn_name = prod.GOODS[offer["good"]].name if offer["good"] in prod.GOODS else offer["good"]
                 repo.add_log(s, "player", p.id, f"🤝 продал купцу {qn}×{gn_name} за {gn} 🪙 (мини-апп)")
                 market.nudge(world, offer["good"], qn * bal.MARKET_WHOLESALE_WEIGHT)
-                st.update(result="sold", react=trademod.reaction(offer, kind), qty=qn, gold=gn, unit=unit)
+                react = trademod.reaction(offer, kind)
+                # мошна не резиновая: согласился на цену, но взял меньше заявленного —
+                # СКАЗАТЬ об этом прямо (иначе игрок думает, что его обсчитали)
+                short = qn < min(asked, int((p.tavern.products or {}).get(offer["good"], 0)) + qn)
+                if short:
+                    react += f" «Мошна не резиновая — по такой цене беру {qn}, не обессудь»"
+                st.update(result="sold", react=react, qty=qn, gold=gn, unit=unit,
+                          asked=asked, short=short)
             else:
                 st.update(result="walk", react=trademod.reaction(offer, "walk"))
 

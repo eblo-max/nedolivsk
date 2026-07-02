@@ -10,7 +10,7 @@ export interface TradeData {
 }
 interface TradeResp {
   ok: boolean; result?: 'sold' | 'counter' | 'walk'; react?: string
-  qty?: number; gold?: number; unit?: number; trade?: TradeData | null; state?: unknown
+  qty?: number; gold?: number; unit?: number; asked?: number; short?: boolean; trade?: TradeData | null; state?: unknown
 }
 
 const TIER = ['подешевле', 'по рынку', 'втридорога']
@@ -43,7 +43,7 @@ export default function TradeSheet({ offer, onClose, onState }: {
   const [d, setD] = useState<TradeData>(offer)
   const [phase, setPhase] = useState<'deal' | 'sold' | 'walk'>('deal')
   const [react, setReact] = useState('')
-  const [sold, setSold] = useState<{ qty: number; gold: number; unit: number } | null>(null)
+  const [sold, setSold] = useState<{ qty: number; gold: number; unit: number; asked: number; short: boolean } | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function act(op: string, idx?: number) {
@@ -53,7 +53,7 @@ export default function TradeSheet({ offer, onClose, onState }: {
       const r = await tradeApi(op, idx, d)
       if (r.state) onState?.(r.state)
       setReact(r.react || '')
-      if (r.result === 'sold') { setSold({ qty: r.qty || 0, gold: r.gold || 0, unit: r.unit || 0 }); setPhase('sold'); hapticNotify('success') }
+      if (r.result === 'sold') { setSold({ qty: r.qty || 0, gold: r.gold || 0, unit: r.unit || 0, asked: r.asked || 0, short: !!r.short }); setPhase('sold'); hapticNotify('success') }
       else if (r.result === 'walk') { setPhase('walk'); hapticNotify('warning') }
       else if (r.result === 'counter' && r.trade) { setD(r.trade); haptic('light') }
     } catch { setPhase('walk') }
@@ -82,6 +82,9 @@ export default function TradeSheet({ offer, onClose, onState }: {
           <>
             <div className="trd-deal"><ResIcon k="gold" size={26} />+{fmt(sold?.gold || 0)}</div>
             <div className="trd-deal-sub">продал {sold?.qty} × по {sold?.unit} 🪙/шт</div>
+            {sold?.short && (
+              <div className="trd-short">⚠ хотел ×{sold.asked}, но по такой цене мошны хватило лишь на {sold.qty}</div>
+            )}
             {react && <p className="trd-react sold">{react}</p>}
             <button className="btn trd-ok" onClick={() => { haptic('light'); onClose() }}>🍺 Готово</button>
           </>

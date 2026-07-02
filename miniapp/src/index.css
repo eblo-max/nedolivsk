@@ -1194,6 +1194,10 @@ body {
 .lb-err { display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 0 6px; }
 .lb-err .btn { width:auto; padding:9px 18px; }
 
+/* торг: недобор по мошне купца — честная приписка */
+.trd-short { text-align:center; font-family:system-ui,sans-serif; font-size:11.5px;
+  color:#e7b54a; margin-top:4px; }
+
 /* события черт в бою (фаза C): всплывающие бейджи над ареной */
 .ep-events { position:absolute; inset:0; pointer-events:none; z-index:6; }
 .ep-ev { position:absolute; top:34%; padding:4px 10px; border-radius:999px;
