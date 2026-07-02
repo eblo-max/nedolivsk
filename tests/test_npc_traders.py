@@ -44,11 +44,12 @@ def test_friday_full_cast_and_budgets():
         assert 1 <= o["qty"] <= npct.NPC_ORDER_QTY_MAX
 
 
-def test_weekday_no_monastery_and_open_order_skip():
+def test_monastery_daily_and_open_order_skip():
     r = _Repo()
     wed = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
     asyncio.run(npct.tick(None, r, _world(), wed))
-    assert all(o["nid"] != -9002 for o in r.orders)     # монастырь ждёт пятницы
+    mon = [o for o in r.orders if o["nid"] == -9002]
+    assert mon and mon[0]["side"] == "buy"              # мёд берут каждый день
     r2 = _Repo(open_cnt=1)
     n = asyncio.run(npct.tick(None, r2, _world(), wed))
     assert n == 0 and r2.orders == []                   # ордера висят — не дублируем

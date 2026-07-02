@@ -10,8 +10,8 @@ import random
 import time
 from collections import deque
 
-RUMOR_EVERY_MIN = 35        # не чаще одного слуха в ~полчаса
-PLAYER_COOLDOWN_H = 6       # об одном кабатчике — не чаще раза в 6 часов
+RUMOR_EVERY_MIN = 12        # слух каждые ~12 минут — город болтлив
+PLAYER_COOLDOWN_H = 2       # об одном кабатчике — не чаще раза в 2 часа
 THRESHOLDS = {"auction": 120, "night": 100, "pickpocket": 25, "trade": 150}
 
 _TEMPLATES = {

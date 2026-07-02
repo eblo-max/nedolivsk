@@ -715,7 +715,7 @@ async def _notify_returned(bot: Bot) -> None:
             await repo.feed_prune(session)
         from bot.game import rumors as _rum
         await _rum.flush(session, repo)      # сарафанное радио (сам троттлит)
-        if now.minute == 30:                 # час биржи: NPC-трейдеры ставят ордера
+        if now.minute % 15 == 0:             # NPC-трейдеры выходят 4 раза в час
             from bot.game import npc_traders
             _n = await npc_traders.tick(session, repo, world, now)
             if _n:
@@ -723,13 +723,14 @@ async def _notify_returned(bot: Bot) -> None:
         # NPC-жители чата: стражник 21:15 МСК (18:15 UTC), перекуп в пятницу 12:05 МСК
         from bot.game import town_npc
         npc_post = None
-        if now.hour == 18 and now.minute == 15 and town_npc._once_per_day(world, "watchman", now):
+        _wm_key = "watchman_am" if now.hour < 12 else "watchman_pm"
+        if (now.hour, now.minute) in ((6, 15), (18, 15))                 and town_npc._once_per_day(world, _wm_key, now):
             cnt = await repo.count_open_orders(session, 0, "sell")                 + await repo.count_open_orders(session, 0, "buy")
             npc_post = town_npc.watchman_post(
                 cnt, any(b.status == "active" for b in live_raids),
                 worldevent.event_name(world) if hasattr(worldevent, "event_name") else None,
                 None)
-        elif (now.weekday() == 4 and now.hour == 9 and now.minute == 5
+        elif (now.hour == 9 and now.minute == 5
               and town_npc._once_per_day(world, "dealer", now)):
             from bot.game import production as _pr
             rows = [{"good_name": _pr.GOODS[o.good].name, "qty": o.qty, "unit": o.unit_price}

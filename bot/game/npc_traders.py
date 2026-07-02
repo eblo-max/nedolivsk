@@ -19,8 +19,8 @@ TRADERS = {
     -9001: {"name": "Перекуп Сизый", "style": "cheap",
             "daily_gold": 400,   # скупает дешёвку ниже 0.8×справедливой
             "goods": ("ale1", "ale2", "bread", "cheese")},
-    -9002: {"name": "Монастырь Святой Бочки", "style": "mead_friday",
-            "daily_gold": 600,   # по пятницам скупает мёд/медовуху по честной
+    -9002: {"name": "Монастырь Святой Бочки", "style": "mead",
+            "daily_gold": 300, "friday_gold": 600,   # мёд каждый день, в пятницу — вдвое
             "goods": ("mead",)},
     -9003: {"name": "Спекулянт Крысобой", "style": "supply",
             "daily_qty": 10,     # завозит дефицит по 1.25×цены (сток золота)
@@ -74,10 +74,9 @@ async def tick(session, repo, world, now: datetime | None = None,
                 repo.create_order(session, 0, nid, good, qty, unit, side="buy")
                 spent[str(nid)] = used + qty * unit
                 placed += 1
-        elif style == "mead_friday":
-            if now.weekday() != 4:
-                continue
-            budget = spec["daily_gold"] - used
+        elif style == "mead":
+            cap = spec["friday_gold"] if now.weekday() == 4 else spec["daily_gold"]
+            budget = cap - used
             good = spec["goods"][0]
             if good not in prod.GOODS:
                 continue
