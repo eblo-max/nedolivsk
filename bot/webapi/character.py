@@ -22,7 +22,7 @@ def _character_state(p) -> dict:
         entry = eq.get(slot_key)
         item = it.CATALOG.get(it.parse_entry(entry)[0]) if entry else None
         if item:
-            _, tier, plus, aff = it.parse_full(entry)
+            _, tier, plus, _aff = it.parse_full(entry)
             row = {"slot": slot_key, "slot_name": slot_name, "id": item.id,
                    "name": it.display_name(entry), "tier": tier,
                    "sprite": item.sprite or item.id, "trophy": not item.craftable,
