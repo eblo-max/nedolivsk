@@ -103,6 +103,10 @@ async def _spa(request: web.Request) -> web.Response:
     if tail and target.is_file() and str(target).startswith(str(MINIAPP_DIST.resolve())):
         cache = "no-store" if target.name == "index.html" else "public, max-age=86400"
         return web.FileResponse(target, headers={"Cache-Control": cache})
+    # путь с расширением (ассет) без файла → честный 404, а не HTML-200:
+    # иначе <img> получал text/html, а браузер КЕШИРОВАЛ его как «картинку».
+    if "." in tail.rsplit("/", 1)[-1]:
+        return web.Response(status=404)
     return web.FileResponse(MINIAPP_DIST / "index.html", headers={"Cache-Control": "no-store"})
 
 
