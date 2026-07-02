@@ -85,7 +85,6 @@ def test_trader_memory_bends_offer():
     tav = NS(products={"ale1": 20}, level=5, reputation=50)
     friend = NS(story={"npc_rel": {}, "faction": {}}, gold=0)
     # выставим память вручную под конкретного купца из ролла
-    rng = random.Random(5)
     probe = trade.make_offer(tav, friend, False, rng=random.Random(5))
     cid = probe["cit"]
     warm = NS(story={"npc_rel": {cid: 5}, "faction": {}}, gold=0)
