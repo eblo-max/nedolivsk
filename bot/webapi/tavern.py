@@ -12,6 +12,7 @@ from bot.db.base import session_factory
 from bot.game import worldmap
 from bot.webapi.core import (
     _AV_BY_ESTATE, _auth, _init_user, _is_admin, _npc_avatar, _verify_init_data,
+    touch_seen,
 )
 from bot.webapi.raid import _raid_summary
 
@@ -236,6 +237,7 @@ async def _api_state(request: web.Request) -> web.Response:
         return body
     from bot.game import story_engine as se, buff as buffmod
     async with session_factory() as s:
+        await touch_seen(s, uid)   # апп-активность: нуджи/рейд-пуши видят игрока живым
         p = await repo.get_player(s, uid, for_update=True)
         if p is None or not p.tavern:
             return web.json_response({"ok": False, "error": "no_tavern"})

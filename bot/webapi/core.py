@@ -139,6 +139,30 @@ def _chron_ago(ts, now) -> str:
     return "вчера" if days == 1 else f"{days} дн назад"
 
 
+# «Игрок жив»: мини-апп раньше НЕ обновлял last_seen_at (только бот-middleware) —
+# нудж «вернись» бил по игравшим каждый день в аппе, а рейд-пуш «активным за
+# 7 дней» до них не доходил. Троттлим в памяти: не чаще раза в 5 минут на игрока.
+_SEEN_AT: dict[int, float] = {}
+_SEEN_EVERY = 300.0
+
+
+async def touch_seen(session, uid: int) -> None:
+    """Отметить активность игрока из мини-аппа (+ сброс лестницы нуджей)."""
+    now = time.time()
+    if now - _SEEN_AT.get(uid, 0.0) < _SEEN_EVERY:
+        return
+    _SEEN_AT[uid] = now
+    if len(_SEEN_AT) > 5000:                    # потолок памяти
+        _SEEN_AT.clear()
+        _SEEN_AT[uid] = now
+    from sqlalchemy import update as _update
+    from sqlalchemy import func as _func
+    from bot.db.models import Player as _Player
+    await session.execute(
+        _update(_Player).where(_Player.id == uid)
+        .values(last_seen_at=_func.now(), nudge_tier=0))
+
+
 def base_url() -> str:
     """Публичный https-адрес Mini App (для кнопки web_app). Из WEBAPP_BASE_URL,
     иначе из RAILWAY_PUBLIC_DOMAIN. Пусто → кнопку карты не показываем."""

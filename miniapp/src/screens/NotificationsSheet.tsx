@@ -1,8 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { haptic } from '../telegram'
 
-interface Note { text: string; ago: string; read: boolean }
+interface Note { text: string; ago: string; read: boolean; kind?: string }
+
+// тип вести → иконка и экран механики (тап по вести ведёт «к делу»)
+const KIND_ICON: Record<string, string> = {
+  build: '🏗', prod: '🍺', exped: '⛏', craft: '⚒', hunt: '🏹', auction: '🔨',
+  bourse: '🪙', raid: '⚔️', invasion: '🪓', mill: '🌾', bonus: '🎁',
+  story: '🚪', world: '🌍',
+}
+const KIND_ROUTE: Record<string, string> = {
+  build: '/buildings', prod: '/buildings', mill: '/buildings',
+  exped: '/sorties', hunt: '/sorties',
+  craft: '/character',
+  auction: '/market', bourse: '/market',
+  raid: '/', bonus: '/', story: '/',
+}
 
 // HTML-теги бота (<b>,<a>…) убираем, базовые сущности раскодируем — выводим как текст (без инъекций).
 function plain(t: string): string {
@@ -15,6 +30,7 @@ function plain(t: string): string {
 /** Раздел «Уведомления» — зеркало ВСЕХ DM-нотификаций бота. При открытии гасим бейдж.
  *  Для админа — кнопка засеять все типы уведомлений (тест ленты). */
 export default function NotificationsSheet({ admin, onClose }: { admin?: boolean; onClose: () => void }) {
+  const nav = useNavigate()
   const [items, setItems] = useState<Note[] | null>(null)
   const [err, setErr] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -79,15 +95,24 @@ export default function NotificationsSheet({ admin, onClose }: { admin?: boolean
           <p className="chron-empty">«Тихо, как в погребе на рассвете. Ни одной вести — знать, мир тебя пока бережёт.»</p>
         ) : (
           <div className="chron-list">
-            {items.map((e, i) => (
-              <div key={i} className={`chron-row nf-row${e.read ? '' : ' nf-unread'}`}>
-                <span className="chron-dot" />
-                <div className="chron-body">
-                  <p className="chron-text">{plain(e.text)}</p>
-                  {e.ago && <span className="chron-ago">{e.ago}</span>}
+            {items.map((e, i) => {
+              const route = e.kind ? KIND_ROUTE[e.kind] : undefined
+              const go = () => {
+                if (!route) return
+                haptic('light'); onClose()
+                if (route !== location.pathname.replace(/^.*\/app/, '')) nav(route)
+              }
+              return (
+                <div key={i} className={`chron-row nf-row${e.read ? '' : ' nf-unread'}${route ? ' nf-tap' : ''}`}
+                  onClick={go}>
+                  <span className="nf-ic">{(e.kind && KIND_ICON[e.kind]) || '🔔'}</span>
+                  <div className="chron-body">
+                    <p className="chron-text">{plain(e.text)}</p>
+                    {e.ago && <span className="chron-ago">{e.ago}{route ? ' · открыть →' : ''}</span>}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
         <button className="btn gold chron-close" onClick={() => { haptic('light'); onClose() }}>← Закрыть</button>

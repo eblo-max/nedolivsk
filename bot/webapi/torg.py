@@ -170,7 +170,7 @@ async def _api_auction(request: web.Request) -> web.Response:
             repo.add_log(s, "player", p.id, "🔨 торги закрыты (мини-апп)")
             if res is not None:                        # DM как у нотифаера — чтобы паритет был полный
                 from bot import texts as _t
-                repo.queue_notify(s, p.id, _t.auction_settled(res))
+                repo.queue_notify(s, p.id, _t.auction_settled(res), kind="auction")
             await s.commit()
         out = {"ok": True, "open": True, "gold": p.gold, "admin": _is_admin(uid), **_auction_state(p, world)}
         res = _auc_result((p.story or {}).get("auc_last"))

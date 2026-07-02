@@ -164,7 +164,7 @@ async def _raid_start_if_due(s, boss, now):
         locked.status = "active"
         locked.ends_at = rd.fight_until(now)
         for pid in list((locked.contributions or {}).keys()):
-            repo.queue_notify(s, int(pid), _t.raid_fight_ping())
+            repo.queue_notify(s, int(pid), _t.raid_fight_ping(), kind="raid")
     else:
         locked.status = "expired"        # никто не пришёл — ушёл
     await s.commit()
@@ -264,7 +264,7 @@ async def _api_raid_hit(request: web.Request) -> web.Response:
             if push:
                 for pid in (boss.contributions or {}):
                     if int(pid) != player.id:
-                        repo.queue_notify(s, int(pid), push)
+                        repo.queue_notify(s, int(pid), push, kind="raid")
             await s.commit()                            # урон в БД ДО ответа
             toast = ("🐲 ВТОРОЕ ДЫХАНИЕ! Босс воспрял и взревел — все оглушены!"
                      if second_wind else texts.raid_hit_toast(res, boss.hp, boss.max_hp))
@@ -284,7 +284,8 @@ async def _api_raid_hit(request: web.Request) -> web.Response:
                 pp.gold += plan["gold"][pid]
                 economy.record(pp, "raid", int(plan["gold"][pid]))
                 repo.queue_notify(s, pid,
-                                  f"⚔️ Босс повержен! Твоя доля добычи: +{plan['gold'][pid]} 🪙")
+                                  f"⚔️ Босс повержен! Твоя доля добычи: +{plan['gold'][pid]} 🪙",
+                                  kind="raid")
         drop_line, winner_name = "", None
         if plan["winner"] is not None:
             winner = await repo.get_player(s, plan["winner"], for_update=True)
@@ -294,7 +295,7 @@ async def _api_raid_hit(request: web.Request) -> web.Response:
                 if got:
                     rarity = rd.RARITY.get((plan["drop"] or {}).get("rarity"), "")
                     drop_line = f"{rarity} — {got}" if rarity else got
-                    repo.queue_notify(s, winner.id, f"🎁 С босса тебе выпал {rarity} трофей: {got}")
+                    repo.queue_notify(s, winner.id, f"🎁 С босса тебе выпал {rarity} трофей: {got}", kind="raid")
         top_full = sorted(((pid, r.get("name", pid), int(r.get("dmg", 0)))
                            for pid, r in (boss.contributions or {}).items()
                            if r.get("dmg", 0) > 0), key=lambda x: -x[2])
@@ -390,7 +391,7 @@ async def _api_raid_summon(request: web.Request) -> web.Response:
         pids = (await s.execute(
             _select(_Player.id).where(_Player.last_seen_at >= cut))).scalars().all()
         for pid in pids:
-            repo.queue_notify(s, pid, _t.raid_push_dm(boss))
+            repo.queue_notify(s, pid, _t.raid_push_dm(boss), kind="raid")
         rd.set_active(boss.id)                             # кнопка «Рейд-босс» сразу
         await s.commit()
         dto = _raid_dto(boss, uid)

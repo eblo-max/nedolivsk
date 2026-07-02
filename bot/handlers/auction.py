@@ -553,7 +553,7 @@ async def _match_sell(session: AsyncSession, player: Player,
         _seller_fame(player, k)                # молва + рейтинг продавцу
         _give(buyer.tavern, good, k)           # покупателю (оплачено из залога)
         repo.queue_notify(session, buyer.id,
-                          f"📥 По твоей заявке свели {k}×{nm} (из залога {gross} 🪙)")
+                          f"📥 По твоей заявке свели {k}×{nm} (из залога {gross} 🪙)", kind="auction")
         repo.add_log(session, "player", buyer.id, f"📥 заявка свелась: {k}×{nm}")
         bo.qty -= k
         if bo.qty <= 0:
@@ -591,7 +591,7 @@ async def _match_buy(session: AsyncSession, player: Player,
             seller.gold += net
             _seller_fame(seller, k)            # молва + рейтинг продавцу
             repo.queue_notify(session, seller.id,
-                              f"🛒 Твой лот свели на бирже: {k}×{nm} → +{net} 🪙")
+                              f"🛒 Твой лот свели на бирже: {k}×{nm} → +{net} 🪙", kind="auction")
             repo.add_log(session, "player", seller.id, f"🛒 лот свёлся: {k}×{nm}")
         so.qty -= k
         if so.qty <= 0:
@@ -637,7 +637,7 @@ async def _do_buy(session: AsyncSession, player: Player, chat_id: int | None,
         _seller_fame(seller, qty)             # молва + рейтинг продавцу
         repo.add_log(session, "player", seller.id, f"🏪 продал на бирже {qty}×{nm}")
         repo.queue_notify(session, seller.id,
-                          f"🛒 На бирже купили твой товар: {qty}×{nm} → +{net} 🪙")
+                          f"🛒 На бирже купили твой товар: {qty}×{nm} → +{net} 🪙", kind="auction")
     order.qty -= qty
     if order.qty <= 0:
         await repo.delete_order(session, order.id)
@@ -656,7 +656,7 @@ async def _do_fill(session: AsyncSession, player: Player, chat_id: int | None,
     _seller_fame(player, qty)                 # молва + рейтинг продавцу
     _give(buyer.tavern, good, qty)
     repo.queue_notify(session, buyer.id,
-                      f"📥 По твоей заявке доставили {qty}×{nm} (из залога {gross} 🪙)")
+                      f"📥 По твоей заявке доставили {qty}×{nm} (из залога {gross} 🪙)", kind="auction")
     repo.add_log(session, "player", buyer.id, f"📥 заявка: получил {qty}×{nm}")
     order.qty -= qty
     if order.qty <= 0:

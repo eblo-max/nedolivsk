@@ -7,7 +7,7 @@ from aiohttp import web
 
 from bot.db import repo
 from bot.db.base import session_factory
-from bot.webapi.core import _auth, _chron_ago, _is_admin
+from bot.webapi.core import _auth, _chron_ago, _is_admin, touch_seen
 
 async def _api_notifications(request: web.Request) -> web.Response:
     """Лента уведомлений игрока (раздел «Уведомления») — зеркало ВСЕХ DM + счётчик непрочитанных."""
@@ -16,9 +16,12 @@ async def _api_notifications(request: web.Request) -> web.Response:
         return body
     now = datetime.now(timezone.utc)
     async with session_factory() as s:
+        await touch_seen(s, uid)
         rows = await repo.feed_list(s, uid, 60)
         unread = await repo.feed_unread(s, uid)
-    items = [{"text": r.text, "read": bool(r.read), "ago": _chron_ago(r.created_at, now)}
+        await s.commit()
+    items = [{"text": r.text, "read": bool(r.read), "kind": r.kind or "",
+              "ago": _chron_ago(r.created_at, now)}
              for r in rows]
     return web.json_response({"ok": True, "items": items, "unread": unread},
                              headers={"Cache-Control": "no-store"})

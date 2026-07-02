@@ -320,12 +320,12 @@ async def cleanup_logs(session: AsyncSession, keep: int = 3000) -> None:
 
 # ── Отложенные уведомления (outbox) ──────────────────────────────────────
 def queue_notify(session: AsyncSession, user_id: int, text: str,
-                 photo: str | None = None) -> None:
+                 photo: str | None = None, kind: str = "") -> None:
     """Положить личку игроку в очередь (атомарно со сделкой; шлёт нотифаер).
     photo — file_id картинки: тогда уйдёт фото с подписью (text).
-    Зеркалим в персистентную ленту мини-аппа (раздел «Уведомления»)."""
+    Зеркалим в персистентную ленту мини-аппа; kind — тип вести (иконка/переход)."""
     session.add(Notification(user_id=user_id, text=text[:1024], photo=photo))
-    feed_push(session, user_id, text)
+    feed_push(session, user_id, text, kind=kind)
 
 
 # ── Снимки рангов для тренда доски почёта (переживают деплой) ─────────────
@@ -347,11 +347,12 @@ async def rank_snap_add(session: AsyncSession, ts: float, data: dict,
 
 
 # ── Лента уведомлений мини-аппа (зеркало ВСЕХ DM) ─────────────────────────
-def feed_push(session: AsyncSession, user_id: int, text: str) -> None:
+def feed_push(session: AsyncSession, user_id: int, text: str,
+              kind: str = "") -> None:
     """Добавить уведомление в персистентную ленту игрока (раздел «Уведомления»)."""
-    if not text:
+    if not text or user_id < 0:      # id<0 = группа (эхо в чат) — не в личную ленту
         return
-    session.add(NotifFeed(user_id=user_id, text=text[:1024]))
+    session.add(NotifFeed(user_id=user_id, text=text[:1024], kind=kind[:32]))
 
 
 async def feed_list(session: AsyncSession, user_id: int,
@@ -380,9 +381,13 @@ async def feed_mark_read(session: AsyncSession, user_id: int) -> None:
 async def feed_ping_targets(session: AsyncSession, limit: int = 300) -> list[int]:
     """Кому слать тизер «весть в таверну»: есть непрочитанные И ещё не пинговали.
     Сразу ставим флаг notif_pinged (один тизер на пачку — анти-спам)."""
+    active_cut = datetime.now(timezone.utc) - timedelta(minutes=3)
     rows = await session.execute(
         select(Player.id).where(
             Player.notif_pinged.is_(False),
+            # кто в игре ПРЯМО СЕЙЧАС — не пингуем (видит бейдж сам); флаг не
+            # ставим → пинганём после выхода, если так и не прочитает
+            (Player.last_seen_at.is_(None)) | (Player.last_seen_at < active_cut),
             Player.id.in_(
                 select(NotifFeed.user_id).where(NotifFeed.read.is_(False)))
         ).limit(limit))

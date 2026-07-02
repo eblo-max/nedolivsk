@@ -5,7 +5,7 @@ from aiohttp import web
 
 from bot.db import repo
 from bot.db.base import session_factory
-from bot.webapi.core import _auth
+from bot.webapi.core import _auth, touch_seen
 
 def _cost_items(p, cost: dict) -> list:
     """Стоимость в виде [{key,name,emoji,need,have,ok}] — для стройки и рецептов.
@@ -512,10 +512,12 @@ async def _api_hunt(request: web.Request) -> web.Response:
         return web.json_response({"ok": True, "closed": True, "note": HUNT_CLOSED_NOTE},
                                  headers={"Cache-Control": "no-store"})
     async with session_factory() as s:
+        await touch_seen(s, uid)
         p = await repo.get_player(s, uid)
         if p is None or not p.tavern:
             return web.json_response({"ok": False, "error": "no_tavern"})
         st = _hunt_state(p)
+        await s.commit()                      # зафиксировать touch_seen
     return web.json_response(st, headers={"Cache-Control": "no-store"})
 
 

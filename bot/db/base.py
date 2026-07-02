@@ -296,6 +296,11 @@ async def create_tables() -> None:
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "notif_pinged BOOLEAN NOT NULL DEFAULT FALSE"
         ))
+        # Тип вести в ленте (иконка/переход в мини-аппе), 02.07.2026
+        await conn.execute(text(
+            "ALTER TABLE notif_feed ADD COLUMN IF NOT EXISTS "
+            "kind VARCHAR(32) NOT NULL DEFAULT ''"
+        ))
         # Зазывала (рефералка): кто привёл, выдана ли награда, сколько тиров взято.
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS referred_by BIGINT"

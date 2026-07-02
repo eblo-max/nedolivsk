@@ -78,7 +78,8 @@ async def _apply_invasion(session, inv, plan: dict) -> None:
             if trophy and int(trophy["pid"]) == int(pid):
                 tline = _apply_trophy(player, trophy["drop"])
             repo.queue_notify(session, int(pid),
-                              texts.invasion_reward_dm(True, int(dgold), drep, haul, tline))
+                              texts.invasion_reward_dm(True, int(dgold), drep, haul, tline),
+                              kind="invasion")
         else:
             _before = player.gold
             player.gold = max(0, player.gold + int(dgold))     # не в минус
@@ -87,7 +88,8 @@ async def _apply_invasion(session, inv, plan: dict) -> None:
             if tav is not None:
                 tav.reputation = max(0, (tav.reputation or 0) + drep)
             repo.queue_notify(session, int(pid),
-                              texts.invasion_reward_dm(False, int(dgold), drep))
+                              texts.invasion_reward_dm(False, int(dgold), drep),
+                              kind="invasion")
 
 
 def _has_webapp(markup) -> bool:
@@ -202,7 +204,7 @@ async def _notify_returned(bot: Bot) -> None:
                 continue
             story_state.set_pending(player, s.id, s.npc)
             who = npc.label(s.npc) if s.npc else "Гость"
-            outbox.append((player, f"🚪 {who} ждёт тебя у стойки — загляни в таверну.", story_push_kb()))
+            outbox.append((player, f"🚪 {who} ждёт тебя у стойки — загляни в таверну.", story_push_kb(), "story"))
 
         result = await session.execute(
             select(Player)
@@ -221,7 +223,7 @@ async def _notify_returned(bot: Bot) -> None:
                     new_exps.append(e)
             if not newly:
                 continue
-            outbox.append((player, texts.expedition_returned(newly), claim_kb()))
+            outbox.append((player, texts.expedition_returned(newly), claim_kb(), "exped"))
             player.expeditions = new_exps
 
         result = await session.execute(
@@ -239,7 +241,7 @@ async def _notify_returned(bot: Bot) -> None:
             if item is not None:
                 outbox.append((
                     player,
-                    texts.craft_ready_notification(item, tier), craft_claim_kb(),
+                    texts.craft_ready_notification(item, tier), craft_claim_kb(), "craft",
                 ))
             player.craft_notified = True
 
@@ -252,7 +254,7 @@ async def _notify_returned(bot: Bot) -> None:
         )
         for player in result.scalars().all():
             player.hunt_ready_at = None
-            outbox.append((player, texts.hunter_recovered_notification(), hunt_cta_kb()))
+            outbox.append((player, texts.hunter_recovered_notification(), hunt_cta_kb(), "hunt"))
 
         # Возвращалка: напоминаем забывчивым (простой 1/3/7 дней, тон нарастает).
         # nudge_tier сбрасывается в 0 при любой активности (middleware), так что
@@ -304,7 +306,7 @@ async def _notify_returned(bot: Bot) -> None:
                 continue
             outbox.append((
                 player,
-                texts.build_ready_notification(building), buildings_notify_kb(),
+                texts.build_ready_notification(building), buildings_notify_kb(), "build",
             ))
 
         from bot.game import production as prod
@@ -339,7 +341,7 @@ async def _notify_returned(bot: Bot) -> None:
                 recipe = mbatch.get("recipe", "mead")
                 outbox.append((
                     player,
-                    texts.meadery_ready_notification(recipe), buildings_notify_kb(),
+                    texts.meadery_ready_notification(recipe), buildings_notify_kb(), "prod",
                 ))
                 new = dict(tavern.production)
                 new["meadery"] = {**mbatch, "notified": True}
@@ -350,7 +352,7 @@ async def _notify_returned(bot: Bot) -> None:
                     and prod.state(tavern, "kitchen")[0] == "ready"):
                 outbox.append((
                     player,
-                    texts.kitchen_ready_notification(), buildings_notify_kb(),
+                    texts.kitchen_ready_notification(), buildings_notify_kb(), "prod",
                 ))
                 new = dict(tavern.production)
                 new["kitchen"] = {**kbatch, "notified": True}
@@ -361,7 +363,7 @@ async def _notify_returned(bot: Bot) -> None:
                     and prod.state(tavern, "winery")[0] == "ready"):
                 outbox.append((
                     player,
-                    texts.winery_ready_notification(), buildings_notify_kb(),
+                    texts.winery_ready_notification(), buildings_notify_kb(), "prod",
                 ))
                 new = dict(tavern.production)
                 new["winery"] = {**wbatch, "notified": True}
@@ -373,7 +375,7 @@ async def _notify_returned(bot: Bot) -> None:
                         and prod.state(tavern, bname)[0] == "ready"):
                     outbox.append((
                         player,
-                        texts.recipe_ready_notification(rbatch.get("recipe")),
+                        texts.recipe_ready_notification(rbatch.get("recipe")), "prod",
                         buildings_notify_kb(),
                     ))
                     new = dict(tavern.production)
@@ -409,7 +411,7 @@ async def _notify_returned(bot: Bot) -> None:
                                  texts.auction_sold_chat(
                                      player.first_name or "Кабатчик", res)))
                     outbox.append((
-                        player, texts.auction_settled(res),
+                        player, texts.auction_settled(res), "auction",
                         buildings_notify_kb()))
                 continue
             chance = balance.AUCTION_BID_CHANCE * (
@@ -425,7 +427,7 @@ async def _notify_returned(bot: Bot) -> None:
                     repo.queue_notify(
                         session, player.id,
                         f"🔨 Твой лот {lot.get('qty')}×{gn} заметили на торгах — "
-                        f"ставка {bres['unit']} 🪙!")
+                        f"ставка {bres['unit']} 🪙!", kind="auction")
 
         # Авто-истечение биржевых лотов: старше TTL — вернуть товар/залог владельцу.
         from bot.game import production as prodmod2
@@ -439,12 +441,13 @@ async def _notify_returned(bot: Bot) -> None:
                 pr[o.good] = pr.get(o.good, 0) + o.qty
                 owner.tavern.products = pr
                 repo.queue_notify(session, owner.id,
-                                  f"⌛ Лот на бирже истёк — {o.qty}×{gname} в погребе")
+                                  f"⌛ Лот на бирже истёк — {o.qty}×{gname} в погребе",
+                                  kind="bourse")
             elif owner is not None and o.side == "buy":
                 owner.gold += o.qty * o.unit_price  # возврат залога
                 repo.queue_notify(session, owner.id,
                                   f"⌛ Заявка «куплю» истекла — залог "
-                                  f"{o.qty * o.unit_price} 🪙 вернулся")
+                                  f"{o.qty * o.unit_price} 🪙 вернулся", kind="bourse")
             await repo.delete_order(session, o.id)
 
         # Рейд-босс: жизненный цикл. Сбор → битва (HP под явку + пинг) → уход.
@@ -473,7 +476,7 @@ async def _notify_returned(bot: Bot) -> None:
                                            texts.raid_screen(boss), raid_kb(boss.id),
                                            is_vid))
                         for pid in list((boss.contributions or {}).keys()):
-                            repo.queue_notify(session, int(pid), texts.raid_fight_ping())
+                            repo.queue_notify(session, int(pid), texts.raid_fight_ping(), kind="raid")
                 else:                                        # идёт сбор — отсчёт
                     raid_edits.append((dict(boss.messages or {}),
                                        texts.raid_gather_screen(boss),
@@ -492,7 +495,7 @@ async def _notify_returned(bot: Bot) -> None:
                         push = texts.raid_cast_push(boss, events)   # «громкие» касты — в личку бойцам
                         if push:
                             for pid in list((boss.contributions or {}).keys()):
-                                repo.queue_notify(session, int(pid), push)
+                                repo.queue_notify(session, int(pid), push, kind="raid")
         # Кэш для кнопки «Рейд-босс» в меню: какой босс ещё жив (или None).
         raidmod.set_active(next(
             (b.id for b in live_raids if b.status in ("gathering", "active")), None))
@@ -575,7 +578,7 @@ async def _notify_returned(bot: Bot) -> None:
                 Player.mill_run_at <= now - timedelta(seconds=millmod.TRIP_SECONDS),
             ))).scalars().all()
         for pl in mill_back:
-            repo.queue_notify(session, pl.id, texts.mill_back_dm(int(pl.mill_grain or 0)))
+            repo.queue_notify(session, pl.id, texts.mill_back_dm(int(pl.mill_grain or 0)), kind="mill")
             pl.mill_notified = True
 
         city_events: list[tuple[int, str]] = []  # (chat_id, текст анонса)
@@ -645,7 +648,7 @@ async def _notify_returned(bot: Bot) -> None:
                     select(Player.id).where(Player.chat_id.is_(None),
                                             Player.last_seen_at >= online))).all()]
                 for uid in dm_ids:
-                    repo.queue_notify(session, uid, bourse_news_text)
+                    repo.queue_notify(session, uid, bourse_news_text, kind="bourse")
 
         # Симуляция фракций — по чатам (фракции/ситуации остаются ЛОКАЛЬНЫМИ).
         for city in cities:
@@ -690,10 +693,10 @@ async def _notify_returned(bot: Bot) -> None:
         # Зеркалим «вести» этого тика в ЛЕНТУ мини-аппа (раздел «Уведомления»).
         # queue_notify пишет в ленту сам; здесь — outbox/бонус/вести мира.
         # (idle/onboard — это re-engagement «вернись», не «весть»; шлём как раньше.)
-        for _p, _txt, _mk in outbox:
-            repo.feed_push(session, _p.id, _txt)
+        for _p, _txt, _mk, _kind in outbox:
+            repo.feed_push(session, _p.id, _txt, kind=_kind)
         for _pid in bonus_push_targets:
-            repo.feed_push(session, _pid, texts.bonus_ready_push())
+            repo.feed_push(session, _pid, texts.bonus_ready_push(), kind="bonus")
         if world_news:
             _digest = "🌍 <b>ВЕСТИ ИЗ НЕДОЛИВСКА</b>\n\n" + "\n\n".join(world_news)
             _news_ids = [r[0] for r in (await session.execute(
@@ -701,7 +704,7 @@ async def _notify_returned(bot: Bot) -> None:
                     Player.chat_id.is_(None), Player.dm_news.is_(True),
                     Player.last_seen_at >= now - timedelta(days=7)))).all()]
             for _uid in _news_ids:
-                repo.feed_push(session, _uid, _digest)
+                repo.feed_push(session, _uid, _digest, kind="world")
         if now.minute == 0:          # раз в час чистим старые записи ленты
             await repo.feed_prune(session)
 

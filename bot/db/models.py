@@ -270,6 +270,7 @@ class NotifFeed(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     text: Mapped[str] = mapped_column(String(1024))
+    kind: Mapped[str] = mapped_column(String(32), default="")  # тип → иконка/переход в аппе
     read: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
