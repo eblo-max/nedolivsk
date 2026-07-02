@@ -75,7 +75,7 @@ const SAMPLE: TavernState = {
   world: ['🍂 Осень — спрос обычный', '🪓 Орда орков точит топоры на севере', '🏛 В городе тихо'],
   next_upgrade: { gold: 715, wood: 220, grain: 180, hops: 120 }, upgrade_pct: 60,
   world_event: { id: 'fashion', emoji: '🔥', name: 'Ажиотаж', blurb: 'Весь Недоливск помешался на одном товаре — он в цене, налетай!', good: 'butter', good_name: 'Масло', effects: [{ text: 'Масло ×1.5', good: true }] },
-  fgoal: { fac: 'merchants', text: '', emblem: '⚜️', title: 'Неделя оборота', task: 'Наторгуйте 1500 🪙 всем городом — купцы, гости, аукцион', done: 830, target: 1500, pct: 55, feast: false },
+  fgoal: { fac: 'merchants', text: '', emblem: '⚜️', title: 'Большой торг', task: 'Наторгуйте 75000 🪙 всем городом — купцы, гости, аукцион', done: 41300, target: 75000, pct: 55, feast: false },
   city: { mood: 18, mood_label: '🙂 доброе', situation: { emoji: '💰', label: 'Купеческий бум' }, factions: [{ id: 'merchants', name: 'Купеческая лига', power: 42 }, { id: 'thieves', name: 'Воровская гильдия', power: 20 }, { id: 'watch', name: 'Стража', power: -15 }] },
   raid: null, admin: true,   // DEV: нет живого рейда → видно админ-кнопку «Призвать босса»
   notif_unread: 3,
