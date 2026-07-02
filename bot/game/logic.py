@@ -93,7 +93,7 @@ def expedition_goals(player: Player, tavern: Tavern, max_goals: int = 3):
         if (bld.is_built(tavern, bid) or bld.missing_requirements(tavern, b)
                 or bld.rep_locked(tavern, b)):
             continue
-        short = gatherable_short(b.cost)
+        short = gatherable_short(bld.cost_of(b))   # реальная цена (как экран стройки)
         if short:
             building_goals.append((f"{b.emoji} {b.name}", short))
     building_goals.sort(key=lambda g: trips(g[1]))   # ближайшие к готовности — выше
@@ -114,25 +114,33 @@ class ExpeditionStart:
     pay: int = 0
 
 
+def expedition_quote(player: Player, tavern: Tavern | None) -> tuple[int, float]:
+    """РЕАЛЬНЫЕ плата и часы бригады со всеми множителями (снаряга/перки/баф/
+    погода/новичок) — единый источник для списания И показа (панель, текст-бот).
+    Расхождение показа со списанием — жалоба игрока 02.07."""
+    level = tavern.level if tavern else 1
+    equipment = getattr(player, "equipment", None)
+    pay = max(1, int(balance.worker_pay(level) * items.pay_multiplier(equipment)
+                     * perks.expedition_pay_mult(player)
+                     * newbie.pay_mult(player)))  # поблажка новичку (с грейс-окном)
+    hours = (balance.EXPEDITION_HOURS * items.speed_multiplier(equipment)
+             * buff.expedition_speed_mult(player)   # баф «Быстрые ноги»
+             * worldevent.exp_speed_mult(player)    # погода (Вёдро/Ненастье)
+             * newbie.speed_mult(player))           # поблажка новичку (с грейс-окном)
+    return pay, hours
+
+
 def start_expedition(player: Player, tavern: Tavern, resource: str) -> ExpeditionStart:
     """Отправить ещё одну бригаду за ресурсом, если есть свободный слот."""
     exps = _exps(player)
     if len(exps) >= expedition_slots(tavern):
         return ExpeditionStart(ok=False, reason="no_slot")
 
-    level = tavern.level if tavern else 1
-    equipment = getattr(player, "equipment", None)
-    pay = max(1, int(balance.worker_pay(level) * items.pay_multiplier(equipment)
-                     * perks.expedition_pay_mult(player)
-                     * newbie.pay_mult(player)))  # поблажка новичку (с грейс-окном)
+    pay, hours = expedition_quote(player, tavern)
     if player.gold < pay:
         return ExpeditionStart(ok=False, reason="no_gold", pay=pay)
 
     player.gold -= pay
-    hours = (balance.EXPEDITION_HOURS * items.speed_multiplier(equipment)
-             * buff.expedition_speed_mult(player)   # баф «Быстрые ноги»
-             * worldevent.exp_speed_mult(player)    # погода (Вёдро/Ненастье)
-             * newbie.speed_mult(player))           # поблажка новичку (с грейс-окном)
     exps.append({
         "resource": resource,
         "ends_at": (_now() + timedelta(hours=hours)).isoformat(),

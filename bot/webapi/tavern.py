@@ -569,7 +569,7 @@ def _panel_data(p, t, kind: str) -> dict:
             resources.append({"key": res, "name": bal.RESOURCE_NAMES.get(res, res), "amount": amt})
     return {"kind": "expedition", "free": c.free, "total": c.total, "out": c.out,
             "ready": c.ready, "next_minutes": c.next_minutes,
-            "pay": bal.worker_pay(level), "hours": bal.EXPEDITION_HOURS,
+            "pay": (_q := logic.expedition_quote(p, t))[0], "hours": round(_q[1], 1),
             "goals": goal_list, "resources": resources}
 
 

@@ -1331,8 +1331,7 @@ def storehouse_caption(player: Player, tavern: Tavern) -> str:
 
 def expedition_menu(player: Player) -> str:
     tavern = player.tavern
-    level = tavern.level if tavern else 1
-    pay = balance.worker_pay(level)
+    pay, _hours = logic.expedition_quote(player, tavern)
     c = logic.expedition_counts(player, tavern)
     ico = {**RESOURCE_EMOJI, **balance.GOODS_EMOJI}
     parts = [
