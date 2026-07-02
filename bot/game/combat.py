@@ -474,7 +474,8 @@ def heal(player, key: str, now: datetime | None = None) -> dict | None:
 
 
 def flask_apply(player, keys: list[str] | None,
-                stats: dict, chp: int) -> tuple[int, list[str], list[str]]:
+                stats: dict, chp: int,
+                consume: bool = True) -> tuple[int, list[str], list[str]]:
     """Выпить/съесть до FLASK_SLOTS порций ИЗ ПОГРЕБА перед боем: списывает
     продукты, мутирует stats (dmg/crit/dodge/antidote), возвращает
     (hp_на_бой, применённые_ключи, подписи_эффектов). Нет в погребе — порция
@@ -497,7 +498,7 @@ def flask_apply(player, keys: list[str] | None,
         if eff.get("antidote"):
             stats["antidote"] = True
         chp += eff.get("hp", 0)
-    if used:
+    if used and consume:
         player.tavern.products = prods
     return chp, used, labels
 

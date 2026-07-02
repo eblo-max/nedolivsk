@@ -2601,16 +2601,20 @@ def forge_screen(player) -> str:
 
 
 def _tier_bonus_line(item, tier: int) -> str:
+    """Польза вещи на ярусе — ЧЕСТНЫМИ множителями (бой ×1/1.6/2.2, экономика
+    ×1/1.3/1.6 — см. items.TIER_*_MULT), а не старым линейным ×tier."""
+    from bot.game.items import _cmul, _emul
     parts = []
-    if item.income_pct: parts.append(f"+{item.income_pct * tier}% доход")
-    if item.yield_pct: parts.append(f"+{item.yield_pct * tier}% добыча")
-    if item.yield_wood_pct: parts.append(f"+{item.yield_wood_pct * tier}% 🪵")
-    if item.speed_pct: parts.append(f"−{item.speed_pct * tier}% время вылазки")
-    if item.pay_discount_pct: parts.append(f"−{item.pay_discount_pct * tier}% плата")
-    if item.damage: parts.append(f"⚔{item.damage * tier}")
-    if item.crit: parts.append(f"💥{item.crit * tier}%")
-    if item.armor: parts.append(f"🛡{item.armor * tier}")
-    if item.luck: parts.append(f"🍀{item.luck * tier}")
+    if item.income_pct: parts.append(f"+{_emul(item.income_pct, tier)}% доход")
+    if item.yield_pct: parts.append(f"+{_emul(item.yield_pct, tier)}% добыча")
+    if item.yield_wood_pct: parts.append(f"+{_emul(item.yield_wood_pct, tier)}% 🪵")
+    if item.speed_pct: parts.append(f"−{_emul(item.speed_pct, tier)}% время вылазки")
+    if item.pay_discount_pct: parts.append(f"−{_emul(item.pay_discount_pct, tier)}% плата")
+    if item.damage: parts.append(f"⚔{_cmul(item.damage, tier)}")
+    if item.crit: parts.append(f"💥{_cmul(item.crit, tier)}%")
+    if item.armor: parts.append(f"🛡{_cmul(item.armor, tier)}")
+    if item.vitality: parts.append(f"❤{_cmul(item.vitality, tier)}")
+    if item.luck: parts.append(f"🍀{_cmul(item.luck, tier)}")
     return " · ".join(parts) if parts else "—"
 
 

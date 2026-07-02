@@ -472,9 +472,33 @@ def _hunt_state(p) -> dict:
     }
 
 
+async def _api_hunt_forecast(request: web.Request) -> web.Response:
+    """Живой прогноз боя С УЧЁТОМ выбранной фляги (dry-run, порции не списываются):
+    «что в прогнозе — то и в бою», включая выпитое."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import balance as bal, combat
+    eid = str(body.get("id") or "")
+    flask = [str(k) for k in (body.get("flask") or [])][:bal.FLASK_SLOTS]
+    enemy = combat.ENEMY.get(eid)
+    if enemy is None:
+        return web.json_response({"ok": False, "error": "unknown"})
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        stats = combat.player_stats(p)
+        chp = combat.current_hp(p)
+        chp, _used, labels = combat.flask_apply(p, flask, stats, chp, consume=False)
+        win, est = combat.forecast(stats, enemy, chp)
+    return web.json_response({"ok": True, "win": win, "est_hp": est, "flask": labels},
+                             headers={"Cache-Control": "no-store"})
+
+
 # Охота ВРЕМЕННО закрыта на обкатку боевого пересмотра (плашка в мини-аппе).
 # Админ видит всё — тестирует новые полосы. Открыть всем: HUNT_CLOSED = False.
-HUNT_CLOSED = True
+HUNT_CLOSED = False
 HUNT_CLOSED_NOTE = ("Ловчие переучиваются: большое обновление механики и новых "
                     "фич боёвки. Доска розыска откроется в течение 3 часов.")
 

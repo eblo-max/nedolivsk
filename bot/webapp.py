@@ -65,7 +65,7 @@ from bot.webapi.character import (  # noqa: E402,F401 — фасад
 # Двор/производство/охота — bot/webapi/production.py (распил, move-only).
 from bot.webapi.production import (  # noqa: E402,F401 — фасад
     _api_brew_age, _api_build_start, _api_building, _api_buildings, _api_hunt,
-    _api_hunt_fight, _api_prod_claim, _api_prod_start,
+    _api_hunt_fight, _api_hunt_forecast, _api_prod_claim, _api_prod_start,
 )
 # Карты мира (/map, /world, тайлы, таверны с коронами) — bot/webapi/world.py
 # (распил, move-only). Импорт = ре-экспорт для build_app и внешних потребителей.
@@ -193,7 +193,8 @@ def build_app() -> web.Application:
     app.router.add_post("/api/brew_age", _api_brew_age)       # выдержка эля (риск)
     app.router.add_post("/api/prod_claim", _api_prod_claim)   # забрать партию
     app.router.add_post("/api/hunt", _api_hunt)               # меню охоты (бестиарий+прогноз)
-    app.router.add_post("/api/hunt_fight", _api_hunt_fight)   # бой со зверем
+    app.router.add_post("/api/hunt_fight", _api_hunt_fight)
+    app.router.add_post("/api/hunt_forecast", _api_hunt_forecast)  # прогноз с флягой (dry-run)   # бой со зверем
     app.router.add_post("/api/nightrun", _api_nightrun)            # ночная ходка: стейт
     app.router.add_post("/api/nightrun/start", _api_nightrun_start)  # выйти на тракт
     app.router.add_post("/api/nightrun/pick", _api_nightrun_pick)    # выбрать испытание

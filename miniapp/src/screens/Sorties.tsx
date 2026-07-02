@@ -262,6 +262,16 @@ function BeastBrief({ b, hp, ready, busy, onHunt, flask, sel, setSel }: { b: Bea
     if (i >= 0) setSel(sel.filter((_, j) => j !== i))
     else if (sel.length < (flask?.slots ?? 2)) setSel([...sel, k])
   }
+  // живой прогноз с флягой: «что в прогнозе — то и в бою», включая выпитое
+  const [boost, setBoost] = useState<{ win: number; est: number } | null>(null)
+  useEffect(() => {
+    if (!sel.length) { setBoost(null); return }
+    let dead = false
+    api<{ ok: boolean; win: number; est_hp: number }>('hunt_forecast', { id: b.id, flask: sel })
+      .then((r) => { if (!dead && r.ok) setBoost({ win: r.win, est: r.est_hp }) })
+      .catch(() => { if (!dead) setBoost(null) })
+    return () => { dead = true }
+  }, [sel, b.id])
   return (
     <>
       {b.sprite && MONSTERS[b.sprite]
@@ -280,7 +290,10 @@ function BeastBrief({ b, hp, ready, busy, onHunt, flask, sel, setSel }: { b: Bea
 
       <div className="cap">твой расклад</div>
       <div className="kv-list">
-        <div className="kv"><span>Шанс победы</span><b className={`win-${threatCls(b.win)}`}>{b.threat.icon} {b.win}% · {b.threat.label}</b></div>
+        <div className="kv"><span>Шанс победы</span><b className={`win-${threatCls(boost ? boost.win : b.win)}`}>
+          {b.threat.icon} {boost && boost.win !== b.win
+            ? <>{b.win}% <span className="win-shift">→ {boost.win}%</span></>
+            : <>{b.win}%</>} · {b.threat.label}</b></div>
         <div className="kv"><span>При здоровье</span><b>❤ {hp.cur}/{hp.max}</b></div>
         {b.win > 0 && <div className="kv"><span>Останется при победе</span><b>≈ {b.est_hp}/{hp.max}</b></div>}
       </div>
