@@ -114,6 +114,7 @@ async def tavern_region(
             callback.from_user.username,
             callback.from_user.first_name,
         )
+        await session.refresh(player, ["tavern"])  # свежий объект: связь явно (MissingGreenlet)
     chest = None
     ref_bonus = None
     if player.tavern is None:
