@@ -32,7 +32,7 @@ export default function Onboarding({ onCreated }: { onCreated: (st: unknown) => 
   return (
     <div className="onb">
       <div className="rise">
-        <div className="title">НЕДОЛИВСК<small>САМЫЙ ПРОПОЙНЫЙ ГОРОДОК</small></div>
+        <div className="title">НЕДОЛИВСК<small>САМЫЙ СКЛОЧНЫЙ ГОРОДОК</small></div>
         <div className="orn"><img className="orn-ic" src={`${import.meta.env.BASE_URL}goods/ale.png`} alt="" /></div>
       </div>
 

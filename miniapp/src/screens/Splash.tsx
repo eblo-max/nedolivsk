@@ -28,7 +28,7 @@ export default function Splash({ onEnter }: { onEnter: () => void }) {
       <div className="splash-veil" />
 
       <div className="splash-top">
-        <div className="title">НЕДОЛИВСК<small>САМЫЙ ПРОПОЙНЫЙ ГОРОДОК</small></div>
+        <div className="title">НЕДОЛИВСК<small>САМЫЙ СКЛОЧНЫЙ ГОРОДОК</small></div>
         <div className="orn"><img className="orn-ic" src={`${import.meta.env.BASE_URL}goods/ale.png`} alt="" /></div>
       </div>
 
