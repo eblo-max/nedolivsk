@@ -6,7 +6,7 @@ import { GoodIcon, ResIcon, fmt } from '../components/icons'
 export interface TradeData {
   good: string; name: string; emoji: string; qty: number
   merchant: string; memoji: string; avatar: number | null
-  intro: string; fv: number; prices: number[]; counter?: number | null
+  intro: string; mood_line?: string | null; fv: number; prices: number[]; counter?: number | null
   choice?: { mine: { unit: number; qty: number }; full: { unit: number; qty: number } } | null
 }
 interface TradeResp {
@@ -79,6 +79,7 @@ export default function TradeSheet({ offer, onClose, onState }: {
           <div className="trd-id">
             <div className="trd-name">{d.memoji} {d.merchant}</div>
             <div className="trd-intro">{d.intro}</div>
+            {d.mood_line && <div className="trd-intro" style={{ opacity: .85, fontStyle: 'italic' }}>{d.mood_line}</div>}
           </div>
         </div>
 

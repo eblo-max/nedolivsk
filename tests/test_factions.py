@@ -75,3 +75,34 @@ def test_perk_lines_from_quotes():
     assert any("тишком" in ln for ln in F.perk_lines(p, "thieves"))
     assert any("карманники" in ln for ln in F.perk_lines(p, "watch"))
     assert F.perk_lines(_pl(), "merchants") == []     # нейтралу не пишем
+
+
+# ── Ф2: память именных NPC + ритмы ──────────────────────────────────────
+def test_trader_memory_bends_offer():
+    """Личное отношение купца двигает потолок цены и реплику."""
+    import random
+    from bot.game import trade
+    tav = NS(products={"ale1": 20}, level=5, reputation=50)
+    friend = NS(story={"npc_rel": {}, "faction": {}}, gold=0)
+    # выставим память вручную под конкретного купца из ролла
+    rng = random.Random(5)
+    probe = trade.make_offer(tav, friend, False, rng=random.Random(5))
+    cid = probe["cit"]
+    warm = NS(story={"npc_rel": {cid: 5}, "faction": {}}, gold=0)
+    cold = NS(story={"npc_rel": {cid: -5}, "faction": {}}, gold=0)
+    o_warm = trade.make_offer(tav, warm, False, rng=random.Random(5))
+    o_cold = trade.make_offer(tav, cold, False, rng=random.Random(5))
+    assert o_warm["max_unit"] > o_cold["max_unit"]     # друга не жмут
+    assert o_warm["mood_line"] and "добром" in o_warm["mood_line"]
+    assert o_cold["mood_line"] and "обошёлся" in o_cold["mood_line"]
+
+
+def test_visit_chance_rhythms():
+    from datetime import datetime, timezone
+    from bot.game import balance, trade
+    night = datetime(2026, 7, 1, 21, 0, tzinfo=timezone.utc)    # 00:00 МСК (среда)
+    friday_day = datetime(2026, 7, 3, 9, 0, tzinfo=timezone.utc)  # пятница 12:00 МСК
+    weekday = datetime(2026, 7, 1, 9, 0, tzinfo=timezone.utc)   # среда 12:00 МСК
+    assert trade.visit_chance(0.2, night) == 0.2 * balance.TRADE_NIGHT_MULT
+    assert trade.visit_chance(0.2, friday_day) == 0.2 * balance.TRADE_FRIDAY_MULT
+    assert trade.visit_chance(0.2, weekday) == 0.2

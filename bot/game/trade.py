@@ -120,6 +120,19 @@ ARCHES = [
 ARCH = {a.id: a for a in ARCHES}
 
 
+def visit_chance(base: float, now=None) -> float:
+    """Ритм города: ночью (23–7 МСК) купцы спят, в пятницу — базарный день.
+    Единый источник для спавна купца в аппе и текст-боте."""
+    from datetime import datetime, timezone
+    now = now or datetime.now(timezone.utc)
+    msk = (now.hour + 3) % 24
+    if msk >= 23 or msk < 7:
+        return base * balance.TRADE_NIGHT_MULT
+    if now.weekday() == 4:                      # пятница
+        return base * balance.TRADE_FRIDAY_MULT
+    return base
+
+
 def has_sellable(tavern) -> bool:
     prods = tavern.products or {}
     return any(v > 0 and k in prod.GOODS for k, v in prods.items())
@@ -152,8 +165,10 @@ def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
     greed = rng.uniform(*arch.greed)
     need = rng.uniform(*arch.need)
     rel = min(0.3, max(0, story_state.faction(player, "merchants")) / 300)
+    nrel = story_state.npc_rel(player, cit.id)     # ЛИЧНАЯ память этого купца
+    nrel_f = max(-0.15, min(0.15, nrel / 25))      # ±15% к щедрости за отношения
 
-    max_unit = fv * (1 + need + rel) * (1 - greed * 0.3)
+    max_unit = fv * (1 + need + rel + nrel_f) * (1 - greed * 0.3)
     max_unit = max(fv * balance.TRADE_MIN_UNDER,
                    min(fv * balance.TRADE_MAX_OVER, max_unit))
 
@@ -172,6 +187,11 @@ def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
         "fv": round(fv, 2), "max_unit": round(max_unit, 2), "wealth": wealth,
         "greed": round(greed, 3), "prices": prices, "mkt": round(mkt, 3),
         "fmul": round(factions.merchant_price_mult(player), 3),  # ранг лиги двигает вилку
+        "cit": cit.id, "nrel": nrel,
+        "mood_line": ("Он помнит тебя добром — говорит без обиняков, цену держит честную."
+                      if nrel >= 3 else
+                      "Он щурится: «Помню-помню, как ты в прошлый раз со мной обошёлся…»"
+                      if nrel <= -3 else ""),
     }
 
 

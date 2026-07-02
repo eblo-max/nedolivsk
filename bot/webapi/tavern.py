@@ -225,6 +225,7 @@ def _trade_dto(offer) -> dict | None:
         "good": offer.get("good"), "name": g.name if g else offer.get("good"),
         "emoji": g.emoji if g else "📦", "qty": offer.get("qty"),
         "merchant": offer.get("name"), "memoji": offer.get("emoji"), "avatar": avatar,
+        "mood_line": offer.get("mood_line") or None,
         "intro": offer.get("intro"), "fv": offer.get("fv"),
         "prices": offer.get("prices"), "counter": offer.get("counter"), "choice": offer.get("choice"),
     }
@@ -354,7 +355,8 @@ async def _api_collect(request: web.Request) -> web.Response:
             from bot.game import story_state as _ss, trade as _trade, balance as _bal, world as _wld
             busy = _ss.get_pending(p) or _ss.get_trade(p)
             if not busy and _trade.has_sellable(p.tavern):
-                chance = _bal.TRADE_FAIR_CHANCE if _wld.is_fair() else _bal.TRADE_CHANCE
+                chance = _trade.visit_chance(
+                    _bal.TRADE_FAIR_CHANCE if _wld.is_fair() else _bal.TRADE_CHANCE)
                 if _rnd.random() < chance:
                     world = await repo.get_or_create_world(s)
                     offer = _trade.make_offer(p.tavern, p, _wld.is_fair(), world=world)
@@ -397,6 +399,8 @@ async def _api_trade(request: web.Request) -> web.Response:
             qn, gn = _sell(p, offer, unit)
             ss.set_trade(p, None)
             if qn:
+                if offer.get("cit"):                 # купец запомнит сделку
+                    ss.adjust_npc_rel(p, offer["cit"], 2 if kind == "accept_high" else 1)
                 newbie.mark(p, "nb_sale")
                 gn_name = prod.GOODS[offer["good"]].name if offer["good"] in prod.GOODS else offer["good"]
                 repo.add_log(s, "player", p.id, f"🤝 продал купцу {qn}×{gn_name} за {gn} 🪙 (мини-апп)")
@@ -413,6 +417,8 @@ async def _api_trade(request: web.Request) -> web.Response:
                 st.update(result="walk", react=trademod.reaction(offer, "walk"))
 
         if op == "decline":
+            if offer.get("cit"):                     # прогнал — купец затаит обиду
+                ss.adjust_npc_rel(p, offer["cit"], -1)
             ss.set_trade(p, None)
             st.update(result="walk", react=trademod.reaction(offer, "walk"))
         elif op == "accept":                          # согласие на контр-цену
