@@ -29,6 +29,13 @@ def price(resource: str) -> int:
     return max(1, math.ceil(base * balance.SHOP_PRICE_MARKUP))
 
 
+def price_for(player, resource: str) -> int:
+    """ПЕРСОНАЛЬНАЯ цена лавки: друзьям Купеческой лиги дешевле, врагам дороже.
+    Единый источник для показа, лимита и списания (показ = действие)."""
+    from bot.game import factions
+    return max(1, round(price(resource) * factions.shop_buy_mult(player)))
+
+
 def _fresh(rec: dict, now: datetime) -> bool:
     """Запись лимита ещё в текущем 24-часовом окне?"""
     try:
@@ -63,7 +70,7 @@ def max_affordable(player, resource: str, now: datetime | None = None) -> int:
     """Сколько РЕАЛЬНО можно купить сейчас: ограничено и золотом, и дневным лимитом."""
     if resource not in balance.EXPEDITION_YIELD:
         return 0
-    p = price(resource)
+    p = price_for(player, resource)
     by_gold = player.gold // p if p else 0
     return max(0, min(int(by_gold), buy_room(player, resource, now)))
 

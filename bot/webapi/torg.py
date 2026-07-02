@@ -22,7 +22,7 @@ def _shop_items(p) -> list:
     for r in shop.sellable():
         out.append({
             "key": r, "name": bal.RESOURCE_NAMES.get(r, r), "emoji": bal.RESOURCE_EMOJI.get(r, "📦"),
-            "price": shop.price(r), "room": shop.buy_room(p, r), "limit": bal.SHOP_DAILY_LIMIT,
+            "price": shop.price_for(p, r), "room": shop.buy_room(p, r), "limit": bal.SHOP_DAILY_LIMIT,
             "max": shop.max_affordable(p, r), "have": int(inv.get(r, 0)),
         })
     return out
@@ -68,7 +68,7 @@ async def _api_torg_buy(request: web.Request) -> web.Response:
         qty = max(0, min(want, shop.max_affordable(p, res)))
         if qty <= 0:
             return web.json_response({"ok": False, "error": "cant"})
-        cost = qty * shop.price(res)
+        cost = qty * shop.price_for(p, res)
         p.gold -= cost
         economy.record(p, "shop", -cost)
         inventory.add(p, res, qty)

@@ -62,7 +62,7 @@ async def cb_shop_buy(callback: CallbackQuery, session: AsyncSession) -> None:
     if qty <= 0:
         await callback.answer(texts.shop_cant_afford(res), show_alert=True)
         return
-    cost = qty * shop.price(res)
+    cost = qty * shop.price_for(player, res)
     player.gold -= cost
     economy.record(player, "shop", -cost)
     inventory.add(player, res, qty)
@@ -102,8 +102,8 @@ async def cb_shop_fill(callback: CallbackQuery, session: AsyncSession) -> None:
         return
     spent = 0
     for r, q in short.items():
-        player.gold -= shop.price(r) * q
-        spent += shop.price(r) * q
+        player.gold -= shop.price_for(player, r) * q
+        spent += shop.price_for(player, r) * q
         inventory.add(player, r, q)
         shop.record_buy(player, r, q)
     economy.record(player, "shop", -spent)

@@ -62,6 +62,11 @@ def merchant_price_mult(player) -> float:
     return 1 + MERCHANT_PRICE_PCT * rank(player, "merchants") / 100
 
 
+def shop_buy_mult(player) -> float:
+    """Лига: закуп в лавке скупщика — друзьям дешевле, врагам дороже (зеркало торга)."""
+    return max(0.85, 2 - merchant_price_mult(player))
+
+
 def thief_sneak_bonus(player) -> float:
     """Воры: прибавка шанса «тишком» в ночной ходке (только дружба)."""
     return THIEF_SNEAK_P * max(0, rank(player, "thieves"))
@@ -90,7 +95,8 @@ def perk_lines(player, fac_id: str) -> list[str]:
     out: list[str] = []
     if fac_id == "merchants" and r != 0:
         pct = MERCHANT_PRICE_PCT * r
-        out.append(f"{'+' if pct > 0 else ''}{pct}% к ценам лавки и торга")
+        out.append(f"торг: цена {'выше' if pct > 0 else 'ниже'} на {abs(pct)}%")
+        out.append(f"лавка: закуп {'дешевле' if pct > 0 else 'дороже'} на {abs(pct)}%")
     if fac_id == "thieves" and r > 0:
         out.append(f"+{int(THIEF_SNEAK_P * r * 100)}% к «тишком» в ночной ходке")
         out.append(f"+{THIEF_NIGHT_SALE_PCT * r}% к ночной скупке (22–6 МСК)")

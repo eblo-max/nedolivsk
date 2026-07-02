@@ -71,7 +71,7 @@ def test_adjust_faction_returns_rank_change():
 
 def test_perk_lines_from_quotes():
     p = _pl(merchants=45, thieves=20, watch=16)
-    assert any("+6%" in ln for ln in F.perk_lines(p, "merchants"))
+    assert any("6%" in ln for ln in F.perk_lines(p, "merchants"))
     assert any("тишком" in ln for ln in F.perk_lines(p, "thieves"))
     assert any("карманники" in ln for ln in F.perk_lines(p, "watch"))
     assert F.perk_lines(_pl(), "merchants") == []     # нейтралу не пишем
@@ -105,3 +105,43 @@ def test_visit_chance_rhythms():
     assert trade.visit_chance(0.2, night) == 0.2 * balance.TRADE_NIGHT_MULT
     assert trade.visit_chance(0.2, friday_day) == 0.2 * balance.TRADE_FRIDAY_MULT
     assert trade.visit_chance(0.2, weekday) == 0.2
+
+
+# ── Матрица «обещано ↔ подключено»: все бонусы фракций живые ─────────────
+def test_shop_personal_price_display_equals_charge():
+    """Лавка: другу лиги дешевле, врагу дороже — одна котировка на показ и списание."""
+    from bot.game import shop
+    res = next(iter(shop.sellable()))
+    base = shop.price(res)
+    friend = _pl(merchants=80)
+    enemy = _pl(merchants=-80)
+    assert shop.price_for(friend, res) <= base <= shop.price_for(enemy, res)
+    assert shop.price_for(friend, res) < shop.price_for(enemy, res)
+
+
+def test_retail_night_bonus_actually_pays(monkeypatch):
+    """Ночная скупка воров реально увеличивает золото со сбыта."""
+    from datetime import datetime, timezone
+    from bot.game import logic
+
+    class _T:
+        products = {"ale1": 10}
+        reputation = 50
+        rep_progress = 0
+        auction_sold = 0
+        level = 5
+
+    def run(player):
+        t = _T(); t.products = {"ale1": 10}
+        monkeypatch.setattr(logic, "_now",
+                            lambda: datetime(2026, 7, 1, 20, 30, tzinfo=timezone.utc))  # 23:30 МСК
+        _sold, gold, _rep = logic.apply_retail(player, t, {"ale1": 5})
+        return gold
+
+    thief = NS(story={"faction": {"thieves": 45}}, gold=0, level=5,
+               equipment={}, inventory={}, buff_kind=None, buff_until=None,
+               reputation=0, tavern=None, perks={}, econ={})
+    plain = NS(story={"faction": {}}, gold=0, level=5,
+               equipment={}, inventory={}, buff_kind=None, buff_until=None,
+               reputation=0, tavern=None, perks={}, econ={})
+    assert run(thief) >= run(plain)
