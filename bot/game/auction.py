@@ -160,12 +160,13 @@ def settle(player, tavern, world) -> dict | None:
         gold = int(qty * top * buff.sale_mult(player)
                    * worldevent.sale_mult(player))      # баф + погода (Лихорадка/Буря)
         player.gold += gold
-        story_state.adjust_faction(player, "merchants", 1)
+        _or, _nr = story_state.adjust_faction(player, "merchants", 1)
         from bot.game import logic            # ленивый импорт — без цикла
         logic.add_goods_rep_progress(player, tavern, qty * balance.REP_POINTS_AUCTION)  # молва, как на бирже
         tavern.auction_sold = int(tavern.auction_sold or 0) + qty  # в рейтинг продавцов
         market.add_supply(world, good, int(qty * balance.MARKET_WHOLESALE_WEIGHT))
-        res = {"sold": True, "good": good, "qty": qty, "unit": top, "gold": gold, "npc": bidder}
+        res = {"sold": True, "good": good, "qty": qty, "unit": top, "gold": gold, "npc": bidder,
+               "fac_rank": (_or, _nr) if _nr != _or else None}
     else:
         prods = dict(tavern.products or {})
         prods[good] = prods.get(good, 0) + qty

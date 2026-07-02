@@ -1100,6 +1100,19 @@ body {
 .cf-val { font-family:var(--num),system-ui,sans-serif; font-weight:700; font-size:12px; color:#b7a587; width:34px; text-align:right; flex:none; }
 
 /* ── ссылка «Летопись» в карточке Город ── */
+/* цель недели: гравюра с золотой лентой прогресса; пир — тёплое свечение */
+.fgoal { margin:8px 0 2px; padding:9px 11px; border-radius:12px;
+  background:linear-gradient(180deg, rgba(212,164,76,.07), rgba(0,0,0,.18));
+  border:1px solid rgba(212,164,76,.22); }
+.fgoal.feast { border-color:rgba(212,164,76,.55);
+  box-shadow:0 0 18px rgba(212,164,76,.18), inset 0 0 18px rgba(212,164,76,.07); }
+.fgoal-t { font-size:12.5px; line-height:1.35; color:var(--ink); }
+.fgoal-bar { margin-top:7px; height:6px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden; }
+.fgoal-bar i { display:block; height:100%; border-radius:99px;
+  background:linear-gradient(90deg, #8a6420, var(--gold), #ffd98a);
+  box-shadow:0 0 8px rgba(212,164,76,.5); transition:width .6s ease; }
+.fgoal-n { margin-top:4px; font-size:11px; color:var(--gold-2);
+  font-variant-numeric:tabular-nums; text-align:right; }
 .chron-open { margin-top:12px; width:100%; background:none; border:1px dashed var(--brass-d,#5a4326); border-radius:11px;
   padding:9px; cursor:pointer; font-family:var(--text),system-ui,sans-serif; font-size:13px; color:var(--gold,#f0b859);
   -webkit-tap-highlight-color:transparent; transition:background .14s; }

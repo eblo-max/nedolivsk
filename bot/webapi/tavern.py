@@ -256,6 +256,9 @@ async def _api_state(request: web.Request) -> web.Response:
         out["story"] = _story_state(p, city)         # с городом — корректная доступность выборов
         out["world_event"] = _world_event_state()    # баннер активного мирового события
         out["city"] = _city_state(city)              # настроение + фракции + ситуация
+        from bot.game import fgoal as _fg
+        _w = await repo.get_or_create_world(s)
+        out["fgoal"] = _fg.state(_w)                 # цель недели: прогресс + пир
         from bot.game import story_state as _ss
         out["trade"] = _trade_dto(_ss.get_trade(p))  # незавершённый торг с купцом (если висит)
         boss = await repo.get_active_raid(s)
@@ -401,8 +404,14 @@ async def _api_trade(request: web.Request) -> web.Response:
             if qn:
                 if offer.get("cit"):                 # купец запомнит сделку
                     ss.adjust_npc_rel(p, offer["cit"], 2 if kind == "accept_high" else 1)
-                from bot.game import rumors
+                from bot.game import factions as _fx2, fgoal, rumors
                 rumors.note("trade", p, gn)          # хваткая сделка — пища для сплетен
+                fgoal.note("gold_trade", gn)         # оборот двигает цель Лиги
+                if offer.get("fac_rank"):
+                    _o, _n = offer["fac_rank"]
+                    repo.feed_push(s, uid, (
+                        f"{'⚖️' if _n > _o else '🕳'} {_fx2.name('merchants')} теперь зовёт тебя "
+                        f"«{_fx2.rank_label(_n)}»"), kind="rep")
                 newbie.mark(p, "nb_sale")
                 gn_name = prod.GOODS[offer["good"]].name if offer["good"] in prod.GOODS else offer["good"]
                 repo.add_log(s, "player", p.id, f"🤝 продал купцу {qn}×{gn_name} за {gn} 🪙 (мини-апп)")

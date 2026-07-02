@@ -391,11 +391,13 @@ def apply_retail(player: Player, tavern: Tavern, want: dict | None):
             gold += n * unit_price(key)
     if not sold:
         return {}, 0, 0
-    from bot.game import factions
+    from bot.game import factions, fgoal
     _msk = (_now().hour + 3) % 24
     gold = int(gold * buff.gold_mult(player) * worldevent.income_mult(player)
                * assortment_mult(sold)    # бонус за число РЕАЛЬНО проданных видов
-               * factions.thief_night_sale_mult(player, _msk))  # ночная скупка воров
+               * factions.thief_night_sale_mult(player, _msk)   # ночная скупка воров
+               * fgoal.feast_mult())      # городской пир: цель недели взята
+    fgoal.note("gold_trade", gold)        # оборот двигает цель Лиги
     tavern.products = products
     player.gold += gold
     economy.record(player, "retail", gold)

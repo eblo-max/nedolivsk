@@ -59,7 +59,9 @@ def _sell(player: Player, offer: dict, unit: int) -> tuple[int, int]:
     prods[offer["good"]] = stock - qty
     tavern.products = prods
     player.gold += gold
-    story_state.adjust_faction(player, "merchants", 1)  # доброе имя у купцов
+    _or, _nr = story_state.adjust_faction(player, "merchants", 1)  # доброе имя у купцов
+    if _nr != _or:
+        offer["fac_rank"] = (_or, _nr)     # весть пошлёт вызывающий (у него session)
     return qty, gold
 
 
@@ -72,6 +74,12 @@ async def _finish_sale(callback: CallbackQuery, player: Player, offer: dict,
         from bot.game import production as prod
         newbie.mark(player, "nb_sale")  # веха грамоты новосёла
         gname = prod.GOODS[offer["good"]].name if offer["good"] in prod.GOODS else offer["good"]
+        if offer.get("fac_rank"):
+            from bot.game import factions as _fx
+            _o, _n = offer["fac_rank"]
+            repo.feed_push(session, player.id, (
+                f"{'⚖️' if _n > _o else '🕳'} {_fx.name('merchants')} теперь зовёт тебя "
+                f"«{_fx.rank_label(_n)}»"), kind="rep")
         repo.add_log(session, "player", player.id,
                      f"🤝 продал купцу {qty}×{gname} за {gold} 🪙")
         market.nudge(world, offer["good"],  # сброс на ЕДИНЫЙ рынок — полный сигнал

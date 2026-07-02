@@ -526,6 +526,8 @@ def hunt(player, enemy_id: str, rng: random.Random | None = None,
     fight = resolve(stats, enemy, chp, rng)
     player.hp_at = now
     if fight.win:
+        from bot.game import fgoal
+        fgoal.note("hunt", 1)                       # облава Стражи: −1 тварь
         loot = roll_loot(enemy, stats.get("luck", 0), rng)
         loot["gold"] = int(loot["gold"] * buff.hunt_gold_mult(player))  # «Звериный нюх»
         if "pickpocket" in getattr(enemy, "traits", ()):   # 💰 обчистил карманника — навар
