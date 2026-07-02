@@ -1027,7 +1027,7 @@ async def cb_raid_spawn(cb: CallbackQuery, session: AsyncSession) -> None:
     pids = [r[0] for r in (await session.execute(
         select(Player.id).where(Player.last_seen_at >= cut))).all()]
     for uid in pids:
-        repo.queue_notify(session, uid, texts.raid_push_dm(boss))
+        repo.queue_notify(session, uid, texts.raid_push_dm(boss), kind="raid")
     kb = InlineKeyboardBuilder()
     kb.button(text="🏠 В меню", callback_data="adm:home")
     await _edit(cb, f"⚔️ {spec.emoji} {spec.name} призван — сбор {raid.GATHER_MINUTES} "

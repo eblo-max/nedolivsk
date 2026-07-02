@@ -7,7 +7,7 @@ import random
 from datetime import datetime, timedelta, timezone
 
 from aiogram import Bot
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from bot import announce, autoclean, effects, panels, texts
 from bot.db import repo
@@ -30,10 +30,14 @@ from bot.game import world as wld
 from bot.keyboards.inline import (
     buildings_notify_kb, claim_kb, craft_claim_kb, hunt_cta_kb,
     idle_nudge_kb, loot_kb, notif_teaser_kb, onboard_nudge_kb,
-    raid_gather_kb, raid_kb, story_push_kb,
+    raid_gather_kb, raid_kb, story_push_kb, urgent_dm_kb,
 )
 
 CHECK_INTERVAL_SECONDS = 60
+
+# Срочные типы вестей: битва ограничена по времени — шлём в личку ПОЛНЫМ
+# текстом с боевой кнопкой (обычные вести зовёт единый тизер «весть в таверну»).
+URGENT_KINDS = {"raid", "invasion"}
 
 logger = logging.getLogger(__name__)
 
@@ -735,16 +739,31 @@ async def _notify_returned(bot: Bot) -> None:
 
         # Бонус «готов» уже в ленте — отдельный пуш не шлём (зовёт тизер).
 
-        # Outbox-очередь: «вести» уже в ленте; в Telegram шлём ТОЛЬКО фото-рассылки
-        # (админ-анонсы), остальное просто гасим — суть игрок увидит в «Уведомлениях».
+        # Outbox-очередь: «вести» уже в ленте; в Telegram шлём фото-рассылки
+        # (админ-анонсы) и СРОЧНОЕ (рейд/орда — время ограничено, тизером не
+        # прозеваешь) полным текстом с боевой кнопкой. Остальное гасим — суть
+        # игрок увидит в «Уведомлениях».
         notes = await repo.pop_notifications(session, 50)
         if notes:
+            urgent_pinged: set[int] = set()
             for n in notes:
                 if n.photo:        # рассылка с картинкой: фото + подпись
                     await deliver(
                         lambda nn=n: bot.send_photo(
                             nn.user_id, nn.photo, caption=nn.text or None),
                         what=f"outbox-photo→{n.user_id}")
+                elif n.kind in URGENT_KINDS:
+                    await deliver(
+                        lambda nn=n: bot.send_message(
+                            nn.user_id, nn.text,
+                            reply_markup=urgent_dm_kb(nn.kind)),
+                        what=f"срочное({n.kind})→{n.user_id}")
+                    urgent_pinged.add(n.user_id)
+            # срочный пуш сам позвал игрока — общий тизер поверх него не шлём
+            if urgent_pinged:
+                await session.execute(
+                    update(Player).where(Player.id.in_(urgent_pinged))
+                    .values(notif_pinged=True))
             await repo.delete_notifications(session, [n.id for n in notes])
             await session.commit()
 

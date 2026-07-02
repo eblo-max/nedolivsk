@@ -308,6 +308,23 @@ def notif_teaser_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def urgent_dm_kb(kind: str) -> InlineKeyboardMarkup:
+    """Срочная весть в личке (рейд/орда) — красная кнопка сразу в бой.
+    Рейд живёт в мини-аппе (?startapp=raid), орда — чатовый экран (invopen)."""
+    from bot.webapp import base_url
+    kb = InlineKeyboardBuilder()
+    b = base_url()
+    if kind == "raid" and b:
+        kb.button(text="⚔️ В БОЙ — открыть в игре",
+                  web_app=WebAppInfo(url=f"{b}/app/?startapp=raid"), style="danger")
+    elif kind == "invasion":
+        kb.button(text="🪓 ОРДА ОРКОВ — В СТРОЙ!", callback_data="invopen", style="danger")
+    else:
+        kb.button(text="🍺 К таверне", callback_data="tavern")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def claim_kb() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     _app_btn(kb, "🎒 Забрать — в приложении")          # → мини-апп (Таверна)

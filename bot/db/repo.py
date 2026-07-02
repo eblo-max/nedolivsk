@@ -324,7 +324,8 @@ def queue_notify(session: AsyncSession, user_id: int, text: str,
     """Положить личку игроку в очередь (атомарно со сделкой; шлёт нотифаер).
     photo — file_id картинки: тогда уйдёт фото с подписью (text).
     Зеркалим в персистентную ленту мини-аппа; kind — тип вести (иконка/переход)."""
-    session.add(Notification(user_id=user_id, text=text[:1024], photo=photo))
+    session.add(Notification(user_id=user_id, text=text[:1024], photo=photo,
+                             kind=kind[:32]))
     feed_push(session, user_id, text, kind=kind)
 
 

@@ -301,6 +301,11 @@ async def create_tables() -> None:
             "ALTER TABLE notif_feed ADD COLUMN IF NOT EXISTS "
             "kind VARCHAR(32) NOT NULL DEFAULT ''"
         ))
+        # Тип вести в outbox: срочные (рейд/орда) пробивают тизер полным текстом.
+        await conn.execute(text(
+            "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "
+            "kind VARCHAR(32) NOT NULL DEFAULT ''"
+        ))
         # Зазывала (рефералка): кто привёл, выдана ли награда, сколько тиров взято.
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS referred_by BIGINT"

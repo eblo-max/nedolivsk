@@ -92,7 +92,7 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
     pids = [r[0] for r in (await session.execute(
         select(Player.id).where(Player.last_seen_at >= cut))).all()]
     for uid in pids:
-        repo.queue_notify(session, uid, texts.invasion_push_dm(inv))
+        repo.queue_notify(session, uid, texts.invasion_push_dm(inv), kind="invasion")
     army = ("\n🤖 Подсажена болванка-армия: 16 бойцов с никами — город уже силён, "
             "живые добьют." if seed_army else "")
     await message.answer(

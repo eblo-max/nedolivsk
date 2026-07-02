@@ -242,6 +242,7 @@ class Notification(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, index=True)
     text: Mapped[str] = mapped_column(String(1024))
     photo: Mapped[str | None] = mapped_column(String(256))  # file_id картинки (рассылка)
+    kind: Mapped[str] = mapped_column(String(32), default="")  # срочные (raid/invasion) шлём полным текстом
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

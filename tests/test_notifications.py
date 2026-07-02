@@ -117,3 +117,28 @@ def test_quiet_hours_msk_math():
     quiet = lambda utc_h: ((utc_h + 3) % 24) >= 23 or ((utc_h + 3) % 24) < 8
     assert quiet(20) and quiet(23) and quiet(4)       # ночь МСК
     assert not quiet(6) and not quiet(12) and not quiet(19)   # день МСК
+
+
+# ── Срочные вести (рейд/орда пробивают тизер) ───────────────────────────
+def test_queue_notify_stores_kind_on_outbox_row():
+    """kind лежит и на outbox-строке — нотифаер по нему решает «срочное или тизер»."""
+    s = _FakeSession()
+    repo.queue_notify(s, 7, "Босс идёт", kind="raid")
+    note = next(o for o in s.added if type(o).__name__ == "Notification")
+    assert note.kind == "raid"
+
+
+def test_urgent_kinds_are_time_limited_battles():
+    from bot.notifier import URGENT_KINDS
+    assert URGENT_KINDS == {"raid", "invasion"}
+
+
+def test_urgent_dm_kb_routes(monkeypatch):
+    import bot.webapp as webapp
+    from bot.keyboards.inline import urgent_dm_kb
+    monkeypatch.setattr(webapp, "base_url", lambda: "https://x.example")
+    kb = urgent_dm_kb("raid")
+    btn = kb.inline_keyboard[0][0]
+    assert btn.web_app and btn.web_app.url.endswith("/app/?startapp=raid")
+    kb = urgent_dm_kb("invasion")
+    assert kb.inline_keyboard[0][0].callback_data == "invopen"
