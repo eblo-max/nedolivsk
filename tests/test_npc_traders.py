@@ -16,7 +16,7 @@ class _Repo:
         self.open_cnt = open_cnt
         self.has_sells = has_sells
 
-    async def count_seller_orders(self, _s, _nid):
+    async def count_seller_orders(self, _s, _nid, _side):
         return self.open_cnt
 
     async def has_sell_orders(self, _s, _good, exclude=0):

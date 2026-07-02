@@ -59,7 +59,8 @@ async def tick(session, repo, world, now: datetime | None = None,
     spent = dict(st.get("spent") or {})
     placed = 0
     for nid, spec in TRADERS.items():
-        open_cnt = await repo.count_seller_orders(session, nid)
+        open_cnt = (await repo.count_seller_orders(session, nid, "buy")
+                    + await repo.count_seller_orders(session, nid, "sell"))
         if open_cnt > 0:
             continue                             # его ордер ещё висит
         style = spec["style"]
