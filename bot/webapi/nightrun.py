@@ -273,6 +273,8 @@ async def _api_nightrun_bank(request: web.Request) -> web.Response:
         if not nr.is_active(run):
             return web.json_response({"ok": False, "error": "stale"})
         banked = nr.bank(run, p)
+        from bot.game import rumors
+        rumors.note("night", p, nr.satchel_value(banked))   # богатый куш — слух
         p.night_run = {}
         repo.add_log(s, "player", p.id, f"🏠 вернулся с ходки (+{nr.satchel_value(banked)}🪙-экв)")
         await s.commit()

@@ -409,6 +409,8 @@ async def _notify_returned(bot: Bot) -> None:
                         repo.add_log(session, "player", player.id,
                                      f"🔨 аукцион: продал {res['qty']}×{gn} "
                                      f"за {res['gold']} 🪙")
+                        from bot.game import rumors
+                        rumors.note("auction", player, res["gold"])
                         if player.chat_id is not None:   # анонс продажи в домашний чат
                             auction_chat_posts.append(
                                 (player.chat_id,
@@ -711,6 +713,8 @@ async def _notify_returned(bot: Bot) -> None:
                 repo.feed_push(session, _uid, _digest, kind="world")
         if now.minute == 0:          # раз в час чистим старые записи ленты
             await repo.feed_prune(session)
+        from bot.game import rumors as _rum
+        await _rum.flush(session, repo)      # сарафанное радио (сам троттлит)
 
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода

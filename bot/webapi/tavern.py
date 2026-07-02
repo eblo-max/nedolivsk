@@ -401,6 +401,8 @@ async def _api_trade(request: web.Request) -> web.Response:
             if qn:
                 if offer.get("cit"):                 # купец запомнит сделку
                     ss.adjust_npc_rel(p, offer["cit"], 2 if kind == "accept_high" else 1)
+                from bot.game import rumors
+                rumors.note("trade", p, gn)          # хваткая сделка — пища для сплетен
                 newbie.mark(p, "nb_sale")
                 gn_name = prod.GOODS[offer["good"]].name if offer["good"] in prod.GOODS else offer["good"]
                 repo.add_log(s, "player", p.id, f"🤝 продал купцу {qn}×{gn_name} за {gn} 🪙 (мини-апп)")
