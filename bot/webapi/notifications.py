@@ -127,6 +127,8 @@ def _all_notification_samples() -> list[str]:
         t(lambda: T.idle_nudge(2), "🍺 Кабак простаивает — загляни, гости заждались."),
         t(lambda: T.onboard_nudge(True), "🏰 Ты завёл двор, но кабак так и не открыл — пора!"),
         "🎟 Зазывала сработал: твой гость дошёл до Недоливска — держи награду!",
+        "🍻 Налил гостям: +14 🪙, +1 ⭐",
+        "🏆 Тебя подвинули с пьедестала — теперь #4. Загляни в рейтинг!",
     ]
     return [x[:1024] for x in items if x and x.strip()]
 
@@ -144,7 +146,7 @@ async def _api_notifications_seed_all(request: web.Request) -> web.Response:
     kinds = (["build", "craft", "exped", "hunt"] + ["prod"] * 7
              + ["auction"] * 2 + ["bourse"] * 3 + ["story"]
              + ["raid"] * 3 + ["invasion"] * 3 + ["mill", "bonus"]
-             + ["world"] * 6 + [""] * 2 + [""])
+             + ["world"] * 6 + [""] * 2 + ["ref", "retail", "rating"])
     async with session_factory() as s:
         for i, txt in enumerate(samples):
             repo.feed_push(s, uid, txt, kind=kinds[i] if i < len(kinds) else "")
