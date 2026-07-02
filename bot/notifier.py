@@ -715,6 +715,11 @@ async def _notify_returned(bot: Bot) -> None:
             await repo.feed_prune(session)
         from bot.game import rumors as _rum
         await _rum.flush(session, repo)      # сарафанное радио (сам троттлит)
+        if now.minute == 30:                 # час биржи: NPC-трейдеры ставят ордера
+            from bot.game import npc_traders
+            _n = await npc_traders.tick(session, repo, world, now)
+            if _n:
+                logger.info("NPC-трейдеры выставили ордеров: %s", _n)
 
         await session.commit()
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода

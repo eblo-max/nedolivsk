@@ -444,6 +444,22 @@ def create_order(
     return order
 
 
+async def count_open_orders(session: AsyncSession, seller_id: int) -> int:
+    """Сколько открытых ордеров у продавца (NPC-трейдеры: один за раз)."""
+    return await session.scalar(
+        select(func.count(MarketOrder.id)).where(
+            MarketOrder.seller_id == seller_id, MarketOrder.qty > 0)) or 0
+
+
+async def has_sell_orders(session: AsyncSession, good: str, exclude: int = 0) -> bool:
+    """Есть ли чужие sell-ордера по товару (поиск дефицита для NPC-завоза)."""
+    n = await session.scalar(
+        select(func.count(MarketOrder.id)).where(
+            MarketOrder.good == good, MarketOrder.side == "sell",
+            MarketOrder.qty > 0, MarketOrder.seller_id != exclude)) or 0
+    return n > 0
+
+
 def _orders_q(exclude_seller: int, side: str, goods: list[str] | None):
     # ЕДИНЫЙ рынок: стакан глобальный (без фильтра по чату), скрываем лишь свои.
     stmt = select(MarketOrder).where(
