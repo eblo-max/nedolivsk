@@ -95,3 +95,25 @@ def test_raid_player_damage_flask_boost():
     rng = random.Random(3)                         # тот же ролл — чистая разница
     boosted, _ = raid.player_damage(p, rng, raid.flask_mods(["ale3"]))
     assert boosted > base                          # +7 к базе до разброса
+
+
+# ── Фляга в ночной ходке ─────────────────────────────────────────────────
+def test_nightrun_flask_boosts_matching_approach():
+    from bot.game import nightrun as nr
+    p = _pl({})
+    run = nr.start(p, "green_valleys", flask=["ale2"])
+    assert run["flask"] == ["ale2"]
+    run["leg"] = 3                              # глубже — база ниже потолка шанса
+    base = nr.success_p(dict(run, flask=[]), p, "fight")
+    boosted = nr.success_p(run, p, "fight")
+    assert abs(boosted - base - nr.FLASK_P_BONUS) < 1e-9   # эль красит драку
+    assert nr.success_p(run, p, "sneak") == nr.success_p(dict(run, flask=[]), p, "sneak")
+
+
+def test_nightrun_sbiten_clears_situation_penalty():
+    from bot.game import balance as bal, nightrun as nr
+    sit = next(iter(bal.NIGHTRUN_SITUATION_PENALTY))
+    p = _pl({})
+    dirty = nr.start(p, "", situation=sit)
+    clean = nr.start(p, "", situation=sit, flask=["sbiten"])
+    assert nr.success_p(clean, p, "fight") > nr.success_p(dirty, p, "fight")

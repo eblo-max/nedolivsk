@@ -126,7 +126,10 @@ def success_p(run: dict, player, kind: str) -> float:
     Засада любит броню, Тишком — удачу, Лихо рискованнее (но видит кубик)."""
     s = combat.player_stats(player)
     armor, luck = s.get("armor", 0), s.get("luck", 0)
+    fl = run.get("flask") or []
     pen = balance.NIGHTRUN_SITUATION_PENALTY.get(run.get("situation"), 0.0)
+    if "sbiten" in fl:
+        pen = 0.0                                         # сбитень гасит дурноту города
     p = (balance.NIGHTRUN_P0 - balance.NIGHTRUN_P_DECAY * (run["leg"] - 1)
          + armor * balance.NIGHTRUN_ARMOR_W + luck * balance.NIGHTRUN_LUCK_W - pen)
     if kind == "fight":
@@ -135,6 +138,8 @@ def success_p(run: dict, player, kind: str) -> float:
         p += luck * balance.NIGHTRUN_LUCK_W               # удача — проскользнуть
     elif kind == "gamble":
         p -= 0.05                                         # азарт рискованнее
+    if any(FLASK_APPROACH.get(k) == kind for k in fl):    # глоток под свой подход
+        p += FLASK_P_BONUS
     return max(balance.NIGHTRUN_P_FLOOR, min(balance.NIGHTRUN_P_CAP, p))
 
 
@@ -166,13 +171,22 @@ def satchel_value(satchel: dict) -> int:
                    for k, v in (satchel or {}).items()))
 
 
+# Фляга на ходку: глоток красит ПОДХОД на всю ночь (эль — драка, медовуха —
+# тишком, вино — азарт), сбитень гасит штраф городской ситуации.
+FLASK_APPROACH = {"ale1": "fight", "ale2": "fight", "ale3": "fight",
+                  "mead": "sneak", "wine": "gamble"}
+FLASK_P_BONUS = 0.06
+
+
 def start(player, region: str, situation: str | None = None,
-          seed: int | None = None, now: datetime | None = None) -> dict:
+          seed: int | None = None, now: datetime | None = None,
+          flask: list[str] | None = None) -> dict:
     """Завести ходку: этап 1, полное здоровье, пустая котомка."""
     return {
         "leg": 1, "state": "fork", "hp": combat.max_hp(player),
         "hp_max": combat.max_hp(player), "satchel": {},
         "region": region or "", "situation": situation,
+        "flask": list(flask or []),
         "seed": seed if seed is not None else random.randint(1, 10**9),
         "started_at": (now or datetime.now(UTC)).isoformat(),
     }

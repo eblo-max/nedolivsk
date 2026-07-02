@@ -15,7 +15,8 @@ interface NRun {
   fork?: NFork[]; meet?: { npc: string; scene: string; options: { id: string; label: string }[] }
   quiz?: { q: string; options: string[] }
 }
-interface NState { ok: boolean; cooldown: number; active: boolean; max_legs: number; stats: { armor: number; luck: number }; run: NRun | null }
+interface NState { ok: boolean; cooldown: number; active: boolean; max_legs: number; stats: { armor: number; luck: number }; run: NRun | null
+  flask?: { key: string; name: string; emoji: string; hint: string; qty: number }[] }
 interface NOut {
   kind: string; busted: boolean; loot: NItem[]; hp_cost: number; healed: number; roll?: number | null
   lose_faces?: number | null; collapsed: boolean; lost?: NItem[]; correct?: boolean
@@ -158,10 +159,12 @@ export default function Nightrun() {
     }
   }
 
+  const [flaskSel, setFlaskSel] = useState<string[]>([])
   async function start() {
     if (busy) return; setBusy(true); haptic('medium'); setChron([ZONE_LORE.town])
     if (off) { set(offState(offStart())); setBusy(false); return }
-    const r = await call<NState>('nightrun/start'); if (r) set(r); setBusy(false)
+    const r = await call<NState>('nightrun/start', flaskSel.length ? { flask: flaskSel } : {})
+    if (r) set(r); setBusy(false)
   }
   function resolveOut(o: NOut, ns: NState) {
     setOut(narr(o)); set(ns)
@@ -273,7 +276,7 @@ export default function Nightrun() {
     <div className="nr" style={nrbg}>
       <div className="nr-bgfix" key={bgName} aria-hidden="true" />
       {toast && <div className="toast">{toast}</div>}
-      {!d.active && <NrIntro d={d} busy={busy} onStart={start} />}
+      {!d.active && <NrIntro d={d} busy={busy} onStart={start} flaskSel={flaskSel} onFlask={(k) => setFlaskSel((c) => c.includes(k) ? c.filter((x) => x !== k) : c.length < 2 ? [...c, k] : c)} />}
       {run && run.state === 'fork' && <NrFork d={d} run={run} busy={busy} onPick={pick} />}
       {run && run.state === 'meet' && <NrMeet run={run} busy={busy} onPick={meet} />}
       {run && run.state === 'quiz' && <NrQuiz run={run} busy={busy} onAnswer={quiz} />}
@@ -333,7 +336,9 @@ function HalfBody({ s }: { s: SplitSide }) {
 }
 
 // ── интро ──
-function NrIntro({ d, busy, onStart }: { d: NState; busy: boolean; onStart: () => void }) {
+function NrIntro({ d, busy, onStart, flaskSel, onFlask }: {
+  d: NState; busy: boolean; onStart: () => void; flaskSel: string[]; onFlask: (k: string) => void
+}) {
   const cd = d.cooldown
   return (
     <div className="nr-scene intro rise">
@@ -341,6 +346,17 @@ function NrIntro({ d, busy, onStart }: { d: NState; busy: boolean; onStart: () =
       <h2 className="nr-title">Ночная ходка</h2>
       <p className="nr-flavor">«Когда город спит, тракт оживает. Иди во тьму — но знай меру: зарвёшься, и обчистят дочиста.»</p>
       <div className="nr-stats"><i>🛡 {d.stats.armor}</i><i>🍀 {d.stats.luck}</i></div>
+      {cd <= 0 && (d.flask?.length ?? 0) > 0 && (
+        <div className="raid-flask">
+          <span className="raid-flask-h">🍺 Глоток на дорожку (до 2):</span>
+          {d.flask!.map((f) => (
+            <button key={f.key} className={`raid-flask-chip${flaskSel.includes(f.key) ? ' on' : ''}`}
+              onClick={() => { haptic('light'); onFlask(f.key) }}>
+              {f.emoji} {f.name} — {f.hint} <em>×{f.qty}</em>
+            </button>
+          ))}
+        </div>
+      )}
       {cd > 0
         ? <div className="nr-cd">🌅 Ноги ещё гудят — в путь через <b>{hms(cd)}</b></div>
         : <button className="btn nr-go" disabled={busy} onClick={() => { haptic('medium'); onStart() }}>🌙 Выйти на тракт</button>}

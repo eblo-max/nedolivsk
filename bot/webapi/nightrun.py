@@ -44,6 +44,7 @@ def _nightrun_state(p) -> dict:
     """Состояние ночной ходки: кулдаун / активный забег (этап, HP, котомка, текущий
     под-экран развилки/встречи/загадки). Прогноз успеха — nightrun.success_p."""
     from bot.game import balance as bal, combat, nightrun as nr
+    from bot.game import production as prodm
     from bot.config import settings
     cd = 0 if p.id == settings.admin_id else nr.cooldown_left(p)   # админ — без кулдауна (тест)
     run = p.night_run or {}
@@ -53,6 +54,15 @@ def _nightrun_state(p) -> dict:
             "stats": {"armor": s.get("armor", 0), "luck": s.get("luck", 0)}}
     if not nr.is_active(run):
         base["run"] = None
+        # фляга на дорожку: что есть в погребе (глоток красит подход на всю ночь)
+        prods = (p.tavern.products if p.tavern else None) or {}
+        base["flask"] = [
+            {"key": k, "name": prodm.GOODS[k].name, "emoji": prodm.GOODS[k].emoji,
+             "hint": hint, "qty": int(prods.get(k, 0))}
+            for k, hint in (("ale1", "смелее в драке"), ("ale2", "смелее в драке"),
+                            ("ale3", "смелее в драке"), ("mead", "легче тишком"),
+                            ("wine", "фарт в лихо"), ("sbiten", "гасит дурноту города"))
+            if k in prodm.GOODS and int(prods.get(k, 0)) > 0]
         return base
     st = run.get("state")
     r = {"leg": run["leg"], "state": st, "hp": run["hp"],
@@ -60,6 +70,7 @@ def _nightrun_state(p) -> dict:
          "satchel": _nr_items(run.get("satchel")),
          "satchel_value": nr.satchel_value(run.get("satchel")),
          "situation": run.get("situation"), "can_push": nr.can_push(run),
+         "flask_drunk": run.get("flask") or [],
          "rest_heal": bal.NIGHTRUN_REST_HEAL,
          "next_value": round(nr.leg_value(run["leg"] + 1)) if nr.can_push(run) else 0,
          "growth": round(bal.NIGHTRUN_REWARD_GROWTH, 2)}
@@ -120,8 +131,14 @@ async def _api_nightrun_start(request: web.Request) -> web.Response:
             sit = citymod.current(city)
             situation = sit.id if sit else None
         p.night_run_at = datetime.now(timezone.utc)
-        p.night_run = nr.start(p, p.region or "", situation=situation)
-        repo.add_log(s, "player", p.id, "🌙 ушёл в ночную ходку")
+        keys = [str(k) for k in ((body or {}).get("flask") or [])]
+        used: list[str] = []
+        if keys:                                    # глоток на дорожку — из погреба
+            from bot.game import combat as cb
+            _, used, _ = cb.flask_apply(p, keys, {}, 0)
+        p.night_run = nr.start(p, p.region or "", situation=situation, flask=used)
+        repo.add_log(s, "player", p.id, "🌙 ушёл в ночную ходку"
+                     + (f" (фляга: {len(used)} порц.)" if used else ""))
         await s.commit()
         st = _nightrun_state(p)
     return web.json_response(st, headers={"Cache-Control": "no-store"})
