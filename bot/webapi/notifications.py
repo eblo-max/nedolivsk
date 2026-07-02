@@ -114,9 +114,15 @@ async def _api_notifications_seed_all(request: web.Request) -> web.Response:
     if not _is_admin(uid):
         return web.json_response({"ok": False, "error": "forbidden"}, status=403)
     samples = _all_notification_samples()
+    # kind по классам сэмплов (тот же порядок, что в _all_notification_samples) —
+    # чтобы админ-тест показывал иконки и тап-переходы как у боевых вестей
+    kinds = (["build", "craft", "exped", "hunt"] + ["prod"] * 7
+             + ["auction"] * 2 + ["bourse"] * 3 + ["story"]
+             + ["raid"] * 3 + ["invasion"] * 3 + ["mill", "bonus"]
+             + ["world"] * 6 + [""] * 2 + [""])
     async with session_factory() as s:
-        for txt in samples:
-            repo.feed_push(s, uid, txt)
+        for i, txt in enumerate(samples):
+            repo.feed_push(s, uid, txt, kind=kinds[i] if i < len(kinds) else "")
         await s.commit()
     return web.json_response({"ok": True, "count": len(samples)},
                              headers={"Cache-Control": "no-store"})
