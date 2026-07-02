@@ -458,7 +458,8 @@ def _hunt_state(p) -> dict:
         "ok": True,
         "hp": {"cur": chp, "max": mhp, "regen": combat.regen_full_minutes(p)},
         "ready": {"can": ready, "minutes": mins},
-        "stats": {"damage": bal.BASE_DAMAGE + stats.get("damage", 0),
+        "stats": {"damage": (bal.BASE_DAMAGE + stats.get("damage", 0)
+                             + bal.LEVEL_DAMAGE * stats.get("level", 0)),
                   "crit": min(bal.HUNT_CRIT_CAP, stats.get("crit", 0)),
                   "armor": stats.get("armor", 0), "luck": stats.get("luck", 0)},
         "heal": {"can": chp < mhp, "full": chp >= mhp, "options": heal_opts},
