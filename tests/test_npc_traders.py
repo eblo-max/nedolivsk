@@ -87,3 +87,15 @@ def test_dealer_post_from_real_orders():
     assert town_npc.dealer_post([]) is None
     txt = town_npc.dealer_post([{"good_name": "Эль", "qty": 6, "unit": 14}])
     assert "Эль" in txt and "14 🪙" in txt and "скупку" in txt
+
+
+def test_bourse_news_names_citizens():
+    from bot import texts
+    out = texts.bourse_news([("ale1", 5, 12)], [("bread", 3, 8)],
+                            npc=[("Перекуп Сизый", "buy", "mead", 8, 9),
+                                 ("Спекулянт Крысобой", "sell", "ale1", 8, 6)])
+    assert "ГОРОЖАНЕ НА ТОРГУ" in out
+    assert "Перекуп Сизый скупает" in out and "Крысобой продаёт" in out
+    assert "лотов: 4" in out                          # именные тоже в счётчике
+    plain = texts.bourse_news([("ale1", 5, 12)], [])
+    assert "ГОРОЖАНЕ" not in plain                    # без NPC — как раньше

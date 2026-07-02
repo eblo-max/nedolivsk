@@ -633,8 +633,14 @@ async def _notify_returned(bot: Bot) -> None:
             orders = await repo.bourse_orders_since(session, blast or (now - bdelta))
             world.bourse_announced_at = now
             agg: dict[str, dict[str, list]] = {"sell": {}, "buy": {}}
+            from bot.game import npc_traders as _npt
+            npc_lots = []
             for o in orders:
                 side = o.side if o.side in ("sell", "buy") else "sell"
+                _nm = _npt.trader_name(o.seller_id)
+                if _nm:                        # именной лот горожанина — отдельно
+                    npc_lots.append((_nm, side, o.good, o.qty, o.unit_price))
+                    continue
                 cur = agg[side].get(o.good)
                 if cur is None:
                     agg[side][o.good] = [o.qty, o.unit_price]
@@ -644,8 +650,8 @@ async def _notify_returned(bot: Bot) -> None:
                               else max(cur[1], o.unit_price))
             sells = [(g, v[0], v[1]) for g, v in list(agg["sell"].items())[:6]]
             buys = [(g, v[0], v[1]) for g, v in list(agg["buy"].items())[:6]]
-            if sells or buys:
-                bourse_news_text = texts.bourse_news(sells, buys)
+            if sells or buys or npc_lots:
+                bourse_news_text = texts.bourse_news(sells, buys, npc=npc_lots)
                 # Личечным игрокам (без домашнего чата), кто СЕЙЧАС за ботом, —
                 # сводку в личку. Окно ≈ интервал дайджеста: пока играешь —
                 # видишь, ушёл — не заваливаем (пинги не копятся в простое).

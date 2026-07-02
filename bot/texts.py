@@ -1745,7 +1745,7 @@ def trade_cancelled() -> str:
     return "Передумал продавать — купец пожал плечами и потопал дальше."
 
 
-def bourse_news(sells: list, buys: list) -> str:
+def bourse_news(sells: list, buys: list, npc: list | None = None) -> str:
     """Сводка свежих лотов биржи в чаты (верстка как на главном экране).
     sells/buys: [(good, qty, price)]."""
     from bot.game import production as prod
@@ -1755,7 +1755,7 @@ def bourse_news(sells: list, buys: list) -> str:
         nm = f"{g.emoji} {g.name}" if g else good
         return f"└ {nm} ×{qty} — по {price}🪙"
 
-    n = len(sells) + len(buys)
+    n = len(sells) + len(buys) + len(npc or [])
     parts = [
         "🪙 <b>БИРЖА НЕДОЛИВСКА ГУДИТ!</b>",
         f"<i>свежак на торгу (лотов: {n}) — налетай, покуда барыги всё не расхватали</i>",
@@ -1776,6 +1776,14 @@ def bourse_news(sells: list, buys: list) -> str:
         "<i>Кто проворен — при барыше, кто зевает — глотает пыль.\n"
         "🏪 Рынок → 🛒 Купить · 📥 Заявки</i>",
     ]
+    if npc:
+        parts.append("")
+        parts.append("<b>🧾 ГОРОЖАНЕ НА ТОРГУ</b>")
+        for _nm, _side, _good, _qty, _price in npc[:4]:
+            _g = prod.GOODS.get(_good)
+            _gn = f"{_g.emoji} {_g.name}" if _g else _good
+            _verb = "скупает" if _side == "buy" else "продаёт"
+            parts.append(f"└ {_nm} {_verb} {_gn} ×{_qty} — по {_price}🪙")
     return "\n".join(parts)
 
 
