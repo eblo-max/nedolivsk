@@ -4,7 +4,7 @@
 обычными делами. Выполнили — сутки «городского пира» (+15% к сбыту гостям)
 и громкий анонс. Провалили — ничего: цель не кнут, а повод.
 
-Прогресс буферится в памяти (note) и раз в тик пишется в world.market['fgoal']
+Прогресс буферится в памяти (note) и раз в тик пишется в world.live['fgoal']
 нотифаером (flush) — как слухи. Пир кэшируется в памяти и гидрируется из
 world при старте (переживает деплой)."""
 
@@ -65,7 +65,7 @@ def feast_mult() -> float:
 def hydrate(world) -> None:
     """При старте процесса: подтянуть пир из world (переживает деплой)."""
     global _feast_until
-    st = (world.market or {}).get("fgoal") or {}
+    st = (world.live or {}).get("fgoal") or {}
     _feast_until = float(st.get("feast_until") or 0.0)
 
 
@@ -75,7 +75,7 @@ def flush(world, now: datetime | None = None) -> str | None:
     global _feast_until
     now = now or datetime.now(timezone.utc)
     goal = current_goal(now)
-    m = dict(world.market or {})
+    m = dict(world.live or {})
     st = dict(m.get("fgoal") or {})
     if st.get("week") != goal["week"]:            # новая неделя — новая цель
         st = {"week": goal["week"], "done": 0, "rewarded": False,
@@ -95,7 +95,7 @@ def flush(world, now: datetime | None = None) -> str | None:
         announce = (f"🎉 <b>ЦЕЛЬ НЕДЕЛИ ВЗЯТА!</b>\n{fac_txt} — "
                     f"город гуляет сутки: <b>сбыт гостям +15%</b>. Наливай!")
     m["fgoal"] = st
-    world.market = m
+    world.live = m
     return announce
 
 
@@ -103,7 +103,7 @@ def state(world, now: datetime | None = None) -> dict:
     """Снимок для экрана: цель, прогресс, пир (единый источник для UI)."""
     now = now or datetime.now(timezone.utc)
     goal = current_goal(now)
-    st = (world.market or {}).get("fgoal") or {}
+    st = (world.live or {}).get("fgoal") or {}
     done = int(st.get("done", 0)) if st.get("week") == goal["week"] else 0
     return {"fac": goal["fac"], "text": goal["text"],
             "emblem": goal["emblem"], "title": goal["title"], "task": goal["task"],

@@ -26,10 +26,10 @@ def test_progress_reward_and_idempotent_feast():
     _reset()
     now = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
     goal = fgoal.current_goal(now)
-    w = NS(market={})
+    w = NS(live={}, market={})
     fgoal.note(goal["kind"], goal["target"] - 5)
     assert fgoal.flush(w, now) is None                 # ещё не добили
-    st = w.market["fgoal"]
+    st = w.live["fgoal"]
     assert st["done"] == goal["target"] - 5 and not st["rewarded"]
     fgoal.note(goal["kind"], 10)
     ann = fgoal.flush(w, now)
@@ -42,22 +42,22 @@ def test_progress_reward_and_idempotent_feast():
 
 def test_new_week_resets_progress():
     _reset()
-    w = NS(market={})
+    w = NS(live={}, market={})
     d1 = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
     g1 = fgoal.current_goal(d1)
     fgoal.note(g1["kind"], 50)
     fgoal.flush(w, d1)
     d2 = datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc)
     fgoal.flush(w, d2)
-    assert w.market["fgoal"]["week"] == fgoal.week_key(d2)
-    assert w.market["fgoal"]["done"] == 0
+    assert w.live["fgoal"]["week"] == fgoal.week_key(d2)
+    assert w.live["fgoal"]["done"] == 0
     _reset()
 
 
 def test_hydrate_restores_feast():
     _reset()
     until = time.time() + 3600
-    w = NS(market={"fgoal": {"feast_until": until}})
+    w = NS(live={"fgoal": {"feast_until": until}}, market={})
     fgoal.hydrate(w)
     assert fgoal.feast_mult() > 1.0
     _reset()
@@ -67,7 +67,7 @@ def test_state_for_ui():
     _reset()
     now = datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc)
     g = fgoal.current_goal(now)
-    w = NS(market={})
+    w = NS(live={}, market={})
     fgoal.note(g["kind"], g["target"] // 2)
     fgoal.flush(w, now)
     st = fgoal.state(w, now)

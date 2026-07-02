@@ -5,7 +5,8 @@
 (перекуп подбирает дешёвку, спекулянт закрывает дефицит), а внимательные
 игроки учатся торговать «против» повадок конкретного NPC.
 
-Бюджеты дневные, состояние в world.market['npc'] (JSONB, переживает деплой).
+Бюджеты дневные, состояние в world.live['npc'] (JSONB, переживает деплой;
+НЕ в world.market — рынок ждёт там только числа, словарь ронял decay 02.07).
 seller_id отрицательный — личная лента/уведомления такие id игнорируют."""
 
 import random
@@ -36,7 +37,7 @@ def _day_key(now: datetime) -> str:
 
 
 def _state(world, now: datetime) -> dict:
-    m = dict(world.market or {})
+    m = dict(world.live or {})
     st = dict(m.get("npc") or {})
     if st.get("day") != _day_key(now):          # новый день — свежие бюджеты
         st = {"day": _day_key(now), "spent": {}}
@@ -44,9 +45,9 @@ def _state(world, now: datetime) -> dict:
 
 
 def _save(world, st: dict) -> None:
-    m = dict(world.market or {})
+    m = dict(world.live or {})
     m["npc"] = st
-    world.market = m
+    world.live = m
 
 
 async def tick(session, repo, world, now: datetime | None = None,

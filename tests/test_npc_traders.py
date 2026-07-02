@@ -28,7 +28,7 @@ class _Repo:
 
 
 def _world():
-    return NS(market={})
+    return NS(live={}, market={})
 
 
 def test_friday_full_cast_and_budgets():
@@ -38,7 +38,7 @@ def test_friday_full_cast_and_budgets():
     n = asyncio.run(npct.tick(None, r, w, friday))
     nids = {o["nid"] for o in r.orders}
     assert -9001 in nids and -9002 in nids and -9003 in nids and n == 3
-    st = w.market["npc"]
+    st = w.live["npc"]
     assert st["day"] == "2026-07-03" and st["spent"]
     for o in r.orders:
         assert 1 <= o["qty"] <= npct.NPC_ORDER_QTY_MAX
@@ -65,7 +65,7 @@ def test_supply_only_on_deficit_and_price_styles():
     r3 = _Repo()
     asyncio.run(npct.tick(None, r3, w, wed))
     cheap = next(o for o in r3.orders if o["nid"] == -9001)
-    fv = auc.fair_value(NS(market={}), cheap["good"])
+    fv = auc.fair_value(NS(live={}, market={}), cheap["good"])
     assert cheap["side"] == "buy" and cheap["unit"] <= int(fv * npct.CHEAP_MULT) + 1
 
 
@@ -99,3 +99,15 @@ def test_bourse_news_names_citizens():
     assert "лотов: 4" in out                          # именные тоже в счётчике
     plain = texts.bourse_news([("ale1", 5, 12)], [])
     assert "ГОРОЖАНЕ" not in plain                    # без NPC — как раньше
+
+
+def test_market_decay_survives_legacy_dict_keys():
+    """Регресс 02.07: словарь в world.market ронял decay каждый тик (крашлуп)."""
+    from datetime import datetime, timedelta, timezone
+    from bot.game import market
+    w = NS(market={"ale1": 12.0, "npc": {"day": "x"}, "fgoal": {"done": 1},
+                   "_t": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()},
+           live={})
+    market.decay(w)                                # не должно упасть
+    assert isinstance(w.market.get("npc"), dict)   # служебный мусор не тронут
+    assert w.market["ale1"] < 12.0                 # числа впитываются как раньше

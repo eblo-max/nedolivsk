@@ -66,9 +66,9 @@ def decay(holder, now: datetime | None = None) -> None:
     if holder is None:
         return
     m = dict(holder.market or {})
-    goods = [g for g in m if g != _TKEY]
+    goods = [g for g in m if g != _TKEY and isinstance(m[g], (int, float))]
     if not goods:                       # впитывать нечего
-        if m:                           # остались только метки — сбрасываем
+        if m and all(g == _TKEY for g in m):   # остались только метки — сбрасываем
             holder.market = {}
         return
     now = now or _now()
@@ -87,5 +87,5 @@ def decay(holder, now: datetime | None = None) -> None:
             m.pop(g)
         else:
             m[g] = round(nv, 3)
-    remaining = [g for g in m if g != _TKEY]
+    remaining = [g for g in m if g != _TKEY and isinstance(m.get(g), (int, float))]
     holder.market = {**m, _TKEY: now.isoformat()} if remaining else {}

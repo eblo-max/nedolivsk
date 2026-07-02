@@ -301,6 +301,28 @@ async def create_tables() -> None:
             "ALTER TABLE notif_feed ADD COLUMN IF NOT EXISTS "
             "kind VARCHAR(32) NOT NULL DEFAULT ''"
         ))
+        # Живой мир: отдельное поле (словари в market роняли decay, 02.07.2026)
+        await conn.execute(text(
+            "ALTER TABLE world ADD COLUMN IF NOT EXISTS "
+            "live JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))
+        await conn.execute(text(
+            "UPDATE world SET "
+            "live = live || COALESCE(jsonb_build_object("
+            "  'npc', market->'npc', 'npc_posts', market->'npc_posts', "
+            "  'fgoal', market->'fgoal'), '{}'::jsonb), "
+            "market = market - 'npc' - 'npc_posts' - 'fgoal' "
+            "WHERE market ?| array['npc','npc_posts','fgoal']"
+        ))
+        await conn.execute(text(
+            "UPDATE world SET live = live - 'npc' WHERE live->'npc' = 'null'::jsonb"
+        ))
+        await conn.execute(text(
+            "UPDATE world SET live = live - 'npc_posts' WHERE live->'npc_posts' = 'null'::jsonb"
+        ))
+        await conn.execute(text(
+            "UPDATE world SET live = live - 'fgoal' WHERE live->'fgoal' = 'null'::jsonb"
+        ))
         # Тип вести в outbox: срочные (рейд/орда) пробивают тизер полным текстом.
         await conn.execute(text(
             "ALTER TABLE notifications ADD COLUMN IF NOT EXISTS "

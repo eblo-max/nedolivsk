@@ -13,14 +13,14 @@ def _day(now: datetime) -> str:
 
 
 def _once_per_day(world, key: str, now: datetime) -> bool:
-    """True — сегодня ещё не постил (и пометить, что постим)."""
-    m = dict(world.market or {})
+    """True — сегодня ещё не постил (и пометить, что постим). Метки в world.live."""
+    m = dict(world.live or {})
     posts = dict(m.get("npc_posts") or {})
     if posts.get(key) == _day(now):
         return False
     posts[key] = _day(now)
     m["npc_posts"] = posts
-    world.market = m
+    world.live = m
     return True
 
 
