@@ -1,8 +1,10 @@
 """Механика горожан: спавн визитёра не конфликтует с торгом, валидность выбора."""
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace as NS
+
+import pytest
 
 os.environ.setdefault("BOT_TOKEN", "test:test")
 
@@ -36,3 +38,30 @@ def test_resolve_index_bounds_are_api_guarded():
     assert "0 <= idx < len(st.choices)" in src
     # int() обёрнут в try (иначе index='abc' → ValueError → 500)
     assert "except (TypeError, ValueError)" in src
+
+
+def test_faction_decay_scales_with_active():
+    """Единый мир: распад растёт с активными (иначе перелив), зажат в коридор."""
+    from bot.game import balance as bal
+    assert bal.faction_decay_per_hour(0) == bal.FACTION_DECAY_MIN      # пустой мир — пол
+    assert bal.faction_decay_per_hour(10**6) == bal.FACTION_DECAY_MAX  # огромный — потолок
+    assert bal.faction_decay_per_hour(43) == pytest.approx(43 * bal.FACTION_DECAY_PER_ACTIVE)
+    # при живом масштабе (~43 активных) — в «сладкой зоне» симуляции 0.75..1.0/ч
+    assert 0.7 <= bal.faction_decay_per_hour(43) <= 1.1
+
+
+def test_advance_respects_dynamic_decay():
+    """Больше распад → сильнее оседает сила фракции за тот же интервал."""
+    from bot.game import city as citymod
+    now = datetime.now(timezone.utc)
+
+    def mkcity():
+        return NS(faction_power={"thieves": 40}, updated_at=now - timedelta(hours=10),
+                  situations=[], last_situation_end=None, mood=0)
+
+    slow, fast = mkcity(), mkcity()
+    citymod.advance(slow, now, decay_per_hour=0.4)   # 0.4×10 = 4 шага → 36
+    citymod.advance(fast, now, decay_per_hour=2.0)   # 2.0×10 = 20 шагов → 20
+    assert fast.faction_power["thieves"] < slow.faction_power["thieves"]
+    assert slow.faction_power["thieves"] == 36
+    assert fast.faction_power["thieves"] == 20

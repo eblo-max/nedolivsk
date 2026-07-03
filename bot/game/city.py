@@ -162,11 +162,13 @@ def effects(city, player, now: datetime | None = None) -> CityEffects:
     )
 
 
-def advance(city, now: datetime | None = None) -> list[tuple[str, Situation]]:
+def advance(city, now: datetime | None = None,
+            decay_per_hour: float | None = None) -> list[tuple[str, Situation]]:
     """Двигает симуляцию города: дрейф силы фракций, старт/конец ситуаций.
-    Возвращает события для анонса: [('activate'|'expire', Situation)].
-    Мутирует city; кэш обновляется снаружи (refresh_cache)."""
+    decay_per_hour — динамический распад (растёт с числом активных); None →
+    базовый (тесты/фолбэк). Возвращает события для анонса. Мутирует city."""
     now = now or _now()
+    decay = decay_per_hour or balance.FACTION_DECAY_PER_HOUR
     events: list[tuple[str, Situation]] = []
     drift_h = 0.0  # сколько часов «прошло» этим тиком (для дрейфа настроения)
 
@@ -175,10 +177,9 @@ def advance(city, now: datetime | None = None) -> list[tuple[str, Situation]]:
     if updated is not None:
         if updated.tzinfo is None:
             updated = updated.replace(tzinfo=timezone.utc)
-        steps = int(balance.FACTION_DECAY_PER_HOUR
-                    * (now - updated).total_seconds() / 3600)
+        steps = int(decay * (now - updated).total_seconds() / 3600)
         if steps > 0:
-            drift_h = steps / balance.FACTION_DECAY_PER_HOUR
+            drift_h = steps / decay
             fp = dict(city.faction_power or {})
             changed = False
             for f, v in list(fp.items()):
@@ -193,8 +194,7 @@ def advance(city, now: datetime | None = None) -> list[tuple[str, Situation]]:
                     changed = True
             if changed:
                 city.faction_power = fp
-            city.updated_at = updated + timedelta(
-                hours=steps / balance.FACTION_DECAY_PER_HOUR)
+            city.updated_at = updated + timedelta(hours=steps / decay)
     else:
         city.updated_at = now
 

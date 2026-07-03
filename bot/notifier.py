@@ -673,9 +673,15 @@ async def _notify_returned(bot: Bot) -> None:
                 for uid in dm_ids:
                     repo.queue_notify(session, uid, bourse_news_text, kind="bourse")
 
-        # Симуляция фракций/ситуаций — ЕДИНЫЙ мировой город. Ситуации мира
-        # транслируются во ВСЕ чаты-окна, летопись — одна общая.
-        _sit_events = list(citymod.advance(world_city, now))
+        # Симуляция фракций/ситуаций — ЕДИНЫЙ мировой город. Распад силы фракций
+        # масштабируем по числу активных: больше народа кормит город → быстрее
+        # остывает, иначе фракции упираются в потолок и мир тонет в ситуациях.
+        _active = await session.scalar(
+            select(func.count()).select_from(Player).where(
+                Player.last_seen_at > now - timedelta(days=1)))
+        _decay = balance.faction_decay_per_hour(_active or 0)
+        # Ситуации мира транслируются во ВСЕ чаты-окна, летопись — одна общая.
+        _sit_events = list(citymod.advance(world_city, now, decay_per_hour=_decay))
         if _sit_events:
             _win_chats = await repo.all_chat_ids(session)
             for kind, sit in _sit_events:
