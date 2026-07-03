@@ -585,8 +585,7 @@ def _panel_data(p, t, kind: str) -> dict:
             {"label": "Уют", "frm": int(t.comfort), "to": int(ns["comfort"])},
             {"label": "Доход/ч",
              "frm": logic.income_rate_quote(p, t),
-             "to": int(logic.income_rate_quote(p, t) / max(1, t.income_rate)
-                       * ns["income_rate"])},
+             "to": logic.income_rate_quote(p, t, base_rate=int(ns["income_rate"]))},
         ]
         return {"kind": "upgrade", "level": int(t.level), "next": int(t.level) + 1,
                 "cost": items, "gains": gains, "affordable": all(i["ok"] for i in items),

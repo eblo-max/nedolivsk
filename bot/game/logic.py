@@ -142,11 +142,14 @@ def expedition_gain_quote(player: Player, tavern: Tavern | None, resource: str) 
                * newbie.yield_mult(player))
 
 
-def income_rate_quote(player: Player, tavern: Tavern) -> int:
+def income_rate_quote(player: Player, tavern: Tavern,
+                      base_rate: int | None = None) -> int:
     """Реальный пассив «в час» с множителями снаряги/перков/бафа/погоды и
-    вычетом содержания — то, что капает на самом деле (показ = начисление)."""
+    вычетом содержания — то, что капает на самом деле (показ = начисление).
+    base_rate — базовая ставка (для превью след. уровня); по умолчанию текущая."""
+    base = tavern.income_rate if base_rate is None else base_rate
     mult = items.income_multiplier(getattr(player, "equipment", None))
-    rate = (tavern.income_rate * mult * perks.passive_mult(player)
+    rate = (base * mult * perks.passive_mult(player)
             * buff.gold_mult(player) * worldevent.income_mult(player))
     return max(0, int(rate - rate * balance.WORKER_UPKEEP_PCT))
 

@@ -83,3 +83,16 @@ def test_income_rate_quote_reflects_gear():
     p1, t1 = _pl(equipment={inc.slot: items.make_entry(inc.id, 1)})
     t1.income_rate = 100
     assert logic.income_rate_quote(p1, t1) > base > 0
+
+
+def test_income_quote_base_rate_matches_upgrade_preview():
+    """Превью дохода при апгрейде == факту после апгрейда (жалоба: 14 vs 15).
+    Котировка с base_rate след. уровня == котировке после смены income_rate."""
+    from bot.game import logic, balance
+    p, t = _pl()
+    t.income_rate = 40
+    next_base = int(balance.stats_for_level(t.level + 1)["income_rate"])
+    preview = logic.income_rate_quote(p, t, base_rate=next_base)
+    t.income_rate = next_base                        # как после апгрейда
+    fact = logic.income_rate_quote(p, t)
+    assert preview == fact, (preview, fact)
