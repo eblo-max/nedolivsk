@@ -357,8 +357,11 @@ def retail_total(want: dict | None, player: Player | None = None) -> int:
                for k, q in (want or {}).items() if k in production.GOODS)
     if player is None:
         return base
+    from bot.game import factions
+    _msk = (_now().hour + 3) % 24
     return int(base * buff.gold_mult(player) * worldevent.income_mult(player)
-               * assortment_mult(want))
+               * assortment_mult(want)
+               * factions.thief_night_sale_mult(player, _msk))  # ночная скупка воров (как в apply_retail)
 
 
 def add_goods_rep_progress(player: Player, tavern: Tavern, points: int) -> int:

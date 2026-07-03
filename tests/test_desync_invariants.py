@@ -171,3 +171,27 @@ def test_craft_cost_single_source():
     assert "it.craft_cost(" in inspect.getsource(ch)
     from bot import texts
     assert "craft_cost(" in inspect.getsource(texts.forge_item_screen)
+
+
+# ── 9. РОЗНИЦА: показанная сумма == начислению (все множители, вкл. воров) ──
+def test_retail_show_equals_payout(monkeypatch):
+    """retail_total (показ) и apply_retail (начисление) — одинаковый набор
+    множителей, включая ночную скупку воров (рассинхрон 03.07)."""
+    from datetime import datetime, timezone
+    from bot.game import logic as lg
+    # ночь МСК (23:30 = 20:30 UTC) — час, где ночная скупка воров активна
+    monkeypatch.setattr(lg, "_now", lambda: datetime(2026, 7, 3, 20, 30, tzinfo=timezone.utc))
+    for seed in range(300):
+        r = random.Random(seed)
+        thief_rank = r.choice([-2, 0, 2, 3])
+        tav = NS(products={"ale1": 50, "mead": 50}, level=5, reputation=50,
+                 rep_progress=0, auction_sold=0, income_rate=40)
+        p = NS(level=5, gold=0, equipment={}, inventory={}, buff_kind=None,
+               buff_until=None, perks={}, tavern=tav, econ={}, reputation=50,
+               story={"faction": {"thieves": thief_rank * 40}})
+        want = {"ale1": r.randint(1, 20)}
+        shown = lg.retail_total(want, p)
+        g0 = p.gold
+        _sold, gold, _rep = lg.apply_retail(p, tav, dict(want))
+        # показ == реально начисленному золоту (оба с ночным бонусом воров)
+        assert shown == gold, (thief_rank, shown, gold)
