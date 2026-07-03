@@ -2465,9 +2465,12 @@ body {
 
 /* ОБУЧЕНИЕ — контекстный гид: затемнение + подсветка элемента + карточка */
 .tut-root { position:fixed; inset:0; z-index:2000; }
-.tut-dim { position:absolute; inset:0; background:rgba(6,6,10,.78); }
+/* прозрачный ловец кликов при подсветке; сплошная заливка — только для центр-карточки */
+.tut-dim { position:absolute; inset:0; background:transparent; }
+.tut-dim.full { background:rgba(6,6,10,.82); }
+/* вырез-подсветка: сама тень 9999px и создаёт темноту вокруг, дырка — чистый элемент */
 .tut-spot { position:absolute; border-radius:14px; pointer-events:none;
-  box-shadow:0 0 0 3px var(--gold), 0 0 0 9999px rgba(6,6,10,.78), 0 0 22px rgba(212,164,76,.5);
+  box-shadow:0 0 0 3px var(--gold-2), 0 0 0 9999px rgba(6,6,10,.82), 0 0 26px 4px rgba(246,216,133,.6);
   transition:all .3s cubic-bezier(.2,.8,.2,1); }
 .tut-card { position:absolute; width:min(320px,86vw); padding:20px 18px 16px;
   border-radius:18px; text-align:center; z-index:1;
