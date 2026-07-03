@@ -13,6 +13,8 @@ from bot.webapi.rating import _rating_entries, _rating_leaders
 # Пирамида тайлов мира (генерится в Docker из assets/world25.jpg тайлером worldgen/tiler.py).
 WORLD_TILES = pathlib.Path(__file__).resolve().parent.parent.parent / "world_tiles"
 
+_PARTY_MAX = 60   # потолок точек войск орды на карте (перф)
+
 async def _map_page(request: web.Request) -> web.Response:
     return web.Response(text=_MAP_HTML, content_type="text/html")
 
@@ -67,6 +69,34 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
   border:1px solid #ff7a4a;box-shadow:0 4px 16px rgba(210,58,24,.5);animation:rb 1.6s ease-in-out infinite}
 @keyframes rb{0%,100%{box-shadow:0 4px 16px rgba(210,58,24,.45)}50%{box-shadow:0 4px 26px rgba(255,90,50,.8)}}
 #raidbar .go{margin-left:auto;opacity:.85}
+/* ── Орда орков на карте: анимированный орк (spritesheet 10 кадров) + войска ── */
+.orc-ev{position:relative;width:100px;height:76px;pointer-events:auto;cursor:pointer}
+.orc-ev .orc{width:100px;height:76px;background:url('/assets/boss/ork1_idle.png') 0 0/1000px 76px no-repeat;
+  animation:orcIdle 1.1s steps(10) infinite;filter:drop-shadow(0 4px 7px rgba(0,0,0,.75));transform-origin:50% 100%}
+@keyframes orcIdle{to{background-position:-1000px 0}}
+.orc-ev.battle .orc{animation:orcIdle 1.1s steps(10) infinite,orcSh .5s ease-in-out infinite}
+@keyframes orcSh{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-3px) rotate(-2deg)}75%{transform:translateX(3px) rotate(2deg)}}
+.orc-ev .aura{position:absolute;left:50%;top:55%;width:132px;height:132px;transform:translate(-50%,-50%);z-index:-1;
+  border-radius:50%;background:radial-gradient(circle,rgba(120,200,70,.3),rgba(80,160,40,0) 68%);animation:orcAura 2.3s ease-in-out infinite}
+.orc-ev.battle .aura{background:radial-gradient(circle,rgba(255,70,50,.42),rgba(220,30,20,0) 66%);animation-duration:.9s}
+@keyframes orcAura{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(.92)}50%{opacity:.95;transform:translate(-50%,-50%) scale(1.16)}}
+.orc-ev .hp{position:absolute;left:50%;top:-15px;transform:translateX(-50%);width:104px;height:10px;z-index:3;
+  border-radius:6px;background:#2a0d0a;border:1px solid #5a1e14;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.6);opacity:0;transition:opacity .3s}
+.orc-ev.battle .hp{opacity:1}
+.orc-ev .hp i{display:block;height:100%;width:100%;border-radius:5px;transition:width .9s linear;background:linear-gradient(180deg,#ff5a3c,#c11e12)}
+.orc-ev .lbl{position:absolute;left:50%;top:-34px;transform:translateX(-50%);white-space:nowrap;z-index:3;
+  font:800 12px/1 var(--serif);color:#cdeba6;text-shadow:0 1px 3px #000,0 0 7px rgba(120,200,80,.6);letter-spacing:.3px}
+.orc-ev.battle .lbl{color:#ffcf9a;text-shadow:0 1px 3px #000,0 0 8px rgba(255,90,50,.7)}
+/* войска-соратники: марш к логову (близко — фигурки, далеко — нити) */
+.orc-fig{width:12px;height:12px;pointer-events:none;transition:opacity .3s}
+.orc-fig i{display:block;font-size:11px;line-height:12px;text-align:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7));animation:figB .8s ease-in-out infinite}
+.orc-fig.mine i{filter:drop-shadow(0 0 5px #ffd27a) drop-shadow(0 1px 2px #000)}
+@keyframes figB{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-3px) rotate(8deg)}}
+.orc-line{stroke:#9ad35a;stroke-width:1.6;fill:none;opacity:.45;stroke-dasharray:5 9;animation:march 1.1s linear infinite}
+.orc-line.mine{stroke:#ffd27a;stroke-width:2.2;opacity:.9}
+@keyframes march{to{stroke-dashoffset:-14}}
+body.far .orc-fig{opacity:0}
+body:not(.far) .orc-line{opacity:0}
 /* названия регионов — «гравировка»: разрядка + halo, без плашки, ПОД пинами */
 .cont-label{width:240px!important;display:flex;align-items:center;justify-content:center;
   pointer-events:none;transition:opacity .18s}
@@ -260,6 +290,49 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
   else{mb.style.display='none';}
   document.getElementById('loader').classList.add('hide');
 }).catch(function(){document.getElementById('loader').textContent='Карта не загрузилась — обнови';});
+
+// ── Орда орков на карте: анимированный орк + марш войск + автобой (read-only) ──
+var invLayer=L.layerGroup().addTo(map),invTroops=L.layerGroup().addTo(map);
+var invM=null,invKey='',invData=null,invBaseEl=0,invAtMs=0;
+function fmtT(s){s=Math.max(0,s|0);var m=(s/60)|0,ss=s%60;return m+':'+(ss<10?'0':'')+ss;}
+function invElapsed(){return invBaseEl+(Date.now()-invAtMs)/1000;}
+function invPhase(e,el){var g=e.gather_secs,mr=e.march_secs,b=e.battle_secs;
+  if(el<g)return'gather';if(el<g+mr)return'march';if(el<g+mr+b)return'battle';return'done';}
+function drawTroops(e,ph,el){invTroops.clearLayers();var lair=px(e.x*W,e.y*H);
+  var prog=ph==='gather'?0:(ph==='march'?Math.min(1,(el-e.gather_secs)/Math.max(1,e.march_secs)):1);
+  (e.troops||[]).forEach(function(t,i){var from=px(t.x*W,t.y*H);
+    L.polyline([from,lair],{className:'orc-line'+(t.mine?' mine':''),interactive:false}).addTo(invTroops);
+    var ang=i*2.399963,rr=0.5+((i*53)%9)*0.13;
+    var lx=e.x+(prog>=1?Math.cos(ang)*0.006*rr:0),ly=e.y+(prog>=1?Math.sin(ang)*0.006*rr:0);
+    var fx=t.x+(lx-t.x)*prog,fy=t.y+(ly-t.y)*prog;
+    var fi=L.divIcon({className:'orc-fig'+(t.mine?' mine':''),iconSize:[12,12],html:'<i>'+(t.mine?'🛡':'⚔')+'</i>'});
+    L.marker(px(fx*W,fy*H),{icon:fi,interactive:false,keyboard:false,zIndexOffset:1500}).addTo(invTroops);});}
+function renderInv(){
+  if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';return;}
+  var e=invData,el=invElapsed(),ph=invPhase(e,el),lair=px(e.x*W,e.y*H);
+  var key=e.name+'|'+(ph==='battle'?'b':'p');
+  if(key!==invKey){invLayer.clearLayers();
+    var icon=L.divIcon({className:'orc-ev'+(ph==='battle'?' battle':''),iconSize:[100,76],iconAnchor:[50,76],
+      html:'<div class="aura"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="orc"></div>'});
+    invM=L.marker(lair,{icon:icon,zIndexOffset:2000}).addTo(invLayer);
+    invM.on('click',function(){(window.top||window).location.href='/app/?startapp=raid';});
+    invKey=key;}
+  var el2=invM.getElement();
+  if(el2){el2.classList.toggle('battle',ph==='battle');
+    var fill=el2.querySelector('.hp i');
+    if(fill){var hp=100;
+      if(ph==='battle'){var bp=Math.min(1,(el-e.gather_secs-e.march_secs)/Math.max(1,e.battle_secs));
+        var endp=e.orc_hp_max?100*e.orc_hp_left/e.orc_hp_max:0;hp=Math.max(endp,100-(100-endp)*bp);}
+      fill.style.width=hp+'%';}
+    var lb=el2.querySelector('.lbl');
+    if(lb){if(ph==='gather')lb.textContent='🪓 СБОР · '+fmtT(e.gather_secs-el)+' ('+(e.n||0)+')';
+      else if(ph==='march')lb.textContent='🪓 ОРДА ИДЁТ!';
+      else if(ph==='battle')lb.textContent='⚔️ БИТВА · '+fmtT(e.gather_secs+e.march_secs+e.battle_secs-el);
+      else lb.textContent='…';}}
+  drawTroops(e,ph,el);}
+function pollInv(){fetch('/world/invasion.json?uid='+uid).then(function(r){return r.json();})
+  .then(function(d){invData=d.inv;invBaseEl=invData?(invData.elapsed||0):0;invAtMs=Date.now();renderInv();}).catch(function(){});}
+pollInv();setInterval(pollInv,5000);setInterval(renderInv,1000);   // поллинг орды + плавная анимация
 </script></body></html>"""
 
 
@@ -280,6 +353,40 @@ def _world_continents() -> list[dict]:
 async def _world_slots(request: web.Request) -> web.Response:
     """Континенты с именами/биомом — для подписей на карте."""
     return web.json_response(_world_continents(), headers={"Cache-Control": "public, max-age=3600"})
+
+
+async def _world_invasion(request: web.Request) -> web.Response:
+    """Лёгкий поллинг Орды орков для карты: позиция логова, фаза/тайминги (elapsed),
+    войска (позиции таверн записавшихся), HP. Read-only, переиспользует _invasion_event
+    (та же детерминированная симуляция → анимация синхронна серверу)."""
+    try:
+        uid = int(request.query.get("uid", "0"))
+    except ValueError:
+        uid = 0
+    # ВРЕМЕННО: орда на карте открыта ТОЛЬКО админу (обкатка фичи). Гейт по ?uid —
+    # мягкий (для скрытия сырого, не безопасность): обычный игрок орка не увидит.
+    from bot.config import settings
+    if uid != settings.admin_id:
+        return web.json_response({"inv": None}, headers={"Cache-Control": "no-store"})
+    from bot.webapi.invasion import _invasion_event
+    async with session_factory() as s:
+        inv = await repo.get_active_invasion(s)
+    ev = None
+    if inv is not None and inv.status in ("gathering", "battle"):
+        e = _invasion_event(inv, uid)
+        tl = e.get("timeline") or []
+        ohl = int(tl[-1].get("hp", 0)) if tl and isinstance(tl[-1], dict) else 0
+        ev = {   # только нужное карте (без тяжёлого timeline целиком)
+            "x": e["x"], "y": e["y"], "sprite": e.get("sprite", 1),
+            "name": e["name"], "status": e["status"], "n": e.get("n", 0),
+            "me": bool(uid) and str(uid) in (inv.registered or {}),
+            "gather_secs": e.get("gather_secs", 0), "march_secs": e.get("march_secs", 0),
+            "battle_secs": e.get("battle_secs", 0), "elapsed": e.get("elapsed", 0),
+            "orc_hp_max": e.get("orc_hp_max", 1), "orc_hp_left": ohl,
+            "troops": [{"x": t.get("x", 0.5), "y": t.get("y", 0.5)}
+                       for t in (e.get("troops") or [])][:_PARTY_MAX],
+        }
+    return web.json_response({"inv": ev}, headers={"Cache-Control": "no-store"})
 
 
 async def _world_taverns(request: web.Request) -> web.Response:
