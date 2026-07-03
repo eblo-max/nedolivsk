@@ -81,3 +81,43 @@ def test_precondition_ids_valid():
                 assert p.sid in SEASONS, f"{sl.id}: неизвестный сезон {p.sid!r}"
             elif cn == "NpcRel":
                 assert p.npc in NPCS, f"{sl.id}: NpcRel неизвестный npc {p.npc!r}"
+
+
+# ── Целостность переплетений (флаги-перекличи и цепочки) ────────────────
+def test_read_flags_are_set_somewhere():
+    """Флаг, что читается (HasFlag/NotFlag), но нигде не ставится → мёртвая
+    ветка: сторилет-переклич никогда не всплывёт."""
+    set_flags, read_flags = set(), {}
+    for sl in STORYLETS.values():
+        for e in _effects(sl):
+            if e.__class__.__name__ == "SetFlag":
+                set_flags.add(e.flag)
+        for p in _preconds(sl):
+            if p.__class__.__name__ in ("HasFlag", "NotFlag"):
+                read_flags.setdefault(p.flag, []).append(sl.id)
+    dead = {f: ids for f, ids in read_flags.items() if f not in set_flags}
+    assert not dead, f"флаги читаются, но нигде не ставятся: {dead}"
+
+
+def test_no_orphan_scheduled_only():
+    """scheduled_only без входящего Schedule недостижим (мёртвое звено цепочки)."""
+    targets = set()
+    for sl in STORYLETS.values():
+        for e in _effects(sl):
+            if e.__class__.__name__ == "Schedule":
+                targets.add(e.sid)
+    orphans = [sl.id for sl in STORYLETS.values()
+               if sl.scheduled_only and sl.id not in targets]
+    assert not orphans, f"scheduled_only без входящего Schedule (недостижимы): {orphans}"
+
+
+def test_schedule_targets_are_scheduled_only():
+    """Schedule должен целить в scheduled_only — иначе звено спавнится и само."""
+    bad = []
+    for sl in STORYLETS.values():
+        for e in _effects(sl):
+            if e.__class__.__name__ == "Schedule":
+                tgt = STORYLETS.get(e.sid)
+                if tgt is not None and not tgt.scheduled_only:
+                    bad.append((sl.id, e.sid))
+    assert not bad, f"Schedule целит в НЕ-scheduled_only: {bad}"
