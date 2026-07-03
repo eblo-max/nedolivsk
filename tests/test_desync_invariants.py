@@ -11,7 +11,7 @@ from types import SimpleNamespace as NS
 
 os.environ.setdefault("BOT_TOKEN", "test:test")
 
-from bot.game import balance, combat, items, logic, shop  # noqa: E402
+from bot.game import balance, combat, items, logic  # noqa: E402
 
 SEEDS = range(1500)
 
