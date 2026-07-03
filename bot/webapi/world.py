@@ -76,6 +76,12 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 @keyframes orcIdle{to{background-position:-1000px 0}}
 .orc-ev.battle .orc{animation:orcIdle 1.1s steps(10) infinite,orcSh .5s ease-in-out infinite,orcHurt .48s ease-in-out infinite}
 @keyframes orcSh{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-3px) rotate(-2deg)}75%{transform:translateX(3px) rotate(2deg)}}
+/* DEATH орка (защитники победили): лист _die 10 кадров one-shot → растворяется */
+.orc-ev.dead .orc{background-image:url('/assets/boss/ork1_die.png');animation:orcIdle 1.1s steps(10) 1 forwards}
+.orc-ev.dead .fx{display:none}
+.orc-ev.dead .aura{opacity:.15}
+.orc-ev.dead{animation:orcFade 1.8s ease-out 1.1s forwards}
+@keyframes orcFade{to{opacity:0;transform:translateY(6px) scale(.9)}}
 .orc-ev .aura{position:absolute;left:50%;top:55%;width:132px;height:132px;transform:translate(-50%,-50%);z-index:-1;
   border-radius:50%;background:radial-gradient(circle,rgba(120,200,70,.3),rgba(80,160,40,0) 68%);animation:orcAura 2.3s ease-in-out infinite}
 .orc-ev.battle .aura{background:radial-gradient(circle,rgba(255,70,50,.42),rgba(220,30,20,0) 66%);animation-duration:.9s}
@@ -105,8 +111,22 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 .orc-fig.h5 .hf{background-image:url('/assets/heroes/hero5_walk.png')}
 .orc-fig.h6 .hf{background-image:url('/assets/heroes/hero6_walk.png')}
 @keyframes heroWalk{to{background-position-x:-440px}}
-.orc-fig.atk .hf{animation:heroWalk .5s steps(10) infinite,heroLunge .5s ease-in-out infinite}   /* у босса: быстрее + выпад */
-@keyframes heroLunge{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
+/* ATTACK: настоящий взмах (лист _attack, 10 кадров, тот же steps/размер) */
+.orc-fig.atk.h1 .hf{background-image:url('/assets/heroes/hero1_attack.png')}
+.orc-fig.atk.h2 .hf{background-image:url('/assets/heroes/hero2_attack.png')}
+.orc-fig.atk.h3 .hf{background-image:url('/assets/heroes/hero3_attack.png')}
+.orc-fig.atk.h4 .hf{background-image:url('/assets/heroes/hero4_attack.png')}
+.orc-fig.atk.h5 .hf{background-image:url('/assets/heroes/hero5_attack.png')}
+.orc-fig.atk.h6 .hf{background-image:url('/assets/heroes/hero6_attack.png')}
+.orc-fig.atk .hf{animation:heroWalk .6s steps(10) infinite}
+/* DEATH: падение (лист _die, one-shot, замереть на последнем кадре) */
+.orc-fig.dead.h1 .hf{background-image:url('/assets/heroes/hero1_die.png')}
+.orc-fig.dead.h2 .hf{background-image:url('/assets/heroes/hero2_die.png')}
+.orc-fig.dead.h3 .hf{background-image:url('/assets/heroes/hero3_die.png')}
+.orc-fig.dead.h4 .hf{background-image:url('/assets/heroes/hero4_die.png')}
+.orc-fig.dead.h5 .hf{background-image:url('/assets/heroes/hero5_die.png')}
+.orc-fig.dead.h6 .hf{background-image:url('/assets/heroes/hero6_die.png')}
+.orc-fig.dead .hf{animation:heroWalk .9s steps(10) 1 forwards}
 .orc-fig.mine .hf{filter:drop-shadow(0 0 6px #ffd27a) drop-shadow(0 2px 2px #000)}
 .orc-line{stroke:#9ad35a;stroke-width:1.6;fill:none;opacity:.45;stroke-dasharray:5 9;animation:march 1.1s linear infinite}
 .orc-line.mine{stroke:#ffd27a;stroke-width:2.2;opacity:.9}
@@ -318,8 +338,11 @@ var invM=null,invKey='',invData=null,invBaseEl=0,invAtMs=0;
 var troopMarks=[],troopMeta=[],troopKey='';
 function fmtT(s){s=Math.max(0,s|0);var m=(s/60)|0,ss=s%60;return m+':'+(ss<10?'0':'')+ss;}
 function invElapsed(){return invBaseEl+(Date.now()-invAtMs)/1000;}
-function invPhase(e,el){var g=e.gather_secs,mr=e.march_secs,b=e.battle_secs;
-  if(el<g)return'gather';if(el<g+mr)return'march';if(el<g+mr+b)return'battle';return'done';}
+function invPhase(e,el){
+  if(e.status==='won')return'won';    // защитники победили → орк ГИБНЕТ
+  if(e.status==='lost')return'lost';  // орда прорвалась → воины ГИБНУТ
+  var g=e.gather_secs,mr=e.march_secs;
+  if(el<g)return'gather';if(el<g+mr)return'march';return'battle';}   // после боя держим 'battle' до флипа статуса
 // Пересоздаём фигурки ТОЛЬКО при смене состава (иначе марш дёргался — каждый тик
 // маркеры уничтожались/создавались заново). Дальше их плавно ДВИГАЕМ (setLatLng + CSS-transition).
 function rebuildTroops(e){invTroops.clearLayers();troopMarks=[];troopMeta=[];var lair=px(e.x*W,e.y*H);
@@ -336,13 +359,14 @@ function moveTroops(e,ph,el){
   for(var i=0;i<troopMarks.length;i++){var mt=troopMeta[i];
     var fx=mt.tx+(mt.ex-mt.tx)*prog,fy=mt.ty+(mt.ey-mt.ty)*prog;
     troopMarks[i].setLatLng(px(fx*W,fy*H));
-    var g=troopMarks[i].getElement();if(g)g.classList.toggle('atk',ph==='battle');}}
+    var g=troopMarks[i].getElement();
+    if(g){g.classList.toggle('atk',ph==='battle');g.classList.toggle('dead',ph==='lost');}}}
 function renderInv(){
   if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';troopKey='';troopMarks=[];return;}
   var e=invData,el=invElapsed(),ph=invPhase(e,el),lair=px(e.x*W,e.y*H);
   var tk=e.name+'|'+((e.troops||[]).length);
   if(tk!==troopKey){rebuildTroops(e);troopKey=tk;}
-  var key=e.name+'|'+(ph==='battle'?'b':'p');
+  var key=e.name+'|'+(ph==='battle'?'b':(ph==='won'?'w':(ph==='lost'?'l':'p')));
   if(key!==invKey){invLayer.clearLayers();
     var icon=L.divIcon({className:'orc-ev'+(ph==='battle'?' battle':''),iconSize:[100,76],iconAnchor:[50,76],
       html:'<div class="aura"></div><div class="fx"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="orc"></div>'});
@@ -351,15 +375,20 @@ function renderInv(){
     invKey=key;}
   var el2=invM.getElement();
   if(el2){el2.classList.toggle('battle',ph==='battle');
+    el2.classList.toggle('dead',ph==='won');   // орк гибнет при победе защитников
     var fill=el2.querySelector('.hp i');
     if(fill){var hp=100;
       if(ph==='battle'){var bp=Math.min(1,(el-e.gather_secs-e.march_secs)/Math.max(1,e.battle_secs));
         var endp=e.orc_hp_max?100*e.orc_hp_left/e.orc_hp_max:0;hp=Math.max(endp,100-(100-endp)*bp);}
+      else if(ph==='won')hp=0;
+      else if(ph==='lost')hp=e.orc_hp_max?Math.max(6,100*e.orc_hp_left/e.orc_hp_max):50;
       fill.style.width=hp+'%';}
     var lb=el2.querySelector('.lbl');
     if(lb){if(ph==='gather')lb.textContent='🪓 СБОР · '+fmtT(e.gather_secs-el)+' ('+(e.n||0)+')';
       else if(ph==='march')lb.textContent='🪓 ОРДА ИДЁТ!';
       else if(ph==='battle')lb.textContent='⚔️ БИТВА · '+fmtT(e.gather_secs+e.march_secs+e.battle_secs-el);
+      else if(ph==='won')lb.textContent='🏆 ОРДА ПОВЕРЖЕНА!';
+      else if(ph==='lost')lb.textContent='💀 ОРДА ПРОРВАЛАСЬ…';
       else lb.textContent='…';}}
   moveTroops(e,ph,el);}
 // Фокус рейда: на время орды показываем ТОЛЬКО таверны участников (+ свою), чужие
@@ -414,7 +443,17 @@ async def _world_invasion(request: web.Request) -> web.Response:
     ev = None
     async with session_factory() as s:
         inv = await repo.get_active_invasion(s)
-        if inv is not None and inv.status in ("gathering", "battle"):
+        if inv is None:
+            inv = await repo.latest_invasion(s)      # мог только что зарезолвиться
+        show = False
+        if inv is not None:
+            if inv.status in ("gathering", "battle"):
+                show = True
+            elif inv.status in ("won", "lost") and inv.resolve_at:   # окно смерти ~14с
+                from datetime import datetime, timezone
+                _ra = inv.resolve_at if inv.resolve_at.tzinfo else inv.resolve_at.replace(tzinfo=timezone.utc)
+                show = (datetime.now(timezone.utc) - _ra).total_seconds() < 14
+        if show:
             e = _invasion_event(inv, uid)
             tl = e.get("timeline") or []
             ohl = int(tl[-1].get("hp", 0)) if tl and isinstance(tl[-1], dict) else 0
