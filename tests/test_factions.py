@@ -60,6 +60,31 @@ def test_bust_keeps_share_for_watch_friend():
     assert "saved" not in out2 and out2["lost"] == {"gold": 100}
 
 
+def test_bust_keep_actually_credits_player():
+    """Регресс (аудит 03.07): перк стражи не только ПОКАЗЫВАЛСЯ, но и реально
+    зачислял отбитое добро. Раньше оба хендлера стирали run на бюсте → kept
+    (до 36% котомки) молча терялся — перк был мёртв."""
+    from bot.game import nightrun as nr
+    p = _pl(watch=80)                       # легенда стражи → отбивает 36%
+    p.gold = 1000
+    run = nr.start(p, "green_valleys")
+    run["satchel"] = {"gold": 100, "grain": 10}
+    nr._bust(run, {"kind": "fight"}, p)     # оставит kept в run['satchel']
+    saved = nr.bust_keep(run, p)            # кредитуем игроку (фикс)
+    assert saved == {"gold": 36, "grain": 3}
+    assert p.gold == 1036                   # золото реально пришло
+    assert p.inventory.get("grain") == 3    # ресурс — в инвентарь
+    assert run["satchel"] == {}             # вычищено — второй bust_keep не задвоит
+    assert nr.bust_keep(run, p) == {}       # идемпотентно
+    assert p.gold == 1036
+    assert p.econ.get("nightrun") == 36     # учтено в экономике
+    # не-друг стражи: отбивать нечего — no-op, всё потеряно
+    p2 = _pl(); p2.gold = 1000
+    run2 = nr.start(p2, "green_valleys"); run2["satchel"] = {"gold": 100}
+    nr._bust(run2, {"kind": "fight"}, p2)
+    assert nr.bust_keep(run2, p2) == {} and p2.gold == 1000
+
+
 def test_adjust_faction_returns_rank_change():
     from bot.game import story_state as ss
     p = _pl(merchants=13)

@@ -86,6 +86,8 @@ def shortfall(have: dict, cost: dict) -> dict:
     return out
 
 
-def bill(items: dict) -> int:
-    """Сколько золота стоит набор {ресурс: кол-во} в лавке."""
-    return sum(price(r) * int(q) for r, q in items.items())
+def bill(player, items: dict) -> int:
+    """Сколько золота стоит набор {ресурс: кол-во} в лавке ПО ЛИЧНОЙ цене игрока
+    (лига купцов дешевле/дороже). Единый источник с гейтом «хватит ли золота» и
+    фактическим списанием — иначе враг лиги обходил гейт и уходил в минус."""
+    return sum(price_for(player, r) * int(q) for r, q in items.items())

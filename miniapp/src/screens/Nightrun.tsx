@@ -19,7 +19,7 @@ interface NState { ok: boolean; cooldown: number; active: boolean; max_legs: num
   flask?: { key: string; name: string; emoji: string; hint: string; qty: number }[] }
 interface NOut {
   kind: string; busted: boolean; loot: NItem[]; hp_cost: number; healed: number; roll?: number | null
-  lose_faces?: number | null; collapsed: boolean; lost?: NItem[]; correct?: boolean
+  lose_faces?: number | null; collapsed: boolean; lost?: NItem[]; saved?: NItem[]; correct?: boolean
   factions?: { faction: string; delta: number }[]; npc?: string; story?: string
 }
 
@@ -576,6 +576,12 @@ function NrEnd({ end, chron, onClose }: { end: { kind: 'bust' | 'bank'; out?: NO
           <p className="nr-final-txt">{end.out?.collapsed ? 'Победил, да рухнул без сил — всё растащили.' : 'Не свезло на тёмной тропе. Котомку как ветром сдуло.'}</p>
           {end.out?.lost && end.out.lost.length > 0 && (
             <div className="nr-res-loot lost">{end.out.lost.map((it) => <span key={it.key} className="nr-loot-i"><ResIcon k={it.key} emoji={it.emoji} size={20} />−{fmt(it.qty)}</span>)}</div>
+          )}
+          {end.out?.saved && end.out.saved.length > 0 && (
+            <>
+              <p className="nr-final-txt" style={{ marginTop: 10 }}>🛡 Стража отбила и вернула часть:</p>
+              <div className="nr-res-loot">{end.out.saved.map((it) => <span key={it.key} className="nr-loot-i"><ResIcon k={it.key} emoji={it.emoji} size={20} />+{fmt(it.qty)}</span>)}</div>
+            </>
           )}
         </>
       ) : (

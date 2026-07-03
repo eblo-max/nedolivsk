@@ -150,6 +150,8 @@ def _nr_out(out: dict) -> dict:
          "lose_faces": out.get("lose_faces"), "collapsed": bool(out.get("collapsed"))}
     if out.get("lost"):
         o["lost"] = _nr_items(out.get("lost"))
+    if out.get("saved"):
+        o["saved"] = _nr_items(out.get("saved"))   # стража отбила часть (перк)
     if "correct" in out:
         o["correct"] = bool(out["correct"])
     if out.get("factions"):
@@ -176,6 +178,7 @@ async def _api_nightrun_pick(request: web.Request) -> web.Response:
         roll = _r.randint(1, 6) if kind == "gamble" else None
         out = nr.attempt(run, p, kind, roll=roll)
         if out.get("busted"):
+            nr.bust_keep(run, p)          # стража отбивает % котомки (перк) — зачислить
             p.night_run = {}
             repo.add_log(s, "player", p.id, "🌑 ходка сорвалась")
         else:

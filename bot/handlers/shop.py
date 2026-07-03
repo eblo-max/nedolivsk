@@ -96,7 +96,7 @@ async def cb_shop_fill(callback: CallbackQuery, session: AsyncSession) -> None:
             "Дневной лимит лавки не даёт добрать всё разом — возьми частями "
             "или дождись бригад.", show_alert=True)
         return
-    need_gold = shop.bill(short) + cost.get("gold", 0)
+    need_gold = shop.bill(player, short) + cost.get("gold", 0)
     if player.gold < need_gold:
         await _show(callback, texts.shop_fill_poor(need_gold, player.gold), kb.back_kb())
         return

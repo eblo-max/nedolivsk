@@ -285,6 +285,7 @@ async def _apply(cb: CallbackQuery, session: AsyncSession, p, run: dict,
                  out: dict, *, answered: bool = False) -> None:
     """Записать исход испытания и показать перекрёсток либо финал (бюст)."""
     if out["busted"]:
+        nightrun.bust_keep(run, p)                          # стража отбивает % котомки (перк)
         p.night_run = {}                                    # забег окончен
         repo.add_log(session, "player", p.id, "🌑 ходка сорвалась")
         await session.commit()

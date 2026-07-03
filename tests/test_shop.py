@@ -48,4 +48,6 @@ def test_shortfall_and_bill():
     cost = {"gold": 250, "wood": 75, "grain": 60, "hops": 40}
     short = shop.shortfall(have, cost)
     assert short == {"wood": 25, "grain": 60, "hops": 40}
-    assert shop.bill({"wood": 10}) == 10 * shop.price("wood")   # докупка по цене лавки
+    p = _p()
+    assert shop.bill(p, {"wood": 10}) == 10 * shop.price_for(p, "wood")   # докупка по ЛИЧНОЙ цене
+    assert shop.bill(p, {"wood": 10}) == 10 * shop.price("wood")          # нейтралу == базовой

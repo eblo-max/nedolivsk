@@ -3124,7 +3124,11 @@ def nightrun_bust(run: dict, out: dict) -> str:
     else:
         lead = "Оступился в темноте, попался — и налегке драпал до самого кабака."
     tail = f"\n\n😶 Потеряно: {lost}." if lost and lost != "пусто" else ""
-    return f"🌑 <b>Ходка сорвалась.</b>\n\n{lead}{tail}\n\n<i>В другой раз сверни вовремя, жадюга.</i>"
+    saved = _nr_loot(out.get("saved") or {})
+    save_line = (f"\n🛡 Стража отбила и вернула: {saved}."
+                 if saved and saved != "пусто" else "")
+    return (f"🌑 <b>Ходка сорвалась.</b>\n\n{lead}{tail}{save_line}"
+            "\n\n<i>В другой раз сверни вовремя, жадюга.</i>")
 
 
 def nightrun_bank(banked: dict) -> str:

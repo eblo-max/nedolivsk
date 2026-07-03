@@ -91,6 +91,28 @@ def test_sharpen_tables_consistent():
     assert costs == sorted(costs)                           # дороже с каждым уровнем
 
 
+def test_claim_reforge_preserves_sharpen_and_affix():
+    """Регресс (аудит 03.07): перековка НАДЕТОЙ вещи на след. ярус сохраняет
+    заточку и аффикс (как апгрейд трофеем в рейде, _drop_apply) — иначе вложенное
+    в заточку золото (до 2500×ярус за уровень) сгорало бы при каждом апгрейде."""
+    from types import SimpleNamespace as NS
+    from datetime import datetime, timedelta, timezone
+    itm = next(i for i in items.CATALOG.values() if i.craftable and i.damage > 0)
+    past = datetime.now(timezone.utc) - timedelta(hours=1)
+    # надета T1 +4 «злобы», доковалась T2 → должна стать T2 +4 «злобы»
+    p = NS(craft_item=items.make_entry(itm.id, 2), craft_ends_at=past,
+           equipment={itm.slot: items.make_entry(itm.id, 1, 4, "zloby")})
+    r = logic.claim_craft(p)
+    assert r.ok
+    _id, t, plus, aff = items.parse_full(p.equipment[itm.slot])
+    assert (t, plus, aff) == (2, 4, "zloby")               # ярус вырос, заточка+аффикс переехали
+    # свежая вещь в ЧУЖОЙ/пустой слот — заточка с нуля (перезаписи чужого нет здесь)
+    p2 = NS(craft_item=items.make_entry(itm.id, 1), craft_ends_at=past, equipment={})
+    assert logic.claim_craft(p2).ok
+    _id2, t2, plus2, _aff2 = items.parse_full(p2.equipment[itm.slot])
+    assert (t2, plus2) == (1, 0)
+
+
 # ── Первая ковка новичка — за четверть цены ─────────────────────────────
 def test_first_craft_discount_quote():
     from types import SimpleNamespace as NS

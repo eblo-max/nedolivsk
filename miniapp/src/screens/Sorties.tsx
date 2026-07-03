@@ -441,6 +441,11 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
   const phpPct = Math.max(0, Math.min(100, (php / fight.hp_max) * 100))
   const ehpPct = Math.max(0, Math.min(100, (ehp / fight.enemy.hp) * 100))
   const done = step >= fight.rounds.length - 1
+  // Усталость от вылазки (HUNT_EXERTION): любой бой стоит минимум HP. Если зверь
+  // нанёс меньше — разница уходит на усталость. Подписываем ОТДЕЛЬНО, иначе игрок
+  // видит падение HP после лёгкого 1-шота и думает, что зверь его «тайно» ударил.
+  const enemyDmg = fight.rounds.reduce((a, r) => a + (r.ed || 0), 0)
+  const fatigue = Math.max(0, fight.player_hp0 - fight.hp_now - enemyDmg)
   const arenaRef = useRef<HTMLDivElement>(null)
 
   const skey = fight.enemy.sprite
@@ -596,7 +601,7 @@ function FightView({ fight, step, onClose }: { fight: FightRes; step: number; on
           {fight.win ? (
             <>
               {fight.flask && fight.flask.length > 0 && <div className="ep-flask">🍺 Фляга: {fight.flask.join(' · ')}</div>}
-              <div className="ep-tally">🗡 Уложил за {fight.rounds_n} р.{fight.crits > 0 ? ` · ${fight.crits} крит.` : ''} · осталось ❤{fight.hp_now}/{fight.hp_max}</div>
+              <div className="ep-tally">🗡 Уложил за {fight.rounds_n} р.{fight.crits > 0 ? ` · ${fight.crits} крит.` : ''} · осталось ❤{fight.hp_now}/{fight.hp_max}{fatigue > 0 ? ` · 😮‍💨 устал −${fatigue}` : ''}</div>
               <div className="ep-loot">
                 {fight.loot.gold > 0 && <span className="ep-loot-i" style={{ animationDelay: '0s' }}><ResIcon k="gold" size={22} />+{fmt(fight.loot.gold)}</span>}
                 {fight.loot.res.map((x, i) => <span key={x.key} className="ep-loot-i" style={{ animationDelay: `${(i + 1) * 0.09}s` }}><ResIcon k={x.key} emoji={x.emoji} size={22} />+{x.qty}</span>)}

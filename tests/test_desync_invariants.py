@@ -109,6 +109,20 @@ def test_shop_price_single_source():
     assert hsrc.count("shop.price(") == 0, "текст-бот: голый price()"
 
 
+def test_shop_bill_uses_personal_price():
+    """bill (гейт «хватит золота» в докупке+апгрейде) == сумме price_for
+    (фактическое списание). Регресс (аудит 03.07): bill считал по базовой цене,
+    враг лиги обходил гейт и уходил в минус; шло мимо строкового скана выше."""
+    from types import SimpleNamespace as NS
+    from bot.game import shop
+    enemy = NS(story={"faction": {"merchants": -80}})     # враг лиги — дороже базы
+    friend = NS(story={"faction": {"merchants": 80}})     # друг — дешевле
+    res = shop.sellable()[0]
+    assert shop.bill(enemy, {res: 5}) == 5 * shop.price_for(enemy, res)
+    assert shop.bill(friend, {res: 5}) == 5 * shop.price_for(friend, res)
+    assert shop.price_for(enemy, res) > shop.price_for(friend, res)   # лига реально двигает
+
+
 # ── 5. БРИГАДЫ: показанная плата == списанию (единый expedition_quote) ─────
 def test_expedition_pay_single_source():
     bad = 0
@@ -176,14 +190,17 @@ def test_craft_cost_single_source():
 # ── 9. РОЗНИЦА: показанная сумма == начислению (все множители, вкл. воров) ──
 def test_retail_show_equals_payout(monkeypatch):
     """retail_total (показ) и apply_retail (начисление) — одинаковый набор
-    множителей, включая ночную скупку воров (рассинхрон 03.07)."""
+    множителей: ночная скупка воров (рассинхрон 03.07) И городской пир feast_mult
+    (рассинхрон 03.07 — показ забывал пир, игроку капало больше кнопки)."""
     from datetime import datetime, timezone
-    from bot.game import logic as lg
+    from bot.game import logic as lg, fgoal
     # ночь МСК (23:30 = 20:30 UTC) — час, где ночная скупка воров активна
     monkeypatch.setattr(lg, "_now", lambda: datetime(2026, 7, 3, 20, 30, tzinfo=timezone.utc))
     for seed in range(300):
         r = random.Random(seed)
         thief_rank = r.choice([-2, 0, 2, 3])
+        feast = r.choice([1.0, 1.15, 1.25])            # пир то есть, то нет
+        monkeypatch.setattr(fgoal, "feast_mult", lambda f=feast: f)
         tav = NS(products={"ale1": 50, "mead": 50}, level=5, reputation=50,
                  rep_progress=0, auction_sold=0, income_rate=40)
         p = NS(level=5, gold=0, equipment={}, inventory={}, buff_kind=None,
@@ -192,8 +209,8 @@ def test_retail_show_equals_payout(monkeypatch):
         want = {"ale1": r.randint(1, 20)}
         shown = lg.retail_total(want, p)
         _sold, gold, _rep = lg.apply_retail(p, tav, dict(want))
-        # показ == реально начисленному золоту (оба с ночным бонусом воров)
-        assert shown == gold, (thief_rank, shown, gold)
+        # показ == реально начисленному золоту (оба с ночным бонусом воров И пиром)
+        assert shown == gold, (thief_rank, feast, shown, gold)
 
 
 # ── 10. ДОХОД: текст-бот и мини-апп показывают ОДНО (единая котировка) ─────

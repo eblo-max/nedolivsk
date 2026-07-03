@@ -326,19 +326,37 @@ def push(run: dict) -> None:
         run["state"] = "fork"
 
 
-def bank(run: dict, player) -> dict:
-    """Свернуть в таверну: вся котомка — в инвентарь/золото. Возвращает добычу."""
-    sat = dict(run.get("satchel") or {})
-    for k, v in sat.items():
+def _credit(satchel: dict, player) -> None:
+    """Зачислить котомку игроку (золото → мошна, ресурсы → инвентарь). Единый
+    источник и для банка (свернул), и для добра, отбитого стражей при бюсте —
+    чтобы одно не расходилось с другим."""
+    for k, v in satchel.items():
         if k == "gold":
             player.gold += v
             economy.record(player, "nightrun", v)
         else:
             inventory.add(player, k, v)
+
+
+def bank(run: dict, player) -> dict:
+    """Свернуть в таверну: вся котомка — в инвентарь/золото. Возвращает добычу."""
+    sat = dict(run.get("satchel") or {})
+    _credit(sat, player)
     run["banked"] = sat
     run["satchel"] = {}
     run["state"] = "done"
     return sat
+
+
+def bust_keep(run: dict, player) -> dict:
+    """Бюст: зачислить игроку добро, отбитое стражей (перк watch_bust_keep_pct).
+    _bust уже оставил его в run['satchel'] — кредитуем и чистим. Пусто — no-op.
+    Без этого перк «стража отбивает % котомки» показывался, но добро терялось."""
+    saved = dict(run.get("satchel") or {})
+    if saved:
+        _credit(saved, player)
+        run["satchel"] = {}
+    return saved
 
 
 def _pick_meet(run: dict) -> str:

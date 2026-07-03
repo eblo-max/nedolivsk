@@ -357,11 +357,12 @@ def retail_total(want: dict | None, player: Player | None = None) -> int:
                for k, q in (want or {}).items() if k in production.GOODS)
     if player is None:
         return base
-    from bot.game import factions
+    from bot.game import factions, fgoal
     _msk = (_now().hour + 3) % 24
     return int(base * buff.gold_mult(player) * worldevent.income_mult(player)
                * assortment_mult(want)
-               * factions.thief_night_sale_mult(player, _msk))  # ночная скупка воров (как в apply_retail)
+               * factions.thief_night_sale_mult(player, _msk)   # ночная скупка воров
+               * fgoal.feast_mult())     # городской пир (цель недели взята) — как в apply_retail
 
 
 def add_goods_rep_progress(player: Player, tavern: Tavern, points: int) -> int:
@@ -564,9 +565,18 @@ def claim_craft(player: Player) -> CraftClaim:
 
     item_id, tier = items.parse_entry(player.craft_item)
     item = items.CATALOG[item_id]
-    affix = roll_affix(tier)                      # T2+ может выйти с характером
     equipment = dict(player.equipment or {})
-    equipment[item.slot] = items.make_entry(item_id, tier, 0, affix)
+    # Перековка ТОГО ЖЕ предмета на след. ярус — заточка и аффикс ПЕРЕЕЗЖАЮТ (как
+    # апгрейд трофеем в рейде, _drop_apply): иначе вложенное в заточку золото (до
+    # 2500×ярус за уровень) сгорало бы при каждом апгрейде яруса. Новый предмет в
+    # слоте (или пустой слот) — свежий ролл характера (T2+ может выйти с аффиксом).
+    prev = equipment.get(item.slot)
+    prev_id, _pt, prev_plus, prev_aff = items.parse_full(prev) if prev else (None, 0, 0, "")
+    if prev_id == item_id:
+        plus, affix = prev_plus, prev_aff
+    else:
+        plus, affix = 0, roll_affix(tier)
+    equipment[item.slot] = items.make_entry(item_id, tier, plus, affix)
     player.equipment = equipment
     player.craft_item = None
     player.craft_ends_at = None
