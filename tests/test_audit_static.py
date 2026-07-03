@@ -110,3 +110,44 @@ def test_fgoal_and_npc_use_world_live():
         src = _src(ROOT / "bot" / "game" / name)
         assert "world.live" in src or "holder.live" in src, f"{name}: не на live"
         assert "world.market =" not in src, f"{name}: пишет в market"
+
+
+def test_queue_notify_calls_carry_kind():
+    """Каждый queue_notify (кроме фото-рассылок) обязан нести kind — иначе весть
+    в ленте без иконки/перехода, а срочные (рейд/орда) не доставятся полным
+    текстом. Регресс: рейдовые вести текст-бота теряли kind (03.07)."""
+    import re
+    bad = []
+    for p in (ROOT / "bot").rglob("*.py"):
+        src = _src(p)
+        # находим вызовы queue_notify(...) с балансом скобок
+        for m in re.finditer(r"queue_notify\(", src):
+            depth, i = 0, m.end() - 1
+            while i < len(src):
+                depth += (src[i] == "(") - (src[i] == ")")
+                if depth == 0:
+                    break
+                i += 1
+            call = src[m.start():i + 1]
+            before = src[max(0, m.start() - 5):m.start()]
+            if before.endswith("def "):                 # это определение функции
+                continue
+            arg2 = call.split(",")[1] if call.count(",") >= 1 else ""
+            if "chat_id" in arg2:                        # эхо в ОБЩИЙ чат (не личная лента)
+                continue
+            if "kind=" not in call and "photo=" not in call:
+                ln = src[:m.start()].count("\n") + 1
+                bad.append(f"{p.name}:{ln}")
+    assert not bad, f"queue_notify без kind (и без photo): {bad}"
+
+
+def test_teaser_window_covers_seen_throttle():
+    """Окно активности тизера (feed_ping_targets) должно покрывать троттл
+    touch_seen — иначе активный игрок получит тизер, сидя в игре."""
+    import re
+    from bot.webapi.core import _SEEN_EVERY
+    repo_src = _src(ROOT / "bot" / "db" / "repo.py")
+    m = re.search(r"active_cut = datetime\.now\(timezone\.utc\) - timedelta\(minutes=(\d+)\)", repo_src)
+    assert m, "не найден active_cut в feed_ping_targets"
+    window_sec = int(m.group(1)) * 60
+    assert window_sec >= _SEEN_EVERY, (window_sec, _SEEN_EVERY)

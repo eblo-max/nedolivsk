@@ -239,7 +239,7 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
         if push:
             for pid in (boss.contributions or {}):
                 if int(pid) != player.id:
-                    repo.queue_notify(session, int(pid), push)
+                    repo.queue_notify(session, int(pid), push, kind="raid")
         # ФИКСИРУЕМ урон в БД ДО косметической отрисовки — иначе сбой правки
         # сообщения/ответа (429, «query too old») откатил бы записанный удар.
         await session.commit()
@@ -262,7 +262,8 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
             p.gold += plan["gold"][pid]
             economy.record(p, "raid", int(plan["gold"][pid]))
             repo.queue_notify(session, pid,
-                              f"⚔️ Босс повержен! Твоя доля добычи: +{plan['gold'][pid]} 🪙")
+                              f"⚔️ Босс повержен! Твоя доля добычи: +{plan['gold'][pid]} 🪙",
+                              kind="raid")
     drop_line, winner_name = "", None
     if plan["winner"] is not None:
         winner = await repo.get_player(session, plan["winner"], for_update=True)
@@ -273,7 +274,8 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
                 rarity = raid.RARITY.get((plan["drop"] or {}).get("rarity"), "")
                 drop_line = f"{rarity} — {got}" if rarity else got
                 repo.queue_notify(session, winner.id,
-                                  f"🎁 С босса тебе выпал {rarity} трофей: {got}")
+                                  f"🎁 С босса тебе выпал {rarity} трофей: {got}",
+                                  kind="raid")
     # В список «кто рубился» — только реально бившие (dmg>0). Записавшиеся, но не
     # ударившие, награды не получают и в списке не маячат нулями.
     top = sorted(((r.get("name", str(p)), r.get("dmg", 0))

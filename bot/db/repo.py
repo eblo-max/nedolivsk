@@ -382,7 +382,10 @@ async def feed_mark_read(session: AsyncSession, user_id: int) -> None:
 async def feed_ping_targets(session: AsyncSession, limit: int = 300) -> list[int]:
     """Кому слать тизер «весть в таверну»: есть непрочитанные И ещё не пинговали.
     Сразу ставим флаг notif_pinged (один тизер на пачку — анти-спам)."""
-    active_cut = datetime.now(timezone.utc) - timedelta(minutes=3)
+    # Окно активности ДОЛЖНО покрывать троттл touch_seen (core._SEEN_EVERY=5 мин):
+    # иначе активный игрок с last_seen, обновляемым раз в 5 мин, попадёт в окно
+    # 3–5 мин как «неактивный» и получит тизер, сидя в игре. 6 мин = 5 + буфер.
+    active_cut = datetime.now(timezone.utc) - timedelta(minutes=6)
     rows = await session.execute(
         select(Player.id).where(
             Player.notif_pinged.is_(False),
