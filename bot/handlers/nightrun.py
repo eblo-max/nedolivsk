@@ -107,11 +107,11 @@ async def _render_state(cb: CallbackQuery, p, run: dict,
 
 
 async def _apply_factions(session: AsyncSession, p, factions) -> None:
-    """Применить сдвиг силы фракций к ОБЩЕМУ городу игрока (если есть домашний
-    чат). Город лочим FOR UPDATE — как в событиях, безопасно при параллели."""
-    if not factions or p.chat_id is None:
+    """Применить сдвиг силы фракций к ЕДИНОМУ мировому городу. Город лочим
+    FOR UPDATE — как в событиях, безопасно при параллели."""
+    if not factions:
         return
-    city = await repo.get_or_create_city(session, p.chat_id, lock=True)
+    city = await repo.get_world_city(session, lock=True)
     fp = dict(city.faction_power or {})
     for fac, delta in factions:
         fp[fac] = max(balance.FACTION_MIN, min(balance.FACTION_MAX, fp.get(fac, 0) + delta))
@@ -166,11 +166,9 @@ async def cb_go(cb: CallbackQuery, session: AsyncSession) -> None:
     if _cooldown(p) > 0:
         await cb.answer("Ноги ещё гудят — отдышись.", show_alert=True)
         return
-    situation = None                                    # активная ситуация города красит ночь
-    if p.chat_id is not None:
-        city = await repo.get_or_create_city(session, p.chat_id)
-        sit = citymod.current(city)
-        situation = sit.id if sit else None
+    city = await repo.get_world_city(session)           # активная ситуация мира красит ночь
+    sit = citymod.current(city)
+    situation = sit.id if sit else None
     p.night_run_at = datetime.now(UTC)
     p.night_run = nightrun.start(p, p.region or "", situation=situation)
     repo.add_log(session, "player", p.id, "🌙 ушёл в ночную ходку")

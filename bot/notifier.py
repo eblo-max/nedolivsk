@@ -385,9 +385,9 @@ async def _notify_returned(bot: Bot) -> None:
                     new = dict(tavern.production)
                     new[bname] = {**rbatch, "notified": True}
                     tavern.production = new
-        # Живой город: блокируем города ПЕРВЫМИ (FOR UPDATE), чтобы тик фракций
-        # не словил гонку с правкой faction_power из хендлеров.
-        cities = await repo.all_cities(session, lock=True)
+        # Живой город: ЕДИНЫЙ мировой. Блокируем ПЕРВЫМ (FOR UPDATE), чтобы тик
+        # фракций не словил гонку с правкой faction_power из хендлеров.
+        world_city = await repo.get_world_city(session, lock=True)
 
         # Аукцион: горожане перебивают ставки по активным лотам; закрытие — продажа.
         result = await session.execute(
@@ -608,10 +608,12 @@ async def _notify_returned(bot: Bot) -> None:
             cit = npc.random_pulser()
             good, delta, _verb = cit.pulse
             marketmod.nudge(world, good, delta)
-            world_news.append(texts.market_pulse_announce(cit))
-            for cid in await repo.all_chat_ids(session):
-                city_events.append((cid, texts.market_pulse_announce(cit)))
-                await repo.add_chronicle(session, cid, texts.market_pulse_chron(cit))
+            _pulse = texts.market_pulse_announce(cit)
+            world_news.append(_pulse)
+            await repo.add_chronicle(session, repo.GLOBAL_CITY_ID,   # одна мировая летопись
+                                     texts.market_pulse_chron(cit))
+            for cid in await repo.all_chat_ids(session):             # окна в мир — все чаты
+                city_events.append((cid, _pulse))
         # Глобальные события — и в DM-дайджест одиночкам (сезон/праздник/ярмарка).
         if season_changed:
             world_news.append(texts.season_announce(season.SEASONS[cur_season]))
@@ -671,16 +673,17 @@ async def _notify_returned(bot: Bot) -> None:
                 for uid in dm_ids:
                     repo.queue_notify(session, uid, bourse_news_text, kind="bourse")
 
-        # Симуляция фракций — по чатам (фракции/ситуации остаются ЛОКАЛЬНЫМИ).
-        # Общий мировой город (chat_id=0, «личники») тоже дрейфует и копит летопись,
-        # но НЕ анонсится в чат — слать в «чат 0» некуда.
-        for city in cities:
-            for kind, sit in citymod.advance(city, now):
+        # Симуляция фракций/ситуаций — ЕДИНЫЙ мировой город. Ситуации мира
+        # транслируются во ВСЕ чаты-окна, летопись — одна общая.
+        _sit_events = list(citymod.advance(world_city, now))
+        if _sit_events:
+            _win_chats = await repo.all_chat_ids(session)
+            for kind, sit in _sit_events:
                 text = sit.activate_text if kind == "activate" else sit.expire_text
-                if city.chat_id != repo.GLOBAL_CITY_ID:
-                    city_events.append((city.chat_id, text))
                 if kind == "activate":
-                    await repo.add_chronicle(session, city.chat_id, sit.chron)
+                    await repo.add_chronicle(session, repo.GLOBAL_CITY_ID, sit.chron)
+                for cid in _win_chats:
+                    city_events.append((cid, text))
 
         # Подкидыш: в каждом чате независимо ~раз в час «что-то теряется».
         # Не множим, пока висит неподобранный (анти-навал).
@@ -814,8 +817,7 @@ async def _notify_returned(bot: Bot) -> None:
         wld.refresh_cache(world)  # синхронизируем кэш ярмарки для экранов/дохода
         worldevent.set_active(world.event_kind, world.event_until,
                               world.event_good)  # кэш мир-события
-        for city in cities:
-            citymod.refresh_cache(city, now)  # кэш ситуаций для экранов
+        citymod.refresh_cache(world_city, now)  # кэш ситуаций для экранов (единый мир)
 
         # Персональные «вести» (outbox) в Telegram БОЛЬШЕ НЕ шлём полным текстом —
         # они уже в ленте мини-аппа; игрока зовёт единый тизер ниже (анти-спам).

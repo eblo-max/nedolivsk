@@ -28,9 +28,11 @@ def test_note_threshold_and_cooldown():
     assert len(rumors._pending) == 2
 
 
-def test_note_needs_chat_and_tavern():
+def test_note_needs_only_tavern():
     _reset()
-    assert not rumors.note("night", NS(id=3, chat_id=None, tavern=NS(name="X")), 999)
+    # единый мир: личка (chat_id=None) ТОЖЕ порождает слух, если есть таверна
+    assert rumors.note("night", NS(id=3, chat_id=None, tavern=NS(name="X")), 999)
+    # без таверны — слуха нет
     assert not rumors.note("night", NS(id=4, chat_id=-1, tavern=None), 999)
 
 
@@ -42,6 +44,7 @@ def test_flush_throttles():
     lines: list = []
 
     class _Repo:
+        GLOBAL_CITY_ID = 0
         @staticmethod
         async def add_chronicle(_s, chat_id, text):
             lines.append((chat_id, text))
@@ -68,6 +71,7 @@ def test_last_text_remembered():
     lines: list = []
 
     class _Repo:
+        GLOBAL_CITY_ID = 0
         @staticmethod
         async def add_chronicle(_s, chat_id, text):
             lines.append(text)

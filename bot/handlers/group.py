@@ -67,11 +67,11 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
         autoclean.schedule_message(await show_rating(message, session))
         return
     if section == "chronicle":
-        entries = await repo.recent_chronicle(session, message.chat.id, 10)
+        entries = await repo.recent_chronicle(session, repo.GLOBAL_CITY_ID, 10)
         autoclean.schedule_message(await message.reply(texts.chronicle_screen(entries)))
         return
     if section == "city":
-        city = await repo.get_or_create_city(session, message.chat.id)
+        city = await repo.get_world_city(session)   # единый мир — город у всех общий
         autoclean.schedule_message(await message.reply(texts.city_screen(city)))
         return
     if section == "market":

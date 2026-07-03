@@ -64,21 +64,13 @@ async def cmd_auction(message: Message, session: AsyncSession) -> None:
 
 @router.message(Command("city", "gorod"))
 async def cmd_city(message: Message, session: AsyncSession) -> None:
-    player = await repo.get_player(session, message.from_user.id)
-    chat_id = _chat_id(message, player)
-    if chat_id is None:
-        await _send(message, "Ты ещё не прибился ни к одному городу. "
-                             "Сыграй через «гг» в общем чате.")
-        return
-    city = await repo.get_or_create_city(session, chat_id)
+    city = await repo.get_world_city(session)   # единый мир — город у всех общий
     await _send(message, texts.city_screen(city), kb.city_kb())
 
 
 @router.message(Command("chronicle", "letopis"))
 async def cmd_chronicle(message: Message, session: AsyncSession) -> None:
-    player = await repo.get_player(session, message.from_user.id)
-    chat_id = _chat_id(message, player)
-    entries = await repo.recent_chronicle(session, chat_id, 10) if chat_id else []
+    entries = await repo.recent_chronicle(session, repo.GLOBAL_CITY_ID, 10)
     await _send(message, texts.chronicle_screen(entries), kb.chronicle_kb())
 
 

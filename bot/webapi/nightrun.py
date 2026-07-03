@@ -125,7 +125,7 @@ async def _api_nightrun_start(request: web.Request) -> web.Response:
             return web.json_response(_nightrun_state(p), headers={"Cache-Control": "no-store"})
         if nr.cooldown_left(p) > 0 and p.id != settings.admin_id:   # админ — без кулдауна
             return web.json_response({"ok": False, "error": "cooldown"})
-        city = await repo.get_or_create_city(s, p.chat_id)   # None → мировой город
+        city = await repo.get_world_city(s)                  # единый мир
         sit = citymod.current(city)
         situation = sit.id if sit else None
         p.night_run_at = datetime.now(timezone.utc)
@@ -201,7 +201,7 @@ async def _api_nightrun_meet(request: web.Request) -> web.Response:
             return web.json_response({"ok": False, "error": "stale"})
         out = nr.meet_resolve(run, p, opt)
         if out.get("factions"):
-            city = await repo.get_or_create_city(s, p.chat_id, lock=True)  # None → мировой
+            city = await repo.get_world_city(s, lock=True)   # единый мир
             fp = dict(city.faction_power or {})
             for fac, delta in out["factions"]:
                 fp[fac] = fp.get(fac, 0) + delta

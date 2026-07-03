@@ -205,9 +205,7 @@ async def cb_income(callback: CallbackQuery, session: AsyncSession) -> None:
         return
 
     now = datetime.now(timezone.utc)
-    city = None
-    if player.chat_id is not None:
-        city = await repo.get_or_create_city(session, player.chat_id)
+    city = await repo.get_world_city(session)   # единый мир — ситуация общая
     ce = citymod.effects(city, player, now)  # эффект городской ситуации
     perk_demand = perks.demand_bonus(player)
     mood_factor = citymod.mood_factor(city)
@@ -294,9 +292,7 @@ async def cb_retail_sell(callback: CallbackQuery, session: AsyncSession) -> None
         await callback.answer("Гости уже разошлись.", show_alert=True)
         return
     now = datetime.now(timezone.utc)
-    city = None
-    if player.chat_id is not None:
-        city = await repo.get_or_create_city(session, player.chat_id)
+    city = await repo.get_world_city(session)   # единый мир
     sold, gold, rep = logic.apply_retail(player, player.tavern, want)
     story_state.set_retail(player, None)
     if not sold:

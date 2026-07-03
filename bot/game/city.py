@@ -248,6 +248,11 @@ def advance(city, now: datetime | None = None) -> list[tuple[str, Situation]]:
 
 
 # ── Кэш состояния города (для экранов) ─────────────────────────────────
+# Единый мир: город один (chat_id=0), кэш держит одну запись. Читатели больше
+# не различают чаты — отдаём состояние мирового города всем (личка и группы).
+_WORLD = 0
+
+
 def refresh_cache(city, now: datetime | None = None) -> None:
     sit = _active_situation(city, now or _now())
     _cache[city.chat_id] = {
@@ -257,18 +262,18 @@ def refresh_cache(city, now: datetime | None = None) -> None:
     }
 
 
-def cached_label(chat_id: int | None) -> str | None:
-    e = _cache.get(chat_id) if chat_id is not None else None
+def cached_label(chat_id: int | None = None) -> str | None:      # noqa: ARG001 — единый мир
+    e = _cache.get(_WORLD)
     return e.get("label") if e else None
 
 
-def cached_situation_id(chat_id: int | None) -> str | None:
-    e = _cache.get(chat_id) if chat_id is not None else None
+def cached_situation_id(chat_id: int | None = None) -> str | None:  # noqa: ARG001
+    e = _cache.get(_WORLD)
     return e.get("sid") if e else None
 
 
-def cached_mood(chat_id: int | None) -> int | None:
-    e = _cache.get(chat_id) if chat_id is not None else None
+def cached_mood(chat_id: int | None = None) -> int | None:       # noqa: ARG001 — единый мир
+    e = _cache.get(_WORLD)
     return e.get("mood") if e else None
 
 

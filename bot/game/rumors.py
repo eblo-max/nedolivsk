@@ -31,39 +31,39 @@ _TEMPLATES = {
     ],
 }
 
-_pending: deque = deque(maxlen=30)      # (ts, player_id, chat_id, text)
+_pending: deque = deque(maxlen=30)      # (ts, player_id, text)
 _last_by_player: dict[int, float] = {}
 _last_flush = 0.0
 _last_text: str | None = None           # последний вышедший слух (цитирует стражник)
 
 
 def note(kind: str, player, gold: int) -> bool:
-    """Кандидат в слухи. False — не дотянул до порога/кулдауна/нет чата."""
+    """Кандидат в слухи. False — не дотянул до порога/кулдауна. Единый мир: слухи
+    порождают ВСЕ игроки (в т.ч. из лички), идут в общую мировую летопись."""
     if gold < THRESHOLDS.get(kind, 10**9):
         return False
-    chat_id = getattr(player, "chat_id", None)
     tavern = getattr(getattr(player, "tavern", None), "name", None)
-    if chat_id is None or not tavern:
+    if not tavern:
         return False
     now = time.time()
     if now - _last_by_player.get(player.id, 0.0) < PLAYER_COOLDOWN_H * 3600:
         return False
     _last_by_player[player.id] = now
     text = random.choice(_TEMPLATES[kind]).format(tavern=tavern, gold=int(gold))
-    _pending.append((now, int(player.id), int(chat_id), text))
+    _pending.append((now, int(player.id), text))
     return True
 
 
 async def flush(session, repo) -> str | None:
-    """Выпустить один слух в летопись города (зовёт нотифаер каждый тик)."""
+    """Выпустить один слух в общую мировую летопись (зовёт нотифаер каждый тик)."""
     global _last_flush, _last_text
     now = time.time()
     if not _pending or now - _last_flush < RUMOR_EVERY_MIN * 60:
         return None
-    _ts, _pid, chat_id, text = _pending.popleft()
+    _ts, _pid, text = _pending.popleft()
     _last_flush = now
     _last_text = text
-    await repo.add_chronicle(session, chat_id, text)
+    await repo.add_chronicle(session, repo.GLOBAL_CITY_ID, text)
     return text
 
 

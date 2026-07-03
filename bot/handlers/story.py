@@ -35,12 +35,7 @@ async def cb_city(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         await callback.answer()
         return
-    chat_id = callback.message.chat.id if panels.is_group(callback.message) \
-        else player.chat_id
-    if chat_id is None:
-        await callback.answer("Ты ещё не прибился ни к одному городу.", show_alert=True)
-        return
-    city = await repo.get_or_create_city(session, chat_id)
+    city = await repo.get_world_city(session)   # единый мир — город у всех общий
     await common.caption_edit(callback.message, texts.city_screen(city), kb.city_kb())
     await callback.answer()
 
@@ -51,10 +46,7 @@ async def cb_market(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         await callback.answer()
         return
-    chat_id = callback.message.chat.id if panels.is_group(callback.message) \
-        else player.chat_id
-    city = (await repo.get_or_create_city(session, chat_id)
-            if chat_id is not None else None)
+    city = await repo.get_world_city(session)   # единый мир
     await common.show_image_panel(
         callback.message, images.named_image("rinok"),
         texts.market_screen(city), kb.market_kb(), callback.from_user.id)
@@ -67,14 +59,7 @@ async def cb_chronicle(callback: CallbackQuery, session: AsyncSession) -> None:
     if player is None:
         await callback.answer()
         return
-    # В группе — летопись текущего чата; в личке — домашнего города игрока.
-    if panels.is_group(callback.message):
-        chat_id = callback.message.chat.id
-    else:
-        chat_id = player.chat_id
-    entries: list[str] = []
-    if chat_id is not None:
-        entries = await repo.recent_chronicle(session, chat_id, 10)
+    entries = await repo.recent_chronicle(session, repo.GLOBAL_CITY_ID, 10)  # единый мир
     await common.caption_edit(
         callback.message, texts.chronicle_screen(entries), kb.chronicle_kb()
     )
@@ -147,9 +132,7 @@ async def cb_event(callback: CallbackQuery, session: AsyncSession) -> None:
         return
 
     now = datetime.now(timezone.utc)
-    city = None
-    if player.chat_id is not None:
-        city = await repo.get_or_create_city(session, player.chat_id, lock=True)
+    city = await repo.get_world_city(session, lock=True)   # единый мир — фракции общие
     shielded = story_state.is_shielded(player, now)
 
     outcome, ctx = story_engine.resolve(
@@ -159,10 +142,10 @@ async def cb_event(callback: CallbackQuery, session: AsyncSession) -> None:
         await callback.answer("Этот выбор сейчас недоступен.", show_alert=True)
         return
 
-    # Летопись и эхо в общий чат — только если у игрока есть домашний чат.
+    # Летопись — в общую мировую (видят все). Эхо — в домашний чат игрока, если есть.
+    for line in ctx.chronicle:
+        await repo.add_chronicle(session, repo.GLOBAL_CITY_ID, line)
     if player.chat_id is not None:
-        for line in ctx.chronicle:
-            await repo.add_chronicle(session, player.chat_id, line)
         for line in ctx.chat_echo:
             try:
                 m = await callback.bot.send_message(player.chat_id, line)
