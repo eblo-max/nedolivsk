@@ -33,7 +33,8 @@ from bot.webapi.core import (  # noqa: E402,F401 — фасад
 
 # Старая карта/Орда — bot/webapi/invasion.py (распил, move-only).
 from bot.webapi.invasion import (  # noqa: E402,F401 — фасад
-    _api_invasion_join, _api_taverns, _invasion_event, _invasion_report_event,
+    _api_invasion_join, _api_invasion_seed, _api_taverns, _invasion_event,
+    _invasion_report_event,
 )
 
 
@@ -165,6 +166,7 @@ def build_app() -> web.Application:
     app.router.add_get("/app/{tail:.*}", _spa)        # SPA-fallback + статика dist
     app.router.add_get("/api/taverns", _api_taverns)
     app.router.add_post("/api/invasion/join", _api_invasion_join)
+    app.router.add_post("/api/invasion/seed", _api_invasion_seed)   # АДМИН: тихий призыв орды (тест карты)
     app.router.add_post("/api/whoami", _api_whoami)          # флаг админа (гейт вкладки «Карта»)
     app.router.add_post("/api/raid", _api_raid)              # рейд-босс: состояние
     app.router.add_post("/api/raid/join", _api_raid_join)    # записаться (сбор)

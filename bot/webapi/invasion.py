@@ -220,3 +220,36 @@ async def _api_invasion_join(request: web.Request) -> web.Response:
            "ready": round(invmod.readiness(sim), 3), "n": invmod.registered_count(fresh)}
     out["ok"] = True
     return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+async def _api_invasion_seed(request: web.Request) -> web.Response:
+    """ТЕСТ (только админ): ТИХО призвать Орду орков — БЕЗ анонсов в чаты и пушей
+    игрокам (в отличие от /orc). Fast-режим + болванка-армия (отриц. pid → в наградах
+    пропускаются, никого не уведомляет). Появится на карте /world (гейт админа).
+    Весь жизненный цикл тихий: inv.messages пуст → нотифаер ничего не постит/правит."""
+    from bot.webapi.core import _auth, _is_admin
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    if not _is_admin(uid):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+    from datetime import datetime, timezone
+    async with session_factory() as s:
+        if await repo.get_active_invasion(s) is not None:
+            return web.json_response({"ok": False, "error": "busy"})
+        now = datetime.now(timezone.utc)
+        threshold = invmod.horde_threshold(await repo.world_might_sum(s))
+        g_until, r_at = invmod.schedule(now, fast=True)
+        inv = repo.create_invasion(s, sprite=invmod.SPRITE, threshold=threshold,
+                                   gather_until=g_until, resolve_at=r_at)
+        inv.registered = invmod.dummy_roster()          # болванка — сразу виден марш
+        world = await repo.get_or_create_world(s)
+        inv.escal = invmod.escalation(getattr(world, "orc_wins", 0))
+        world.invasion_next_at = None                   # активна — авто не спавнит поверх
+        await s.flush()                                 # нужен inv.id
+        invmod.set_gathering(inv.id)
+        repo.add_log(s, "admin", uid, "🪓 тихо призвал Орду (мини-апп, тест карты)")
+        await s.commit()
+        iid = inv.id
+    return web.json_response({"ok": True, "id": iid, "gather_secs": invmod.FAST_GATHER_SECONDS},
+                             headers={"Cache-Control": "no-store"})

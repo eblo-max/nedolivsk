@@ -238,6 +238,19 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
     finally { setBusy(false) }
   }
 
+  // АДМИН: тихо поднять Орду орков (без анонсов/пушей) — обкатка карты /world.
+  async function summonOrc() {
+    if (busy) return
+    setBusy(true); haptic('medium')
+    try {
+      const r = await raidApi<{ ok: boolean; error?: string }>('invasion/seed', {})
+      if (r.ok) { setToast('🪓 Орда поднята тихо — открой «Карту мира»!'); hapticNotify('success') }
+      else { setToast(r.error === 'busy' ? 'Орда/босс уже идёт' : 'Не вышло'); hapticNotify('warning') }
+      setTimeout(() => setToast(''), 2800)
+    } catch { hapticNotify('warning') }
+    finally { setBusy(false) }
+  }
+
   async function hit() {
     if (busy || cd > 0 || boss.dead) return
     setBusy(true); haptic('rigid')
@@ -323,7 +336,14 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
                   <span className="raid-summon-nm">{b.name}</span>
                 </button>
               ))}
+              <button className="raid-summon-b" disabled={busy} onClick={summonOrc}
+                style={{ gridColumn: '1 / -1', borderColor: '#6ea83a' }}>
+                <span className="raid-summon-emo">🪓</span>
+                <span className="raid-summon-nm">Орда орков — тихо (тест карты)</span>
+              </button>
             </div>
+            <p className="raid-summon-sub" style={{ marginTop: 6, opacity: .8 }}>
+              🪓 тихий призыв: без анонсов и пушей, только тебе. Подними → открой «Карту мира».</p>
             {toast && <div className="raid-toast">{toast}</div>}
           </div>
         )}
