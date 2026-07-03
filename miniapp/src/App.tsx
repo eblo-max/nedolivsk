@@ -4,6 +4,7 @@ import { pushBack, popBack } from './telegram'
 import BottomNav from './components/BottomNav'
 import { music } from './music'
 import Splash from './screens/Splash'
+import ChannelModal from './screens/ChannelModal'
 import Tavern from './screens/Tavern'
 
 // Под-экраны — ленивые чанки: первый вход грузит только Таверну (быстрее старт
@@ -16,8 +17,19 @@ const WorldMap = lazy(() => import('./screens/WorldMap'))
 
 const LOADING = <div className="center" style={{ flex: 1, paddingTop: 80 }}><div className="spin" /></div>
 
+// промо канала — не чаще раза в сутки на устройство (дата последнего показа)
+function channelDueToday(): boolean {
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    if (localStorage.getItem('chanSeen') === today) return false
+    localStorage.setItem('chanSeen', today)
+    return true
+  } catch { return false }   // приватный режим/нет localStorage — не назойливо
+}
+
 export default function App() {
   const [intro, setIntro] = useState(true)
+  const [chan, setChan] = useState(false)
   const loc = useLocation()
   const nav = useNavigate()
 
@@ -49,7 +61,8 @@ export default function App() {
       <div className="fx-glow" />
       <div className="fx-grain" />
       <div className="fx-vig" />
-      {intro && <Splash onEnter={() => setIntro(false)} />}
+      {intro && <Splash onEnter={() => { setIntro(false); if (channelDueToday()) setChan(true) }} />}
+      {!intro && chan && <ChannelModal onClose={() => setChan(false)} />}
       <div className="app">
         {/* место под фикс. тикер резервируем только на Таверне (он там и рендерится) */}
         <div className={`scroll${['/buildings', '/character', '/sorties', '/market', '/map'].includes(loc.pathname) ? '' : ' with-ticker'}`}>
