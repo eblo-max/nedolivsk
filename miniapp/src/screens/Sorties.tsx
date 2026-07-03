@@ -6,11 +6,12 @@ import { ResIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
 import { MONSTERS, MON_FLIP, HERO, RANGED, type MonMeta, type AnimName } from '../monsters'
 import Nightrun from './Nightrun'
+import CoachTour, { useFirstVisitTour } from './CoachTour'
 
 // переключатель режимов вылазки (Охота ↔ Ночная ходка)
 function VyTabs({ mode, setMode }: { mode: 'hunt' | 'night'; setMode: (m: 'hunt' | 'night') => void }) {
   return (
-    <div className="vy-tabs">
+    <div className="vy-tabs" data-tut="sortie-tabs">
       <button className={mode === 'hunt' ? 'on' : ''} onClick={() => setMode('hunt')}>🏹 Охота</button>
       <button className={mode === 'night' ? 'on' : ''} onClick={() => setMode('night')}>🌙 Ночная ходка</button>
     </div>
@@ -80,7 +81,17 @@ const SAMPLE: HuntState = {
   ],
 }
 
+const SORTIE_TOUR = [
+  { sel: '[data-tut="sortie-tabs"]', emoji: '⚔️', title: 'Две вылазки',
+    body: 'Охота — бой со зверьём ради шкур, мяса и золота. Ночная ходка — рискованный поход по тёмным тропам за большим кушем. Переключайся тут.', place: 'bottom' as const },
+  { sel: '[data-tut="beasts"]', emoji: '🏹', title: 'Выбор добычи',
+    body: 'На доске розыска — звери с прогнозом победы. Бери по силам: цвет подсказывает опасность. Перед боем можно хлебнуть флягу (эль — урон, вино — крит) для перевеса.', place: 'top' as const },
+  { emoji: '🩹', title: 'Риск и лечение',
+    body: 'Проиграешь — потеряешь здоровье и щепотку золота, и будешь ранен (пауза перед следующим боем). Лечись едой из погреба (значок 🍖). Копи снарягу — и берись за крупную дичь.' },
+]
+
 export default function Sorties() {
+  const sortieTour = useFirstVisitTour('sorties')
   const { data, loading, error, set, reload } = useApi<HuntState>('hunt', SAMPLE)
   const [pick, setPick] = useState<Beast | null>(null)
   const [fight, setFight] = useState<FightRes | null>(null)
@@ -170,6 +181,9 @@ export default function Sorties() {
 
   return (
     <div className="scr">
+      {sortieTour.show && mode === 'hunt' && (
+        <CoachTour steps={SORTIE_TOUR} onDone={sortieTour.finish} endLabel="Понятно" />
+      )}
       {toast && <div className="toast">{toast}</div>}
       <VyTabs mode={mode} setMode={setMode} />
       <div className="hero rise" style={{ paddingBottom: 0 }}>
@@ -200,7 +214,7 @@ export default function Sorties() {
         </div>
         {!d.ready.can && <div className="bh-warn">⚠ Ранен — в строй через {hm(d.ready.minutes)}</div>}
 
-        <div className="posters">
+        <div className="posters" data-tut="beasts">
           {d.beasts.map((b, i) => (
             <button key={b.id} className={`poster th-${threatCls(b.win)}`}
               style={{ transform: `rotate(${(i % 2 ? 1 : -1) * (0.7 + (i % 3) * 0.5)}deg)`, marginLeft: i % 2 ? 10 : 0, marginRight: i % 2 ? 0 : 10, zIndex: 10 + i }}

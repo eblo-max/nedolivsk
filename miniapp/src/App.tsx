@@ -6,6 +6,7 @@ import { music } from './music'
 import Splash from './screens/Splash'
 import ChannelModal from './screens/ChannelModal'
 import Tavern from './screens/Tavern'
+import { whoamiAdmin } from './admin'
 
 // Под-экраны — ленивые чанки: первый вход грузит только Таверну (быстрее старт
 // на холодном WebView), остальное подтягивается при переходе по вкладкам.
@@ -14,6 +15,7 @@ const Sorties = lazy(() => import('./screens/Sorties'))
 const Buildings = lazy(() => import('./screens/Buildings'))
 const Market = lazy(() => import('./screens/Market'))
 const WorldMap = lazy(() => import('./screens/WorldMap'))
+const Tutorial = lazy(() => import('./screens/Tutorial'))
 
 const LOADING = <div className="center" style={{ flex: 1, paddingTop: 80 }}><div className="spin" /></div>
 
@@ -30,6 +32,7 @@ function channelDueToday(): boolean {
 export default function App() {
   const [intro, setIntro] = useState(true)
   const [chan, setChan] = useState(false)
+  const [tut, setTut] = useState(false)
   const loc = useLocation()
   const nav = useNavigate()
 
@@ -61,8 +64,22 @@ export default function App() {
       <div className="fx-glow" />
       <div className="fx-grain" />
       <div className="fx-vig" />
-      {intro && <Splash onEnter={() => { setIntro(false); if (channelDueToday()) setChan(true) }} />}
-      {!intro && chan && <ChannelModal onClose={() => setChan(false)} />}
+      {intro && <Splash onEnter={() => {
+        setIntro(false)
+        let done = true
+        try { done = localStorage.getItem('tutDone') === '1' } catch { /* */ }
+        // ВРЕМЕННО обучение только админу (обкатка в проде). Остальным — сразу канал.
+        whoamiAdmin().then((admin) => {
+          if (admin && !done) setTut(true)          // новичок-админ → обучение
+          else if (channelDueToday()) setChan(true)
+        })
+      }} />}
+      {!intro && tut && (
+        <Suspense fallback={null}>
+          <Tutorial onDone={() => { setTut(false); if (channelDueToday()) setChan(true) }} />
+        </Suspense>
+      )}
+      {!intro && !tut && chan && <ChannelModal onClose={() => setChan(false)} />}
       <div className="app">
         {/* место под фикс. тикер резервируем только на Таверне (он там и рендерится) */}
         <div className={`scroll${['/buildings', '/character', '/sorties', '/market', '/map'].includes(loc.pathname) ? '' : ' with-ticker'}`}>

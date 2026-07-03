@@ -4,6 +4,7 @@ import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
 import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
+import CoachTour, { useFirstVisitTour } from './CoachTour'
 import ReputationSheet from './ReputationSheet'
 
 interface Slot { slot: string; slot_name: string; id?: string; name?: string; tier?: number; sprite?: string; trophy?: boolean
@@ -85,7 +86,17 @@ const SAMPLE: CharState = {
   ] },
 }
 
+const CHAR_TOUR = [
+  { sel: '[data-tut="doll"]', emoji: '🧍', title: 'Твой герой',
+    body: 'Слоты по бокам — снаряжение: оружие, броня, амулеты. Что надел, то и видно на кукле. Пустые слоты стоит заполнить — голым в бой лучше не соваться.', place: 'bottom' as const },
+  { sel: '[data-tut="stats"]', emoji: '⚔', title: 'Характеристики',
+    body: 'Урон, крит, броня, живучесть (❤ здоровье) и удача. Они решают исход боя на охоте и в рейдах. Снаряга их растит — чем лучше вещи, тем сильнее ты.', place: 'top' as const },
+  { sel: '[data-tut="forge-btn"]', emoji: '⚒', title: 'Кузница и заточка',
+    body: 'Тут куёшь новые вещи из сырья, а надетые — точишь. Заточка заметно усиливает вещь (кнопка в детали вещи). Первая ковка — со скидкой, начни с неё.', place: 'top' as const },
+]
+
 export default function Character() {
+  const charTour = useFirstVisitTour('character')
   const { data, loading, error, set, reload } = useApi<CharState>('character', SAMPLE)
   const [view, setView] = useState<'doll' | 'forge'>('doll')
   const [forge, setForge] = useState<ForgeState | null>(null)
@@ -238,6 +249,9 @@ export default function Character() {
   // ── ПЕРСОНАЖ (кукла) ──
   return (
     <>
+      {charTour.show && view === 'doll' && (
+        <CoachTour steps={CHAR_TOUR} onDone={charTour.finish} endLabel="Понятно" />
+      )}
       <div className="hero rise" style={{ paddingBottom: 0 }}>
         <div className="nm">{c.name}</div>
         <div className="meta"><span className="region">Хозяин кабака</span>
@@ -246,7 +260,7 @@ export default function Character() {
       </div>
 
       {/* кукла: герой (анимированный) парит в воздухе, слоты по бокам — без рамки */}
-      <div className="doll rise">
+      <div className="doll rise" data-tut="doll">
         <div className="doll-col">{COL_L.map((k) => <SlotBox key={k} s={bySlot(c, k)} onTap={openItem} onEmpty={openForge} />)}</div>
         <div className="doll-fig"><AnimHero /></div>
         <div className="doll-col">{COL_R.map((k) => <SlotBox key={k} s={bySlot(c, k)} onTap={openItem} onEmpty={openForge} />)}</div>
@@ -256,7 +270,7 @@ export default function Character() {
       {craftBanner(c.craft)}
 
       {/* боевые — плавающая лента, без рамки */}
-      <div className="statband rise" style={{ animationDelay: '.04s' }}>
+      <div className="statband rise" data-tut="stats" style={{ animationDelay: '.04s' }}>
         <div className="cap">БОЕВЫЕ</div>
         <div className="stat-hp">
           <span className="shp-ic">❤</span>
@@ -293,7 +307,7 @@ export default function Character() {
 
       <div className="flavor rise" style={{ margin: '8px 14px 4px', fontSize: 13.5, animationDelay: '.14s' }}>«Голый трактирщик — смешной трактирщик. Загляни в кузницу.»</div>
       <div className="char-cta rise" style={{ animationDelay: '.16s' }}>
-        <button className="btn gold" onClick={openForge}>⚒ В кузницу</button>
+        <button className="btn gold" data-tut="forge-btn" onClick={openForge}>⚒ В кузницу</button>
         <button className="btn" onClick={() => { haptic('light'); setRepOpen(true) }}>🤝 Репутация</button>
       </div>
       {pick && <ItemSheet item={pick} worn={pickSlot} busy={busy} craftState={c.craft.state} onMake={make} onSharpen={sharpen} onClose={() => { setPick(null); setPickSlot(null) }} />}

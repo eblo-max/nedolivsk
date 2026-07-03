@@ -19,6 +19,7 @@ const RatingSheet = lazy(() => import('./RatingSheet'))
 const ReferralSheet = lazy(() => import('./ReferralSheet'))
 const RaidSheet = lazy(() => import('./RaidSheet'))
 const NotificationsSheet = lazy(() => import('./NotificationsSheet'))
+const GuideSheet = lazy(() => import('./GuideSheet'))
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
@@ -89,6 +90,7 @@ export default function Tavern() {
   const [sheet, setSheet] = useState<string | null>(null)
   const [storyOpen, setStoryOpen] = useState(false)
   const [chronOpen, setChronOpen] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
   const [ratingOpen, setRatingOpen] = useState(false)   // доска почёта (топ таверн)
   const [refOpen, setRefOpen] = useState(false)
   const [raidOpen, setRaidOpen] = useState(false)       // экран рейд-босса
@@ -171,7 +173,7 @@ export default function Tavern() {
 
       <div className="hero rise">
         <MusicToggle />
-        <button className="nf-bell" aria-label="Уведомления"
+        <button className="nf-bell" data-tut="notif" aria-label="Уведомления"
           onClick={() => { haptic('light'); setNotifOpen(true) }}>
           🔔{(t.notif_unread ?? 0) > 0 &&
             <span className="nf-badge">{(t.notif_unread ?? 0) > 99 ? '99+' : t.notif_unread}</span>}
@@ -239,7 +241,7 @@ export default function Tavern() {
             <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--gold-2)', fontVariantNumeric: 'tabular-nums' }}>{fmt(t.gold)}</span>
             <span className="muted" style={{ fontFamily: 'var(--text)', fontSize: 14 }}>в мошне</span>
           </div>
-          <button className="btn gold" disabled={busy || t.income_ready <= 0} onClick={collect}>
+          <button className="btn gold" data-tut="collect" disabled={busy || t.income_ready <= 0} onClick={collect}>
             {t.income_ready > 0 ? `Собрать выручку  +${fmt(t.income_ready)} 🪙` : 'Касса пуста — гости копят жажду'}
           </button>
         </div>
@@ -254,7 +256,7 @@ export default function Tavern() {
       {/* город: настроение + фракции + ситуация */}
       {t.city && (
         <div className="card rise" style={{ animationDelay: '.1s' }}>
-          <div className="card-h"><span className="he">🏛</span>ГОРОД<span className="cnt">{t.city.mood_label}</span></div>
+          <div className="card-h" data-tut="city"><span className="he">🏛</span>ГОРОД<span className="cnt">{t.city.mood_label}</span></div>
           <div className="card-b">
             {t.city.situation && (
               <div className="city-sit">{t.city.situation.emoji} <b>{t.city.situation.label}</b> — в самом разгаре</div>
@@ -286,6 +288,18 @@ export default function Tavern() {
         </span>
         <span className="zz-cta-chev">›</span>
       </button>
+
+      {/* обучение — та же форма, меньше и синяя. ВРЕМЕННО только админу (обкатка). */}
+      {t.admin && (
+        <button className="zz-cta gd rise" style={{ animationDelay: '.115s' }} onClick={() => { haptic('light'); setGuideOpen(true) }}>
+          <span className="zz-cta-emo">📖</span>
+          <span className="zz-cta-body">
+            <b>Как играть</b>
+            <small>обучение и справочник</small>
+          </span>
+          <span className="zz-cta-chev">›</span>
+        </button>
+      )}
 
       {/* заведение */}
       <div className="card rise" style={{ animationDelay: '.12s' }}>
@@ -350,6 +364,7 @@ export default function Tavern() {
             onClose={() => { tradeShut.current = true; setTrade(null) }} />
         )}
         {chronOpen && <ChronicleSheet onClose={() => setChronOpen(false)} />}
+        {guideOpen && <GuideSheet onClose={() => setGuideOpen(false)} />}
         {ratingOpen && <RatingSheet onClose={() => setRatingOpen(false)} />}
         {refOpen && <ReferralSheet onClose={() => setRefOpen(false)} />}
         {raidOpen && <RaidSheet onClose={() => { setRaidOpen(false); reload() }} onGold={() => reload()} />}

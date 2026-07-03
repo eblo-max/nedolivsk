@@ -18,6 +18,7 @@ export default function BottomNav() {
         <NavLink
           key={t.to}
           to={t.to}
+          data-tut={`nav-${t.to}`}
           end={t.to === '/'}
           className={({ isActive }) => (isActive ? 'on' : '')}
           onClick={() => haptic('light')}

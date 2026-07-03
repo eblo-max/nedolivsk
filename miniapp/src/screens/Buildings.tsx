@@ -4,6 +4,7 @@ import { api, errText } from '../api'
 import { haptic, hapticNotify, pushBack, popBack } from '../telegram'
 import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
+import CoachTour, { useFirstVisitTour } from './CoachTour'
 
 // ── типы (зеркало webapp _buildings_state/_building_detail/_production_state) ──
 type BStatus = 'built' | 'building' | 'locked' | 'available'
@@ -157,7 +158,17 @@ const SAMPLE: BState = {
   ],
 }
 
+const BUILD_TOUR = [
+  { sel: '[data-tut="yard"]', emoji: '🏗', title: 'Твой двор',
+    body: 'Здесь стоят производства. Каждое здание делает свой товар: пивоварня — эль, кухня — жаркое, винокурня — вино. Товар потом продаёшь в Торге.', place: 'top' as const },
+  { sel: '[data-tut="yard"]', emoji: '🔨', title: 'Как построить',
+    body: 'Тапни по зданию — увидишь, что оно даёт, во сколько золота и сырья обойдётся и сколько строится. Плотники берут плату вперёд. Одна стройка за раз.', place: 'top' as const },
+  { emoji: '🍺', title: 'И запусти партию',
+    body: 'Построил — запускай партию товара. Через время забери готовое (значок «к сбору») и неси на продажу. Так и капает доход помимо кассы таверны.' },
+]
+
 export default function Buildings() {
+  const buildTour = useFirstVisitTour('buildings')
   const { data, loading, error, set, reload } = useApi<BState>('buildings', SAMPLE)
   const [view, setView] = useState<'list' | 'prod'>('list')
   const [prod, setProd] = useState<ProdState | null>(null)
@@ -322,6 +333,9 @@ export default function Buildings() {
   const onBuild = d.build.state !== 'none' && d.build.name
   return (
     <div className="scr">
+      {buildTour.show && d.list.length > 0 && (
+        <CoachTour steps={BUILD_TOUR} onDone={buildTour.finish} endLabel="Понятно" />
+      )}
       {toast && <div className="toast">{toast}</div>}
       <div className="hero rise" style={{ paddingBottom: 0 }}>
         <div className="nm">Двор таверны</div>
@@ -334,7 +348,7 @@ export default function Buildings() {
         <div className="flavor" style={{ margin: '6px 14px 0', fontSize: 13.5 }}>«Каждая открывает своё производство. Деньги и сырьё — вперёд.»</div>
       </div>
 
-      <div className="yard" ref={fitYard}>
+      <div className="yard" data-tut="yard" ref={fitYard}>
         <div className="yard-stage" style={{ width: STAGE_W, height: YARD_H }}>
           <svg className="yard-paths" viewBox={`0 0 100 ${YARD_H}`} preserveAspectRatio="none" aria-hidden="true">
             {YARD_PATHS.map((dp, i) => <path key={i} d={dp} />)}

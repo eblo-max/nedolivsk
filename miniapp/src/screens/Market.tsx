@@ -5,6 +5,7 @@ import { ResIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
 import AuctionSheet from './AuctionSheet'
 import BourseSheet from './BourseSheet'
+import CoachTour, { useFirstVisitTour } from './CoachTour'
 
 interface ShopItem { key: string; name: string; emoji: string; price: number; room: number; limit: number; max: number; have: number }
 interface TorgState { ok: boolean; open: boolean; gold?: number; limit?: number; shop?: ShopItem[] }
@@ -25,7 +26,17 @@ const DEMO_TORG: TorgState = { ok: true, open: true, gold: 4810, limit: 150, sho
 
 /** Торг: лавка скупщика (купить сырьё за золото). Закрыт для всех (ставни + замок),
  * кроме админа/флага TORG_OPEN — гейт серверный. Аукцион и биржа — «скоро». */
+const TORG_TOUR = [
+  { sel: '[data-tut="torg-shop"]', emoji: '🛒', title: 'Лавка скупщика',
+    body: 'Скупщик берёт сырьё сразу по фиксированной цене. Быстро и без ожидания, но дёшево — выручай так, когда нужно золото прямо сейчас.', place: 'top' as const },
+  { sel: '[data-tut="torg-market"]', emoji: '🔨', title: 'Аукцион и биржа',
+    body: 'Аукцион — выставь партию, гости перебивают ставки, уходит дороже. Биржа — торгуй напрямую с другими игроками: ставь лоты и выкупай чужие. Цены живые.', place: 'bottom' as const },
+  { emoji: '💰', title: 'Где выгоднее',
+    body: 'Мелочь и срочность — скупщику. Хороший товар в спрос — на аукцион или биржу, там дают больше. Следи за спросом: в ярмарку и события цены скачут.' },
+]
+
 export default function Market() {
+  const torgTour = useFirstVisitTour('market')
   const [d, setD] = useState<TorgState | null>(null)
   const [pick, setPick] = useState<ShopItem | null>(null)
   const [aucOpen, setAucOpen] = useState(false)
@@ -77,6 +88,9 @@ export default function Market() {
   // ── ОТКРЫТО (админ/флаг): лавка скупщика ──
   return (
     <div className="scr">
+      {torgTour.show && (
+        <CoachTour steps={TORG_TOUR} onDone={torgTour.finish} endLabel="Понятно" />
+      )}
       {toast && <div className="toast">{toast}</div>}
 
       {/* купеческий баннер — современная hero-плашка */}
@@ -95,7 +109,7 @@ export default function Market() {
       </div>
 
       {/* рынок игроков — компактно, в одну строку, выше лавки скупщика */}
-      <div className="torg-pair">
+      <div className="torg-pair" data-tut="torg-market">
         <button className="torg-tile t-auc rise" onClick={() => { haptic('light'); setAucOpen(true) }}>
           <span className="torg-tile-ic"><span className="torg-gavel">🔨</span></span>
           <span className="torg-tile-t">Аукцион</span>
@@ -111,7 +125,7 @@ export default function Market() {
       </div>
 
       {/* лавка — ящики с товаром */}
-      <div className="torg-cap">🛒 Лавка скупщика<span className="torg-coin"><ResIcon k="gold" size={13} />{fmt(d.gold ?? 0)}</span></div>
+      <div className="torg-cap" data-tut="torg-shop">🛒 Лавка скупщика<span className="torg-coin"><ResIcon k="gold" size={13} />{fmt(d.gold ?? 0)}</span></div>
       <div className="torg-grid">
         {(d.shop || []).map((it) => {
           const used = Math.max(0, it.limit - it.room), pct = Math.round((used / it.limit) * 100)
