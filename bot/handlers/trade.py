@@ -96,12 +96,21 @@ async def _finish_sale(callback: CallbackQuery, player: Player, offer: dict,
 
 @router.callback_query(F.data == "trade_open")
 async def cb_trade_open(callback: CallbackQuery, session: AsyncSession) -> None:
-    """Вернуться к торгу (кнопка «Купец торгуется»)."""
+    """Торг переехал в приложение: зовём открыть мини-апп (старые сообщения/фолбэк)."""
     player = await repo.get_player(session, callback.from_user.id)
     if player is None or story_state.get_trade(player) is None:
         await callback.answer("Купец уже ушёл.", show_alert=True)
         return
-    await deliver_trade(callback.message, player, callback.from_user.id)
+    from bot.webapp import base_url
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+    b = base_url()
+    if b:
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
+            text="🤝 Торговать — в приложении", web_app=WebAppInfo(url=f"{b}/app"))]])
+        await _edit(callback, "🤝 <b>Заезжий купец ждёт торга.</b>\n"
+                    "Торговаться удобнее в приложении — там видно цену, объём и вилку сделки.", kb)
+    else:
+        await deliver_trade(callback.message, player, callback.from_user.id)  # фолбэк без url
     await callback.answer()
 
 

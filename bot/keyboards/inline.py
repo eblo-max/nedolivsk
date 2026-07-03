@@ -118,8 +118,12 @@ def tavern_kb(player: Player, private: bool = True) -> InlineKeyboardMarkup:
     if story_state.get_retail(player):  # гости ждут решения по сбыту
         kb.button(text="🍺 Гости ждут заказ!", callback_data="retail_open", style="primary")
         sizes.append(1)
-    if story_state.get_trade(player):  # купец ждёт ответа по цене
-        kb.button(text="🤝 Купец торгуется!", callback_data="trade_open", style="primary")
+    if story_state.get_trade(player):  # купец ждёт ответа по цене — торг в приложении
+        if private and _aurl:
+            kb.button(text="🤝 Купец торгуется — в приложении",
+                      web_app=WebAppInfo(url=f"{_aurl}/app"), style="primary")
+        else:
+            kb.button(text="🤝 Купец торгуется!", callback_data="trade_open", style="primary")
         sizes.append(1)
     if story_state.get_pending(player):  # незакрытое событие — даём вернуться к нему
         kb.button(text="🔔 Тебя ждёт гость!", callback_data="event_open", style="primary")
