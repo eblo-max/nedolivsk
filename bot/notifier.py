@@ -172,17 +172,17 @@ async def _notify_returned(bot: Bot) -> None:
         # Утренний пуш «бонус готов»: раз в день после рубежа 10:00 МСК.
         # Шлём недавно активным (за 3 дня) — давно ушедших ведёт «возвращалка».
         from bot.game import buff as buffmod
-        bonus_push_targets: list[int] = []
+        bonus_push_targets: list[tuple[int, object]] = []   # (id, last_seen)
         day_key = buffmod.reset_day_key(now)
         if world.bonus_push_on != day_key:
             world.bonus_push_on = day_key
             res = await session.execute(
-                select(Player.id)
+                select(Player.id, Player.last_seen_at)
                 .join(Tavern, Tavern.player_id == Player.id)
                 .where(Player.last_seen_at.is_not(None),
                        Player.last_seen_at >= now - timedelta(days=3))
             )
-            bonus_push_targets = [r[0] for r in res.all()]
+            bonus_push_targets = [(r[0], r[1]) for r in res.all()]
 
         # Рассылку копим и шлём ПОСЛЕ коммита, чтобы не держать локи строк
         # через сетевые вызовы Telegram (иначе клики игроков ждут весь тик).
@@ -716,8 +716,19 @@ async def _notify_returned(bot: Bot) -> None:
         # (idle/onboard — это re-engagement «вернись», не «весть»; шлём как раньше.)
         for _p, _txt, _mk, _kind in outbox:
             repo.feed_push(session, _p.id, _txt, kind=_kind)
-        for _pid in bonus_push_targets:
+        # ВАЖНАЯ весть (ретеншн-крючок): в ленту — всем; заметным пушем в
+        # Telegram — тем, кого сейчас НЕТ в игре (вернуть). Активные увидят в
+        # ленте сами. notif_pinged ставим пушнутым, чтобы тизер не дублировал.
+        _bonus_active_cut = now - timedelta(minutes=6)
+        _bonus_push_ids: list[int] = []
+        for _pid, _ls in bonus_push_targets:
             repo.feed_push(session, _pid, texts.bonus_ready_push(), kind="bonus")
+            if _ls is None or _ls < _bonus_active_cut:
+                _bonus_push_ids.append(_pid)
+        if _bonus_push_ids:
+            await session.execute(
+                update(Player).where(Player.id.in_(_bonus_push_ids))
+                .values(notif_pinged=True))
         if world_news:
             _digest = "🌍 <b>ВЕСТИ ИЗ НЕДОЛИВСКА</b>\n\n" + "\n\n".join(world_news)
             _news_ids = [r[0] for r in (await session.execute(
@@ -821,7 +832,16 @@ async def _notify_returned(bot: Bot) -> None:
                     p, texts.onboard_nudge(r), reply_markup=onboard_nudge_kb()),
                 what=f"онбординг→{pid}")
 
-        # Бонус «готов» уже в ленте — отдельный пуш не шлём (зовёт тизер).
+        # ВАЖНАЯ весть «бонус дня готов» — заметный пуш с кнопкой тем, кого нет
+        # в игре (ретеншн-крючок: вернуть и забрать, пока не сгорел). Активные
+        # видят в ленте. Флаг notif_pinged уже выставлен выше — тизер не дублит.
+        if _bonus_push_ids:
+            from bot.keyboards.inline import bonus_cta_kb
+            for _pid in _bonus_push_ids:
+                await deliver(
+                    lambda p=_pid: bot.send_message(
+                        p, texts.bonus_ready_push(), reply_markup=bonus_cta_kb()),
+                    what=f"бонус→{_pid}")
 
         # Outbox-очередь: «вести» уже в ленте; в Telegram шлём фото-рассылки
         # (админ-анонсы) и СРОЧНОЕ (рейд/орда — время ограничено, тизером не

@@ -367,6 +367,19 @@ def back_kb() -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def bonus_cta_kb() -> InlineKeyboardMarkup:
+    """Заметный пуш «бонус готов» — кнопкой прямо в игру (web_app в ЛС)."""
+    from bot.webapp import base_url
+    kb = InlineKeyboardBuilder()
+    b = base_url()
+    if b:
+        kb.button(text="🎁 Забрать бонус", web_app=WebAppInfo(url=f"{b}/app/"))
+    else:
+        kb.button(text="🎁 Забрать бонус", callback_data="tavern", style="success")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def idle_nudge_kb() -> InlineKeyboardMarkup:
     """Кнопка возвращения в игру из напоминания о простое."""
     kb = InlineKeyboardBuilder()

@@ -162,3 +162,26 @@ def test_outbox_appends_are_4_tuples():
             if not (isinstance(last, ast.Constant) and isinstance(last.value, str)):
                 bad.append(node.lineno)
     assert not bad, f"outbox.append не (player, text, markup, kind-строка): {bad}"
+
+
+# ── Важные вести: заметный пуш неактивным ───────────────────────────────
+def test_bonus_cta_kb_opens_app(monkeypatch):
+    import bot.webapp as webapp
+    from bot.keyboards.inline import bonus_cta_kb
+    monkeypatch.setattr(webapp, "base_url", lambda: "https://x.example")
+    kb = bonus_cta_kb()
+    btn = kb.inline_keyboard[0][0]
+    assert btn.web_app and btn.web_app.url.endswith("/app/")
+    assert "бонус" in btn.text.lower()
+
+
+def test_bonus_split_active_vs_idle():
+    """Заметный пуш бонуса — только тем, кого нет в игре (last_seen старше окна);
+    активные получают лишь ленту. Логика разделения из нотифаера."""
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    cut = now - timedelta(minutes=6)
+    targets = [(1, None), (2, now - timedelta(minutes=2)),   # 2 — активен
+               (3, now - timedelta(hours=3)), (4, now - timedelta(days=1))]
+    push_ids = [pid for pid, ls in targets if ls is None or ls < cut]
+    assert push_ids == [1, 3, 4]                    # активный (2) — без пуша
