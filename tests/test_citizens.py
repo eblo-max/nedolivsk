@@ -65,3 +65,18 @@ def test_advance_respects_dynamic_decay():
     assert fast.faction_power["thieves"] < slow.faction_power["thieves"]
     assert slow.faction_power["thieves"] == 36
     assert fast.faction_power["thieves"] == 20
+
+
+def test_rel_boost_favors_known_citizens():
+    """«Город помнит тебя»: знакомые (друзья И враги) заходят чаще случайных,
+    но с потолком — чтобы не забивали пул визитов."""
+    from bot.game import story_engine as se, balance as bal
+    stranger = NS(story={"npc_rel": {}})
+    friend = NS(story={"npc_rel": {"buhlo": 30}})
+    foe = NS(story={"npc_rel": {"mzdoimov": -60}})
+    assert se._rel_boost(stranger, None) == 1.0            # событие без NPC
+    assert se._rel_boost(stranger, "buhlo") == 1.0         # незнакомец — базовый вес
+    assert se._rel_boost(friend, "buhlo") > 1.0            # друг заходит чаще
+    assert se._rel_boost(foe, "mzdoimov") > 1.0            # враг тоже (память о вражде)
+    huge = NS(story={"npc_rel": {"buhlo": 100}})
+    assert se._rel_boost(huge, "buhlo") == pytest.approx(1.0 + bal.REL_SPAWN_MAX_BOOST)

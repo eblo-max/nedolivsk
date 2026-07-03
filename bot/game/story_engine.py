@@ -31,13 +31,23 @@ def _choice_available(choice, ctx: Ctx) -> bool:
     return all(p.check(ctx) for p in choice.requires)
 
 
+def _rel_boost(player: Player, npc_id: str | None) -> float:
+    """Множитель веса визита: знакомые горожане (друзья И враги) заходят чаще
+    случайных — «город помнит тебя». Растёт с |npc_rel|, потолок ×(1+MAX)."""
+    if not npc_id:
+        return 1.0
+    rel = abs(story_state.npc_rel(player, npc_id))
+    return 1.0 + min(balance.REL_SPAWN_MAX_BOOST, rel * balance.REL_SPAWN_PER_POINT)
+
+
 def select(player: Player, city, rng: random.Random) -> Storylet | None:
-    """Выбрать случайное подходящее событие (по весам)."""
+    """Выбрать событие (вес × память о горожанине: знакомые заходят чаще)."""
     ctx = Ctx(player=player, city=city)
     pool = [s for s in STORYLETS.values() if _eligible(s, ctx)]
     if not pool:
         return None
-    return rng.choices(pool, weights=[s.weight for s in pool])[0]
+    weights = [s.weight * _rel_boost(player, s.npc) for s in pool]
+    return rng.choices(pool, weights=weights)[0]
 
 
 def maybe_spawn(
