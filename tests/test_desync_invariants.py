@@ -191,7 +191,6 @@ def test_retail_show_equals_payout(monkeypatch):
                story={"faction": {"thieves": thief_rank * 40}})
         want = {"ale1": r.randint(1, 20)}
         shown = lg.retail_total(want, p)
-        g0 = p.gold
         _sold, gold, _rep = lg.apply_retail(p, tav, dict(want))
         # показ == реально начисленному золоту (оба с ночным бонусом воров)
         assert shown == gold, (thief_rank, shown, gold)
