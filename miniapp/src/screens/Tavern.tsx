@@ -289,17 +289,15 @@ export default function Tavern() {
         <span className="zz-cta-chev">›</span>
       </button>
 
-      {/* обучение — та же форма, меньше и синяя. ВРЕМЕННО только админу (обкатка). */}
-      {t.admin && (
-        <button className="zz-cta gd rise" style={{ animationDelay: '.115s' }} onClick={() => { haptic('light'); setGuideOpen(true) }}>
-          <span className="zz-cta-emo">📖</span>
-          <span className="zz-cta-body">
-            <b>Как играть</b>
-            <small>обучение и справочник</small>
-          </span>
-          <span className="zz-cta-chev">›</span>
-        </button>
-      )}
+      {/* обучение — та же форма, меньше и синяя */}
+      <button className="zz-cta gd rise" style={{ animationDelay: '.115s' }} onClick={() => { haptic('light'); setGuideOpen(true) }}>
+        <span className="zz-cta-emo">📖</span>
+        <span className="zz-cta-body">
+          <b>Как играть</b>
+          <small>обучение и справочник</small>
+        </span>
+        <span className="zz-cta-chev">›</span>
+      </button>
 
       {/* заведение */}
       <div className="card rise" style={{ animationDelay: '.12s' }}>

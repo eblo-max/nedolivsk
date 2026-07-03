@@ -6,7 +6,6 @@ import { music } from './music'
 import Splash from './screens/Splash'
 import ChannelModal from './screens/ChannelModal'
 import Tavern from './screens/Tavern'
-import { whoamiAdmin } from './admin'
 
 // Под-экраны — ленивые чанки: первый вход грузит только Таверну (быстрее старт
 // на холодном WebView), остальное подтягивается при переходе по вкладкам.
@@ -68,11 +67,8 @@ export default function App() {
         setIntro(false)
         let done = true
         try { done = localStorage.getItem('tutDone') === '1' } catch { /* */ }
-        // ВРЕМЕННО обучение только админу (обкатка в проде). Остальным — сразу канал.
-        whoamiAdmin().then((admin) => {
-          if (admin && !done) setTut(true)          // новичок-админ → обучение
-          else if (channelDueToday()) setChan(true)
-        })
+        if (!done) setTut(true)                      // новичок → обучение (один раз)
+        else if (channelDueToday()) setChan(true)
       }} />}
       {!intro && tut && (
         <Suspense fallback={null}>
