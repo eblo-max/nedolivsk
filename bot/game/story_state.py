@@ -167,8 +167,9 @@ def set_last_event(player: Player, now: datetime) -> None:
 
 
 def can_spawn(player: Player, now: datetime) -> bool:
-    """Можно ли подкинуть новое личное событие (случайный кулдаун + нет активного)."""
-    if get_pending(player):
+    """Можно ли подкинуть новое личное событие (случайный кулдаун + нет активного
+    визитёра И нет активного торга — иначе два диалога всплывут разом)."""
+    if get_pending(player) or get_trade(player):
         return False
     nxt = (player.story or {}).get("next_event_at")
     if nxt and datetime.fromisoformat(nxt) > now:

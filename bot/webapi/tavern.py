@@ -279,7 +279,10 @@ async def _api_story_choice(request: web.Request) -> web.Response:
     if uid is None:
         return body
     from bot.game import story_engine as se, story_state as ss, balance as bal, production as prod
-    idx = int(body.get("index", -1))
+    try:
+        idx = int(body.get("index", -1))
+    except (TypeError, ValueError):
+        idx = -1
     async with session_factory() as s:
         p = await repo.get_player(s, uid, for_update=True)
         if p is None or not p.tavern:
@@ -289,6 +292,8 @@ async def _api_story_choice(request: web.Request) -> web.Response:
             if ss.get_pending(p):
                 ss.clear_pending(p); await s.commit()
             return web.json_response({"ok": False, "error": "gone"})
+        if not 0 <= idx < len(st.choices):   # битый/устаревший индекс (деплой контента) — не 500
+            return web.json_response({"ok": False, "error": "bad_choice"})
         now = datetime.now(timezone.utc)
         city = await repo.get_or_create_city(s, p.chat_id, lock=True) if p.chat_id else None
         shielded = ss.is_shielded(p, now)
