@@ -142,16 +142,22 @@ def expedition_gain_quote(player: Player, tavern: Tavern | None, resource: str) 
                * newbie.yield_mult(player))
 
 
+def _passive_rate(player: Player, tavern: Tavern, base_rate: int | None = None) -> float:
+    """Полный пассив /ч (float, ДО вычета содержания и округления). ЕДИНЫЙ
+    источник для показа (income_rate_quote) и начисления (collect_income) —
+    иначе разный порядок округления даёт «показ ≠ капает» (аудит 03.07)."""
+    base = tavern.income_rate if base_rate is None else base_rate
+    return (base * items.income_multiplier(getattr(player, "equipment", None))
+            * perks.passive_mult(player) * buff.gold_mult(player)
+            * worldevent.income_mult(player))
+
+
 def income_rate_quote(player: Player, tavern: Tavern,
                       base_rate: int | None = None) -> int:
-    """Реальный пассив «в час» с множителями снаряги/перков/бафа/погоды и
-    вычетом содержания — то, что капает на самом деле (показ = начисление).
+    """Реальный пассив «в час» — показ == начислению (единый _passive_rate).
     base_rate — базовая ставка (для превью след. уровня); по умолчанию текущая."""
-    base = tavern.income_rate if base_rate is None else base_rate
-    mult = items.income_multiplier(getattr(player, "equipment", None))
-    rate = (base * mult * perks.passive_mult(player)
-            * buff.gold_mult(player) * worldevent.income_mult(player))
-    return max(0, int(rate - rate * balance.WORKER_UPKEEP_PCT))
+    r = _passive_rate(player, tavern, base_rate)
+    return max(0, int(r - r * balance.WORKER_UPKEEP_PCT))
 
 
 def start_expedition(player: Player, tavern: Tavern, resource: str) -> ExpeditionStart:
@@ -231,10 +237,8 @@ def collect_income(
     if hours <= 0:
         return IncomeResult(ok=False)
 
-    mult = items.income_multiplier(getattr(player, "equipment", None))
-    passive = int(tavern.income_rate * hours * mult * perks.passive_mult(player)
-                  * buff.gold_mult(player) * worldevent.income_mult(player))
-    passive -= int(passive * balance.WORKER_UPKEEP_PCT)   # содержание (анти-инфляция, сток)
+    gross = _passive_rate(player, tavern) * hours          # единый источник с показом /ч
+    passive = max(0, int(gross - gross * balance.WORKER_UPKEEP_PCT))  # содержание (сток)
 
     order, premium_unsold, premium_left = _retail_demand(
         tavern, hours, demand_mult, perks.food_mult(player))
