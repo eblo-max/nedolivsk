@@ -111,8 +111,10 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 .orc-line{stroke:#9ad35a;stroke-width:1.6;fill:none;opacity:.45;stroke-dasharray:5 9;animation:march 1.1s linear infinite}
 .orc-line.mine{stroke:#ffd27a;stroke-width:2.2;opacity:.9}
 @keyframes march{to{stroke-dashoffset:-14}}
-body.far .orc-fig{opacity:0}
+/* воины видны на ЛЮБОМ зуме во время рейда (раньше пряли на далёком); нити — доп.контекст далеко */
 body:not(.far) .orc-line{opacity:0}
+/* фокус рейда: не-участники таверн скрыты */
+.tav-pin.raid-hidden{opacity:0;transition:opacity .4s;pointer-events:none}
 /* названия регионов — «гравировка»: разрядка + halo, без плашки, ПОД пинами */
 .cont-label{width:240px!important;display:flex;align-items:center;justify-content:center;
   pointer-events:none;transition:opacity .18s}
@@ -253,6 +255,7 @@ function relayout(){_rq=false;var z=map.getZoom(),i;
     if(ok){el.style.opacity=1;occ.push(b);}else{el.style.opacity=0;}});}
   tavMarkers.forEach(function(o){var tt=o.m.getTooltip&&o.m.getTooltip();var el=tt&&tt.getElement&&tt.getElement();
     if(!el)return;o._el=el;
+    if(o.raidHidden){el.style.opacity=0;return;}      // фокус рейда: чужая таверна скрыта
     if(!showNames){el.style.opacity=o.mine?1:0;return;}
     cand.push(o);});
   if(showNames){cand.sort(function(a,b){return b.prio-a.prio;});
@@ -289,7 +292,8 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
         '<div class="sh"></div><img src="/assets/map_tavern_'+t.tier+'.png" alt="" decoding="async"><div class="lv">'+t.level+'</div>'});
     var m=L.marker(ll,{icon:icon,zIndexOffset:t.mine?1000:(crowned?900:0)}).addTo(layer).bindPopup(card(t));
     m.bindTooltip(esc(t.name),{permanent:true,direction:'top',className:'tav-label'+(t.mine?' tl-mine':'')+(crowned?' tl-crown':''),offset:[0,-sz*0.78]});
-    tavMarkers.push({m:m,mine:!!t.mine,prio:t.mine?1e9:(crowned?5e8:0)+(t.level*1000+(t.rep||0))});
+    tavMarkers.push({m:m,mine:!!t.mine,prio:t.mine?1e9:(crowned?5e8:0)+(t.level*1000+(t.rep||0)),
+      key:(t.x||0).toFixed(4)+','+(t.y||0).toFixed(4)});   // ключ позиции — для фокуса рейда
     if(t.mine){myLL=ll;myMarker=m;}
   });
   if(cluster){map.addLayer(cluster);cluster.on('animationend',queueRelayout);}
@@ -304,6 +308,7 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
     if(cluster&&cluster.zoomToShowLayer){cluster.zoomToShowLayer(myMarker,function(){myMarker.openPopup();});}
     else{map.flyTo(myLL,MAXZ-1,{duration:.8});setTimeout(function(){myMarker.openPopup();},850);}};}
   else{mb.style.display='none';}
+  if(typeof applyRaidFocus==='function')applyRaidFocus();   // таверны загрузились — сразу спрятать чужих, если орда идёт
   document.getElementById('loader').classList.add('hide');
 }).catch(function(){document.getElementById('loader').textContent='Карта не загрузилась — обнови';});
 
@@ -357,8 +362,16 @@ function renderInv(){
       else if(ph==='battle')lb.textContent='⚔️ БИТВА · '+fmtT(e.gather_secs+e.march_secs+e.battle_secs-el);
       else lb.textContent='…';}}
   moveTroops(e,ph,el);}
+// Фокус рейда: на время орды показываем ТОЛЬКО таверны участников (+ свою), чужие
+// прячем (по совпадению позиции войска с маркером таверны). Нет орды — все видны.
+function applyRaidFocus(){
+  var focus=invData&&(invData.troops||[]).length>0,set={};
+  if(focus)(invData.troops||[]).forEach(function(t){set[(t.x||0).toFixed(4)+','+(t.y||0).toFixed(4)]=1;});
+  tavMarkers.forEach(function(o){var hidden=focus&&!o.mine&&!set[o.key];o.raidHidden=hidden;
+    var ic=o.m.getElement&&o.m.getElement();if(ic)ic.classList.toggle('raid-hidden',hidden);});
+  queueRelayout();}
 function pollInv(){fetch('/world/invasion.json?uid='+uid).then(function(r){return r.json();})
-  .then(function(d){invData=d.inv;invBaseEl=invData?(invData.elapsed||0):0;invAtMs=Date.now();renderInv();}).catch(function(){});}
+  .then(function(d){invData=d.inv;invBaseEl=invData?(invData.elapsed||0):0;invAtMs=Date.now();renderInv();applyRaidFocus();}).catch(function(){});}
 pollInv();setInterval(pollInv,5000);setInterval(renderInv,120);   // рефетч 5с + плавный марш ~8fps (CSS-transition сглаживает)
 </script></body></html>"""
 
@@ -396,24 +409,58 @@ async def _world_invasion(request: web.Request) -> web.Response:
     if uid != settings.admin_id:
         return web.json_response({"inv": None}, headers={"Cache-Control": "no-store"})
     from bot.webapi.invasion import _invasion_event
+    conts = _world_continents()
+    nc = len(conts)
+    ev = None
     async with session_factory() as s:
         inv = await repo.get_active_invasion(s)
-    ev = None
-    if inv is not None and inv.status in ("gathering", "battle"):
-        e = _invasion_event(inv, uid)
-        tl = e.get("timeline") or []
-        ohl = int(tl[-1].get("hp", 0)) if tl and isinstance(tl[-1], dict) else 0
-        ev = {   # только нужное карте (без тяжёлого timeline целиком)
-            "x": e["x"], "y": e["y"], "sprite": e.get("sprite", 1),
-            "name": e["name"], "status": e["status"], "n": e.get("n", 0),
-            "me": bool(uid) and str(uid) in (inv.registered or {}),
-            "gather_secs": e.get("gather_secs", 0), "march_secs": e.get("march_secs", 0),
-            "battle_secs": e.get("battle_secs", 0), "elapsed": e.get("elapsed", 0),
-            "orc_hp_max": e.get("orc_hp_max", 1), "orc_hp_left": ohl,
-            "troops": [{"x": t.get("x", 0.5), "y": t.get("y", 0.5)}
-                       for t in (e.get("troops") or [])][:_PARTY_MAX],
-        }
+        if inv is not None and inv.status in ("gathering", "battle"):
+            e = _invasion_event(inv, uid)
+            tl = e.get("timeline") or []
+            ohl = int(tl[-1].get("hp", 0)) if tl and isinstance(tl[-1], dict) else 0
+            # Позиции войск — по ТОЙ ЖЕ формуле, что таверны-маркеры (_atlas_pos),
+            # из id записавшихся → воин встаёт РОВНО у своей таверны (иначе марш шёл
+            # мимо, и не совпасть с маркером для «скрыть чужие»). Болванки (отриц. id,
+            # не в таблице) — их стоящая позиция из записи.
+            reg = list((inv.registered or {}).items())[:_PARTY_MAX]
+            real_ids = [int(p) for p, _ in reg if int(p) > 0]
+            pos = {}
+            if real_ids:
+                from sqlalchemy import select as _sel
+                from bot.db.models import Player as _P
+                for pid, region in (await s.execute(
+                        _sel(_P.id, _P.region).where(_P.id.in_(real_ids)))).all():
+                    x, y = _atlas_pos(pid, region, conts, nc)
+                    pos[pid] = (round(x, 4), round(y, 4))
+            troops = []
+            for pid_s, rec in reg:
+                pid = int(pid_s)
+                tx, ty = pos.get(pid) or (round(float(rec.get("tx", 0.5)), 4),
+                                          round(float(rec.get("ty", 0.5)), 4))
+                troops.append({"x": tx, "y": ty, "mine": bool(uid) and pid == uid})
+            ev = {   # только нужное карте (без тяжёлого timeline целиком)
+                "x": e["x"], "y": e["y"], "sprite": e.get("sprite", 1),
+                "name": e["name"], "status": e["status"], "n": e.get("n", 0),
+                "me": bool(uid) and str(uid) in (inv.registered or {}),
+                "gather_secs": e.get("gather_secs", 0), "march_secs": e.get("march_secs", 0),
+                "battle_secs": e.get("battle_secs", 0), "elapsed": e.get("elapsed", 0),
+                "orc_hp_max": e.get("orc_hp_max", 1), "orc_hp_left": ohl, "troops": troops,
+            }
     return web.json_response({"inv": ev}, headers={"Cache-Control": "no-store"})
+
+
+def _atlas_pos(pl_id: int, region: str, conts: list, nc: int) -> tuple[float, float]:
+    """Позиция таверны на атласе (норм. x/y) — ТА ЖЕ формула, что в _world_taverns
+    (хеш-спираль вокруг центра континента). Единый источник, чтобы войска рейда
+    вставали ровно у своих таверн-маркеров."""
+    import math
+    c = worldmap.continent_for(region, pl_id) or conts[pl_id % nc]
+    h1 = (pl_id * 2654435761) & 0xFFFFFFFF
+    h2 = (pl_id * 40503 + 0x9E3779B1) & 0xFFFFFFFF
+    a = (h1 / 4294967296.0) * 6.2831853
+    rr = 0.095 * math.sqrt(h2 / 4294967296.0)
+    return (min(0.997, max(0.003, c["x"] + rr * math.cos(a))),
+            min(0.997, max(0.003, c["y"] + rr * math.sin(a))))
 
 
 async def _world_taverns(request: web.Request) -> web.Response:
