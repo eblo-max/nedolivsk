@@ -220,15 +220,6 @@ async def get_world_city(session: AsyncSession, *, lock: bool = False) -> CitySt
     return await get_or_create_city(session, GLOBAL_CITY_ID, lock=lock)
 
 
-async def all_cities(session: AsyncSession, *, lock: bool = False):
-    """Все города (по чатам) — для тика симуляции фракций."""
-    stmt = select(CityState)
-    if lock:
-        stmt = stmt.with_for_update(skip_locked=True)
-    result = await session.execute(stmt)
-    return list(result.scalars().all())
-
-
 async def add_chronicle(
     session: AsyncSession, chat_id: int, text: str, keep: int = 60
 ) -> None:

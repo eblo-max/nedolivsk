@@ -29,13 +29,6 @@ async def _send(message: Message, text: str, markup=None) -> None:
         await message.answer(text, reply_markup=markup)
 
 
-def _chat_id(message: Message, player) -> int | None:
-    """Городской чат для контекста: в группе — текущий, в личке — домашний."""
-    if panels.is_group(message):
-        return message.chat.id
-    return player.chat_id if player else None
-
-
 @router.message(Command("top", "reyting"))
 async def cmd_top(message: Message, session: AsyncSession) -> None:
     sent = await show_rating(message, session)
