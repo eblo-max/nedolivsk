@@ -346,13 +346,27 @@ async def _api_collect(request: web.Request) -> web.Response:
     uid, body = await _auth(request)
     if uid is None:
         return body
-    from bot.game import logic
+    from bot.game import logic, city as citymod, perks, season, economy
+    from bot.game import world as wld
     async with session_factory() as s:
         p = await repo.get_player(s, uid, for_update=True)
         if p is None or not p.tavern:
             return web.json_response({"ok": False, "error": "no_tavern"})
-        res = logic.collect_income(p, p.tavern)
+        # ТОЧНО как в боте (handlers/tavern.py): спрос = ярмарка × ситуация × перк
+        # × настроение × сезон, плюс skim городской ситуации. Иначе доход в аппе
+        # (86% игроков) не отзывается на живой мир и расходится с текст-ботом.
+        now = datetime.now(timezone.utc)
+        city = await repo.get_world_city(s)
+        ce = citymod.effects(city, p, now)
+        res = logic.collect_income(p, p.tavern, demand_mult=(
+            wld.demand_mult() * ce.demand_mult * perks.demand_bonus(p)
+            * citymod.mood_factor(city) * season.demand_mult()))
         collected = int(getattr(res, "passive", 0) or 0)
+        if ce.skim_pct and collected > 0:      # воры/корона снимают долю с пассива
+            skim = int(collected * ce.skim_pct)
+            p.gold -= skim
+            economy.record(p, "skim", -skim)
+            collected -= skim
         if collected > 0:
             repo.add_log(s, "player", p.id, f"🪙 собрал доход +{collected}")
         order = getattr(res, "order", None)        # гости хотят выкупить товар из погреба
@@ -736,7 +750,7 @@ async def _api_retail_sell(request: web.Request) -> web.Response:
     uid, body = await _auth(request)
     if uid is None:
         return body
-    from bot.game import logic, newbie, story_state
+    from bot.game import logic, newbie, story_state, city as citymod, economy
     async with session_factory() as s:
         p = await repo.get_player(s, uid, for_update=True)
         if p is None or not p.tavern:
@@ -744,8 +758,15 @@ async def _api_retail_sell(request: web.Request) -> web.Response:
         want = story_state.get_retail(p)
         if not want:
             return web.json_response({"ok": False, "error": "gone"})
+        ce = citymod.effects(await repo.get_world_city(s), p,
+                             datetime.now(timezone.utc))
         sold, gold, rep = logic.apply_retail(p, p.tavern, want)
         story_state.set_retail(p, None)
+        if sold and ce.skim_pct and gold > 0:  # воры/корона снимают долю и со сбыта (как в боте)
+            skim = int(gold * ce.skim_pct)
+            p.gold -= skim
+            economy.record(p, "skim", -skim)
+            gold -= skim
         if sold:
             newbie.mark(p, "nb_sale")          # веха грамоты новосёла
             repo.add_log(s, "player", p.id, f"🍺 налил гостям: +{gold} 🪙, +{rep} репутации")

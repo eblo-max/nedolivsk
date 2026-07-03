@@ -125,6 +125,8 @@ def clear_pending(player: Player) -> None:
 def queue_push(player: Player, storylet_id: str, after_hours: float) -> None:
     st = _st(player)
     q = list(st.get("queue", []))
+    if any(item.get("id") == storylet_id for item in q):
+        return  # уже в очереди — не плодим дубли (arc-глава не должна повторяться)
     due = datetime.now(timezone.utc) + timedelta(hours=after_hours)
     q.append({"id": storylet_id, "due": due.isoformat()})
     st["queue"] = q

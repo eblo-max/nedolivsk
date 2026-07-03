@@ -190,7 +190,7 @@ async def _api_nightrun_meet(request: web.Request) -> web.Response:
     uid, body = await _auth(request)
     if uid is None:
         return body
-    from bot.game import nightrun as nr
+    from bot.game import balance as bal, nightrun as nr
     opt = str(body.get("opt") or "")
     async with session_factory() as s:
         p = await repo.get_player(s, uid, for_update=True)
@@ -203,8 +203,8 @@ async def _api_nightrun_meet(request: web.Request) -> web.Response:
         if out.get("factions"):
             city = await repo.get_world_city(s, lock=True)   # единый мир
             fp = dict(city.faction_power or {})
-            for fac, delta in out["factions"]:
-                fp[fac] = fp.get(fac, 0) + delta
+            for fac, delta in out["factions"]:  # клампим как в текст-боте (иначе за ±100)
+                fp[fac] = max(bal.FACTION_MIN, min(bal.FACTION_MAX, fp.get(fac, 0) + delta))
             city.faction_power = fp
         p.night_run = run
         await s.commit()

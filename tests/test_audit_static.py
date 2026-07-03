@@ -151,3 +151,18 @@ def test_teaser_window_covers_seen_throttle():
     assert m, "не найден active_cut в feed_ping_targets"
     window_sec = int(m.group(1)) * 60
     assert window_sec >= _SEEN_EVERY, (window_sec, _SEEN_EVERY)
+
+
+def test_app_income_applies_living_world():
+    """Доход и розница в мини-аппе обязаны применять живой мир (спрос ситуации/
+    ярмарки/перка/настроения/сезона) и skim — как в текст-боте. Иначе доход в
+    аппе (86% игроков) расходится с ботом и не отзывается на ситуации города.
+    Регресс: _api_collect звал collect_income без demand_mult и skim (04.07)."""
+    src = _src(ROOT / "bot" / "webapi" / "tavern.py")
+    coll = re.search(r"async def _api_collect\(.*?(?=\nasync def )", src, re.S)
+    assert coll, "не найден _api_collect"
+    assert "ce.demand_mult" in coll.group(0), "collect в аппе без спроса ситуации"
+    assert "ce.skim_pct" in coll.group(0), "collect в аппе без skim ситуации"
+    sell = re.search(r"async def _api_retail_sell\(.*?(?=\nasync def )", src, re.S)
+    assert sell, "не найден _api_retail_sell"
+    assert "ce.skim_pct" in sell.group(0), "розница в аппе без skim ситуации"
