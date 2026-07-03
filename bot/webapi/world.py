@@ -74,7 +74,7 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 .orc-ev .orc{width:100px;height:76px;background:url('/assets/boss/ork1_idle.png') 0 0/1000px 76px no-repeat;
   animation:orcIdle 1.1s steps(10) infinite;filter:drop-shadow(0 4px 7px rgba(0,0,0,.75));transform-origin:50% 100%}
 @keyframes orcIdle{to{background-position:-1000px 0}}
-.orc-ev.battle .orc{animation:orcIdle 1.1s steps(10) infinite,orcSh .5s ease-in-out infinite}
+.orc-ev.battle .orc{animation:orcIdle 1.1s steps(10) infinite,orcSh .5s ease-in-out infinite,orcHurt .48s ease-in-out infinite}
 @keyframes orcSh{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-3px) rotate(-2deg)}75%{transform:translateX(3px) rotate(2deg)}}
 .orc-ev .aura{position:absolute;left:50%;top:55%;width:132px;height:132px;transform:translate(-50%,-50%);z-index:-1;
   border-radius:50%;background:radial-gradient(circle,rgba(120,200,70,.3),rgba(80,160,40,0) 68%);animation:orcAura 2.3s ease-in-out infinite}
@@ -83,12 +83,18 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 .orc-ev .hp{position:absolute;left:50%;top:-15px;transform:translateX(-50%);width:104px;height:10px;z-index:3;
   border-radius:6px;background:#2a0d0a;border:1px solid #5a1e14;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.6);opacity:0;transition:opacity .3s}
 .orc-ev.battle .hp{opacity:1}
-.orc-ev .hp i{display:block;height:100%;width:100%;border-radius:5px;transition:width .9s linear;background:linear-gradient(180deg,#ff5a3c,#c11e12)}
+.orc-ev .hp i{display:block;height:100%;width:100%;border-radius:5px;transition:width .25s linear;background:linear-gradient(180deg,#ff5a3c,#c11e12)}
 .orc-ev .lbl{position:absolute;left:50%;top:-34px;transform:translateX(-50%);white-space:nowrap;z-index:3;
   font:800 12px/1 var(--serif);color:#cdeba6;text-shadow:0 1px 3px #000,0 0 7px rgba(120,200,80,.6);letter-spacing:.3px}
 .orc-ev.battle .lbl{color:#ffcf9a;text-shadow:0 1px 3px #000,0 0 8px rgba(255,90,50,.7)}
+/* эффект удара по боссу (fire-стрип 7 кадров, только в бою; аддитивное свечение) */
+.orc-ev .fx{display:none;position:absolute;left:50%;top:42%;width:78px;height:78px;transform:translate(-50%,-50%);
+  z-index:2;pointer-events:none;background:url('/assets/fx/fire1.png') 0 0/546px 78px no-repeat;mix-blend-mode:screen}
+.orc-ev.battle .fx{display:block;animation:fxHit .48s steps(7) infinite}
+@keyframes fxHit{to{background-position-x:-546px}}
+@keyframes orcHurt{0%,72%,100%{filter:drop-shadow(0 4px 7px rgba(0,0,0,.75))}80%{filter:drop-shadow(0 4px 7px rgba(0,0,0,.75)) brightness(2.4) sepia(1) hue-rotate(-35deg) saturate(4)}}
 /* войска-соратники: марш к логову (близко — фигурки, далеко — нити) */
-.orc-fig{width:44px;height:55px;pointer-events:none;transition:opacity .3s}
+.orc-fig{width:44px;height:55px;pointer-events:none;transition:opacity .3s,transform .16s linear}
 /* воин: spritesheet WALK 10 кадров (у всех 6 листов; масштаб листа → 440px даёт 44px/кадр) */
 .orc-fig .hf{width:44px;height:55px;background-size:440px 55px;background-repeat:no-repeat;background-position:0 0;
   animation:heroWalk .9s steps(10) infinite;filter:drop-shadow(0 3px 3px rgba(0,0,0,.65))}
@@ -301,31 +307,40 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
   document.getElementById('loader').classList.add('hide');
 }).catch(function(){document.getElementById('loader').textContent='Карта не загрузилась — обнови';});
 
-// ── Орда орков на карте: анимированный орк + марш войск + автобой (read-only) ──
+// ── Орда орков на карте: анимированный орк + ПЛАВНЫЙ марш войск + автобой ──
 var invLayer=L.layerGroup().addTo(map),invTroops=L.layerGroup().addTo(map);
 var invM=null,invKey='',invData=null,invBaseEl=0,invAtMs=0;
+var troopMarks=[],troopMeta=[],troopKey='';
 function fmtT(s){s=Math.max(0,s|0);var m=(s/60)|0,ss=s%60;return m+':'+(ss<10?'0':'')+ss;}
 function invElapsed(){return invBaseEl+(Date.now()-invAtMs)/1000;}
 function invPhase(e,el){var g=e.gather_secs,mr=e.march_secs,b=e.battle_secs;
   if(el<g)return'gather';if(el<g+mr)return'march';if(el<g+mr+b)return'battle';return'done';}
-function drawTroops(e,ph,el){invTroops.clearLayers();var lair=px(e.x*W,e.y*H);
+// Пересоздаём фигурки ТОЛЬКО при смене состава (иначе марш дёргался — каждый тик
+// маркеры уничтожались/создавались заново). Дальше их плавно ДВИГАЕМ (setLatLng + CSS-transition).
+function rebuildTroops(e){invTroops.clearLayers();troopMarks=[];troopMeta=[];var lair=px(e.x*W,e.y*H);
+  (e.troops||[]).forEach(function(t,i){
+    L.polyline([px(t.x*W,t.y*H),lair],{className:'orc-line'+(t.mine?' mine':''),interactive:false}).addTo(invTroops);
+    var hv='h'+((i%6)+1),ang=i*2.399963,rr=0.5+((i*53)%9)*0.13;
+    var m=L.marker(px(t.x*W,t.y*H),{icon:L.divIcon({className:'orc-fig '+hv+(t.mine?' mine':''),
+      iconSize:[44,55],iconAnchor:[22,50],html:'<div class="hf"></div>'}),
+      interactive:false,keyboard:false,zIndexOffset:1500}).addTo(invTroops);
+    troopMarks.push(m);
+    troopMeta.push({tx:t.x,ty:t.y,ex:e.x+Math.cos(ang)*0.006*rr,ey:e.y+Math.sin(ang)*0.006*rr});});}
+function moveTroops(e,ph,el){
   var prog=ph==='gather'?0:(ph==='march'?Math.min(1,(el-e.gather_secs)/Math.max(1,e.march_secs)):1);
-  (e.troops||[]).forEach(function(t,i){var from=px(t.x*W,t.y*H);
-    L.polyline([from,lair],{className:'orc-line'+(t.mine?' mine':''),interactive:false}).addTo(invTroops);
-    var ang=i*2.399963,rr=0.5+((i*53)%9)*0.13;
-    var lx=e.x+(prog>=1?Math.cos(ang)*0.006*rr:0),ly=e.y+(prog>=1?Math.sin(ang)*0.006*rr:0);
-    var fx=t.x+(lx-t.x)*prog,fy=t.y+(ly-t.y)*prog;
-    var hv='h'+((i%6)+1);   // разнообразие воинов hero1..6
-    var fi=L.divIcon({className:'orc-fig '+hv+(t.mine?' mine':'')+(ph==='battle'?' atk':''),
-      iconSize:[44,55],iconAnchor:[22,50],html:'<div class="hf"></div>'});
-    L.marker(px(fx*W,fy*H),{icon:fi,interactive:false,keyboard:false,zIndexOffset:1500}).addTo(invTroops);});}
+  for(var i=0;i<troopMarks.length;i++){var mt=troopMeta[i];
+    var fx=mt.tx+(mt.ex-mt.tx)*prog,fy=mt.ty+(mt.ey-mt.ty)*prog;
+    troopMarks[i].setLatLng(px(fx*W,fy*H));
+    var g=troopMarks[i].getElement();if(g)g.classList.toggle('atk',ph==='battle');}}
 function renderInv(){
-  if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';return;}
+  if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';troopKey='';troopMarks=[];return;}
   var e=invData,el=invElapsed(),ph=invPhase(e,el),lair=px(e.x*W,e.y*H);
+  var tk=e.name+'|'+((e.troops||[]).length);
+  if(tk!==troopKey){rebuildTroops(e);troopKey=tk;}
   var key=e.name+'|'+(ph==='battle'?'b':'p');
   if(key!==invKey){invLayer.clearLayers();
     var icon=L.divIcon({className:'orc-ev'+(ph==='battle'?' battle':''),iconSize:[100,76],iconAnchor:[50,76],
-      html:'<div class="aura"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="orc"></div>'});
+      html:'<div class="aura"></div><div class="fx"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="orc"></div>'});
     invM=L.marker(lair,{icon:icon,zIndexOffset:2000}).addTo(invLayer);
     invM.on('click',function(){(window.top||window).location.href='/app/?startapp=raid';});
     invKey=key;}
@@ -341,10 +356,10 @@ function renderInv(){
       else if(ph==='march')lb.textContent='🪓 ОРДА ИДЁТ!';
       else if(ph==='battle')lb.textContent='⚔️ БИТВА · '+fmtT(e.gather_secs+e.march_secs+e.battle_secs-el);
       else lb.textContent='…';}}
-  drawTroops(e,ph,el);}
+  moveTroops(e,ph,el);}
 function pollInv(){fetch('/world/invasion.json?uid='+uid).then(function(r){return r.json();})
   .then(function(d){invData=d.inv;invBaseEl=invData?(invData.elapsed||0):0;invAtMs=Date.now();renderInv();}).catch(function(){});}
-pollInv();setInterval(pollInv,5000);setInterval(renderInv,1000);   // поллинг орды + плавная анимация
+pollInv();setInterval(pollInv,5000);setInterval(renderInv,120);   // рефетч 5с + плавный марш ~8fps (CSS-transition сглаживает)
 </script></body></html>"""
 
 
