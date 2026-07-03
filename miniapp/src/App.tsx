@@ -76,7 +76,10 @@ export default function App() {
       }} />}
       {!intro && tut && (
         <Suspense fallback={null}>
-          <Tutorial onDone={() => { setTut(false); if (channelDueToday()) setChan(true) }} />
+          <Tutorial onDone={() => {
+            try { localStorage.setItem('tutDone', '1') } catch { /* */ }   // больше не всплывать
+            setTut(false); if (channelDueToday()) setChan(true)
+          }} />
         </Suspense>
       )}
       {!intro && !tut && chan && <ChannelModal onClose={() => setChan(false)} />}
