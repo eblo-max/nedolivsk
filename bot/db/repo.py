@@ -188,12 +188,25 @@ async def world_might_sum(session: AsyncSession) -> int:
     return int((await session.execute(stmt)).scalar_one() or 0)
 
 
+# Общий «мировой город» для игроков без домашнего чата (личка/мини-апп): весь
+# народ из ЛС живёт в одном городе-0 (у реальных чатов Telegram id отрицательный,
+# 0 не бывает). Так блок «Город» (фракции, настроение, летопись, цель) виден
+# всем, а не только пришедшим из группы.
+GLOBAL_CITY_ID = 0
+
+
+def player_city_id(player) -> int:
+    """Город игрока: домашний чат или общий мировой (0) для «личников»."""
+    return getattr(player, "chat_id", None) or GLOBAL_CITY_ID
+
+
 async def get_or_create_city(
-    session: AsyncSession, chat_id: int, *, lock: bool = False
+    session: AsyncSession, chat_id: int | None, *, lock: bool = False
 ) -> CityState:
-    """Состояние живого города для конкретного чата (ленивое создание).
-    lock=True блокирует строку до конца транзакции — для безопасной правки
-    силы фракций при одновременных событиях."""
+    """Состояние живого города для чата (ленивое создание). chat_id=None/0 →
+    общий мировой город (личники). lock=True блокирует строку до конца
+    транзакции — для безопасной правки силы фракций при одновременных событиях."""
+    chat_id = chat_id or GLOBAL_CITY_ID          # None/0 → общий мировой город
     city = await session.get(CityState, chat_id, with_for_update=lock)
     if city is None:
         city = CityState(chat_id=chat_id)

@@ -125,11 +125,9 @@ async def _api_nightrun_start(request: web.Request) -> web.Response:
             return web.json_response(_nightrun_state(p), headers={"Cache-Control": "no-store"})
         if nr.cooldown_left(p) > 0 and p.id != settings.admin_id:   # админ — без кулдауна
             return web.json_response({"ok": False, "error": "cooldown"})
-        situation = None
-        if getattr(p, "chat_id", None) is not None:
-            city = await repo.get_or_create_city(s, p.chat_id)
-            sit = citymod.current(city)
-            situation = sit.id if sit else None
+        city = await repo.get_or_create_city(s, p.chat_id)   # None → мировой город
+        sit = citymod.current(city)
+        situation = sit.id if sit else None
         p.night_run_at = datetime.now(timezone.utc)
         keys = [str(k) for k in ((body or {}).get("flask") or [])]
         used: list[str] = []
@@ -202,8 +200,8 @@ async def _api_nightrun_meet(request: web.Request) -> web.Response:
         if run.get("state") != "meet":
             return web.json_response({"ok": False, "error": "stale"})
         out = nr.meet_resolve(run, p, opt)
-        if out.get("factions") and getattr(p, "chat_id", None) is not None:
-            city = await repo.get_or_create_city(s, p.chat_id, lock=True)
+        if out.get("factions"):
+            city = await repo.get_or_create_city(s, p.chat_id, lock=True)  # None → мировой
             fp = dict(city.faction_power or {})
             for fac, delta in out["factions"]:
                 fp[fac] = fp.get(fac, 0) + delta

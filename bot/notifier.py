@@ -672,10 +672,13 @@ async def _notify_returned(bot: Bot) -> None:
                     repo.queue_notify(session, uid, bourse_news_text, kind="bourse")
 
         # Симуляция фракций — по чатам (фракции/ситуации остаются ЛОКАЛЬНЫМИ).
+        # Общий мировой город (chat_id=0, «личники») тоже дрейфует и копит летопись,
+        # но НЕ анонсится в чат — слать в «чат 0» некуда.
         for city in cities:
             for kind, sit in citymod.advance(city, now):
                 text = sit.activate_text if kind == "activate" else sit.expire_text
-                city_events.append((city.chat_id, text))
+                if city.chat_id != repo.GLOBAL_CITY_ID:
+                    city_events.append((city.chat_id, text))
                 if kind == "activate":
                     await repo.add_chronicle(session, city.chat_id, sit.chron)
 

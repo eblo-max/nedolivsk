@@ -78,14 +78,12 @@ async def _api_chronicle(request: web.Request) -> web.Response:
         p = await repo.get_player(s, uid)
         if p is None:
             return web.json_response({"ok": False, "error": "no_tavern"})
-        entries = []
-        if p.chat_id is not None:
-            rows = (await s.execute(
-                select(Chronicle.text, Chronicle.ts)
-                .where(Chronicle.chat_id == p.chat_id)
-                .order_by(Chronicle.id.desc()).limit(40))).all()
-            now = datetime.now(timezone.utc)
-            entries = [{"text": t, "ago": _chron_ago(ts, now)} for t, ts in rows]
+        rows = (await s.execute(          # None → летопись общего мирового города
+            select(Chronicle.text, Chronicle.ts)
+            .where(Chronicle.chat_id == repo.player_city_id(p))
+            .order_by(Chronicle.id.desc()).limit(40))).all()
+        now = datetime.now(timezone.utc)
+        entries = [{"text": t, "ago": _chron_ago(ts, now)} for t, ts in rows]
     return web.json_response({"ok": True, "entries": entries}, headers={"Cache-Control": "no-store"})
 
 

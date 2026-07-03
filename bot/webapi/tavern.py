@@ -246,7 +246,7 @@ async def _api_state(request: web.Request) -> web.Response:
         now = datetime.now(timezone.utc)
         before = (p.bonus_kind, p.buff_kind, p.buff_until)
         buffmod.refresh(p, now)                      # прокрутить ежедневный бонус (как бот перед таверной)
-        city = await repo.get_or_create_city(s, p.chat_id, lock=True) if p.chat_id else None
+        city = await repo.get_or_create_city(s, p.chat_id, lock=True)  # None → мировой город
         spawned = se.maybe_spawn(p, city, now)       # кулдаун+шанс → pending
         if spawned is not None:
             repo.add_log(s, "player", p.id, "🚪 у стойки объявился гость")
@@ -295,7 +295,7 @@ async def _api_story_choice(request: web.Request) -> web.Response:
         if not 0 <= idx < len(st.choices):   # битый/устаревший индекс (деплой контента) — не 500
             return web.json_response({"ok": False, "error": "bad_choice"})
         now = datetime.now(timezone.utc)
-        city = await repo.get_or_create_city(s, p.chat_id, lock=True) if p.chat_id else None
+        city = await repo.get_or_create_city(s, p.chat_id, lock=True)  # None → мировой город
         shielded = ss.is_shielded(p, now)
         g0, r0 = int(p.gold), int(p.reputation or 0)
         inv0 = dict(p.inventory or {}); cel0 = dict((p.tavern.products or {}))
