@@ -66,6 +66,15 @@ class HasBuilding:
         return self.bid in (getattr(ctx.player.tavern, "buildings", None) or [])
 
 
+class HasStock:
+    """Есть ли в погребе >= qty товара (для выборов с ценой в товаре — иначе
+    Product-цена клампится в 0 и награда достаётся даром)."""
+    def __init__(self, key, qty=1): self.key, self.qty = key, qty
+    def check(self, ctx):
+        prod = getattr(ctx.player.tavern, "products", None) or {}
+        return int(prod.get(self.key, 0)) >= self.qty
+
+
 class CitySituation:
     """Активна ли в городе указанная ситуация (для эмерджентных событий)."""
     def __init__(self, sid): self.sid = sid

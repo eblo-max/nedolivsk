@@ -6,7 +6,7 @@
 from bot.game import balance
 from bot.game.story_defs import (
     Choice, CitySituation, ClearFlag, Echo, FacRep, Faction, FactionPower, Gold,
-    HasBuilding, HasFlag, Chron, MinLevel, Mood, NotFlag, NpcRel, Outcome,
+    HasBuilding, HasFlag, HasStock, Chron, MinLevel, Mood, NotFlag, NpcRel, Outcome,
     Product, RelTo, Rep, Res, Schedule, SeasonIs, SetFlag, Storylet,
 )
 
@@ -1585,7 +1585,7 @@ _LIST = [
                         (Product("ale1", -3), Gold(tier="serious"), FacRep("merchants", 8),
                          Schedule("hansa_contract", 24),
                          Chron("{name} сбыл эль заморскому Ганзейцу — молва о кабаке ушла за море."))),
-            ), requires=(HasBuilding("brewery"),)),
+            ), requires=(HasBuilding("brewery"), HasStock("ale1", 3))),
             Choice("🤝 Сторговаться на пряности вместо монеты", (
                 Outcome(55, "Обменял эль на мешок заморских пряностей — на кухне "
                             "теперь пахнет так, что гости слюну глотают. Спрос попёр.",
@@ -2358,7 +2358,7 @@ _LIST = [
                            "окупилась сторицей.",
                         (Product("wine", -1), Gold(tier="serious"),
                          FacRep("crown", 8), Rep(1), Schedule("duke_warrant", 22))),
-            )),
+            ), requires=(HasStock("wine", 1),)),
             Choice("😏 Поклониться в пояс, кусая губу", (
                 Outcome(55, "Герцог принял низкий поклон за должное и оставил "
                             "щедро — а что ты при этом думал, осталось при тебе.",
@@ -2990,7 +2990,7 @@ _LIST = [
                         (Product("ale1", -1), FacRep("crown", 15), Gold(tier="serious"),
                          Rep(3), RelTo("countess", 10),
                          Chron("{name} стал придворным поставщиком — эль его пьёт сама знать!"))),
-            ), requires=(HasBuilding("brewery"),)),
+            ), requires=(HasBuilding("brewery"), HasStock("ale1", 1))),
             Choice("🎁 Приложить дорогой подарок для верности", (
                 Outcome(55, "Подарок покорил двор вернее вина — тебя обласкали и "
                             "осыпали заказами. Графиня довольна протеже.",
@@ -3056,7 +3056,7 @@ _LIST = [
                         (Product("ale1", -3), FacRep("merchants", 12),
                          Gold(tier="serious"), Rep(2), RelTo("hanza_taler", 12),
                          Chron("{name} сладил заморский контракт с Ганзейцем — торговля загремела за морем."))),
-            ), requires=(HasBuilding("brewery"),)),
+            ), requires=(HasBuilding("brewery"), HasStock("ale1", 3))),
             Choice("😏 Подсунуть разбавленный эль под шумок", (
                 Outcome(45, "Прокатило: сплавил бочки с водицей по цене доброго "
                             "эля. Барыш жирный — да только удача любит наглых "
@@ -3068,7 +3068,7 @@ _LIST = [
                             "всех гильдиях от моря до моря. Лига закрыла двери.",
                         (FacRep("merchants", -15), Rep(-2),
                          RelTo("hanza_taler", -25))),
-            )),
+            ), requires=(HasStock("ale1", 2),)),
             Choice("🚪 «Не по мне заморские хлопоты»", (
                 Outcome(1, "«Шаде. Дело хозяйское.» Ганзеец свернул уговор и "
                            "уплыл к сговорчивым — а лига пожала плечами.",
@@ -4271,7 +4271,7 @@ _LIST = [
                         (Product("wine", -1), Gold(tier="serious"), FacRep("crown", 12),
                          Rep(2), RelTo("dowager", 10),
                          Chron("Кабак {name} вошёл в моду у знати — сама Княгиня Скукота водит туда свой кружок!"))),
-            )),
+            ), requires=(HasStock("wine", 1),)),
             Choice("🎭 Устроить представление с ряжеными", (
                 Outcome(55, "Скоморохи, гадалка, юродивый — знать визжала от "
                             "восторга от «простонародной экзотики». Щедро "

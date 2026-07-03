@@ -121,3 +121,33 @@ def test_schedule_targets_are_scheduled_only():
                 if tgt is not None and not tgt.scheduled_only:
                     bad.append((sl.id, e.sid))
     assert not bad, f"Schedule целит в НЕ-scheduled_only: {bad}"
+
+
+_TIER = {"petty": 1, "minor": 2, "serious": 3, "major": 4}
+
+
+def test_pricey_costs_gated_on_stock():
+    """Выбор с ценой в товаре И КРУПНОЙ наградой (Gold>=serious или FacRep>=10)
+    обязан требовать HasStock: иначе Product/Res клампится в 0 и крупная
+    награда достаётся даром (эксплойт «продай то, чего нет»)."""
+    bad = []
+    for s in STORYLETS.values():
+        for ch in s.choices:
+            stock = {p.key for p in (ch.requires or ())
+                     if p.__class__.__name__ == "HasStock"}
+            for o in ch.outcomes:
+                costs = {e.key for e in o.effects
+                         if e.__class__.__name__ == "Product"
+                         and getattr(e, "amount", 0) < 0}
+                if not costs:
+                    continue
+                big = any(
+                    (e.__class__.__name__ == "Gold" and getattr(e, "sign", 1) > 0
+                     and _TIER.get(getattr(e, "tier", None), 0) >= 3)
+                    or (e.__class__.__name__ in ("FacRep", "FactionPower")
+                        and getattr(e, "delta", 0) >= 10)
+                    for e in o.effects)
+                if big and not (costs & stock):
+                    bad.append(f"{s.id}/{ch.label}")
+    assert not bad, ("крупная награда с ценой в товаре без HasStock (даровой "
+                     "эксплойт): " + "; ".join(bad))
