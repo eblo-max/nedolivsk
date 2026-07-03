@@ -88,17 +88,17 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
   font:800 12px/1 var(--serif);color:#cdeba6;text-shadow:0 1px 3px #000,0 0 7px rgba(120,200,80,.6);letter-spacing:.3px}
 .orc-ev.battle .lbl{color:#ffcf9a;text-shadow:0 1px 3px #000,0 0 8px rgba(255,90,50,.7)}
 /* войска-соратники: марш к логову (близко — фигурки, далеко — нити) */
-.orc-fig{width:22px;height:27px;pointer-events:none;transition:opacity .3s}
-/* воин: spritesheet WALK 10 кадров (у всех 6 листов; масштаб листа → 220px даёт 22px/кадр) */
-.orc-fig .hf{width:22px;height:27px;background-size:220px 27px;background-repeat:no-repeat;background-position:0 0;
-  animation:heroWalk .9s steps(10) infinite;filter:drop-shadow(0 2px 2px rgba(0,0,0,.65))}
+.orc-fig{width:44px;height:55px;pointer-events:none;transition:opacity .3s}
+/* воин: spritesheet WALK 10 кадров (у всех 6 листов; масштаб листа → 440px даёт 44px/кадр) */
+.orc-fig .hf{width:44px;height:55px;background-size:440px 55px;background-repeat:no-repeat;background-position:0 0;
+  animation:heroWalk .9s steps(10) infinite;filter:drop-shadow(0 3px 3px rgba(0,0,0,.65))}
 .orc-fig.h1 .hf{background-image:url('/assets/heroes/hero1_walk.png')}
 .orc-fig.h2 .hf{background-image:url('/assets/heroes/hero2_walk.png')}
 .orc-fig.h3 .hf{background-image:url('/assets/heroes/hero3_walk.png')}
 .orc-fig.h4 .hf{background-image:url('/assets/heroes/hero4_walk.png')}
 .orc-fig.h5 .hf{background-image:url('/assets/heroes/hero5_walk.png')}
 .orc-fig.h6 .hf{background-image:url('/assets/heroes/hero6_walk.png')}
-@keyframes heroWalk{to{background-position-x:-220px}}
+@keyframes heroWalk{to{background-position-x:-440px}}
 .orc-fig.atk .hf{animation:heroWalk .5s steps(10) infinite,heroLunge .5s ease-in-out infinite}   /* у босса: быстрее + выпад */
 @keyframes heroLunge{0%,100%{transform:translateX(0)}50%{transform:translateX(4px)}}
 .orc-fig.mine .hf{filter:drop-shadow(0 0 6px #ffd27a) drop-shadow(0 2px 2px #000)}
@@ -317,7 +317,7 @@ function drawTroops(e,ph,el){invTroops.clearLayers();var lair=px(e.x*W,e.y*H);
     var fx=t.x+(lx-t.x)*prog,fy=t.y+(ly-t.y)*prog;
     var hv='h'+((i%6)+1);   // разнообразие воинов hero1..6
     var fi=L.divIcon({className:'orc-fig '+hv+(t.mine?' mine':'')+(ph==='battle'?' atk':''),
-      iconSize:[22,27],iconAnchor:[11,25],html:'<div class="hf"></div>'});
+      iconSize:[44,55],iconAnchor:[22,50],html:'<div class="hf"></div>'});
     L.marker(px(fx*W,fy*H),{icon:fi,interactive:false,keyboard:false,zIndexOffset:1500}).addTo(invTroops);});}
 function renderInv(){
   if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';return;}
