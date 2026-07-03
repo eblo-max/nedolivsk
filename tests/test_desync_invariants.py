@@ -194,3 +194,16 @@ def test_retail_show_equals_payout(monkeypatch):
         _sold, gold, _rep = lg.apply_retail(p, tav, dict(want))
         # показ == реально начисленному золоту (оба с ночным бонусом воров)
         assert shown == gold, (thief_rank, shown, gold)
+
+
+# ── 10. ДОХОД: текст-бот и мини-апп показывают ОДНО (единая котировка) ─────
+def test_bot_and_app_income_show_same():
+    """Текст-бот (texts) не показывает сырой tavern.income_rate как «Доход/ч» —
+    только income_rate_quote (иначе чат и приложение разойдутся, жалоба 03.07)."""
+    import re
+    from pathlib import Path
+    src = Path(__file__).resolve().parent.parent.joinpath("bot", "texts.py").read_text(encoding="utf-8")
+    # показ дохода «💰 Доход — {...}» обязан идти через income_rate_quote
+    for m in re.finditer(r"💰 Доход[^\n]*\{([^}]*income[^}]*)\}", src):
+        expr = m.group(1)
+        assert "income_rate_quote" in expr, f"сырой доход в тексте: {expr[:60]}"

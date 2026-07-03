@@ -1254,7 +1254,7 @@ def tavern_screen(player: Player, tavern: Tavern) -> str:
         "",
         *_branch("РЕСУРСЫ", [
             f"🪙 Золото — {player.gold}",
-            f"💰 Доход — {tavern.income_rate}/ч",
+            f"💰 Доход — {logic.income_rate_quote(player, tavern)}/ч",
             f"⭐ Репутация — {tavern.reputation}",
         ]),
         "",
@@ -2351,7 +2351,8 @@ def upgrade_offer(player: Player, tavern: Tavern, cost: dict) -> str:
         *_branch("ПОЛУЧИШЬ", [
             f"👥 Вместимость — {tavern.capacity} → {new_stats['capacity']}",
             f"✨ Комфорт — {tavern.comfort} → {new_stats['comfort']}",
-            f"💰 Доход — {tavern.income_rate} → {new_stats['income_rate']}/ч",
+            f"💰 Доход — {logic.income_rate_quote(player, tavern)} → "
+            f"{logic.income_rate_quote(player, tavern, base_rate=int(new_stats['income_rate']))}/ч",
         ]),
         "",
         "<i>Плотники деньги вперёд берут и сдачу не дают.</i>",
