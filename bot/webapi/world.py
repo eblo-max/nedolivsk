@@ -234,7 +234,9 @@ function fit(){
   var cz=MAXZ+Math.log2(Math.max(s.x,s.y)/W*1.02);
   if(!isFinite(cz)){cz=2;}
   map.setMinZoom(cz);
-  if(!map._c){map.setView(px(W/2,H/2),cz,{animate:false});map._c=true;}
+  // старт НЕ на самом дальнем: +2 ступени, но не меньше порога подписей (видны
+  // таверны и их названия); зум-аут до обзора (cz) остаётся доступен.
+  if(!map._c){var iz=Math.min(MAXZ,Math.max(cz+2,3.8));map.setView(px(W/2,H/2),iz,{animate:false});map._c=true;}
 }
 map.whenReady(fit);window.addEventListener('load',fit);
 setTimeout(fit,350);setTimeout(fit,1200);
