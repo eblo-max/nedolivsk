@@ -361,12 +361,13 @@ function rebuildTroops(e){invTroops.clearLayers();troopMarks=[];troopMeta=[];var
     // орбита ВОКРУГ босса (кольцо с глубиной): угол по золотому сечению + радиус
     // СНАРУЖИ туши (иначе прятались за 100px орком)
     troopMeta.push({tx:t.x,ty:t.y,orbAng:i*2.399963,orbR:0.026+((i*37)%5)*0.003});});}
-var wonAt=0;
 function moveTroops(e,ph,el){
-  var bx=e.x,by=e.y,tt=Date.now()/1000;
-  if(ph==='won'){if(!wonAt)wonAt=Date.now();}else{wonAt=0;}
+  var bx=e.x,by=e.y,tt=Date.now()/1000,bEnd=e.gather_secs+e.march_secs+e.battle_secs;
   var march=ph==='gather'?0:(ph==='march'?Math.min(1,(el-e.gather_secs)/Math.max(1,e.march_secs)):1);
-  var retreat=ph==='won'?Math.min(1,(Date.now()-wonAt)/6000):0;   // 6с идут домой
+  // отступление по СЕРВЕРНОМУ времени (el), а не клиентскому таймеру — иначе при
+  // перезаходе в карту путь домой проигрывался заново. Дошли (retreat>=1) → исчезают.
+  var retreat=ph==='won'?Math.min(1,Math.max(0,el-bEnd)/6):0;
+  var home=ph==='won'&&retreat>=1;
   for(var i=0;i<troopMarks.length;i++){var mt=troopMeta[i],fx,fy,atk=false,dead=false;
     var rx=bx+Math.cos(mt.orbAng)*mt.orbR,ry=by+Math.sin(mt.orbAng)*mt.orbR;   // точка на кольце
     if(ph==='gather'||ph==='march'){fx=mt.tx+(rx-mt.tx)*march;fy=mt.ty+(ry-mt.ty)*march;}   // марш к кольцу
@@ -376,7 +377,8 @@ function moveTroops(e,ph,el){
     else{fx=rx;fy=ry;dead=true;}                                                // ПРОРЫВ → падают у босса
     troopMarks[i].setLatLng(px(fx*W,fy*H));
     var g=troopMarks[i].getElement();
-    if(g){g.classList.toggle('atk',atk);g.classList.toggle('dead',dead);}}}
+    if(g){g.classList.toggle('atk',atk);g.classList.toggle('dead',dead);
+      g.style.transition='opacity .5s';g.style.opacity=home?'0':'';}}}   // дошли до таверн → исчезли (и при перезаходе сразу 0)
 function renderInv(){
   if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';troopKey='';troopMarks=[];return;}
   var e=invData,el=invElapsed(),ph=invPhase(e,el),lair=px(e.x*W,e.y*H);
@@ -394,6 +396,9 @@ function renderInv(){
   var el2=invM.getElement();
   if(el2){el2.classList.toggle('battle',ph==='battle');
     el2.classList.toggle('dead',ph==='won');   // орк гибнет при победе защитников
+    // смерть отыграна давно (перезаход) → орк уже исчез, не переигрываем анимацию
+    var bEnd=e.gather_secs+e.march_secs+e.battle_secs;
+    el2.style.opacity=(ph==='won'&&el-bEnd>3)?'0':'';
     var fill=el2.querySelector('.hp i');
     if(fill){var hp=100;
       if(ph==='battle'){var bp=Math.min(1,(el-e.gather_secs-e.march_secs)/Math.max(1,e.battle_secs));
