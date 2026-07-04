@@ -63,6 +63,14 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
   border:1px solid #ff7a4a;box-shadow:0 4px 16px rgba(210,58,24,.5);animation:rb 1.6s ease-in-out infinite}
 @keyframes rb{0%,100%{box-shadow:0 4px 16px rgba(210,58,24,.45)}50%{box-shadow:0 4px 26px rgba(255,90,50,.8)}}
 #raidbar .go{margin-left:auto;opacity:.85}
+/* баннер Орды: заметный призыв «встать в строй» на сборе (не искать орка на карте) */
+#ordaBar{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 48px);z-index:1001;
+  display:none;align-items:center;gap:9px;padding:9px 13px;border-radius:14px;cursor:pointer;font-family:var(--serif);
+  color:#fff;font-weight:700;font-size:14px;background:linear-gradient(180deg,#c1521c,#7d2c0e);
+  border:1px solid #ff9a4a;box-shadow:0 4px 16px rgba(190,74,26,.5);animation:rb 1.6s ease-in-out infinite}
+#ordaBar .go{margin-left:auto;opacity:.92;white-space:nowrap}
+#ordaBar.reg{background:linear-gradient(180deg,#3f7a24,#255015);border-color:#7fd14f;animation:none}
+#ordaBar.info{cursor:default;animation:none;background:linear-gradient(180deg,#8a3a16,#5a220c)}
 /* ── Орда орков на карте: анимированный орк (spritesheet 10 кадров) + войска ── */
 .orc-ev{position:relative;width:100px;height:76px;pointer-events:auto;cursor:pointer}
 .orc-ev .orc{width:100px;height:76px;background:url('/assets/boss/ork1_idle.png') 0 0/1000px 76px no-repeat;
@@ -205,6 +213,7 @@ body.far .tav-pin .crown{opacity:0}
 <div id="hud"><div id="title">🗺 <b>Мир Недоливска</b> <span id="cnt"></span></div>
   <button id="mine">🏰 Моя таверна</button></div>
 <div id="raidbar"></div>
+<div id="ordaBar"></div>
 <div id="loader">Разворачиваем карту мира…</div>
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -411,11 +420,33 @@ function moveTroops(e,ph,el){
     var g=troopMarks[i].getElement();
     if(g){g.classList.toggle('atk',atk);g.classList.toggle('dead',dead);
       g.style.opacity=home?'0':'';}}}   // дошли до таверн → плавно исчезли (fade из CSS .orc-fig)
+// Верхний баннер-призыв: на сборе — заметное «встать в строй» (не искать орка на карте);
+// в марше/бою — статус. Итог (won/lost) не дублируем — им занимается авто-модалка + чип в React.
+function ordaBarUpdate(e,ph,el){
+  var ob=document.getElementById('ordaBar');if(!ob)return;
+  ob.classList.remove('reg','info');
+  if(ph==='gather'){
+    var t=fmtT(e.gather_secs-el),n=e.n||0;
+    if(e.me){ob.classList.add('reg');
+      ob.innerHTML='✅ <span>Ты в строю · '+t+' · дружина '+n+'</span><span class="go">состав ›</span>';}
+    else ob.innerHTML='🪓 <span>Орда орков идёт! '+t+' · в строю '+n+'</span><span class="go">встать в строй ›</span>';
+    ob.onclick=function(){try{parent.postMessage({t:'nedo-orda'},location.origin);}catch(_){}
+      if(parent===window)location.href='/app/?startapp=orda';};
+    ob.style.display='flex';
+  }else if(ph==='march'||ph==='battle'){
+    ob.classList.add('info');ob.onclick=null;
+    ob.innerHTML=(ph==='march'?'🪓 <span>Орда наступает на Недоливск…</span>'
+      :'⚔️ <span>Битва за Недоливск…</span>')+'<span class="go">следим ›</span>';
+    ob.style.display='flex';
+  }else ob.style.display='none';
+}
 function renderInv(){
-  if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';troopInvId=null;troopMarks=[];troopMeta=[];return;}
+  if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';troopInvId=null;troopMarks=[];troopMeta=[];
+    var _ob=document.getElementById('ordaBar');if(_ob)_ob.style.display='none';return;}
   var e=invData,el=invElapsed(),ph=invPhase(e,el),lair=px(e.x*W,e.y*H);
   invPh=ph;maybeAutoResult(e,ph);   // тап по орку знает фазу + авто-модалка итогов (раз на бой)
   syncTroops(e);                    // дорисовать новоприбывших без пересбора всех (без мигания)
+  ordaBarUpdate(e,ph,el);           // баннер-призыв «встать в строй» / статус боя
   var key=e.name+'|'+(ph==='battle'?'b':(ph==='won'?'w':(ph==='lost'?'l':'p')));
   if(key!==invKey){invLayer.clearLayers();
     var icon=L.divIcon({className:'orc-ev'+(ph==='battle'?' battle':''),iconSize:[100,76],iconAnchor:[50,76],
