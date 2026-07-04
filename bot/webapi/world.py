@@ -550,7 +550,7 @@ function renderInv(){
     if(af){var ap;
       if(ph==='lost')ap=8;
       else if(fr)ap=100*fr.a/(e.army_hp_max||1);
-      else ap=(ph==='won')?55:100;                          // fallback без tl
+      else ap=(ph==='won')?50:Math.max(28,100-42*bp);       // fallback без tl: примерная убыль по прогрессу боя
       af.style.width=Math.max(0,Math.min(100,ap))+'%';}
     // ТЕЛЕГРАФ способностей орка (только в бою): компактные иконки (без крупного баннера)
     // + эпичные слои-оверлеи (щит/ярость/проклятье/волки) с «pop» при смене набора.

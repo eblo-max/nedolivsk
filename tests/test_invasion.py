@@ -48,14 +48,10 @@ def test_registered_might_sums():
     assert inv.registered_count(i) == 3
 
 
-# ── исход ─────────────────────────────────────────────────────────────────
-def test_win_when_might_meets_threshold():
-    assert inv.is_won(_inv(_reg(60, 60), threshold=100)) is True   # 120 ≥ 100
-    assert inv.is_won(_inv(_reg(30), threshold=100)) is False      # 30 < 100
-
-
-def test_win_boundary_inclusive():
-    assert inv.is_won(_inv(_reg(100), threshold=100)) is True      # ровно порог — победа
+def test_no_legacy_win_oracle():
+    """Исход считает ТОЛЬКО simulate(). Прежний is_won (might≥threshold) удалён —
+    он рассинхронил с реальным боем. Стережём, чтобы «второй оракул» не вернулся."""
+    assert not hasattr(inv, "is_won")
 
 
 # ── раздача / штраф ────────────────────────────────────────────────────────
@@ -379,19 +375,33 @@ def test_prep_applies_bonus_and_dedups():
     r2 = inv.apply_prep(inv.apply_prep(r1, "feast"), "forge")   # +36 HP, +5 урона
     assert r2["hp"] == bh + 36 and abs(r2["dmg"] - (bd + 5)) < 0.01
     assert set(r2["preps"]) == {"wall", "feast", "forge"}
+    assert r2.get("prep_dmg") == 5                       # forge-урон учтён отдельно (не толстит орка)
+    assert not inv.apply_prep(r1, "wall").get("prep_dmg")   # wall не даёт prep_dmg
     assert inv.prep_cost("wall") == {"wood": 12, "stone": 6}
     assert inv.apply_prep(rec, "nope") == dict(rec)      # неизвестное — no-op
     assert "preps" not in rec                            # исходную запись не тронули
+
+
+def test_prep_forge_does_not_thicken_orc():
+    """forge (+урон) усиливает удар армии, но НЕ толстит орка: масштаб HP орды считаем
+    по БАЗОВОМУ урону (без prep_dmg). Иначе бонус forge нивелировал бы сам себя."""
+    base = [dict(inv.battle_profile({"damage": 10, "crit": 6, "armor": 5, "luck": 4}, 30), pid=i)
+            for i in range(1, 7)]
+    forged = [inv.apply_prep(dict(p), "forge") for p in base]
+    sb, sf = inv.simulate(base, seed=7), inv.simulate(forged, seed=7)
+    assert sb["orc_hp_max"] == sf["orc_hp_max"]          # орк НЕ толще от forge
+    assert sf["rounds"] <= sb["rounds"]                  # но усиленная армия валит не медленнее
 
 
 def test_postmortem_explains_outcome():
     """Разбор боя: победа → «выдержал» + MVP из ЖИВЫХ (не болванка); поражение →
     приоритет причины: нет фронта → не закрыт трейт → мало сил; считает павших."""
     tr = ("shaman", "💀", "Шаманская орда", "flank", "...")   # контра flank→scout
-    # победа: болванка (pid<0) нанесла больше, но MVP — живой игрок
+    # победа: болванка (pid<0) нанесла больше, но MVP — живой игрок; болванка не в счётчиках
     won = inv.postmortem([{"pid": 1, "name": "Гром", "role": "tank", "dmg": 100, "fell": False},
-                          {"pid": -1, "name": "Бот", "role": "archer", "dmg": 300, "fell": False}], tr, True)
+                          {"pid": -1, "name": "Бот", "role": "archer", "dmg": 300, "fell": True}], tr, True)
     assert "выдержал" in won["cause"].lower() and won["mvp"]["name"] == "Гром"
+    assert won["n"] == 1 and won["fell"] == 0            # болванка не считается бойцом/павшим
     # поражение без фронта (одни стрелки/разведка)
     no_front = inv.postmortem([{"pid": 1, "name": "A", "role": "archer", "dmg": 50, "fell": True},
                                {"pid": 2, "name": "B", "role": "scout", "dmg": 40, "fell": True},

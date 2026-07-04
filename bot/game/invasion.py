@@ -312,7 +312,8 @@ _SIM_CACHE_MAX = 256
 def _sim_key(participants: list[dict], seed: int, escal: float, trait) -> tuple:
     return (int(seed or 0), round(float(escal or 1.0), 4), trait, tuple(
         (p.get("pid"), p.get("role"), round(p.get("dmg", 0), 2), round(p.get("crit", 0), 4),
-         p.get("armor", 0), round(p.get("dodge", 0), 4), p.get("hp", 0))
+         p.get("armor", 0), round(p.get("dodge", 0), 4), p.get("hp", 0),
+         round(p.get("prep_dmg", 0) or 0, 2))   # приготовления влияют на толщину орка → в ключ
         for p in participants))
 
 
@@ -351,7 +352,11 @@ def _simulate_impl(participants: list[dict], seed: int = 0, escal: float = 1.0,
                 "army_hp_max": 0, "army_hp_left": 0,
                 "dealt": {}, "stats": {}, "fell": [], "events": [],
                 "timeline": [], "n": 0}
-    power = sum(_unit_output(p, ORC_ARMOR) for p in participants) or 1.0
+    # МАСШТАБ орды (HP и злость) считаем по БАЗОВОМУ урону — без бонуса приготовлений
+    # (иначе forge «толстил» бы орка и нивелировал сам себя). Боевой урон армии ниже —
+    # с полным dmg, так forge усиливает удар, но орду сильнее не делает (симметрия с wall/feast).
+    power = sum(_unit_output(dict(p, dmg=max(1.0, p["dmg"] - (p.get("prep_dmg", 0) or 0))),
+                             ORC_ARMOR) for p in participants) or 1.0
     orc_hp_max = max(MIN_ORC_HP, round(HP_PER_POWER * power ** HP_POWER_EXP))
     orc_hp_max = round(orc_hp_max * escal)            # эскалация: толще с каждой победой
     orc_hp = float(orc_hp_max)
@@ -604,7 +609,11 @@ def apply_prep(rec: dict, prep_id: str) -> dict:
     out["preps"] = preps
     for stat, val in p["bonus"].items():
         cur = out.get(stat, 0) or 0
-        out[stat] = round(cur + val, 1) if stat == "dmg" else int(cur + val)
+        if stat == "dmg":
+            out["dmg"] = round(cur + val, 1)
+            out["prep_dmg"] = round((out.get("prep_dmg", 0) or 0) + val, 1)   # чтобы не толстить орка
+        else:
+            out[stat] = int(cur + val)
     return out
 
 
@@ -638,27 +647,30 @@ def need_hint(participants: list[dict], trait: tuple | None) -> str:
 
 def postmortem(rows: list[dict], trait: tuple | None, won: bool) -> dict:
     """Разбор боя для модалки итогов: ГЛАВНАЯ причина исхода + MVP + число павших.
-    rows — из build_report (role/dmg/fell/name/pid, сорт по урону). Причина поражения
-    приоритетно: нет фронта → не закрыт трейт → просто мало сил. Чистая."""
-    n = len(rows)
-    fell = sum(1 for r in rows if r.get("fell"))
+    rows — из build_report (role/dmg/fell/name/pid, сорт по урону). Счётчики бойцов/
+    павших — по РЕАЛЬНЫМ игрокам (болванки pid<0 из тестового ростера не считаем),
+    а ПРИЧИНА поражения — по всей армии (болванки тоже держат строй). Чистая."""
+    real = [r for r in rows if int(r.get("pid", 1)) > 0]     # реальные игроки, не болванки
+    n = len(real)
+    fell = sum(1 for r in real if r.get("fell"))
     mvp = None
-    for r in rows:                                   # MVP — лучший ЖИВОЙ игрок (не болванка)
-        if int(r.get("pid", 1)) > 0 and int(r.get("dmg", 0)) > 0:
+    for r in real:                                           # MVP — лучший живой игрок по урону
+        if int(r.get("dmg", 0)) > 0:
             mvp = {"name": r.get("name", ""), "dmg": int(r.get("dmg", 0)), "role": r.get("role", "ratnik")}
             break
-    if mvp is None and rows:
-        r = rows[0]
+    if mvp is None and real:
+        r = real[0]
         mvp = {"name": r.get("name", ""), "dmg": int(r.get("dmg", 0)), "role": r.get("role", "ratnik")}
     if won:
         cause = "Строй выдержал натиск — Недоливск отбился."
-    elif n == 0:
+    elif not rows:
         cause = "На зов никто не встал — орда прошла без боя."
-    else:
+    else:                                                    # причина — по ВСЕЙ армии в бою
+        n_all = len(rows)
         front = sum(1 for r in rows if r.get("role") in ("tank", "ratnik"))
         need_role = _ROLE_BY_STANCE.get(trait[3]) if trait else None
         has_counter = any(r.get("role") == need_role for r in rows) if need_role else True
-        if front < max(1, n // 3):
+        if front < max(1, n_all // 3):
             cause = "🛡 Не хватило фронта — орду некому было держать, строй прорвали."
         elif trait and not has_counter:
             cause = (f"{trait[1]} Не закрыли слабость «{trait[2]}» — "
@@ -669,9 +681,9 @@ def postmortem(rows: list[dict], trait: tuple | None, won: bool) -> dict:
 
 
 # ── Исход и раздача ──────────────────────────────────────────────────────────
-def is_won(inv) -> bool:
-    """Победа, если суммарная мощь записавшихся ≥ порога орды."""
-    return registered_might(inv) >= int(inv.threshold or 0)
+# ЕДИНСТВЕННЫЙ оракул исхода — simulate() (композиция, а не сумма мощи). Прежний
+# is_won (might ≥ threshold) удалён как рассинхронный «второй оракул»: он мог соврать
+# относительно реального боя. threshold остался только как анти-тривиал/эталон сложности.
 
 
 def _roll_trophy(rng) -> dict:

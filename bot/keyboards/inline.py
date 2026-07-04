@@ -317,13 +317,14 @@ def notif_teaser_kb() -> InlineKeyboardMarkup:
 def urgent_dm_kb(kind: str) -> InlineKeyboardMarkup:
     """Срочная весть в личке (рейд/орда) — красная кнопка сразу в бой.
     Рейд живёт в мини-аппе (?startapp=raid), орда — чатовый экран (invopen)."""
+    from bot.game import invasion as invmod
     from bot.webapp import base_url
     kb = InlineKeyboardBuilder()
     b = base_url()
     if kind == "raid" and b:
         kb.button(text="⚔️ В БОЙ — открыть в игре",
                   web_app=WebAppInfo(url=f"{b}/app/?startapp=raid"), style="danger")
-    elif kind == "invasion":
+    elif kind == "invasion" and not invmod.TEST_MODE:   # в обкатке участие закрыто — не зовём
         kb.button(text="🪓 ОРДА ОРКОВ — В СТРОЙ!", callback_data="invopen", style="danger")
     else:
         kb.button(text="🍺 К таверне", callback_data="tavern")

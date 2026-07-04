@@ -140,8 +140,11 @@ def test_urgent_dm_kb_routes(monkeypatch):
     kb = urgent_dm_kb("raid")
     btn = kb.inline_keyboard[0][0]
     assert btn.web_app and btn.web_app.url.endswith("/app/?startapp=raid")
+    # кнопка орды согласована с гейтом участия: в обкатке (TEST_MODE) её нет — «К таверне»,
+    # при открытии всем — «invopen».
+    from bot.game import invasion as invmod
     kb = urgent_dm_kb("invasion")
-    assert kb.inline_keyboard[0][0].callback_data == "invopen"
+    assert kb.inline_keyboard[0][0].callback_data == ("tavern" if invmod.TEST_MODE else "invopen")
 
 
 def test_outbox_appends_are_4_tuples():
