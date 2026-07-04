@@ -144,6 +144,37 @@ ROLES: dict[str, tuple[str, str]] = {
     "ratnik": ("🗡", "Ратники"),     # надёжная линия без спец-контры
 }
 
+# ── Стойки (ФАЗА 1): игрок ВЫБИРАЕТ роль на поле при записи. Снаряга даёт статы,
+# стойка — роль (кого бьёт орда, что контрит способности) + малый уклон статов за
+# приверженность. Композиция дружины = КОЛЛЕКТИВНОЕ решение города (автобой цел). ──
+STANCES: dict[str, dict] = {
+    "front":  {"emoji": "🛡", "name": "В строй",  "role": "tank",   "tilt": {"armor": 6},
+               "blurb": "Держишь линию фронта. Контрит ярость и осаду."},
+    "strike": {"emoji": "⚔️", "name": "В атаку",  "role": "archer", "tilt": {"damage": 5},
+               "blurb": "Бёрст-урон. Контрит латы (крит) и волчью стаю."},
+    "flank":  {"emoji": "🔭", "name": "В обход",  "role": "scout",  "tilt": {"luck": 8},
+               "blurb": "Уворот и чистка. Контрит шаманское проклятье."},
+    "line":   {"emoji": "🗡", "name": "В резерв", "role": "ratnik", "tilt": {},
+               "blurb": "Надёжная линия без спец-контры."},
+}
+
+# ── Варлорд-трейт (ФАЗА 1): у каждой орды случайная СЛАБОСТЬ (детерминированно по
+# id ивента), объявлена на сборе. Крутит орка в симуляции; контрится конкретной
+# стойкой → каждый рейд НОВАЯ задача композиции. (id, эмодзи, имя, стойка-контра, лор). ─
+TRAITS: list = [
+    ("armored",  "🛡", "Латная орда",    "strike", "Толстая броня — крит пробивает. Нужны рубаки в атаке."),
+    ("pack",     "🐺", "Стайная орда",   "strike", "Кличет волков — рубаки бьют щиты вдвое. Нужен урон."),
+    ("shaman",   "💀", "Шаманская орда", "flank",  "Сильное проклятье режет урон. Нужна разведка — чистит."),
+    ("frenzied", "🐗", "Бешеная орда",   "front",  "Быстро звереет. Нужен крепкий строй — удержать."),
+    ("siege",    "🏹", "Осадная орда",   "front",  "Тяжёлый вал атаки. Нужен фронт — принять удар."),
+]
+
+
+def trait_of(inv) -> tuple:
+    """Слабость орды (детерминированно по id ивента). Старые записи — первый трейт."""
+    import random as _r
+    return _r.Random(int(getattr(inv, "id", 0) or 0) * 7 + 13).choice(TRAITS)
+
 # Дружина таверны: HP и база урона растут от МОЩИ (развития таверны).
 WB_HP_BASE, WB_HP_PER_MIGHT = 80, 4.0
 WB_DMG_BASE, WB_DMG_PER_MIGHT = 6.0, 0.45
@@ -221,14 +252,22 @@ def role_of(stats: dict) -> str:
     return "archer"
 
 
-def battle_profile(stats: dict, might: int) -> dict:
-    """Боевой профиль войска: роль (билд) + урон/крит/броня/уворот (снаряга) +
-    HP/база урона (мощь таверны = размер дружины)."""
+def battle_profile(stats: dict, might: int, stance: str | None = None) -> dict:
+    """Боевой профиль войска: роль + урон/крит/броня/уворот (снаряга) + HP/база
+    урона (мощь таверны). Стойка (ФАЗА 1) ЗАДАЁТ роль на поле + малый уклон статов;
+    без стойки — роль авто из билда (обратная совместимость)."""
+    st = STANCES.get(stance or "")
+    if st:
+        role = st["role"]
+        if st["tilt"]:
+            stats = {**stats, **{k: stats.get(k, 0) + v for k, v in st["tilt"].items()}}
+    else:
+        role = role_of(stats)
     crit = min(balance.HUNT_CRIT_CAP, stats.get("crit", 0)) / 100
     dodge = min(balance.HUNT_LUCK_DODGE_CAP,
                 stats.get("luck", 0) * balance.HUNT_LUCK_DODGE_PER) / 100
     return {
-        "role": role_of(stats),
+        "role": role, "stance": stance or "",
         "dmg": round(WB_DMG_BASE + might * WB_DMG_PER_MIGHT + stats.get("damage", 0), 1),
         "crit": round(crit, 3),
         "armor": int(stats.get("armor", 0)),
@@ -242,12 +281,22 @@ def _unit_output(p: dict, orc_armor: int) -> float:
     return (1 - p["crit"]) * max(1.0, p["dmg"] - orc_armor) + p["crit"] * 2 * p["dmg"]
 
 
-def simulate(participants: list[dict], seed: int = 0, escal: float = 1.0) -> dict:
+def simulate(participants: list[dict], seed: int = 0, escal: float = 1.0,
+             trait: str | None = None) -> dict:
     """Детерминированный бой армии против орды. participants — боевые профили с
-    полем pid. escal — множитель силы орды (эскалация между нашествиями, ≥1.0).
+    полем pid. escal — множитель силы орды (эскалация). trait — варлорд-слабость
+    орды (ФАЗА 1): крутит её параметры, контрится стойкой бойцов.
     Возвращает {won, rounds, orc_hp_max, orc_hp_left, dealt:{pid:int},
     fell:[pid], events:[(round, kind, payload)], n}. Чистая — без БД/IO."""
     escal = max(1.0, float(escal or 1.0))
+    # варлорд-трейт крутит орка (слабость, контрится нужной стойкой)
+    t_armor = 5 if trait == "armored" else 0
+    t_add = 1.6 if trait == "pack" else 1.0
+    t_curse_r = 3 if trait == "shaman" else 0
+    t_curse_f = -0.12 if trait == "shaman" else 0.0
+    t_enr_at = 0.40 if trait == "frenzied" else ENRAGE_AT
+    t_enr_ramp = ENRAGE_RAMP * 1.6 if trait == "frenzied" else ENRAGE_RAMP
+    t_atk = 1.25 if trait == "siege" else 1.0
     n = len(participants)
     if n == 0:                      # пустой ростер — ВСЕ ключи на месте (иначе KeyError снаружи)
         return {"won": False, "rounds": 0, "orc_hp_max": 0, "orc_hp_left": 0,
@@ -259,9 +308,9 @@ def simulate(participants: list[dict], seed: int = 0, escal: float = 1.0) -> dic
     orc_hp_max = round(orc_hp_max * escal)            # эскалация: толще с каждой победой
     orc_hp = float(orc_hp_max)
     army_hp_max = round(sum(p["hp"] for p in participants)) or 1   # общий запас HP дружины
-    # урон орды растёт от СИЛЫ армии (пол 1.0 — слабая явка как раньше; + эскалация)
+    # урон орды растёт от СИЛЫ армии (пол 1.0 — слабая явка как раньше; + эскалация + осада)
     atk_mult = min(ATK_SCALE_CAP, max(1.0, (power / ATK_REF_POWER) ** ATK_POWER_EXP))
-    orc_atk = ORC_ATK * atk_mult * escal
+    orc_atk = ORC_ATK * atk_mult * escal * t_atk
     units = [dict(p, hp_left=float(p["hp"]), alive=True, dealt=0.0, critdmg=0.0,
                   blocked=0.0) for p in participants]
     scout_frac = sum(1 for p in units if p["role"] == "scout") / n
@@ -277,26 +326,27 @@ def simulate(participants: list[dict], seed: int = 0, escal: float = 1.0) -> dic
         rounds += 1
         pct = orc_hp / orc_hp_max
         for at, name in ((WARD_AT, "ward"), (SUMMON_AT, "summon"),
-                         (CURSE_AT, "curse"), (ENRAGE_AT, "enrage")):
+                         (CURSE_AT, "curse"), (t_enr_at, "enrage")):
             if name not in done and pct <= at:
                 done.add(name)
                 if name == "ward":
                     ward_until = rounds + WARD_ROUNDS
                 elif name == "summon":
-                    adds_hp = orc_hp_max * SUMMON_HP_FRAC
+                    adds_hp = orc_hp_max * SUMMON_HP_FRAC * t_add   # 🐺 стайная — щит жирнее
                 elif name == "curse":
-                    curse_until = rounds + CURSE_ROUNDS
+                    curse_until = rounds + CURSE_ROUNDS + t_curse_r  # 💀 шаманская — дольше
                 else:
                     enraged = True
                 events.append((rounds, name, None))
         alive = [p for p in units if p["alive"]]
         if not alive:
             break
-        orc_armor = ORC_ARMOR + (WARD_ARMOR if rounds <= ward_until else 0)
+        orc_armor = ORC_ARMOR + t_armor + (WARD_ARMOR if rounds <= ward_until else 0)  # 🛡 латная
         curse_mult = 1.0
         if rounds <= curse_until:        # проклятье режет DPS; разведка ослабляет
             relief = min(1.0, scout_frac * 2) * SCOUT_CLEANSE
-            curse_mult = CURSE_FACTOR + (1 - CURSE_FACTOR) * relief
+            cf = CURSE_FACTOR + t_curse_f            # 💀 шаманская — злее
+            curse_mult = cf + (1 - cf) * relief
         # удар армии: если жив щит волков — бьём его (стрелки ×бонус), иначе орду
         hitting_adds = adds_hp > 0
         adds_dmg = orc_dmg = 0.0
@@ -329,7 +379,7 @@ def simulate(participants: list[dict], seed: int = 0, escal: float = 1.0) -> dic
         # удар орды: линию фронта держат танки + ратники (массовая пехота), бьют их;
         # совсем нет фронта (одни рубаки/разведка) — орда прорывается и фокусит DPS.
         # soft-enrage: базовый урон × нарастающая ярость × разовый скачок на 25% HP
-        atk = orc_atk * (1 + ENRAGE_RAMP * (rounds - 1)) * (ENRAGE_MULT if enraged else 1.0)
+        atk = orc_atk * (1 + t_enr_ramp * (rounds - 1)) * (ENRAGE_MULT if enraged else 1.0)  # 🐗 бешеная — круче ramp
         front = [p for p in alive if p["role"] in ("tank", "ratnik")]
         if front:
             share = atk / len(front)
@@ -463,14 +513,42 @@ def dummy_roster(n: int = 16) -> dict:
     return out
 
 
-def make_record(player, tavern, pos, stats: dict) -> dict:
+def make_record(player, tavern, pos, stats: dict, stance: str | None = None) -> dict:
     """Запись бойца в реестр: имя, позиция таверны, мощь дружины + боевой профиль
     (роль/урон/крит/броня/уворот/HP) — снимок на момент записи (фиксирован на бой).
-    stats — combat.player_stats(player) (снаряга + бафы)."""
+    stats — combat.player_stats(player) (снаряга + бафы). stance — выбранная стойка."""
     might = tavern_might(tavern)
     return {"name": player.first_name or str(player.id),
             "tx": round(pos[0], 4), "ty": round(pos[1], 4),
-            "might": might, **battle_profile(stats, might)}
+            "might": might, **battle_profile(stats, might, stance)}
+
+
+def composition(participants: list[dict]) -> dict:
+    """Разбивка дружины по ролям + размер фронта (танки+ратники) — для доски готовности."""
+    c = {"tank": 0, "archer": 0, "scout": 0, "ratnik": 0}
+    for p in participants:
+        r = p.get("role", "ratnik")
+        c[r] = c.get(r, 0) + 1
+    c["front"] = c["tank"] + c["ratnik"]
+    c["n"] = len(participants)
+    return c
+
+
+_ROLE_BY_STANCE = {"front": "tank", "strike": "archer", "flank": "scout", "line": "ratnik"}
+
+
+def need_hint(participants: list[dict], trait: tuple | None) -> str:
+    """Чего не хватает дружине против ЭТОЙ орды (доска готовности)."""
+    c = composition(participants)
+    if c["n"] == 0:
+        return "Нужны бойцы — поднимай войско!"
+    if c["front"] < max(1, c["n"] // 3):
+        return "🛡 НУЖЕН ФРОНТ — без строя орда прорвётся и всех выкосит!"
+    if trait:
+        st = trait[3]
+        if c.get(_ROLE_BY_STANCE.get(st, ""), 0) == 0:
+            return f"{STANCES[st]['emoji']} нужны «{STANCES[st]['name']}» против {trait[2].lower()}"
+    return "Состав крепкий — так держать!"
 
 
 # ── Исход и раздача ──────────────────────────────────────────────────────────

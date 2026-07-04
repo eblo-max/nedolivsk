@@ -371,7 +371,7 @@ function renderInv(){
     var icon=L.divIcon({className:'orc-ev'+(ph==='battle'?' battle':''),iconSize:[100,76],iconAnchor:[50,76],
       html:'<div class="aura"></div><div class="fx"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="orc"></div>'});
     invM=L.marker(lair,{icon:icon,zIndexOffset:2000}).addTo(invLayer);
-    invM.on('click',function(){(window.top||window).location.href='/app/?startapp=raid';});
+    invM.on('click',function(){(window.top||window).location.href='/app/?startapp=orda';});
     invKey=key;}
   var el2=invM.getElement();
   if(el2){el2.classList.toggle('battle',ph==='battle');

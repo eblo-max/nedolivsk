@@ -549,7 +549,8 @@ async def _notify_returned(bot: Bot) -> None:
                         parts = [dict(r, pid=int(pid))
                                  for pid, r in (inv.registered or {}).items()]
                         bsec = invmod.battle_secs_for(invmod.simulate(
-                            parts, seed=inv.id, escal=invmod.escal_of(inv))["rounds"])
+                            parts, seed=inv.id, escal=invmod.escal_of(inv),
+                            trait=invmod.trait_of(inv)[0])["rounds"])
                         gu = inv.gather_until
                         if gu.tzinfo is None:
                             gu = gu.replace(tzinfo=timezone.utc)
@@ -562,7 +563,8 @@ async def _notify_returned(bot: Bot) -> None:
                 if now >= (inv.resolve_at or now):               # время исхода — СИМУЛЯЦИЯ
                     parts = [dict(r, pid=int(pid))
                              for pid, r in (inv.registered or {}).items()]
-                    sim = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv))
+                    sim = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv),
+                                          trait=invmod.trait_of(inv)[0])
                     plan = invmod.settle(inv, sim)
                     await _apply_invasion(session, inv, plan)
                     if sim["won"]:        # победа мира → следующая орда сильнее

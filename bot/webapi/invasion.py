@@ -36,7 +36,8 @@ def _invasion_report_event(inv, uid: int = 0) -> dict:
     n, ohl, ohm = res.get("n"), res.get("orc_hp_left"), res.get("orc_hp_max")
     if not report:                       # ещё не зарезолвлено сервером — предсказываем
         parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
-        sim = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv))
+        sim = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv),
+                              trait=invmod.trait_of(inv)[0])
         plan = invmod.settle(inv, sim)
         report = invmod.build_report(inv, sim, plan)
         won, rounds, n = sim["won"], sim["rounds"], sim["n"]
@@ -137,7 +138,8 @@ async def _api_taverns(request: web.Request) -> web.Response:
             gu = (live.gather_until if live.gather_until.tzinfo
                   else live.gather_until.replace(tzinfo=timezone.utc))
             parts = [dict(r, pid=int(pid)) for pid, r in (live.registered or {}).items()]
-            rounds = invmod.simulate(parts, seed=live.id, escal=invmod.escal_of(live))["rounds"]
+            rounds = invmod.simulate(parts, seed=live.id, escal=invmod.escal_of(live),
+                                     trait=invmod.trait_of(live)[0])["rounds"]
             end = gu + timedelta(seconds=invmod.MARCH_SECONDS + invmod.battle_secs_for(rounds))
         elif live.resolve_at:
             end = (live.resolve_at if live.resolve_at.tzinfo
@@ -178,6 +180,13 @@ async def _api_taverns(request: web.Request) -> web.Response:
         headers={"Cache-Control": "no-store"})
 
 
+def _stances_dto(counter: str) -> list[dict]:
+    """Стойки для выбора при записи (+флаг рекомендованной против трейта орды)."""
+    return [{"id": k, "emoji": v["emoji"], "name": v["name"], "blurb": v["blurb"],
+             "role": v["role"], "counter": k == counter}
+            for k, v in invmod.STANCES.items()]
+
+
 async def _api_invasion_join(request: web.Request) -> web.Response:
     """Регистрация на ивент ПРЯМО С КАРТЫ (мини-апп). Аутентификация — Telegram
     initData (HMAC по токену бота). Атомарная запись (repo.invasion_register).
@@ -192,6 +201,9 @@ async def _api_invasion_join(request: web.Request) -> web.Response:
     from bot.config import settings
     if invmod.TEST_MODE and uid != settings.admin_id:     # тест-режим: только админ
         return web.json_response({"ok": False, "error": "testing"})
+    stance = str((body or {}).get("stance") or "")
+    if stance not in invmod.STANCES:
+        stance = ""                                      # без выбора — авто из билда
     from bot.game import combat
     async with session_factory() as s:
         player = await repo.get_player(s, uid)
@@ -202,24 +214,64 @@ async def _api_invasion_join(request: web.Request) -> web.Response:
             return web.json_response({"ok": False, "error": "closed"})
         already = invmod.is_registered(inv, player.id)
         rec = invmod.make_record(player, player.tavern, _tavern_norm_pos(player),
-                                 combat.player_stats(player))
+                                 combat.player_stats(player), stance)
         if not already:
             ok = await repo.invasion_register(s, inv.id, player.id, rec)
             if ok:
-                repo.add_log(s, "player", player.id, "⚔️ поднял войско (с карты)")
+                repo.add_log(s, "player", player.id,
+                             f"⚔️ поднял войско ({invmod.STANCES.get(stance, {}).get('name', 'в резерв')})")
                 await s.commit()
             else:
                 already = True
         # пересчёт готовности после записи — чтобы полоска дружины долилась сразу
         fresh = await repo.get_active_invasion(s) or inv
         parts = [dict(r, pid=int(pid)) for pid, r in (fresh.registered or {}).items()]
-        sim = invmod.simulate(parts, seed=fresh.id, escal=invmod.escal_of(fresh))
-    out = {"role": rec["role"], "dmg": round(rec["dmg"]), "crit": rec["crit"],
+        tr = invmod.trait_of(fresh)
+        sim = invmod.simulate(parts, seed=fresh.id, escal=invmod.escal_of(fresh), trait=tr[0])
+    out = {"role": rec["role"], "stance": rec.get("stance", ""),
+           "dmg": round(rec["dmg"]), "crit": rec["crit"],
            "armor": rec["armor"], "dodge": rec["dodge"], "hp": rec["hp"],
            "x": rec["tx"], "y": rec["ty"], "already": already,
-           "ready": round(invmod.readiness(sim), 3), "n": invmod.registered_count(fresh)}
+           "ready": round(invmod.readiness(sim), 3), "n": invmod.registered_count(fresh),
+           "trait": {"id": tr[0], "emoji": tr[1], "name": tr[2], "counter": tr[3], "blurb": tr[4]},
+           "comp": invmod.composition(parts), "hint": invmod.need_hint(parts, tr),
+           "stances": _stances_dto(tr[3])}
     out["ok"] = True
     return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+async def _api_invasion_state(request: web.Request) -> web.Response:
+    """Состояние сбора орды для панели «в строй» (ФАЗА 1): трейт-слабость, состав
+    по ролям, готовность, стойки, моя запись. Read-only peek — не регистрирует."""
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        body = {}
+    uid = _verify_init_data(body.get("initData") or "")
+    if not uid:
+        return web.json_response({"ok": False, "error": "auth"}, status=401)
+    from datetime import datetime, timezone
+    async with session_factory() as s:
+        inv = await repo.get_active_invasion(s)
+        if inv is None or inv.status != "gathering":
+            return web.json_response({"ok": True, "active": False},
+                                     headers={"Cache-Control": "no-store"})
+        parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
+        tr = invmod.trait_of(inv)
+        sim = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv), trait=tr[0])
+        me = (inv.registered or {}).get(str(uid))
+        gu = inv.gather_until
+        if gu is not None and gu.tzinfo is None:
+            gu = gu.replace(tzinfo=timezone.utc)
+        left = max(0, int((gu - datetime.now(timezone.utc)).total_seconds())) if gu else 0
+    return web.json_response({
+        "ok": True, "active": True, "n": invmod.registered_count(inv),
+        "ready": round(invmod.readiness(sim), 3), "gather_left": left,
+        "registered": me is not None, "my_stance": (me or {}).get("stance") if me else None,
+        "trait": {"id": tr[0], "emoji": tr[1], "name": tr[2], "counter": tr[3], "blurb": tr[4]},
+        "comp": invmod.composition(parts), "hint": invmod.need_hint(parts, tr),
+        "stances": _stances_dto(tr[3]),
+    }, headers={"Cache-Control": "no-store"})
 
 
 async def _api_invasion_seed(request: web.Request) -> web.Response:

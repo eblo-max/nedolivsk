@@ -58,6 +58,7 @@ ROUTES = [
     "POST /api/hunt_forecast _api_hunt_forecast",
     "POST /api/invasion/join _api_invasion_join",
     "POST /api/invasion/seed _api_invasion_seed",
+    "POST /api/invasion/state _api_invasion_state",
     "POST /api/mill/collect _api_mill_collect",
     "POST /api/mill/run _api_mill_run",
     "POST /api/newbie _api_newbie",

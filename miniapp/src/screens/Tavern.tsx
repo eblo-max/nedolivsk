@@ -18,6 +18,7 @@ const ChronicleSheet = lazy(() => import('./ChronicleSheet'))
 const RatingSheet = lazy(() => import('./RatingSheet'))
 const ReferralSheet = lazy(() => import('./ReferralSheet'))
 const RaidSheet = lazy(() => import('./RaidSheet'))
+const InvasionSheet = lazy(() => import('./InvasionSheet'))
 const NotificationsSheet = lazy(() => import('./NotificationsSheet'))
 const GuideSheet = lazy(() => import('./GuideSheet'))
 
@@ -94,6 +95,7 @@ export default function Tavern() {
   const [ratingOpen, setRatingOpen] = useState(false)   // доска почёта (топ таверн)
   const [refOpen, setRefOpen] = useState(false)
   const [raidOpen, setRaidOpen] = useState(false)       // экран рейд-босса
+  const [invOpen, setInvOpen] = useState(false)         // панель сбора орды («в строй»)
   const [notifOpen, setNotifOpen] = useState(false)     // лента уведомлений
   const storySeen = useRef<string | null>(null)        // авто-показ визитёра один раз на его id
   const [trade, setTrade] = useState<TradeData | null>(null)   // заезжий купец (торг)
@@ -109,6 +111,7 @@ export default function Tavern() {
   useEffect(() => {
     const sp = takeStartParam()
     if (sp === 'raid') setRaidOpen(true)
+    else if (sp === 'orda') setInvOpen(true)
     else if (sp === 'notif') setNotifOpen(true)
   }, [])
 
@@ -366,6 +369,7 @@ export default function Tavern() {
         {ratingOpen && <RatingSheet onClose={() => setRatingOpen(false)} />}
         {refOpen && <ReferralSheet onClose={() => setRefOpen(false)} />}
         {raidOpen && <RaidSheet onClose={() => { setRaidOpen(false); reload() }} onGold={() => reload()} />}
+        {invOpen && <InvasionSheet onClose={() => { setInvOpen(false); reload() }} />}
         {notifOpen && <NotificationsSheet admin={t.admin} onClose={() => { setNotifOpen(false); reload() }} />}
       </Suspense>
       {toast && <div className="toast">{toast}</div>}

@@ -311,3 +311,48 @@ def test_orc_set_bonus_only_when_complete():
     assert bonus["armor"] == base["armor"] + itm.CATALOG["orc_plate"].armor + itm.ORC_SET_BONUS["armor"]
     assert bonus["damage"] - (base["damage"]) == itm.ORC_SET_BONUS["damage"]
     assert bonus["luck"] == itm.ORC_SET_BONUS["luck"]
+
+
+# ── ФАЗА 1: стойки (выбор роли), варлорд-трейт орды, доска готовности ────────
+def test_stance_sets_role_and_tilt():
+    base = inv.battle_profile(_gear(a=2), 30)                  # слабый билд → ratnik авто
+    assert base["stance"] == ""
+    front = inv.battle_profile(_gear(a=2), 30, "front")
+    assert front["role"] == "tank" and front["stance"] == "front"
+    assert front["armor"] == base["armor"] + 6                # уклон брони за стойку
+    strike = inv.battle_profile(_gear(a=2), 30, "strike")
+    assert strike["role"] == "archer" and strike["dmg"] > base["dmg"]   # +урон
+    flank = inv.battle_profile(_gear(a=2), 30, "flank")
+    assert flank["role"] == "scout" and flank["dodge"] > base["dodge"]  # +уворот
+    assert inv.battle_profile(_gear(a=2), 30, "line")["role"] == "ratnik"
+
+
+def test_trait_deterministic_and_varied():
+    ids = [SimpleNamespace(id=i) for i in range(1, 40)]
+    for x in ids:
+        assert inv.trait_of(x) in inv.TRAITS
+        assert inv.trait_of(x)[0] == inv.trait_of(SimpleNamespace(id=x.id))[0]   # стабильно по id
+    assert len({inv.trait_of(x)[0] for x in ids}) >= 3        # разнообразие трейтов
+
+
+def test_trait_changes_the_fight_directionally():
+    a = _army({"tank": 4, "archer": 3})                       # маргинальная — исход чувствителен
+    plain = inv.simulate(a, 1)
+    armored = inv.simulate(a, 1, trait="armored")
+    siege = inv.simulate(a, 1, trait="siege")
+    # трейт РЕАЛЬНО что-то меняет (не no-op)
+    key = lambda r: (r["rounds"], r["orc_hp_left"], r["army_hp_left"])
+    assert key(armored) != key(plain) or key(siege) != key(plain)
+    assert armored["orc_hp_left"] >= plain["orc_hp_left"]     # латная — свалить труднее
+    assert siege["army_hp_left"] <= plain["army_hp_left"]     # осадная — бьёт больнее
+
+
+def test_composition_and_need_hint():
+    c = inv.composition(_army({"tank": 2, "archer": 3, "scout": 1}))
+    assert c["tank"] == 2 and c["archer"] == 3 and c["scout"] == 1
+    assert c["front"] == 2 and c["n"] == 6                    # фронт = танки+ратники
+    assert "ФРОНТ" in inv.need_hint(_army({"archer": 5}), None)   # нет строя → тревога
+    armored = next(t for t in inv.TRAITS if t[0] == "armored")
+    hint = inv.need_hint(_army({"tank": 3}), armored)         # против латной нет рубак
+    assert "атаку" in hint.lower()
+    assert inv.need_hint([], None) and inv.need_hint(_army({"tank": 3, "archer": 2}), armored)
