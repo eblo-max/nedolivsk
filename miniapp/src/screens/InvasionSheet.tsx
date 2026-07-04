@@ -2,6 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
+import CoachTour, { useFirstVisitTour, type Step } from './CoachTour'
+
+// Онбординг первой встречи с ордой (показ 1 раз, флаг localStorage tour_orda):
+// объясняет суть, зачем ФРОНТ и как контрить слабость орды стойкой.
+const ORDA_STEPS: Step[] = [
+  { emoji: '🪓', title: 'Орда орков идёт', body: 'Волна нашествия на весь Недоливск — обороняемся сообща. За окно сбора подними войско: чем больше дружина, тем крепче отпор.' },
+  { sel: '[data-tour="orda-trait"]', place: 'bottom', emoji: '💀', title: 'Слабость орды', body: 'У каждой орды своя слабость. Закрой её нужной стойкой (отмечена ★) — тогда способности орка бьют слабее.' },
+  { sel: '[data-tour="orda-ready"]', place: 'bottom', emoji: '🛡', title: 'Держи строй', body: 'Нужен ФРОНТ — бойцы в стойке «В строй». Без строя орда прорвётся и выкосит стрелков. Полоска покажет, хватает ли сил.' },
+  { sel: '[data-tour="orda-stances"]', place: 'top', emoji: '⚔️', title: 'Встань в бой', body: 'Выбери роль: щит держит фронт, атака рубит, обход чистит проклятья, резерв — надёжная линия. Потом жми «Встать в строй».' },
+]
 
 // ── ФАЗА 1: панель сбора «Орда орков» — выбор СТОЙКИ (роли), слабость орды
 // (варлорд-трейт) и доска готовности. Автобой; агентность — в композиции. ──
@@ -24,6 +34,7 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
   const [pick, setPick] = useState<string>('')
   const [left, setLeft] = useState(0)
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const tour = useFirstVisitTour('orda')   // онбординг первой орды (1 раз)
 
   async function load() {
     try { const r = await api<State>('invasion/state', {}); setD(r); if (r.gather_left != null) setLeft(r.gather_left) } catch { /* keep */ }
@@ -50,6 +61,7 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
   const win = ready >= 0.7
 
   return createPortal(
+    <>
     <div className="sv-backdrop" onClick={onClose}>
       <div className="chron-sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 4px 8px' }}>
@@ -69,7 +81,7 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
           <div style={{ padding: '4px 14px 14px' }}>
             {/* Слабость орды (варлорд-трейт) */}
             {trait && (
-              <div style={{ margin: '8px 0', padding: '10px 12px', borderRadius: 12,
+              <div data-tour="orda-trait" style={{ margin: '8px 0', padding: '10px 12px', borderRadius: 12,
                 background: 'rgba(120,40,30,.25)', border: '1px solid #7a3a2a' }}>
                 <div style={{ fontWeight: 800, color: '#ffcf9a' }}>{trait.emoji} {trait.name}</div>
                 <div style={{ fontSize: 12.5, color: '#d8bfa0', marginTop: 3 }}>{trait.blurb}</div>
@@ -77,7 +89,7 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
             )}
 
             {/* Доска готовности */}
-            <div style={{ margin: '10px 0' }}>
+            <div data-tour="orda-ready" style={{ margin: '10px 0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: '#bfa775', marginBottom: 4 }}>
                 <span>Готовность дружины · {d?.n ?? 0} бойцов</span>
                 <span style={{ color: win ? '#8fd14f' : '#e0a94a', fontWeight: 700 }}>{win ? 'победа в кармане' : 'мало сил'}</span>
@@ -111,7 +123,7 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
             ) : (
               <>
                 <div style={{ fontSize: 13, color: '#bfa775', marginBottom: 6 }}>Выбери, кем встать в бой:</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div data-tour="orda-stances" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   {(d?.stances || []).map((s) => (
                     <button key={s.id} disabled={busy} onClick={() => setPick(s.id)}
                       style={{ textAlign: 'left', padding: '9px 11px', borderRadius: 12, cursor: 'pointer',
@@ -132,7 +144,9 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </div>
-    </div>,
+    </div>
+    {active && tour.show && <CoachTour steps={ORDA_STEPS} onDone={tour.finish} endLabel="⚔️ В бой!" />}
+    </>,
     document.body,
   )
 }
