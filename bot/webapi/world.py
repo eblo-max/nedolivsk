@@ -126,6 +126,21 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 #ordaBar.info{cursor:default;animation:none;background:linear-gradient(180deg,rgba(56,26,14,.94),rgba(34,15,7,.94))}
 #ordaBar.info .go{background:rgba(255,255,255,.12);color:#f0d8b0;box-shadow:none}
 @media (prefers-reduced-motion:reduce){#ordaBar{animation:none}}
+/* нижний HUD боя: ДВЕ подписанные полосы HP (орда/дружина), в бою вместо баннера-призыва */
+#battleHud{position:fixed;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 88px);z-index:1001;
+  display:none;max-width:520px;margin:0 auto;padding:10px 13px 11px;border-radius:16px;font-family:var(--serif);
+  background:linear-gradient(180deg,rgba(30,19,11,.95),rgba(16,10,6,.96));border:1px solid rgba(122,80,42,.55);
+  box-shadow:0 12px 34px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,220,170,.12)}
+.bh-title{text-align:center;font-weight:800;font-size:12.5px;color:#ffcf9a;letter-spacing:.3px;margin-bottom:8px;
+  text-shadow:0 1px 3px #000,0 0 8px rgba(255,90,50,.5)}
+.bh-row{display:flex;align-items:center;gap:9px;margin:5px 0}
+.bh-lbl{flex:none;width:108px;font-weight:700;font-size:12px;color:#e9dcc2;white-space:nowrap}
+.bh-bar{flex:1;height:11px;border-radius:6px;overflow:hidden;border:1px solid rgba(0,0,0,.5);background:#241109}
+.bh-bar.ally{background:#0c1608}
+.bh-bar i{display:block;height:100%;transition:width .3s ease}
+.bh-bar .orcf{background:linear-gradient(180deg,#ff5a3c,#c11e12)}
+.bh-bar .allyf{background:linear-gradient(180deg,#8fe05a,#3f9a24)}
+.bh-pct{flex:none;width:36px;text-align:right;font-weight:800;font-size:11.5px;color:#bfa775}
 /* ── Орда орков на карте: анимированный орк (spritesheet 10 кадров) + войска ── */
 .orc-ev{position:relative;width:100px;height:76px;pointer-events:auto;cursor:pointer}
 .orc-ev .orc{width:100px;height:76px;background:url('/assets/boss/ork1_idle.png') 0 0/1000px 76px no-repeat;
@@ -311,6 +326,7 @@ body.far .tav-pin .crown{opacity:0}
   <button id="mine">🏰 Моя таверна</button></div>
 <div id="raidbar"></div>
 <div id="ordaBar"></div>
+<div id="battleHud"></div>
 <div id="loader">Разворачиваем карту мира…</div>
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -536,16 +552,28 @@ function ordaBarUpdate(e,ph,el){
     ob.onclick=function(){try{parent.postMessage({t:'nedo-orda'},location.origin);}catch(_){}
       if(parent===window)location.href='/app/?startapp=orda';};
     ob.style.display='flex';
-  }else if(ph==='march'||ph==='battle'){
+  }else if(ph==='march'){
     ob.classList.add('info');ob.onclick=null;
-    ob.innerHTML=(ph==='march'?'🪓 <span>Орда наступает…</span>'
-      :'⚔️ <span>Битва за Недоливск</span>')+'<span class="go">Смотрим</span>';
+    ob.innerHTML='🪓 <span>Орда наступает на Недоливск…</span><span class="go">Смотрим</span>';
     ob.style.display='flex';
-  }else ob.style.display='none';
+  }else ob.style.display='none';   // бой/итог — призыв прячем, снизу работает HUD полосок HP
+}
+// Нижний HUD боя: две ПОДПИСАННЫЕ полосы HP (орда/дружина) вместо тесных полосок над орком.
+function battleHudUpdate(ph,orcPct,allyPct){
+  var bh=document.getElementById('battleHud');if(!bh)return;
+  if(ph!=='battle'&&ph!=='won'&&ph!=='lost'){bh.style.display='none';return;}
+  if(!bh.getAttribute('data-built')){bh.setAttribute('data-built','1');
+    bh.innerHTML='<div class="bh-title">⚔️ Битва за Недоливск</div>'
+      +'<div class="bh-row"><span class="bh-lbl">🪓 Орда орков</span><span class="bh-bar"><i class="orcf"></i></span><span class="bh-pct bh-op"></span></div>'
+      +'<div class="bh-row"><span class="bh-lbl">🛡 Наша дружина</span><span class="bh-bar ally"><i class="allyf"></i></span><span class="bh-pct bh-ap"></span></div>';}
+  bh.querySelector('.orcf').style.width=orcPct+'%';bh.querySelector('.allyf').style.width=allyPct+'%';
+  bh.querySelector('.bh-op').textContent=Math.round(orcPct)+'%';bh.querySelector('.bh-ap').textContent=Math.round(allyPct)+'%';
+  bh.style.display='block';
 }
 function renderInv(){
   if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';troopInvId=null;troopMarks=[];troopMeta=[];
-    var _ob=document.getElementById('ordaBar');if(_ob)_ob.style.display='none';return;}
+    var _ob=document.getElementById('ordaBar');if(_ob)_ob.style.display='none';
+    var _bh=document.getElementById('battleHud');if(_bh)_bh.style.display='none';return;}
   var e=invData,el=invElapsed(),ph=invPhase(e,el),lair=px(e.x*W,e.y*H);
   invPh=ph;maybeAutoResult(e,ph);   // тап по орку знает фазу + авто-модалка итогов (раз на бой)
   syncTroops(e);                    // дорисовать новоприбывших без пересбора всех (без мигания)
@@ -553,7 +581,7 @@ function renderInv(){
   var key=e.name+'|'+(ph==='battle'?'b':(ph==='won'?'w':(ph==='lost'?'l':'p')));
   if(key!==invKey){invLayer.clearLayers();
     var icon=L.divIcon({className:'orc-ev'+(ph==='battle'?' battle':''),iconSize:[100,76],iconAnchor:[50,76],
-      html:'<div class="aura"></div><div class="rage"></div><div class="curse"></div><div class="wolves"></div><div class="fx"></div><div class="boom"></div><div class="shield"></div><div class="dmgc"></div><div class="tel"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="ally"><i></i></div><div class="orc"></div>'});
+      html:'<div class="aura"></div><div class="rage"></div><div class="curse"></div><div class="wolves"></div><div class="fx"></div><div class="boom"></div><div class="shield"></div><div class="dmgc"></div><div class="tel"></div><div class="lbl"></div><div class="orc"></div>'});
     invM=L.marker(lair,{icon:icon,zIndexOffset:2000}).addTo(invLayer);
     invM.on('click',function(){   // не релоадим приложение — просим родителя открыть панель поверх карты
       if(invPh==='won'||invPh==='lost'){askResult(invPh==='won',true);return;}   // бой кончился → сводка итогов
@@ -577,20 +605,18 @@ function renderInv(){
       floatDmg(el2,(fi>0?tl[fi-1].h:(e.orc_hp_max||0))-fr.h);
       invFrameIdx=fi;
     }else if(ph!=='battle')invFrameIdx=-1;
-    var fill=el2.querySelector('.hp i');
-    if(fill){var hp;
-      if(ph==='won')hp=0;
-      else if(ph==='lost')hp=e.orc_hp_max?Math.max(6,100*e.orc_hp_left/e.orc_hp_max):50;
-      else if(fr)hp=100*fr.h/(e.orc_hp_max||1);
-      else{var endp=e.orc_hp_max?100*e.orc_hp_left/e.orc_hp_max:0;hp=Math.max(endp,100-(100-endp)*bp);}  // fallback без tl
-      fill.style.width=Math.max(0,Math.min(100,hp))+'%';}
-    // вторая полоса — HP ДРУЖИНЫ: видно, кто кого пересиливает (бой двусторонний)
-    var af=el2.querySelector('.ally i');
-    if(af){var ap;
-      if(ph==='lost')ap=8;
-      else if(fr)ap=100*fr.a/(e.army_hp_max||1);
-      else ap=(ph==='won')?50:Math.max(28,100-42*bp);       // fallback без tl: примерная убыль по прогрессу боя
-      af.style.width=Math.max(0,Math.min(100,ap))+'%';}
+    // HP орды и дружины СЧИТАЕМ здесь, а РИСУЕМ в нижнем подписанном HUD (над орком было
+    // тесно/нечитаемо). Дружина — общий запас HP всех записавшихся войск.
+    var orcHp;
+    if(ph==='won')orcHp=0;
+    else if(ph==='lost')orcHp=e.orc_hp_max?Math.max(6,100*e.orc_hp_left/e.orc_hp_max):50;
+    else if(fr)orcHp=100*fr.h/(e.orc_hp_max||1);
+    else{var endp=e.orc_hp_max?100*e.orc_hp_left/e.orc_hp_max:0;orcHp=Math.max(endp,100-(100-endp)*bp);}
+    var allyHp;
+    if(ph==='lost')allyHp=8;
+    else if(fr)allyHp=100*fr.a/(e.army_hp_max||1);
+    else allyHp=(ph==='won')?50:Math.max(28,100-42*bp);
+    battleHudUpdate(ph,Math.max(0,Math.min(100,orcHp)),Math.max(0,Math.min(100,allyHp)),e.n||0);
     // ТЕЛЕГРАФ способностей орка (только в бою): компактные иконки (без крупного баннера)
     // + эпичные слои-оверлеи (щит/ярость/проклятье/волки) с «pop» при смене набора.
     var b=(ph==='battle'&&fr)?fr:{},w=b.w?1:0,c=b.c?1:0,en=b.e?1:0,dd=b.d?1:0;
@@ -603,7 +629,7 @@ function renderInv(){
     var lb=el2.querySelector('.lbl');
     if(lb){if(ph==='gather')lb.textContent='🪓 СБОР · '+fmtT(e.gather_secs-el)+' ('+(e.n||0)+')';
       else if(ph==='march')lb.textContent='🪓 ОРДА ИДЁТ!';
-      else if(ph==='battle')lb.textContent='⚔️ БИТВА · '+fmtT(e.gather_secs+e.march_secs+e.battle_secs-el);
+      else if(ph==='battle')lb.textContent='⚔️ БИТВА ЗА НЕДОЛИВСК';   // без таймера — бой не по часам
       else if(ph==='won')lb.textContent='🏆 ОРДА ПОВЕРЖЕНА!';
       else if(ph==='lost')lb.textContent='💀 ОРДА ПРОРВАЛАСЬ…';
       else lb.textContent='…';}}}
