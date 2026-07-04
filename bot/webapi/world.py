@@ -63,14 +63,28 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
   border:1px solid #ff7a4a;box-shadow:0 4px 16px rgba(210,58,24,.5);animation:rb 1.6s ease-in-out infinite}
 @keyframes rb{0%,100%{box-shadow:0 4px 16px rgba(210,58,24,.45)}50%{box-shadow:0 4px 26px rgba(255,90,50,.8)}}
 #raidbar .go{margin-left:auto;opacity:.85}
-/* баннер Орды: заметный призыв «встать в строй» на сборе (не искать орка на карте) */
-#ordaBar{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 48px);z-index:1001;
-  display:none;align-items:center;gap:9px;padding:9px 13px;border-radius:14px;cursor:pointer;font-family:var(--serif);
-  color:#fff;font-weight:700;font-size:14px;background:linear-gradient(180deg,#c1521c,#7d2c0e);
-  border:1px solid #ff9a4a;box-shadow:0 4px 16px rgba(190,74,26,.5);animation:rb 1.6s ease-in-out infinite}
-#ordaBar .go{margin-left:auto;opacity:.92;white-space:nowrap}
-#ordaBar.reg{background:linear-gradient(180deg,#3f7a24,#255015);border-color:#7fd14f;animation:none}
-#ordaBar.info{cursor:default;animation:none;background:linear-gradient(180deg,#8a3a16,#5a220c)}
+/* баннер Орды: призыв «встать в строй» на сборе. СНИЗУ по центру, приподнят НАД
+   зум-контролами (чтобы не налезал ни на шапку сверху, ни на зум справа-снизу).
+   Ультрасовременная плавающая плашка: глубокий градиент, тёплое свечение, пилюля-CTA. */
+#ordaBar{position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(env(safe-area-inset-bottom,0px) + 74px);z-index:1001;width:max-content;max-width:calc(100vw - 24px);
+  display:none;align-items:center;gap:11px;padding:10px 12px 10px 16px;border-radius:18px;cursor:pointer;
+  font-family:var(--serif);font-weight:700;font-size:14px;color:#fbe6d2;letter-spacing:.2px;
+  background:linear-gradient(180deg,rgba(64,28,13,.96),rgba(36,15,7,.96));
+  border:1px solid rgba(255,150,70,.42);
+  box-shadow:0 12px 34px rgba(0,0,0,.55),0 0 22px rgba(210,90,30,.32),inset 0 1px 0 rgba(255,220,170,.14);
+  animation:ordaGlow 2.2s ease-in-out infinite}
+@keyframes ordaGlow{0%,100%{box-shadow:0 12px 34px rgba(0,0,0,.55),0 0 16px rgba(210,90,30,.28),inset 0 1px 0 rgba(255,220,170,.14)}
+  50%{box-shadow:0 12px 34px rgba(0,0,0,.55),0 0 32px rgba(255,120,50,.6),inset 0 1px 0 rgba(255,220,170,.2)}}
+#ordaBar>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ordaBar .go{flex:none;padding:6px 13px;border-radius:999px;font-size:12.5px;font-weight:800;white-space:nowrap;
+  background:linear-gradient(180deg,#ffd684,#e0972f);color:#3a1c05;box-shadow:0 2px 7px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.4)}
+#ordaBar.reg{border-color:rgba(126,209,79,.5);color:#e2f0cc;animation:none;
+  background:linear-gradient(180deg,rgba(34,64,22,.96),rgba(20,44,14,.96))}
+#ordaBar.reg .go{background:linear-gradient(180deg,#c3ec9a,#6fae3f);color:#123008}
+#ordaBar.info{cursor:default;animation:none;background:linear-gradient(180deg,rgba(56,26,14,.94),rgba(34,15,7,.94))}
+#ordaBar.info .go{background:rgba(255,255,255,.12);color:#f0d8b0;box-shadow:none}
+@media (prefers-reduced-motion:reduce){#ordaBar{animation:none}}
 /* ── Орда орков на карте: анимированный орк (spritesheet 10 кадров) + войска ── */
 .orc-ev{position:relative;width:100px;height:76px;pointer-events:auto;cursor:pointer}
 .orc-ev .orc{width:100px;height:76px;background:url('/assets/boss/ork1_idle.png') 0 0/1000px 76px no-repeat;
@@ -471,15 +485,15 @@ function ordaBarUpdate(e,ph,el){
   if(ph==='gather'){
     var t=fmtT(e.gather_secs-el),n=e.n||0;
     if(e.me){ob.classList.add('reg');
-      ob.innerHTML='✅ <span>Ты в строю · '+t+' · дружина '+n+'</span><span class="go">состав ›</span>';}
-    else ob.innerHTML='🪓 <span>Орда орков идёт! '+t+' · в строю '+n+'</span><span class="go">встать в строй ›</span>';
+      ob.innerHTML='✅ <span>Ты в строю · '+t+' · дружина '+n+'</span><span class="go">Состав</span>';}
+    else ob.innerHTML='🪓 <span>Орда идёт · '+t+' · '+n+' в строю</span><span class="go">В строй</span>';
     ob.onclick=function(){try{parent.postMessage({t:'nedo-orda'},location.origin);}catch(_){}
       if(parent===window)location.href='/app/?startapp=orda';};
     ob.style.display='flex';
   }else if(ph==='march'||ph==='battle'){
     ob.classList.add('info');ob.onclick=null;
-    ob.innerHTML=(ph==='march'?'🪓 <span>Орда наступает на Недоливск…</span>'
-      :'⚔️ <span>Битва за Недоливск…</span>')+'<span class="go">следим ›</span>';
+    ob.innerHTML=(ph==='march'?'🪓 <span>Орда наступает…</span>'
+      :'⚔️ <span>Битва за Недоливск</span>')+'<span class="go">Смотрим</span>';
     ob.style.display='flex';
   }else ob.style.display='none';
 }
