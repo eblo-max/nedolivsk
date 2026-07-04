@@ -25,7 +25,7 @@ export default function WorldMap() {
       if (data.t === 'nedo-orda') { setResOpen(false); setInvOpen(true) }          // панель сбора «в строй»
       else if (data.t === 'nedo-orda-result') {                                    // модалка итогов боя
         setInvOpen(false); setResOpen(true); setChip({ won: !!data.won })          // + оставляем чип для переоткрытия
-      } else if (data.t === 'nedo-orda-fx') haptic('heavy')                        // сильный гаптик на добивании/прорыве
+      } else if (data.t === 'nedo-orda-fx' || data.t === 'nedo-raid-fx') haptic('heavy')   // сильный гаптик на добивании
       else if (data.t === 'nedo-raid') { setInvOpen(false); setResOpen(false); setRaidOpen(true) }   // бой рейд-босса
     }
     window.addEventListener('message', onMsg)

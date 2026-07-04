@@ -78,6 +78,22 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
   font:800 12px/1 var(--serif);color:#ffcf9a;text-shadow:0 1px 3px #000,0 0 8px rgba(255,90,50,.7)}
 .raid-ev .rsub{position:absolute;left:50%;top:-46px;transform:translateX(-50%);white-space:nowrap;z-index:3;
   font:700 10.5px/1 var(--serif);color:#e9c98a;text-shadow:0 1px 3px #000}
+/* телеграф заклинаний босса (иконки) — переиспользует telPop от Орды */
+.raid-ev .rtel{position:absolute;left:50%;top:-60px;transform:translateX(-50%);white-space:nowrap;z-index:4;
+  font-size:16px;line-height:1;letter-spacing:2px;filter:drop-shadow(0 1px 3px #000);opacity:0;transition:opacity .25s;pointer-events:none}
+.raid-ev .rtel.on{opacity:1}
+.raid-ev .rtel.pop{animation:telPop .5s cubic-bezier(.2,.8,.3,1)}
+/* числа урона/лечения по боссу — переиспользуют dmgUp */
+.raid-ev .rdmgc{position:absolute;left:50%;top:34%;transform:translateX(-50%);width:0;height:0;z-index:6;pointer-events:none}
+.raid-ev .rdn{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;font:900 17px/1 var(--serif);
+  color:#ffe08a;text-shadow:0 0 9px rgba(255,150,40,.6),0 2px 4px #000;animation:dmgUp 1.1s ease-out forwards}
+.raid-ev .rdn.big{font-size:24px;color:#fff6c0;text-shadow:0 0 15px rgba(255,190,70,1),0 2px 5px #000}
+.raid-ev .rdn.heal{color:#8fe05a;text-shadow:0 0 9px rgba(120,220,80,.65),0 2px 4px #000}
+/* ударная волна добивания — переиспользует boom */
+.raid-ev .rboom{position:absolute;left:50%;top:40%;width:44px;height:44px;transform:translate(-50%,-50%) scale(.2);
+  border-radius:50%;border:4px solid rgba(255,224,150,.95);opacity:0;pointer-events:none;z-index:4;
+  box-shadow:0 0 26px rgba(255,180,90,.9),inset 0 0 20px rgba(255,120,60,.7)}
+.raid-ev.dead .rboom{animation:boom .7s cubic-bezier(.15,.7,.3,1) forwards}
 /* нижний CTA-баннер рейда (ультрасовременный, как у Орды) */
 #raidbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 74px);z-index:1000;
   width:max-content;max-width:calc(100vw - 24px);display:none;align-items:center;gap:11px;padding:10px 12px 10px 16px;
@@ -618,16 +634,22 @@ requestAnimationFrame(animTroops);                               // плавны
 // ── РЕЙД-БОСС на карте: живой маркер (эмодзи+аура по фазе+HP) + нижний CTA. Тап →
 // просим родителя открыть бой (RaidSheet) поверх карты, без релоада приложения. ──
 var raidLayer=L.layerGroup().addTo(map),raidM=null,raidData=null,raidKey='';
+var raidPrevHp=-1,raidTel='',raidFxKey='',_rdmgSide=0;   // дельта HP для чисел + телеграф + дедуп FX
 function openRaid(){try{parent.postMessage({t:'nedo-raid'},location.origin);}catch(e){}
   if(parent===window)location.href='/app/?startapp=raid';}
+// всплывающее число по боссу: урон (жёлт) или лечение/реген (зелёный «+»)
+function floatRaid(el,val,heal){var c=el&&el.querySelector('.rdmgc');if(!c||val<=0)return;
+  var s=document.createElement('span');s.className='rdn'+(heal?' heal':'')+(!heal&&val>=200?' big':'');
+  s.textContent=(heal?'+':'−')+val;s.style.left=((_rdmgSide++%2)?18:-18)+'px';
+  c.appendChild(s);setTimeout(function(){if(s.parentNode)s.parentNode.removeChild(s);},1100);}
 function renderRaid(){
   var r=raidData,rb=document.getElementById('raidbar');
-  if(!r){raidLayer.clearLayers();raidM=null;raidKey='';if(rb)rb.style.display='none';return;}
+  if(!r){raidLayer.clearLayers();raidM=null;raidKey='';raidPrevHp=-1;if(rb)rb.style.display='none';return;}
   var ph=r.phase||1,gath=r.status==='gathering',dead=r.status==='dead';
   var key=r.key+'|'+(dead?'d':(gath?'g':'p'+ph));
   if(key!==raidKey){raidLayer.clearLayers();
     var icon=L.divIcon({className:'raid-ev'+(dead?' dead':' ph'+ph),iconSize:[96,92],iconAnchor:[48,92],
-      html:'<div class="raura"></div><div class="rsub"></div><div class="rlbl"></div><div class="rhp"><i></i></div><div class="rboss">'+r.emoji+'</div>'});
+      html:'<div class="raura"></div><div class="rboom"></div><div class="rdmgc"></div><div class="rtel"></div><div class="rsub"></div><div class="rlbl"></div><div class="rhp"><i></i></div><div class="rboss">'+r.emoji+'</div>'});
     raidM=L.marker(px(r.x*W,r.y*H),{icon:icon,zIndexOffset:1900}).addTo(raidLayer);
     raidM.on('click',openRaid);raidKey=key;}
   var el=raidM.getElement();
@@ -636,7 +658,22 @@ function renderRaid(){
     if(fill)fill.style.width=hpPct+'%';
     if(hpEl)hpEl.style.opacity=(gath||dead)?'0':'1';
     if(lbl)lbl.textContent=r.emoji+' '+r.name;
-    if(sub)sub.textContent=dead?'🏆 ПОВЕРЖЕН!':(gath?'🔥 сбор рейда · '+(r.n||0)+' в деле':'⚔️ '+(r.n||0)+' рубятся · Фаза '+ph);}
+    if(sub)sub.textContent=dead?'🏆 ПОВЕРЖЕН!':(gath?'🔥 сбор рейда · '+(r.n||0)+' в деле':'⚔️ '+(r.n||0)+' рубятся · Фаза '+ph);
+    // числа урона/лечения по боссу (дельта HP за интервал поллинга)
+    if(!gath&&!dead&&raidPrevHp>=0){var dh=raidPrevHp-r.hp;
+      if(dh>0)floatRaid(el,dh,false); else if(dh<0)floatRaid(el,-dh,true);}
+    raidPrevHp=(gath||dead)?-1:r.hp;
+    // ТЕЛЕГРАФ заклинаний босса: 🛡 щит · 💀 проклятье · 👹 выводок · 🗣 рык
+    var rtel=el.querySelector('.rtel');
+    if(rtel){var bs=(r.ward?'🛡':'')+(r.curse?'💀':'')+(r.adds?'👹':'')+(r.roar?'🗣':'');
+      rtel.classList.toggle('on',!!bs);
+      if(bs!==raidTel){raidTel=bs;rtel.textContent=bs;
+        if(bs){rtel.classList.remove('pop');void rtel.offsetWidth;rtel.classList.add('pop');}}}
+    // FX добивания (раз на босса): ударная волна (CSS) + тряска карты + гаптик
+    if(dead&&raidFxKey!==r.key){raidFxKey=r.key;
+      var m=document.getElementById('map');
+      if(m){m.classList.remove('shake');void m.offsetWidth;m.classList.add('shake');setTimeout(function(){m.classList.remove('shake');},480);}
+      try{parent.postMessage({t:'nedo-raid-fx'},location.origin);}catch(_){}}}
   if(rb){
     rb.innerHTML='⚔️ <span>'+r.name+(dead?' повержен!':(gath?' — сбор рейда':' · рубят!'))+'</span><span class="go">'+(dead?'Итог':'В БОЙ')+'</span>';
     rb.onclick=openRaid;
@@ -783,11 +820,17 @@ async def _world_raid(request: web.Request) -> web.Response:
             spec = rd.BOSSES.get(boss.boss_key)
             if spec is not None:
                 mh = int(boss.max_hp or 0) or 1
+                active = boss.status == "active"
                 ev = {
                     "key": boss.boss_key, "emoji": spec.emoji, "name": spec.name,
                     "status": boss.status, "hp": max(0, int(boss.hp or 0)), "max_hp": mh,
                     "phase": rd.phase(boss), "n": rd.registered_count(boss),
                     "x": RAID_LAIR[0], "y": RAID_LAIR[1],
+                    # телеграф активных заклинаний босса (для иконок на карте)
+                    "ward": bool(active and rd.ward_left(boss) > 0),
+                    "curse": bool(active and rd.curse_left(boss) > 0),
+                    "adds": bool(active and rd.adds_hp(boss) > 0),
+                    "roar": bool(active and rd.stun_left(boss) > 0),
                 }
     return web.json_response({"raid": ev}, headers={"Cache-Control": "no-store"})
 
