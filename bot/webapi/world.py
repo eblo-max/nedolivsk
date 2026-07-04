@@ -113,17 +113,18 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
   border-radius:50%;background:radial-gradient(circle,rgba(120,200,70,.3),rgba(80,160,40,0) 68%);animation:orcAura 2.3s ease-in-out infinite}
 .orc-ev.battle .aura{background:radial-gradient(circle,rgba(255,70,50,.42),rgba(220,30,20,0) 66%);animation-duration:.9s}
 @keyframes orcAura{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(.92)}50%{opacity:.95;transform:translate(-50%,-50%) scale(1.16)}}
-.orc-ev .hp{position:absolute;left:50%;top:-15px;transform:translateX(-50%);width:104px;height:10px;z-index:3;
-  border-radius:6px;background:#2a0d0a;border:1px solid #5a1e14;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.6);opacity:0;transition:opacity .3s}
-.orc-ev.battle .hp{opacity:1}
-.orc-ev .hp i{display:block;height:100%;width:100%;border-radius:5px;transition:width .25s linear;background:linear-gradient(180deg,#ff5a3c,#c11e12)}
-/* вторая полоса — HP дружины (зелёная, тоньше, под полосой орды) */
-.orc-ev .ally{position:absolute;left:50%;top:-3px;transform:translateX(-50%);width:104px;height:6px;z-index:3;
-  border-radius:4px;background:#0c1608;border:1px solid rgba(0,0,0,.55);overflow:hidden;opacity:0;transition:opacity .3s}
+/* ДВЕ полосы стопкой НАД орком (не на нём): орда (красная) сверху, дружина (зелёная)
+   под ней — сразу видно, кто кого пересиливает */
+.orc-ev .hp{position:absolute;left:50%;top:-30px;transform:translateX(-50%);width:104px;height:8px;z-index:3;
+  border-radius:5px;background:#2a0d0a;border:1px solid #5a1e14;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.6);opacity:0;transition:opacity .3s}
+.orc-ev.battle .hp,.orc-ev.dead .hp{opacity:1}
+.orc-ev .hp i{display:block;height:100%;width:100%;border-radius:4px;transition:width .25s linear;background:linear-gradient(180deg,#ff5a3c,#c11e12)}
+.orc-ev .ally{position:absolute;left:50%;top:-19px;transform:translateX(-50%);width:104px;height:8px;z-index:3;
+  border-radius:5px;background:#0c1608;border:1px solid rgba(0,0,0,.55);overflow:hidden;opacity:0;transition:opacity .3s}
 .orc-ev.battle .ally,.orc-ev.dead .ally{opacity:1}
-.orc-ev .ally i{display:block;height:100%;width:100%;transition:width .25s linear;background:linear-gradient(180deg,#8fe05a,#3f9a24)}
+.orc-ev .ally i{display:block;height:100%;width:100%;border-radius:4px;transition:width .25s linear;background:linear-gradient(180deg,#8fe05a,#3f9a24)}
 /* телеграф способностей орка: иконки активных баффов + «pop» при активации */
-.orc-ev .tel{position:absolute;left:50%;top:-54px;transform:translateX(-50%);white-space:nowrap;z-index:4;
+.orc-ev .tel{position:absolute;left:50%;top:-60px;transform:translateX(-50%);white-space:nowrap;z-index:4;
   font-size:17px;line-height:1;letter-spacing:2px;filter:drop-shadow(0 1px 3px #000);opacity:0;transition:opacity .25s;pointer-events:none}
 .orc-ev.battle .tel{opacity:1}
 .orc-ev .tel.pop{animation:telPop .5s cubic-bezier(.2,.8,.3,1)}
@@ -150,22 +151,15 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 @keyframes auraP{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5}50%{transform:translate(-50%,-50%) scale(1.18);opacity:.92}}
 @keyframes curseP{0%,100%{transform:translate(-50%,-52%) scale(1) rotate(0);opacity:.38}50%{transform:translate(-50%,-48%) scale(1.12) rotate(8deg);opacity:.78}}
 @keyframes shieldP{0%,100%{transform:translate(-50%,-50%) scale(.95);opacity:.75}50%{transform:translate(-50%,-50%) scale(1.07);opacity:1}}
-/* крупный баннер активации способности («🗣 ЯРОСТЬ» и т.п.) — влетает на ~1.4с */
-.orc-ev .banner{position:absolute;left:50%;top:-72px;transform:translateX(-50%);white-space:nowrap;z-index:5;
-  font:800 13px/1 var(--serif);color:#fff;text-shadow:0 2px 6px #000,0 0 12px rgba(255,130,50,.85);
-  padding:4px 11px;border-radius:11px;background:rgba(24,10,4,.72);border:1px solid rgba(255,150,60,.6);opacity:0;pointer-events:none}
-.orc-ev .banner.show{animation:bannerF 1.4s ease-out}
-@keyframes bannerF{0%{opacity:0;transform:translateX(-50%) translateY(9px) scale(.8)}14%{opacity:1;transform:translateX(-50%) translateY(0) scale(1.1)}30%{transform:translateX(-50%) scale(1)}78%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-9px)}}
-@media (prefers-reduced-motion:reduce){.orc-ev .rage,.orc-ev .curse,.orc-ev .wolves,.orc-ev .shield{animation:none!important}.orc-ev .banner.show{animation:none;opacity:1}}
-/* всплывающие числа урона над орком (жёлтые — по орде, красные — по дружине) */
-.orc-ev .dmgc{position:absolute;left:50%;top:22%;transform:translateX(-50%);width:0;height:0;z-index:6;pointer-events:none}
-.orc-ev .dn{position:absolute;transform:translateX(-50%);white-space:nowrap;font:800 15px/1 var(--serif);text-shadow:0 2px 4px #000;animation:dmgUp 1s ease-out forwards}
-.orc-ev .dn.orc{color:#ffe08a;top:-10px}
-.orc-ev .dn.orc.big{font-size:21px;color:#fff3b0;text-shadow:0 0 11px rgba(255,180,60,.95),0 2px 4px #000}
-.orc-ev .dn.ally{color:#ff8272;font-size:12.5px;top:16px}
-@keyframes dmgUp{0%{opacity:0;transform:translateX(-50%) translateY(7px) scale(.7)}18%{opacity:1;transform:translateX(-50%) translateY(0) scale(1.12)}100%{opacity:0;transform:translateX(-50%) translateY(-32px) scale(1)}}
-@media (prefers-reduced-motion:reduce){.orc-ev .dn{animation-duration:.45s}}
-.orc-ev .lbl{position:absolute;left:50%;top:-34px;transform:translateX(-50%);white-space:nowrap;z-index:3;
+@media (prefers-reduced-motion:reduce){.orc-ev .rage,.orc-ev .curse,.orc-ev .wolves,.orc-ev .shield{animation:none!important}}
+/* всплывающие числа урона по ОРДЕ — чистые (без плашки), крупные, всплывают над орком */
+.orc-ev .dmgc{position:absolute;left:50%;top:34%;transform:translateX(-50%);width:0;height:0;z-index:6;pointer-events:none}
+.orc-ev .dn{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;
+  font:900 18px/1 var(--serif);color:#ffe08a;text-shadow:0 0 9px rgba(255,150,40,.65),0 2px 4px #000;animation:dmgUp 1.1s ease-out forwards}
+.orc-ev .dn.big{font-size:25px;color:#fff6c0;text-shadow:0 0 15px rgba(255,190,70,1),0 2px 5px #000}
+@keyframes dmgUp{0%{opacity:0;transform:translateX(-50%) translateY(6px) scale(.6)}20%{opacity:1;transform:translateX(-50%) translateY(-2px) scale(1.15)}100%{opacity:0;transform:translateX(-50%) translateY(-44px) scale(1)}}
+@media (prefers-reduced-motion:reduce){.orc-ev .dn{animation-duration:.5s}}
+.orc-ev .lbl{position:absolute;left:50%;top:-46px;transform:translateX(-50%);white-space:nowrap;z-index:3;
   font:800 12px/1 var(--serif);color:#cdeba6;text-shadow:0 1px 3px #000,0 0 7px rgba(120,200,80,.6);letter-spacing:.3px}
 .orc-ev.battle .lbl{color:#ffcf9a;text-shadow:0 1px 3px #000,0 0 8px rgba(255,90,50,.7)}
 /* эффект удара по боссу (fire-стрип 7 кадров, только в бою; аддитивное свечение) */
@@ -417,15 +411,14 @@ var invLayer=L.layerGroup().addTo(map),invTroops=L.layerGroup().addTo(map);
 var invM=null,invKey='',invData=null,invBaseEl=0,invAtMs=0;
 var troopMarks=[],troopMeta=[],troopInvId=null;
 var invPh='',invResultKey='',invBmask=0,invFrameIdx=-1;   // фаза + дедуп модалки + маска баффов + индекс кадра боя (для чисел урона)
-// Крупный баннер активации способности над орком (перезапуск CSS-анимации).
-function showBanner(el2,txt){var b=el2&&el2.querySelector('.banner');if(!b)return;
-  b.textContent=txt;b.classList.remove('show');void b.offsetWidth;b.classList.add('show');}
-// Всплывающее число урона над орком (kind 'orc' — по орде, 'ally' — по дружине).
-function floatDmg(el2,val,kind){var c=el2&&el2.querySelector('.dmgc');if(!c||val<=0)return;
+// Всплывающее число урона по орде: чистое (без плашки), крупный удар — ярче/больше.
+// Чётко над орком, лёгкое чередование сторон (детерминированно, без «каши» из random).
+var _dmgSide=0;
+function floatDmg(el2,val){var c=el2&&el2.querySelector('.dmgc');if(!c||val<=0)return;
   var s=document.createElement('span');
-  s.className='dn '+kind+(kind==='orc'&&val>=45?' big':'');   // крупный удар — ярче
-  s.textContent='−'+val;s.style.left=((Math.random()*26-13)|0)+'px';
-  c.appendChild(s);setTimeout(function(){if(s.parentNode)s.parentNode.removeChild(s);},1000);}
+  s.className='dn'+(val>=45?' big':'');s.textContent='−'+val;
+  s.style.left=((_dmgSide++%2)?18:-18)+'px';   // чуть влево/вправо по очереди — не стопкой
+  c.appendChild(s);setTimeout(function(){if(s.parentNode)s.parentNode.removeChild(s);},1100);}
 // Итоги боя: просим родителя (React) открыть модалку с полной сводкой. Авто — один
 // раз на нашествие (флаг в localStorage переживает перезаход карты); тап по орку —
 // принудительно (manual), в обход дедупа.
@@ -521,7 +514,7 @@ function renderInv(){
   var key=e.name+'|'+(ph==='battle'?'b':(ph==='won'?'w':(ph==='lost'?'l':'p')));
   if(key!==invKey){invLayer.clearLayers();
     var icon=L.divIcon({className:'orc-ev'+(ph==='battle'?' battle':''),iconSize:[100,76],iconAnchor:[50,76],
-      html:'<div class="aura"></div><div class="rage"></div><div class="curse"></div><div class="wolves"></div><div class="fx"></div><div class="boom"></div><div class="shield"></div><div class="dmgc"></div><div class="banner"></div><div class="tel"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="ally"><i></i></div><div class="orc"></div>'});
+      html:'<div class="aura"></div><div class="rage"></div><div class="curse"></div><div class="wolves"></div><div class="fx"></div><div class="boom"></div><div class="shield"></div><div class="dmgc"></div><div class="tel"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="ally"><i></i></div><div class="orc"></div>'});
     invM=L.marker(lair,{icon:icon,zIndexOffset:2000}).addTo(invLayer);
     invM.on('click',function(){   // не релоадим приложение — просим родителя открыть панель поверх карты
       if(invPh==='won'||invPh==='lost'){askResult(invPh==='won',true);return;}   // бой кончился → сводка итогов
@@ -540,10 +533,9 @@ function renderInv(){
     if(tl.length){
       if(ph==='battle'){fi=Math.min(tl.length-1,Math.floor(bp*tl.length));fr=tl[fi];}
       else if(ph==='won'||ph==='lost')fr=tl[tl.length-1];}
-    // всплывающие числа урона при СМЕНЕ кадра боя: дельта HP орды/дружины за раунд
+    // всплывающее число урона по ОРДЕ при смене кадра боя (дельта HP орды за раунд)
     if(ph==='battle'&&fi>=0&&fi!==invFrameIdx){
-      floatDmg(el2,(fi>0?tl[fi-1].h:(e.orc_hp_max||0))-fr.h,'orc');   // урон армии по орде
-      floatDmg(el2,(fi>0?tl[fi-1].a:(e.army_hp_max||0))-fr.a,'ally'); // урон орды по дружине
+      floatDmg(el2,(fi>0?tl[fi-1].h:(e.orc_hp_max||0))-fr.h);
       invFrameIdx=fi;
     }else if(ph!=='battle')invFrameIdx=-1;
     var fill=el2.querySelector('.hp i');
@@ -560,13 +552,11 @@ function renderInv(){
       else if(fr)ap=100*fr.a/(e.army_hp_max||1);
       else ap=(ph==='won')?55:100;                          // fallback без tl
       af.style.width=Math.max(0,Math.min(100,ap))+'%';}
-    // ТЕЛЕГРАФ способностей орка (только в бою): иконки-строка + КРУПНЫЙ баннер при
-    // активации каждой способности + эпичные слои-оверлеи (щит/ярость/проклятье/волки).
+    // ТЕЛЕГРАФ способностей орка (только в бою): компактные иконки (без крупного баннера)
+    // + эпичные слои-оверлеи (щит/ярость/проклятье/волки) с «pop» при смене набора.
     var b=(ph==='battle'&&fr)?fr:{},w=b.w?1:0,c=b.c?1:0,en=b.e?1:0,dd=b.d?1:0;
     var mask=w|(c<<1)|(en<<2)|(dd<<3),tel=el2.querySelector('.tel');
-    if(mask!==invBmask){var added=mask&~invBmask;invBmask=mask;
-      var nm=(added&1)?'🛡 СТЕНА ЩИТОВ':(added&2)?'💀 ПРОКЛЯТЬЕ':(added&4)?'🗣 ЯРОСТЬ':(added&8)?'🐺 ЗОВ СТАИ':'';
-      if(nm)showBanner(el2,nm);
+    if(mask!==invBmask){invBmask=mask;
       if(tel){tel.textContent=(w?'🛡':'')+(c?'💀':'')+(en?'🗣':'')+(dd?'🐺':'');
         if(mask){tel.classList.remove('pop');void tel.offsetWidth;tel.classList.add('pop');}}}
     el2.classList.toggle('warded',!!w);el2.classList.toggle('cursed',!!c);   // слои-оверлеи баффов
