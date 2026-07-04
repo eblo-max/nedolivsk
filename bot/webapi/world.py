@@ -530,10 +530,11 @@ async def _world_invasion(request: web.Request) -> web.Response:
         uid = int(request.query.get("uid", "0"))
     except ValueError:
         uid = 0
-    # ВРЕМЕННО: орда на карте открыта ТОЛЬКО админу (обкатка фичи). Гейт по ?uid —
-    # мягкий (для скрытия сырого, не безопасность): обычный игрок орка не увидит.
+    # Пока идёт обкатка (invmod.MAP_PUBLIC=False) орда на карте видна ТОЛЬКО админу.
+    # Гейт по ?uid — мягкий (скрыть сырое, не безопасность). Запуск = MAP_PUBLIC=True.
     from bot.config import settings
-    if uid != settings.admin_id:
+    from bot.game import invasion as invmod
+    if not invmod.MAP_PUBLIC and uid != settings.admin_id:
         return web.json_response({"inv": None}, headers={"Cache-Control": "no-store"})
     from bot.webapi.invasion import _invasion_event
     conts = _world_continents()

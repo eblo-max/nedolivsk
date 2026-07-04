@@ -366,3 +366,16 @@ def test_rewards_toggle_is_wired():
     assert isinstance(inv.REWARDS_ENABLED, bool)
     src = inspect.getsource(notifier._apply_invasion)
     assert "REWARDS_ENABLED" in src and "return" in src   # награды под гейтом флага
+
+
+def test_launch_gate_is_single_flag():
+    """Чек-лист запуска: видимость орды на карте/в сводке — единый флаг MAP_PUBLIC,
+    подключённый к ОБОИМ гейтам (_world_invasion и _api_invasion_result). Запуск =
+    один атомарный флип MAP_PUBLIC=True (+ REWARDS_ENABLED=True). Тест ловит, если
+    гейт где-то захардкожен мимо флага."""
+    import inspect
+    from bot.webapi import invasion as invapi
+    from bot.webapi import world as worldapi
+    assert isinstance(inv.MAP_PUBLIC, bool)
+    assert "MAP_PUBLIC" in inspect.getsource(worldapi._world_invasion)
+    assert "MAP_PUBLIC" in inspect.getsource(invapi._api_invasion_result)

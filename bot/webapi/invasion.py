@@ -205,7 +205,7 @@ async def _api_invasion_result(request: web.Request) -> web.Response:
     uid, body = await _auth(request)
     if uid is None:
         return body
-    if not _is_admin(uid):
+    if not invmod.MAP_PUBLIC and not _is_admin(uid):     # обкатка: сводка боя — только админу
         return web.json_response({"ok": False, "error": "forbidden"}, status=403)
     now = datetime.now(timezone.utc)
     async with session_factory() as s:
