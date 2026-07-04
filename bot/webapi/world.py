@@ -129,10 +129,12 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 .orc-fig.dead .hf{animation:heroWalk .9s steps(10) 1 forwards}
 .orc-fig.mine .hf{filter:drop-shadow(0 0 6px #ffd27a) drop-shadow(0 2px 2px #000)}
 .orc-line{stroke:#9ad35a;stroke-width:1.6;fill:none;opacity:.45;stroke-dasharray:5 9;animation:march 1.1s linear infinite}
-.orc-line.mine{stroke:#ffd27a;stroke-width:2.2;opacity:.9}
-@keyframes march{to{stroke-dashoffset:-14}}
-/* воины видны на ЛЮБОМ зуме во время рейда (раньше пряли на далёком); нити — доп.контекст далеко */
-body:not(.far) .orc-line{opacity:0}
+/* СВОЯ нить «таверна → босс» — яркая, толстая, со свечением, видна на ЛЮБОМ зуме */
+.orc-line.mine{stroke:#ffe08a;stroke-width:3.4;opacity:1;stroke-dasharray:9 6;stroke-linecap:round;
+  filter:drop-shadow(0 0 4px rgba(255,205,90,.95)) drop-shadow(0 0 8px rgba(255,180,50,.5));animation:march .9s linear infinite}
+@keyframes march{to{stroke-dashoffset:-15}}
+/* воины видны на ЛЮБОМ зуме; ЧУЖИЕ нити — только на обзоре (иначе каша), СВОЯ — всегда */
+body:not(.far) .orc-line:not(.mine){opacity:0}
 /* фокус рейда: не-участники таверн скрыты */
 .tav-pin.raid-hidden{opacity:0;transition:opacity .4s;pointer-events:none}
 /* названия регионов — «гравировка»: разрядка + halo, без плашки, ПОД пинами */
