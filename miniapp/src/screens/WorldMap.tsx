@@ -4,6 +4,7 @@ import { haptic, tgUser } from '../telegram'
 
 const InvasionSheet = lazy(() => import('./InvasionSheet'))
 const InvasionResult = lazy(() => import('./InvasionResult'))
+const RaidSheet = lazy(() => import('./RaidSheet'))
 
 // Вкладка «Карта мира» — ОТКРЫТА ВСЕМ игрокам. Полноценная тайловая карта (/world,
 // Leaflet) грузится в iframe на весь экран между шапкой и навбаром; uid пробрасываем
@@ -14,6 +15,7 @@ export default function WorldMap() {
   const uid = tgUser()?.id || 0
   const [invOpen, setInvOpen] = useState(false)
   const [resOpen, setResOpen] = useState(false)
+  const [raidOpen, setRaidOpen] = useState(false)                   // бой рейд-босса поверх карты
   const [chip, setChip] = useState<{ won: boolean } | null>(null)   // «Итог последнего боя» — переоткрыть, если пропустил
 
   useEffect(() => {
@@ -24,6 +26,7 @@ export default function WorldMap() {
       else if (data.t === 'nedo-orda-result') {                                    // модалка итогов боя
         setInvOpen(false); setResOpen(true); setChip({ won: !!data.won })          // + оставляем чип для переоткрытия
       } else if (data.t === 'nedo-orda-fx') haptic('heavy')                        // сильный гаптик на добивании/прорыве
+      else if (data.t === 'nedo-raid') { setInvOpen(false); setResOpen(false); setRaidOpen(true) }   // бой рейд-босса
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
@@ -69,6 +72,11 @@ export default function WorldMap() {
       {resOpen && (
         <Suspense fallback={null}>
           <InvasionResult onClose={() => setResOpen(false)} />
+        </Suspense>
+      )}
+      {raidOpen && (
+        <Suspense fallback={null}>
+          <RaidSheet onClose={() => setRaidOpen(false)} />
         </Suspense>
       )}
     </div>

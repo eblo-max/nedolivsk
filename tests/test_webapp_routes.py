@@ -25,6 +25,7 @@ ROUTES = [
     "GET /world _world_page",
     "GET /world/slots.json _world_slots",
     "GET /world/invasion.json _world_invasion",
+    "GET /world/raid.json _world_raid",
     "GET /world/taverns.json _world_taverns",
     "GET /world/tiles/{z}/{x}/{y}.jpg _world_tile",
     "GET /world/tiles/{z}/{x}/{y}.webp _world_tile",

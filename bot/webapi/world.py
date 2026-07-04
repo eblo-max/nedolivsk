@@ -57,12 +57,37 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
   padding:6px 14px;font-weight:700;font-size:13px;color:#241405;cursor:pointer;font-family:var(--serif);
   background:linear-gradient(180deg,#ffe09a,#dca03c);box-shadow:0 2px 9px rgba(220,160,40,.45),inset 0 1px 0 rgba(255,255,220,.5)}
 /* баннер рейда */
-#raidbar{position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 48px);z-index:1000;
-  display:none;align-items:center;gap:9px;padding:9px 13px;border-radius:14px;cursor:pointer;font-family:var(--serif);
-  color:#fff;font-weight:700;font-size:14px;background:linear-gradient(180deg,#d23a18,#9a2a10);
-  border:1px solid #ff7a4a;box-shadow:0 4px 16px rgba(210,58,24,.5);animation:rb 1.6s ease-in-out infinite}
 @keyframes rb{0%,100%{box-shadow:0 4px 16px rgba(210,58,24,.45)}50%{box-shadow:0 4px 26px rgba(255,90,50,.8)}}
-#raidbar .go{margin-left:auto;opacity:.85}
+/* ── РЕЙД-БОСС на карте: живой маркер (крупный эмодзи + аура по фазе + HP-полоса) ── */
+.raid-ev{position:relative;width:96px;height:92px;pointer-events:auto;cursor:pointer}
+.raid-ev .rboss{position:absolute;left:50%;bottom:0;transform:translateX(-50%);font-size:58px;line-height:1;
+  filter:drop-shadow(0 6px 10px rgba(0,0,0,.7));animation:rbossFloat 2.4s ease-in-out infinite}
+@keyframes rbossFloat{0%,100%{transform:translateX(-50%) translateY(0) rotate(-2deg)}50%{transform:translateX(-50%) translateY(-5px) rotate(2deg)}}
+.raid-ev .raura{position:absolute;left:50%;bottom:2px;width:120px;height:120px;transform:translate(-50%,0);z-index:-1;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,120,50,.5),rgba(200,40,20,0) 66%);animation:orcAura 1.6s ease-in-out infinite}
+.raid-ev.ph2 .raura{background:radial-gradient(circle,rgba(255,70,40,.6),rgba(210,25,15,0) 64%);animation-duration:1.1s}
+.raid-ev.ph3 .raura{background:radial-gradient(circle,rgba(255,40,60,.7),rgba(190,10,30,0) 62%);animation-duration:.7s}
+.raid-ev.ph3 .rboss{animation:rbossRage .45s ease-in-out infinite}
+@keyframes rbossRage{0%,100%{transform:translateX(-50%) translate(0,0)}25%{transform:translateX(-50%) translate(-3px,-2px)}75%{transform:translateX(-50%) translate(3px,-1px)}}
+.raid-ev.dead .rboss{animation:orcFade 1.6s ease-out forwards}
+.raid-ev .rhp{position:absolute;left:50%;top:-16px;transform:translateX(-50%);width:100px;height:9px;z-index:3;
+  border-radius:5px;background:#2a0d0a;border:1px solid #6a2016;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.6)}
+.raid-ev .rhp i{display:block;height:100%;width:100%;border-radius:4px;transition:width .4s ease;background:linear-gradient(180deg,#ff6a3c,#c11e12)}
+.raid-ev.ph3 .rhp i{background:linear-gradient(180deg,#ff3a6a,#b0102e)}
+.raid-ev .rlbl{position:absolute;left:50%;top:-34px;transform:translateX(-50%);white-space:nowrap;z-index:3;
+  font:800 12px/1 var(--serif);color:#ffcf9a;text-shadow:0 1px 3px #000,0 0 8px rgba(255,90,50,.7)}
+.raid-ev .rsub{position:absolute;left:50%;top:-46px;transform:translateX(-50%);white-space:nowrap;z-index:3;
+  font:700 10.5px/1 var(--serif);color:#e9c98a;text-shadow:0 1px 3px #000}
+/* нижний CTA-баннер рейда (ультрасовременный, как у Орды) */
+#raidbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 74px);z-index:1000;
+  width:max-content;max-width:calc(100vw - 24px);display:none;align-items:center;gap:11px;padding:10px 12px 10px 16px;
+  border-radius:18px;cursor:pointer;font-family:var(--serif);font-weight:700;font-size:14px;color:#ffe0cf;letter-spacing:.2px;
+  background:linear-gradient(180deg,rgba(150,42,24,.96),rgba(84,20,12,.96));border:1px solid rgba(255,120,70,.5);
+  box-shadow:0 12px 34px rgba(0,0,0,.55),0 0 22px rgba(230,70,30,.34);animation:rb 1.9s ease-in-out infinite}
+#raidbar>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#raidbar .go{flex:none;padding:6px 13px;border-radius:999px;font-size:12.5px;font-weight:800;white-space:nowrap;
+  background:linear-gradient(180deg,#ff9a5a,#e0562a);color:#2a0f04;box-shadow:0 2px 7px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.35)}
+@media (prefers-reduced-motion:reduce){#raidbar{animation:none}.raid-ev .rboss,.raid-ev .raura{animation:none}}
 /* баннер Орды: призыв «встать в строй» на сборе. СНИЗУ по центру, приподнят НАД
    зум-контролами (чтобы не налезал ни на шапку сверху, ни на зум справа-снизу).
    Ультрасовременная плавающая плашка: глубокий градиент, тёплое свечение, пилюля-CTA. */
@@ -392,10 +417,8 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
   });
   if(cluster){map.addLayer(cluster);cluster.on('animationend',queueRelayout);}
   queueRelayout();setTimeout(queueRelayout,300);
-  // баннер рейда
-  if(d.raid){var rb=document.getElementById('raidbar');
-    rb.innerHTML=d.raid.emoji+' <span>'+esc(d.raid.name)+' — '+(d.raid.status==='gathering'?'идёт сбор!':'В БОЙ!')+'</span><span class="go">играть ›</span>';
-    rb.style.display='flex';rb.onclick=function(){(window.top||window).location.href='/app/?startapp=raid';};}
+  // рейд-босс теперь ЖИВОЙ маркер на карте + нижний CTA (см. pollRaid/renderRaid ниже),
+  // а не статичный верхний баннер из taverns.json.
   // кнопка «моя таверна»
   var mb=document.getElementById('mine');
   if(myMarker){mb.onclick=function(){
@@ -591,6 +614,39 @@ function animTroops(ts){
   requestAnimationFrame(animTroops);}
 pollInv();setInterval(pollInv,5000);setInterval(renderInv,250);   // рефетч 5с + тяжёлый рендер 4fps
 requestAnimationFrame(animTroops);                               // плавный марш/орбита/отход ~45fps
+
+// ── РЕЙД-БОСС на карте: живой маркер (эмодзи+аура по фазе+HP) + нижний CTA. Тап →
+// просим родителя открыть бой (RaidSheet) поверх карты, без релоада приложения. ──
+var raidLayer=L.layerGroup().addTo(map),raidM=null,raidData=null,raidKey='';
+function openRaid(){try{parent.postMessage({t:'nedo-raid'},location.origin);}catch(e){}
+  if(parent===window)location.href='/app/?startapp=raid';}
+function renderRaid(){
+  var r=raidData,rb=document.getElementById('raidbar');
+  if(!r){raidLayer.clearLayers();raidM=null;raidKey='';if(rb)rb.style.display='none';return;}
+  var ph=r.phase||1,gath=r.status==='gathering',dead=r.status==='dead';
+  var key=r.key+'|'+(dead?'d':(gath?'g':'p'+ph));
+  if(key!==raidKey){raidLayer.clearLayers();
+    var icon=L.divIcon({className:'raid-ev'+(dead?' dead':' ph'+ph),iconSize:[96,92],iconAnchor:[48,92],
+      html:'<div class="raura"></div><div class="rsub"></div><div class="rlbl"></div><div class="rhp"><i></i></div><div class="rboss">'+r.emoji+'</div>'});
+    raidM=L.marker(px(r.x*W,r.y*H),{icon:icon,zIndexOffset:1900}).addTo(raidLayer);
+    raidM.on('click',openRaid);raidKey=key;}
+  var el=raidM.getElement();
+  if(el){var fill=el.querySelector('.rhp i'),hpEl=el.querySelector('.rhp'),lbl=el.querySelector('.rlbl'),sub=el.querySelector('.rsub');
+    var hpPct=dead?0:(gath?100:(r.max_hp?Math.max(0,Math.min(100,100*r.hp/r.max_hp)):100));
+    if(fill)fill.style.width=hpPct+'%';
+    if(hpEl)hpEl.style.opacity=(gath||dead)?'0':'1';
+    if(lbl)lbl.textContent=r.emoji+' '+r.name;
+    if(sub)sub.textContent=dead?'🏆 ПОВЕРЖЕН!':(gath?'🔥 сбор рейда · '+(r.n||0)+' в деле':'⚔️ '+(r.n||0)+' рубятся · Фаза '+ph);}
+  if(rb){
+    rb.innerHTML='⚔️ <span>'+r.name+(dead?' повержен!':(gath?' — сбор рейда':' · рубят!'))+'</span><span class="go">'+(dead?'Итог':'В БОЙ')+'</span>';
+    rb.onclick=openRaid;
+    var ob=document.getElementById('ordaBar'),ordaShown=ob&&ob.style.display==='flex';   // не наложиться на баннер Орды
+    rb.style.bottom='calc(env(safe-area-inset-bottom,0px) + '+(ordaShown?134:74)+'px)';
+    rb.style.display='flex';}
+}
+function pollRaid(){fetch('/world/raid.json').then(function(r){return r.json();})
+  .then(function(d){raidData=d.raid;renderRaid();}).catch(function(){});}
+pollRaid();setInterval(pollRaid,5000);
 </script></body></html>"""
 
 
@@ -699,6 +755,41 @@ def _atlas_pos(pl_id: int, region: str, conts: list, nc: int) -> tuple[float, fl
     rr = 0.095 * math.sqrt(h2 / 4294967296.0)
     return (min(0.997, max(0.003, c["x"] + rr * math.cos(a))),
             min(0.997, max(0.003, c["y"] + rr * math.sin(a))))
+
+
+RAID_LAIR = (0.40, 0.85)   # логово рейд-босса на карте (юг, вдали от Орды на севере)
+
+
+async def _world_raid(request: web.Request) -> web.Response:
+    """Лёгкий поллинг рейд-босса для карты: логово, emoji/имя, HP/фаза/бойцы, статус.
+    Read-only, открыт ВСЕМ (рейд — публичная механика). Свежий труп показываем ~14с
+    (окно «повержен» под FX добивания)."""
+    from datetime import datetime, timezone
+
+    from bot.game import raid as rd
+    ev = None
+    async with session_factory() as s:
+        boss = await repo.get_active_raid(s)
+        if boss is None:
+            boss = await repo.latest_raid(s)          # мог только что пасть
+        show = False
+        if boss is not None:
+            if boss.status in ("gathering", "active"):
+                show = True
+            elif boss.status == "dead" and boss.ends_at:
+                ea = boss.ends_at if boss.ends_at.tzinfo else boss.ends_at.replace(tzinfo=timezone.utc)
+                show = (datetime.now(timezone.utc) - ea).total_seconds() < 14
+        if show:
+            spec = rd.BOSSES.get(boss.boss_key)
+            if spec is not None:
+                mh = int(boss.max_hp or 0) or 1
+                ev = {
+                    "key": boss.boss_key, "emoji": spec.emoji, "name": spec.name,
+                    "status": boss.status, "hp": max(0, int(boss.hp or 0)), "max_hp": mh,
+                    "phase": rd.phase(boss), "n": rd.registered_count(boss),
+                    "x": RAID_LAIR[0], "y": RAID_LAIR[1],
+                }
+    return web.json_response({"raid": ev}, headers={"Cache-Control": "no-store"})
 
 
 async def _world_taverns(request: web.Request) -> web.Response:

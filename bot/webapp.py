@@ -71,7 +71,7 @@ from bot.webapi.production import (  # noqa: E402,F401 — фасад
 # Карта мира (/world, тайлы, таверны с коронами) — bot/webapi/world.py
 # (распил, move-only). Импорт = ре-экспорт для build_app и внешних потребителей.
 from bot.webapi.world import (  # noqa: E402,F401 — фасад
-    _world_continents, _world_invasion, _world_page,
+    _world_continents, _world_invasion, _world_page, _world_raid,
     _world_slots, _world_taverns, _world_tile,
 )
 
@@ -158,6 +158,7 @@ def build_app() -> web.Application:
     app.router.add_get("/world/slots.json", _world_slots)
     app.router.add_get("/world/taverns.json", _world_taverns)
     app.router.add_get("/world/invasion.json", _world_invasion)   # орда орков на карте (поллинг)
+    app.router.add_get("/world/raid.json", _world_raid)           # рейд-босс на карте (поллинг)
     app.router.add_get("/world/tiles/{z}/{x}/{y}.webp", _world_tile)
     app.router.add_get("/world/tiles/{z}/{x}/{y}.jpg", _world_tile)   # старый кэш → отдаём webp-байты
     app.router.add_get("/app", _spa)                  # React-мини-апп (каркас игры)
