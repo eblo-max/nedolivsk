@@ -111,3 +111,29 @@ def test_market_decay_survives_legacy_dict_keys():
     market.decay(w)                                # не должно упасть
     assert isinstance(w.market.get("npc"), dict)   # служебный мусор не тронут
     assert w.market["ale1"] < 12.0                 # числа впитываются как раньше
+
+
+def test_top_tier_reachable_and_haggle_meaningful():
+    """Регресс жалобы «дожал, а забрали по своей цене»: верхний тир «дорого» достижим
+    прямым согласием у заметной доли купцов, а контр-цена близка к потолку — дожим
+    реально доводит до цели, а не упирается в недостижимый тир."""
+    import random
+    from bot.game import balance, trade
+    rng = random.Random(7)
+    fv, top = 100.0, round(100.0 * balance.TRADE_PRICE_TIERS[2])
+    acc = total = 0
+    gaps = []
+    for arch in trade.ARCHES:
+        for _ in range(300):
+            greed = rng.uniform(*arch.greed)
+            need = rng.uniform(*arch.need)
+            mu = max(fv * balance.TRADE_MIN_UNDER,
+                     min(fv * balance.TRADE_MAX_OVER, fv * (1 + need) * (1 - greed * 0.3)))
+            d, p = trade.evaluate({"max_unit": mu, "greed": greed, "fv": fv}, top)
+            total += 1
+            if d == "accept":
+                acc += 1
+            elif d == "counter":
+                gaps.append((mu - p) / mu)
+    assert acc / total > 0.35          # «дорого» проходит прямым согласием у >35% купцов
+    assert gaps and sum(gaps) / len(gaps) < 0.06   # контр <6% ниже потолка — дожим доводит

@@ -241,8 +241,9 @@ def evaluate(offer: dict, unit: int) -> tuple[str, int]:
     if unit <= mx:
         return "accept", unit
     if unit <= mx * balance.TRADE_COUNTER_MARGIN:
-        # контрит чуть ниже своего потолка — оставляет себе место для торга
-        counter = max(1, int(round(mx * (1 - offer["greed"] * 0.08))))
+        # контрит ЧУТЬ ниже потолка (близко) — оставляет место дожиму до истинного
+        # потолка, но не лоуболлит так, что дожим кажется бессмысленным
+        counter = max(1, int(round(mx * (1 - offer["greed"] * 0.05))))
         return "counter", counter
     return "walk", 0
 
