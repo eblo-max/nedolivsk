@@ -566,6 +566,43 @@ def make_record(player, tavern, pos, stats: dict, stance: str | None = None) -> 
             "might": might, **battle_profile(stats, might, stance)}
 
 
+# ── ФАЗА 2: ВОЕННЫЕ ПРИГОТОВЛЕНИЯ ────────────────────────────────────────────
+# Записавшийся боец за окно сбора тратит ресурсы таверны и усиливает СВОЮ дружину в
+# бою (детерминированно, поверх боевого профиля). Каждое приготовление — раз за
+# нашествие. Кооп: сильнее дружина → выше готовность города и общий шанс отбиться.
+# Хранится в самой записи бойца (registered[pid].preps) — без новой колонки в БД.
+PREPS: dict[str, dict] = {
+    "wall":  {"emoji": "🪵", "name": "Частокол",  "cost": {"wood": 12, "stone": 6},
+              "bonus": {"armor": 7}, "blurb": "Колья и щиты — орде тяжелее пробить строй."},
+    "feast": {"emoji": "🍖", "name": "Провизия",  "cost": {"grain": 14},
+              "bonus": {"hp": 36}, "blurb": "Сытое войско держится дольше под ударом."},
+    "forge": {"emoji": "🗡", "name": "Оружейная", "cost": {"ore": 12},
+              "bonus": {"dmg": 5}, "blurb": "Наточенные клинки быстрее валят орду."},
+}
+
+
+def prep_cost(prep_id: str) -> dict:
+    """Стоимость приготовления (копия — вызывающий не мутирует конфиг)."""
+    return dict(PREPS.get(prep_id, {}).get("cost", {}))
+
+
+def apply_prep(rec: dict, prep_id: str) -> dict:
+    """Новая запись бойца с применённым приготовлением: бонус к профилю (броня/HP/урон)
+    + prep_id в rec['preps'] (дедуп). Идемпотентно: повторная покупка ничего не даёт.
+    Чистая — списание ресурсов делает вызывающий (webapi) в той же транзакции."""
+    p = PREPS.get(prep_id)
+    out = dict(rec)
+    preps = list(out.get("preps") or [])
+    if not p or prep_id in preps:            # неизвестное/уже куплено — не дублируем
+        return out
+    preps.append(prep_id)
+    out["preps"] = preps
+    for stat, val in p["bonus"].items():
+        cur = out.get(stat, 0) or 0
+        out[stat] = round(cur + val, 1) if stat == "dmg" else int(cur + val)
+    return out
+
+
 def composition(participants: list[dict]) -> dict:
     """Разбивка дружины по ролям + размер фронта (танки+ратники) — для доски готовности."""
     c = {"tank": 0, "archer": 0, "scout": 0, "ratnik": 0}

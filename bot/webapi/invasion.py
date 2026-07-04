@@ -111,6 +111,27 @@ def _stances_dto(counter: str) -> list[dict]:
             for k, v in invmod.STANCES.items()]
 
 
+_PREP_STAT = {"armor": "брони", "hp": "HP", "dmg": "урона"}
+
+
+def _prep_bonus_txt(bonus: dict) -> str:
+    return " ".join(f"+{v} {_PREP_STAT.get(k, k)}" for k, v in bonus.items())
+
+
+def _preps_dto() -> list[dict]:
+    """Каталог военных приготовлений (ФАЗА 2) для панели: цена + бонус текстом."""
+    return [{"id": k, "emoji": v["emoji"], "name": v["name"], "cost": v["cost"],
+             "bonus": _prep_bonus_txt(v["bonus"]), "blurb": v["blurb"]}
+            for k, v in invmod.PREPS.items()]
+
+
+def _prep_have(player) -> dict:
+    """Инвентарь игрока по ресурсам приготовлений (для affordability на фронте)."""
+    need = {r for v in invmod.PREPS.values() for r in v["cost"]}
+    inv = (getattr(player, "inventory", None) or {}) if player else {}
+    return {r: int(inv.get(r, 0)) for r in need}
+
+
 async def _api_invasion_join(request: web.Request) -> web.Response:
     """Регистрация на ивент ПРЯМО С КАРТЫ (мини-апп). Аутентификация — Telegram
     initData (HMAC по токену бота). Атомарная запись (repo.invasion_register).
@@ -184,6 +205,7 @@ async def _api_invasion_state(request: web.Request) -> web.Response:
         tr = invmod.trait_of(inv)
         sim = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv), trait=tr[0])
         me = (inv.registered or {}).get(str(uid))
+        player = await repo.get_player(s, uid)     # инвентарь для приготовлений (ФАЗА 2)
         gu = inv.gather_until
         if gu is not None and gu.tzinfo is None:
             gu = gu.replace(tzinfo=timezone.utc)
@@ -195,6 +217,58 @@ async def _api_invasion_state(request: web.Request) -> web.Response:
         "trait": {"id": tr[0], "emoji": tr[1], "name": tr[2], "counter": tr[3], "blurb": tr[4]},
         "comp": invmod.composition(parts), "hint": invmod.need_hint(parts, tr),
         "stances": _stances_dto(tr[3]),
+        "preps": _preps_dto(), "my_preps": (me or {}).get("preps") or [], "have": _prep_have(player),
+    }, headers={"Cache-Control": "no-store"})
+
+
+async def _api_invasion_prepare(request: web.Request) -> web.Response:
+    """ФАЗА 2: военное приготовление. Записавшийся боец тратит ресурсы таверны и
+    усиливает свою дружину (broня/HP/урон) — раз за нашествие на вид. Списание ресурсов
+    и обновление записи — атомарно в одной транзакции. Возвращает свежую готовность."""
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, ValueError):
+        body = {}
+    uid = _verify_init_data(body.get("initData") or "")
+    if not uid:
+        return web.json_response({"ok": False, "error": "auth"}, status=401)
+    from bot.config import settings
+    if invmod.TEST_MODE and uid != settings.admin_id:
+        return web.json_response({"ok": False, "error": "testing"})
+    prep = str((body or {}).get("prep") or "")
+    if prep not in invmod.PREPS:
+        return web.json_response({"ok": False, "error": "bad_prep"})
+    from bot.game import inventory as inv_res
+    async with session_factory() as s:
+        player = await repo.get_player(s, uid)
+        if player is None or not player.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        inv = await repo.get_active_invasion(s)
+        if inv is None or inv.status != "gathering":
+            return web.json_response({"ok": False, "error": "closed"})
+        rec = (inv.registered or {}).get(str(uid))
+        if not rec:
+            return web.json_response({"ok": False, "error": "not_registered"})
+        if prep in (rec.get("preps") or []):
+            return web.json_response({"ok": False, "error": "already"})
+        cost = invmod.prep_cost(prep)
+        if not inv_res.can_afford(player, cost):
+            return web.json_response({"ok": False, "error": "not_enough"})
+        new_rec = invmod.apply_prep(rec, prep)
+        ok = await repo.invasion_prepare(s, inv.id, player.id, new_rec)   # атомарно: записан+сбор
+        if not ok:
+            return web.json_response({"ok": False, "error": "closed"})
+        inv_res.pay(player, cost)                                         # списываем в той же транзе
+        repo.add_log(s, "player", player.id, f"🛠 приготовил «{invmod.PREPS[prep]['name']}» к обороне")
+        await s.commit()
+        fresh = await repo.get_active_invasion(s) or inv
+        parts = [dict(r, pid=int(pid)) for pid, r in (fresh.registered or {}).items()]
+        tr = invmod.trait_of(fresh)
+        sim = invmod.simulate(parts, seed=fresh.id, escal=invmod.escal_of(fresh), trait=tr[0])
+        me = (fresh.registered or {}).get(str(uid)) or {}
+    return web.json_response({
+        "ok": True, "ready": round(invmod.readiness(sim), 3), "comp": invmod.composition(parts),
+        "my_preps": me.get("preps") or [], "have": _prep_have(player),
     }, headers={"Cache-Control": "no-store"})
 
 

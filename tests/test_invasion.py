@@ -368,6 +368,22 @@ def test_rewards_toggle_is_wired():
     assert "REWARDS_ENABLED" in src and "return" in src   # награды под гейтом флага
 
 
+def test_prep_applies_bonus_and_dedups():
+    """ФАЗА 2: приготовление добавляет бонус к профилю + фиксирует preps; повтор
+    идемпотентен; неизвестное — без изменений; исходную запись не мутирует."""
+    rec = inv.battle_profile({"damage": 10, "crit": 5, "armor": 4, "luck": 3}, 30)
+    ba, bh, bd = rec["armor"], rec["hp"], rec["dmg"]
+    r1 = inv.apply_prep(rec, "wall")                     # +7 брони
+    assert r1["armor"] == ba + 7 and r1["preps"] == ["wall"]
+    assert inv.apply_prep(r1, "wall")["armor"] == r1["armor"]   # дедуп — второй раз без эффекта
+    r2 = inv.apply_prep(inv.apply_prep(r1, "feast"), "forge")   # +36 HP, +5 урона
+    assert r2["hp"] == bh + 36 and abs(r2["dmg"] - (bd + 5)) < 0.01
+    assert set(r2["preps"]) == {"wall", "feast", "forge"}
+    assert inv.prep_cost("wall") == {"wood": 12, "stone": 6}
+    assert inv.apply_prep(rec, "nope") == dict(rec)      # неизвестное — no-op
+    assert "preps" not in rec                            # исходную запись не тронули
+
+
 def test_postmortem_explains_outcome():
     """Разбор боя: победа → «выдержал» + MVP из ЖИВЫХ (не болванка); поражение →
     приоритет причины: нет фронта → не закрыт трейт → мало сил; считает павших."""

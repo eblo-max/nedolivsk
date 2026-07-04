@@ -18,13 +18,16 @@ const ORDA_STEPS: Step[] = [
 interface Stance { id: string; emoji: string; name: string; blurb: string; role: string; counter: boolean }
 interface Comp { tank: number; archer: number; scout: number; ratnik: number; front: number; n: number }
 interface Trait { id: string; emoji: string; name: string; counter: string; blurb: string }
+interface Prep { id: string; emoji: string; name: string; cost: Record<string, number>; bonus: string; blurb: string }
 interface State {
   ok: boolean; active: boolean; n?: number; ready?: number; gather_left?: number
   registered?: boolean; my_stance?: string | null
   trait?: Trait; comp?: Comp; hint?: string; stances?: Stance[]
+  preps?: Prep[]; my_preps?: string[]; have?: Record<string, number>
 }
 
 const ROLE_EMO: Record<string, string> = { tank: '🛡', archer: '⚔️', scout: '🔭', ratnik: '🗡' }
+const RES_EMO: Record<string, string> = { wood: '🪵', grain: '🌾', ore: '⛏️', stone: '🪨' }
 
 function fmt(s: number) { const m = (s / 60) | 0, ss = (s | 0) % 60; return `${m}:${ss < 10 ? '0' : ''}${ss}` }
 
@@ -49,6 +52,15 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
     if (busy) return; setBusy(true); haptic('medium')
     try {
       const r = await api<State & { error?: string }>('invasion/join', { stance })
+      if (r.ok) { hapticNotify('success'); await load() }
+      else hapticNotify('warning')
+    } catch { hapticNotify('warning') } finally { setBusy(false) }
+  }
+
+  async function prepare(prep: string) {   // ФАЗА 2: усилить дружину ресурсами
+    if (busy) return; setBusy(true); haptic('medium')
+    try {
+      const r = await api<{ ok: boolean; error?: string }>('invasion/prepare', { prep })
       if (r.ok) { hapticNotify('success'); await load() }
       else hapticNotify('warning')
     } catch { hapticNotify('warning') } finally { setBusy(false) }
@@ -116,10 +128,51 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
 
             {/* Запись / выбор стойки */}
             {d?.registered ? (
-              <div style={{ textAlign: 'center', padding: '10px 0', color: '#8fd14f', fontWeight: 700 }}>
-                ✅ Ты в строю ({d.stances?.find((s) => s.id === d.my_stance)?.name || 'в резерве'}).<br />
-                <span style={{ color: '#a99676', fontWeight: 400, fontSize: 13 }}>Зови соратников — доберите нужные роли!</span>
-              </div>
+              <>
+                <div style={{ textAlign: 'center', padding: '10px 0', color: '#8fd14f', fontWeight: 700 }}>
+                  ✅ Ты в строю ({d.stances?.find((s) => s.id === d.my_stance)?.name || 'в резерве'}).<br />
+                  <span style={{ color: '#a99676', fontWeight: 400, fontSize: 13 }}>Зови соратников — доберите нужные роли!</span>
+                </div>
+
+                {/* ФАЗА 2: военные приготовления — усилить свою дружину до боя */}
+                {(d.preps?.length ?? 0) > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#bfa775', marginBottom: 7 }}>
+                      <span>🛠 Военные приготовления</span>
+                      <span style={{ fontSize: 11.5, color: '#8a795c' }}>усиль дружину до боя</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {d.preps!.map((p) => {
+                        const owned = (d.my_preps || []).includes(p.id)
+                        const afford = Object.entries(p.cost).every(([r, q]) => (d.have?.[r] ?? 0) >= q)
+                        const dis = busy || owned || !afford
+                        return (
+                          <button key={p.id} disabled={dis} onClick={() => prepare(p.id)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 11, textAlign: 'left', width: '100%',
+                              padding: '10px 12px', borderRadius: 13, cursor: dis ? 'default' : 'pointer',
+                              opacity: (!afford && !owned) ? 0.55 : 1,
+                              background: owned ? 'rgba(60,120,40,.22)' : '#1c1610',
+                              border: `1.5px solid ${owned ? '#6a9a3a' : '#4a3420'}` }}>
+                            <span style={{ fontSize: 22 }}>{p.emoji}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 700, color: '#e9dcc2' }}>{p.name}
+                                <span style={{ color: '#8fd14f', fontSize: 12, fontWeight: 800 }}> {p.bonus}</span></div>
+                              <div style={{ fontSize: 11.5, color: '#a99676', marginTop: 1, overflow: 'hidden',
+                                textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.blurb}</div>
+                            </div>
+                            <div style={{ flex: 'none', textAlign: 'right' }}>
+                              {owned
+                                ? <span style={{ color: '#8fd14f', fontWeight: 700, fontSize: 13 }}>✅ Готово</span>
+                                : <span style={{ fontSize: 12.5, whiteSpace: 'nowrap', color: afford ? '#e9dcc2' : '#d88a6a' }}>
+                                    {Object.entries(p.cost).map(([r, q]) => `${RES_EMO[r] || r}${q}`).join(' ')}</span>}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <>
                 <div style={{ fontSize: 13, color: '#bfa775', marginBottom: 6 }}>Выбери, кем встать в бой:</div>

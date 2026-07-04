@@ -32,8 +32,8 @@ from bot.webapi.core import (  # noqa: E402,F401 — фасад
 
 # Старая карта/Орда — bot/webapi/invasion.py (распил, move-only).
 from bot.webapi.invasion import (  # noqa: E402,F401 — фасад
-    _api_invasion_join, _api_invasion_result, _api_invasion_seed, _api_invasion_state,
-    _invasion_event, _invasion_report_event,
+    _api_invasion_join, _api_invasion_prepare, _api_invasion_result, _api_invasion_seed,
+    _api_invasion_state, _invasion_event, _invasion_report_event,
 )
 
 
@@ -164,6 +164,7 @@ def build_app() -> web.Application:
     app.router.add_get("/app/{tail:.*}", _spa)        # SPA-fallback + статика dist
     app.router.add_post("/api/invasion/join", _api_invasion_join)
     app.router.add_post("/api/invasion/state", _api_invasion_state)  # панель сбора: трейт/состав/стойки
+    app.router.add_post("/api/invasion/prepare", _api_invasion_prepare)  # ФАЗА 2: военные приготовления
     app.router.add_post("/api/invasion/result", _api_invasion_result)  # модалка итогов боя (всплывает на карте)
     app.router.add_post("/api/invasion/seed", _api_invasion_seed)   # АДМИН: тихий призыв орды (тест карты)
     app.router.add_post("/api/whoami", _api_whoami)          # флаг админа (гейт вкладки «Карта»)

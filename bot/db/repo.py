@@ -176,6 +176,22 @@ async def invasion_register(
     return (res.rowcount or 0) > 0
 
 
+async def invasion_prepare(
+    session: AsyncSession, inv_id: int, player_id: int, new_record: dict
+) -> bool:
+    """Атомарно ЗАМЕНИТЬ запись бойца (усиленную приготовлением) — jsonb_set по своему
+    ключу. Только в фазе СБОРА и если боец уже записан. Не трогает чужие записи.
+    Возвращает True, если обновление прошло (иначе не записан/сбор окончен)."""
+    res = await session.execute(
+        text("UPDATE invasion SET registered = jsonb_set("
+             "COALESCE(registered, '{}'::jsonb), ARRAY[:pid], CAST(:rec AS jsonb)) "
+             "WHERE id = :id AND status = 'gathering' "
+             "AND jsonb_exists(COALESCE(registered, '{}'::jsonb), :pid)"),
+        {"pid": str(player_id), "rec": json.dumps(new_record), "id": int(inv_id)},
+    )
+    return (res.rowcount or 0) > 0
+
+
 async def world_might_sum(session: AsyncSession) -> int:
     """Суммарная военная мощь всех таверн мира (для порога орды при спавне).
     Считаем в SQL по той же формуле, что invasion.tavern_might."""

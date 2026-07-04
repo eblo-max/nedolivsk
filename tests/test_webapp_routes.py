@@ -54,6 +54,7 @@ ROUTES = [
     "POST /api/hunt_fight _api_hunt_fight",
     "POST /api/hunt_forecast _api_hunt_forecast",
     "POST /api/invasion/join _api_invasion_join",
+    "POST /api/invasion/prepare _api_invasion_prepare",
     "POST /api/invasion/result _api_invasion_result",
     "POST /api/invasion/seed _api_invasion_seed",
     "POST /api/invasion/state _api_invasion_state",
