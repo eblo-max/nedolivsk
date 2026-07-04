@@ -94,7 +94,7 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 @keyframes fxHit{to{background-position-x:-546px}}
 @keyframes orcHurt{0%,72%,100%{filter:drop-shadow(0 4px 7px rgba(0,0,0,.75))}80%{filter:drop-shadow(0 4px 7px rgba(0,0,0,.75)) brightness(2.4) sepia(1) hue-rotate(-35deg) saturate(4)}}
 /* войска-соратники: марш к логову (близко — фигурки, далеко — нити) */
-.orc-fig{width:44px;height:55px;pointer-events:none;transition:opacity .3s,transform .16s linear}
+.orc-fig{width:44px;height:55px;pointer-events:none;transition:opacity .4s}
 /* воин: spritesheet WALK 10 кадров (у всех 6 листов; масштаб листа → 440px даёт 44px/кадр) */
 .orc-fig .hf{width:44px;height:55px;background-size:440px 55px;background-repeat:no-repeat;background-position:0 0;
   animation:heroWalk .9s steps(10) infinite;filter:drop-shadow(0 3px 3px rgba(0,0,0,.65))}
@@ -387,7 +387,7 @@ function moveTroops(e,ph,el){
     troopMarks[i].setLatLng(px(fx*W,fy*H));
     var g=troopMarks[i].getElement();
     if(g){g.classList.toggle('atk',atk);g.classList.toggle('dead',dead);
-      g.style.transition='opacity .5s';g.style.opacity=home?'0':'';}}}   // дошли до таверн → исчезли (и при перезаходе сразу 0)
+      g.style.opacity=home?'0':'';}}}   // дошли до таверн → плавно исчезли (fade из CSS .orc-fig)
 function renderInv(){
   if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';troopKey='';troopMarks=[];return;}
   var e=invData,el=invElapsed(),ph=invPhase(e,el),lair=px(e.x*W,e.y*H);
@@ -423,8 +423,8 @@ function renderInv(){
       else if(ph==='battle')lb.textContent='⚔️ БИТВА · '+fmtT(e.gather_secs+e.march_secs+e.battle_secs-el);
       else if(ph==='won')lb.textContent='🏆 ОРДА ПОВЕРЖЕНА!';
       else if(ph==='lost')lb.textContent='💀 ОРДА ПРОРВАЛАСЬ…';
-      else lb.textContent='…';}}
-  moveTroops(e,ph,el);}
+      else lb.textContent='…';}}}
+  // позиции войск НЕ здесь — их плавно гонит rAF-петля animTroops (~45fps), иначе марш рвался
 // Фокус рейда: на время орды показываем ТОЛЬКО таверны участников (+ свою), чужие
 // прячем (по совпадению позиции войска с маркером таверны). Нет орды — все видны.
 function applyRaidFocus(){
@@ -435,7 +435,18 @@ function applyRaidFocus(){
   queueRelayout();}
 function pollInv(){fetch('/world/invasion.json?uid='+uid).then(function(r){return r.json();})
   .then(function(d){invData=d.inv;invBaseEl=invData?(invData.elapsed||0):0;invAtMs=Date.now();renderInv();applyRaidFocus();}).catch(function(){});}
-pollInv();setInterval(pollInv,5000);setInterval(renderInv,120);   // рефетч 5с + плавный марш ~8fps (CSS-transition сглаживает)
+// Тяжёлое (пересбор маркеров, HP-полоса, подписи, авто-модалка) — раз в 250мс.
+// Позиции войск — отдельной rAF-петлёй с моментальным transform: раньше марш гнался
+// на ~8fps (setInterval 120мс), а инлайновый transition:opacity убил CSS-сглаживание
+// transform → на зумах ход был рваным. Теперь ~45fps без transition (нет и рывка при
+// зуме от Leaflet). Троттлинг 22мс щадит слабый Android.
+var _moveAt=0;
+function animTroops(ts){
+  if(invData&&troopMarks.length&&ts-_moveAt>=22){_moveAt=ts;
+    var e=invData,el=invElapsed(),ph=invPhase(e,el);moveTroops(e,ph,el);}
+  requestAnimationFrame(animTroops);}
+pollInv();setInterval(pollInv,5000);setInterval(renderInv,250);   // рефетч 5с + тяжёлый рендер 4fps
+requestAnimationFrame(animTroops);                               // плавный марш/орбита/отход ~45fps
 </script></body></html>"""
 
 
