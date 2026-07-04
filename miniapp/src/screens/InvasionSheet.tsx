@@ -29,6 +29,32 @@ interface State {
 const ROLE_EMO: Record<string, string> = { tank: '🛡', archer: '⚔️', scout: '🔭', ratnik: '🗡' }
 const RES_EMO: Record<string, string> = { wood: '🪵', grain: '🌾', ore: '⛏️', stone: '🪨' }
 
+// Что делает выбранная стойка против заклинаний орды (для тактической подсказки).
+const STANCE_TIP: Record<string, string> = {
+  front: '🛡 В строю ты принимаешь удар орды на себя и держишь фронт против 🗣 ярости и 🏹 осады.',
+  strike: '⚔️ Твой крит пробивает 🛡 щиты орды, а стрелы рвут призванных 🐺 волков вдвое.',
+  flank: '🔭 В обходе ты чистишь 💀 проклятье шамана — дружина не теряет урон.',
+  line: '🗡 Надёжная линия строя: держишь удар вместе с фронтом, без слабых мест.',
+}
+
+// Тактические подсказки бойцу, пока идёт сбор (крутятся по кругу): роль → заклинания
+// орды → слабость → приготовления → явка. Зависят от выбранной стойки и трейта.
+function buildTips(d: State): string[] {
+  const t: string[] = []
+  const st = d.my_stance ? STANCE_TIP[d.my_stance] : ''
+  if (st) t.push(st)
+  t.push('🪓 По ходу боя орда поднимет 🛡 щит, призовёт 🐺 волков, наложит 💀 проклятье и к концу впадёт в 🗣 ярость.')
+  if (d.trait) {
+    const cs = d.stances?.find((s) => s.counter)
+    t.push(`⚡ Слабость этой орды — ${d.trait.emoji} ${d.trait.name}.` + (cs ? ` Закрыть её поможет стойка «${cs.name}» (★).` : ''))
+  }
+  if ((d.preps?.length ?? 0) > (d.my_preps?.length ?? 0)) {
+    t.push('🛠 Пока есть время — усиль дружину: 🪵 частокол (броня), 🍖 провизия (HP), 🗡 оружейная (урон).')
+  }
+  t.push('📣 Зови соратников — чем больше и разнообразнее дружина, тем крепче отпор орде.')
+  return t
+}
+
 function fmt(s: number) { const m = (s / 60) | 0, ss = (s | 0) % 60; return `${m}:${ss < 10 ? '0' : ''}${ss}` }
 
 export default function InvasionSheet({ onClose }: { onClose: () => void }) {
@@ -38,6 +64,14 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
   const [left, setLeft] = useState(0)
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
   const tour = useFirstVisitTour('orda')   // онбординг первой орды (1 раз)
+  const [tipI, setTipI] = useState(0)      // индекс ротирующейся тактической подсказки
+
+  // Подсказки крутятся раз в 7с, пока боец в строю и идёт сбор.
+  useEffect(() => {
+    if (!d?.registered) return
+    const id = setInterval(() => setTipI((i) => i + 1), 7000)
+    return () => clearInterval(id)
+  }, [d?.registered])
 
   async function load() {
     try { const r = await api<State>('invasion/state', {}); setD(r); if (r.gather_left != null) setLeft(r.gather_left) } catch { /* keep */ }
@@ -129,10 +163,23 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
             {/* Запись / выбор стойки */}
             {d?.registered ? (
               <>
-                <div style={{ textAlign: 'center', padding: '10px 0', color: '#8fd14f', fontWeight: 700 }}>
-                  ✅ Ты в строю ({d.stances?.find((s) => s.id === d.my_stance)?.name || 'в резерве'}).<br />
-                  <span style={{ color: '#a99676', fontWeight: 400, fontSize: 13 }}>Зови соратников — доберите нужные роли!</span>
+                <div style={{ textAlign: 'center', padding: '10px 0 6px', color: '#8fd14f', fontWeight: 700 }}>
+                  ✅ Ты в строю ({d.stances?.find((s) => s.id === d.my_stance)?.name || 'в резерве'}) · до боя {fmt(left)}
                 </div>
+
+                {/* Тактическая подсказка (крутится, пока идёт сбор) */}
+                {(() => {
+                  const tips = buildTips(d)
+                  return tips.length ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 9, minHeight: 46, margin: '2px 0 4px',
+                      padding: '9px 12px', borderRadius: 12, background: 'rgba(38,54,82,.3)', border: '1px solid #37516e' }}>
+                      <span style={{ fontSize: 18, flex: 'none' }}>💡</span>
+                      <span key={tipI} style={{ fontSize: 12.5, color: '#d8e4f0', lineHeight: 1.4, animation: 'sv-fade .4s ease' }}>
+                        {tips[tipI % tips.length]}
+                      </span>
+                    </div>
+                  ) : null
+                })()}
 
                 {/* ФАЗА 2: военные приготовления — усилить свою дружину до боя */}
                 {(d.preps?.length ?? 0) > 0 && (
