@@ -274,6 +274,48 @@ async def _api_invasion_state(request: web.Request) -> web.Response:
     }, headers={"Cache-Control": "no-store"})
 
 
+async def _api_invasion_result(request: web.Request) -> web.Response:
+    """Итог последнего боя с ордой — для МОДАЛКИ РЕЗУЛЬТАТОВ (всплывает на карте
+    сразу после победы/провала). Read-only; admin-gated (фича в обкатке). Отдаёт
+    полную сводку по бойцам (урон/крит/блок/пал/награда) + трейт + флаг наград.
+    Доступно, пока бой недавний (REPORT_WINDOW_SEC) ИЛИ время боя вышло, но нотифаер
+    ещё не зарезолвил (тогда — ПРЕДСКАЗАНИЕ той же детерминированной симуляции)."""
+    from bot.webapi.core import _auth, _is_admin
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    if not _is_admin(uid):
+        return web.json_response({"ok": False, "error": "forbidden"}, status=403)
+    now = datetime.now(timezone.utc)
+    async with session_factory() as s:
+        inv = await repo.latest_invasion(s)
+        avail = False
+        if inv is not None:
+            if inv.status in ("won", "lost") and inv.resolve_at:      # зарезолвлен и недавно
+                ra = inv.resolve_at if inv.resolve_at.tzinfo else inv.resolve_at.replace(tzinfo=timezone.utc)
+                avail = (now - ra).total_seconds() < REPORT_WINDOW_SEC
+            elif inv.status == "battle" and invmod.registered_count(inv) > 0 and inv.gather_until:
+                gu = (inv.gather_until if inv.gather_until.tzinfo       # время боя уже вышло?
+                      else inv.gather_until.replace(tzinfo=timezone.utc))
+                parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
+                rounds = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv),
+                                         trait=invmod.trait_of(inv)[0])["rounds"]
+                end = gu + timedelta(seconds=invmod.MARCH_SECONDS + invmod.battle_secs_for(rounds))
+                avail = now >= end
+        if not avail:
+            return web.json_response({"ok": True, "available": False},
+                                     headers={"Cache-Control": "no-store"})
+        ev = _invasion_report_event(inv, uid)
+        tr = invmod.trait_of(inv)
+        ev.update({
+            "ok": True, "available": True,
+            "trait": {"id": tr[0], "emoji": tr[1], "name": tr[2], "counter": tr[3], "blurb": tr[4]},
+            "rewards_enabled": bool(invmod.REWARDS_ENABLED),
+            "escal": round(invmod.escal_of(inv), 2),
+        })
+    return web.json_response(ev, headers={"Cache-Control": "no-store"})
+
+
 async def _api_invasion_seed(request: web.Request) -> web.Response:
     """ТЕСТ (только админ): ТИХО призвать Орду орков — БЕЗ анонсов в чаты и пушей
     игрокам (в отличие от /orc). Fast-режим + болванка-армия (отриц. pid → в наградах

@@ -340,6 +340,21 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
 var invLayer=L.layerGroup().addTo(map),invTroops=L.layerGroup().addTo(map);
 var invM=null,invKey='',invData=null,invBaseEl=0,invAtMs=0;
 var troopMarks=[],troopMeta=[],troopKey='';
+var invPh='',invResultKey='';   // текущая фаза (для тапа по орку) + дедуп авто-модалки итогов
+// Итоги боя: просим родителя (React) открыть модалку с полной сводкой. Авто — один
+// раз на нашествие (флаг в localStorage переживает перезаход карты); тап по орку —
+// принудительно (manual), в обход дедупа.
+function askResult(won,manual){
+  try{parent.postMessage({t:'nedo-orda-result',won:!!won,manual:!!manual},location.origin);}catch(e){}
+  if(parent===window){location.href='/app/?startapp=orda_result';}}
+function maybeAutoResult(e,ph){
+  if(ph!=='won'&&ph!=='lost')return;
+  var rk='orda-res-'+(e.id||0);
+  if(invResultKey===rk)return;invResultKey=rk;         // уже поставили таймер в этой сессии
+  var seen=false;try{seen=localStorage.getItem(rk)==='1';}catch(_){}
+  if(seen)return;                                       // уже показывали (перезаход) — не спамим
+  try{localStorage.setItem(rk,'1');}catch(_){}
+  setTimeout(function(){askResult(ph==='won',false);},1800);}   // дать добить/пасть → всплывает сводка
 function fmtT(s){s=Math.max(0,s|0);var m=(s/60)|0,ss=s%60;return m+':'+(ss<10?'0':'')+ss;}
 function invElapsed(){return invBaseEl+(Date.now()-invAtMs)/1000;}
 function invPhase(e,el){
@@ -382,6 +397,7 @@ function moveTroops(e,ph,el){
 function renderInv(){
   if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';troopKey='';troopMarks=[];return;}
   var e=invData,el=invElapsed(),ph=invPhase(e,el),lair=px(e.x*W,e.y*H);
+  invPh=ph;maybeAutoResult(e,ph);   // тап по орку знает фазу + авто-модалка итогов (раз на бой)
   var tk=e.name+'|'+((e.troops||[]).length);
   if(tk!==troopKey){rebuildTroops(e);troopKey=tk;}
   var key=e.name+'|'+(ph==='battle'?'b':(ph==='won'?'w':(ph==='lost'?'l':'p')));
@@ -390,6 +406,7 @@ function renderInv(){
       html:'<div class="aura"></div><div class="fx"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="orc"></div>'});
     invM=L.marker(lair,{icon:icon,zIndexOffset:2000}).addTo(invLayer);
     invM.on('click',function(){   // не релоадим приложение — просим родителя открыть панель поверх карты
+      if(invPh==='won'||invPh==='lost'){askResult(invPh==='won',true);return;}   // бой кончился → сводка итогов
       try{parent.postMessage({t:'nedo-orda'},location.origin);}catch(e){}
       if(parent===window){location.href='/app/?startapp=orda';}});
     invKey=key;}
@@ -501,6 +518,7 @@ async def _world_invasion(request: web.Request) -> web.Response:
                                           round(float(rec.get("ty", 0.5)), 4))
                 troops.append({"x": tx, "y": ty, "mine": bool(uid) and pid == uid})
             ev = {   # только нужное карте (без тяжёлого timeline целиком)
+                "id": inv.id,   # ключ дедупа авто-модалки итогов (одна на нашествие)
                 "x": e["x"], "y": e["y"], "sprite": e.get("sprite", 1),
                 "name": e["name"], "status": e["status"], "n": e.get("n", 0),
                 "me": bool(uid) and str(uid) in (inv.registered or {}),

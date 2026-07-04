@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { tgUser } from '../telegram'
 
 const InvasionSheet = lazy(() => import('./InvasionSheet'))
+const InvasionResult = lazy(() => import('./InvasionResult'))
 
 // Вкладка «Карта мира» — ОТКРЫТА ВСЕМ игрокам. Полноценная тайловая карта (/world,
 // Leaflet) грузится в iframe на весь экран между шапкой и навбаром; uid пробрасываем
@@ -11,10 +12,14 @@ const InvasionSheet = lazy(() => import('./InvasionSheet'))
 export default function WorldMap() {
   const uid = tgUser()?.id || 0
   const [invOpen, setInvOpen] = useState(false)
+  const [resOpen, setResOpen] = useState(false)
 
   useEffect(() => {
     function onMsg(e: MessageEvent) {
-      if (e.origin === location.origin && (e.data as { t?: string })?.t === 'nedo-orda') setInvOpen(true)
+      if (e.origin !== location.origin) return
+      const t = (e.data as { t?: string })?.t
+      if (t === 'nedo-orda') { setResOpen(false); setInvOpen(true) }          // панель сбора «в строй»
+      else if (t === 'nedo-orda-result') { setInvOpen(false); setResOpen(true) }  // модалка итогов боя
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
@@ -30,6 +35,11 @@ export default function WorldMap() {
       {invOpen && (
         <Suspense fallback={null}>
           <InvasionSheet onClose={() => setInvOpen(false)} />
+        </Suspense>
+      )}
+      {resOpen && (
+        <Suspense fallback={null}>
+          <InvasionResult onClose={() => setResOpen(false)} />
         </Suspense>
       )}
     </div>
