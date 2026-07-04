@@ -157,6 +157,14 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 .orc-ev .banner.show{animation:bannerF 1.4s ease-out}
 @keyframes bannerF{0%{opacity:0;transform:translateX(-50%) translateY(9px) scale(.8)}14%{opacity:1;transform:translateX(-50%) translateY(0) scale(1.1)}30%{transform:translateX(-50%) scale(1)}78%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-9px)}}
 @media (prefers-reduced-motion:reduce){.orc-ev .rage,.orc-ev .curse,.orc-ev .wolves,.orc-ev .shield{animation:none!important}.orc-ev .banner.show{animation:none;opacity:1}}
+/* всплывающие числа урона над орком (жёлтые — по орде, красные — по дружине) */
+.orc-ev .dmgc{position:absolute;left:50%;top:22%;transform:translateX(-50%);width:0;height:0;z-index:6;pointer-events:none}
+.orc-ev .dn{position:absolute;transform:translateX(-50%);white-space:nowrap;font:800 15px/1 var(--serif);text-shadow:0 2px 4px #000;animation:dmgUp 1s ease-out forwards}
+.orc-ev .dn.orc{color:#ffe08a;top:-10px}
+.orc-ev .dn.orc.big{font-size:21px;color:#fff3b0;text-shadow:0 0 11px rgba(255,180,60,.95),0 2px 4px #000}
+.orc-ev .dn.ally{color:#ff8272;font-size:12.5px;top:16px}
+@keyframes dmgUp{0%{opacity:0;transform:translateX(-50%) translateY(7px) scale(.7)}18%{opacity:1;transform:translateX(-50%) translateY(0) scale(1.12)}100%{opacity:0;transform:translateX(-50%) translateY(-32px) scale(1)}}
+@media (prefers-reduced-motion:reduce){.orc-ev .dn{animation-duration:.45s}}
 .orc-ev .lbl{position:absolute;left:50%;top:-34px;transform:translateX(-50%);white-space:nowrap;z-index:3;
   font:800 12px/1 var(--serif);color:#cdeba6;text-shadow:0 1px 3px #000,0 0 7px rgba(120,200,80,.6);letter-spacing:.3px}
 .orc-ev.battle .lbl{color:#ffcf9a;text-shadow:0 1px 3px #000,0 0 8px rgba(255,90,50,.7)}
@@ -408,10 +416,16 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
 var invLayer=L.layerGroup().addTo(map),invTroops=L.layerGroup().addTo(map);
 var invM=null,invKey='',invData=null,invBaseEl=0,invAtMs=0;
 var troopMarks=[],troopMeta=[],troopInvId=null;
-var invPh='',invResultKey='',invBmask=0;   // фаза (для тапа) + дедуп модалки + битовая маска активных баффов орка (телеграф)
+var invPh='',invResultKey='',invBmask=0,invFrameIdx=-1;   // фаза + дедуп модалки + маска баффов + индекс кадра боя (для чисел урона)
 // Крупный баннер активации способности над орком (перезапуск CSS-анимации).
 function showBanner(el2,txt){var b=el2&&el2.querySelector('.banner');if(!b)return;
   b.textContent=txt;b.classList.remove('show');void b.offsetWidth;b.classList.add('show');}
+// Всплывающее число урона над орком (kind 'orc' — по орде, 'ally' — по дружине).
+function floatDmg(el2,val,kind){var c=el2&&el2.querySelector('.dmgc');if(!c||val<=0)return;
+  var s=document.createElement('span');
+  s.className='dn '+kind+(kind==='orc'&&val>=45?' big':'');   // крупный удар — ярче
+  s.textContent='−'+val;s.style.left=((Math.random()*26-13)|0)+'px';
+  c.appendChild(s);setTimeout(function(){if(s.parentNode)s.parentNode.removeChild(s);},1000);}
 // Итоги боя: просим родителя (React) открыть модалку с полной сводкой. Авто — один
 // раз на нашествие (флаг в localStorage переживает перезаход карты); тап по орку —
 // принудительно (manual), в обход дедупа.
@@ -507,7 +521,7 @@ function renderInv(){
   var key=e.name+'|'+(ph==='battle'?'b':(ph==='won'?'w':(ph==='lost'?'l':'p')));
   if(key!==invKey){invLayer.clearLayers();
     var icon=L.divIcon({className:'orc-ev'+(ph==='battle'?' battle':''),iconSize:[100,76],iconAnchor:[50,76],
-      html:'<div class="aura"></div><div class="rage"></div><div class="curse"></div><div class="wolves"></div><div class="fx"></div><div class="boom"></div><div class="shield"></div><div class="banner"></div><div class="tel"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="ally"><i></i></div><div class="orc"></div>'});
+      html:'<div class="aura"></div><div class="rage"></div><div class="curse"></div><div class="wolves"></div><div class="fx"></div><div class="boom"></div><div class="shield"></div><div class="dmgc"></div><div class="banner"></div><div class="tel"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="ally"><i></i></div><div class="orc"></div>'});
     invM=L.marker(lair,{icon:icon,zIndexOffset:2000}).addTo(invLayer);
     invM.on('click',function(){   // не релоадим приложение — просим родителя открыть панель поверх карты
       if(invPh==='won'||invPh==='lost'){askResult(invPh==='won',true);return;}   // бой кончился → сводка итогов
@@ -522,9 +536,16 @@ function renderInv(){
     el2.style.opacity=(ph==='won'&&el-bEnd>3)?'0':'';
     // кадр боя по elapsed (как HP) → точные HP/баффы синхронно с симуляцией;
     // в терминале берём ПОСЛЕДНИЙ кадр (реальные выжившие/добитый орк, не заглушка).
-    var tl=e.tl||[],fr=null,bp=Math.min(1,(el-e.gather_secs-e.march_secs)/Math.max(1,e.battle_secs));
-    if(tl.length)fr=(ph==='battle')?tl[Math.min(tl.length-1,Math.floor(bp*tl.length))]
-      :((ph==='won'||ph==='lost')?tl[tl.length-1]:null);
+    var tl=e.tl||[],fr=null,fi=-1,bp=Math.min(1,(el-e.gather_secs-e.march_secs)/Math.max(1,e.battle_secs));
+    if(tl.length){
+      if(ph==='battle'){fi=Math.min(tl.length-1,Math.floor(bp*tl.length));fr=tl[fi];}
+      else if(ph==='won'||ph==='lost')fr=tl[tl.length-1];}
+    // всплывающие числа урона при СМЕНЕ кадра боя: дельта HP орды/дружины за раунд
+    if(ph==='battle'&&fi>=0&&fi!==invFrameIdx){
+      floatDmg(el2,(fi>0?tl[fi-1].h:(e.orc_hp_max||0))-fr.h,'orc');   // урон армии по орде
+      floatDmg(el2,(fi>0?tl[fi-1].a:(e.army_hp_max||0))-fr.a,'ally'); // урон орды по дружине
+      invFrameIdx=fi;
+    }else if(ph!=='battle')invFrameIdx=-1;
     var fill=el2.querySelector('.hp i');
     if(fill){var hp;
       if(ph==='won')hp=0;
