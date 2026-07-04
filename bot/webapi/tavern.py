@@ -413,7 +413,12 @@ async def _api_trade(request: web.Request) -> web.Response:
             return web.json_response({"ok": False, "error": "no_tavern"})
         offer = ss.get_trade(p)
         if not offer:
-            return web.json_response({"ok": False, "error": "gone"})
+            # оффер уже consumed (продажа прошла / ответ потерялся на флаки-сети) —
+            # не «ошибка», а мягкий уход с обновлением кассы; лист закроется чисто
+            return web.json_response(
+                {"ok": True, "result": "walk", "react": None, "trade": None,
+                 "state": _tavern_state(p, p.tavern)},
+                headers={"Cache-Control": "no-store"})
         world = await repo.get_or_create_world(s)
         st = {"result": None, "react": None, "qty": 0, "gold": 0, "unit": 0,
               "asked": 0, "short": False}
@@ -523,9 +528,14 @@ async def _api_trade(request: web.Request) -> web.Response:
             variant = str(body.get("variant") or "")
             deal = fork.get(variant)
             if not deal:
-                return web.json_response({"ok": False, "error": "bad"})
-            kind = "accept_high" if deal["unit"] >= offer["fv"] * 1.15 else "accept"
-            _finish(int(deal["unit"]), kind, qty_cap=int(deal["qty"]))
+                # вилка устарела: оффер сменился (напр. после потерянного ответа на
+                # флаки-сети — продажа прошла, гости позвали нового купца). Не мёртвая
+                # «bad», а ресинк на актуальный оффер (уходит trade+state ниже).
+                st.update(result="stale",
+                          react="«Э, погоди — тот уговор уплыл. Гляди, что есть теперь.»")
+            else:
+                kind = "accept_high" if deal["unit"] >= offer["fv"] * 1.15 else "accept"
+                _finish(int(deal["unit"]), kind, qty_cap=int(deal["qty"]))
         else:
             return web.json_response({"ok": False, "error": "bad_op"})
 

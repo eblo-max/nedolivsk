@@ -151,3 +151,21 @@ def test_trade_offer_expires():
     assert trade.is_stale(old) is True
     assert trade.is_stale(legacy) is True        # без ts — протухший
     assert trade.is_stale(None) is False
+
+
+def test_trade_stale_offer_resyncs_not_dead_error():
+    """Устаревшее действие торга (оффер сменился на флаки-сети: продажа прошла,
+    ответ потерялся, гости позвали нового купца) — РЕСИНК на актуальный оффер, а
+    не мёртвая {ok:False,error:bad}, из-за которой игрок застревал с нерабочей
+    вилкой (жалоба 05.07). Источник-гард в стиле test_shop_price_single_source."""
+    import inspect
+    from bot.webapi import tavern
+    src = inspect.getsource(tavern._api_trade)
+    # take без вилки ставит stale (не голую ошибку), и ответ несёт свежий trade
+    assert 'result="stale"' in src, "take не ресинкает — вернётся мёртвая bad"
+    assert '"trade": _trade_dto(ss.get_trade(p))' in src, "ответ без свежего оффера для ресинка"
+    # оффера нет вовсе → мягкий walk с обновлением кассы, а не error:gone
+    assert '"result": "walk"' in src and '"state": _tavern_state' in src
+    # прежние тупики (error bad/gone на этих путях) — вычищены
+    assert '{"ok": False, "error": "gone"}' not in src
+    assert src.count('"error": "bad"') <= 1        # осталась лишь на битом idx (op=offer)

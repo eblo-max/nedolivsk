@@ -10,7 +10,7 @@ export interface TradeData {
   choice?: { mine: { unit: number; qty: number }; full: { unit: number; qty: number } } | null
 }
 interface TradeResp {
-  ok: boolean; result?: 'sold' | 'counter' | 'walk' | 'choice'; react?: string
+  ok: boolean; result?: 'sold' | 'counter' | 'walk' | 'choice' | 'stale'; react?: string
   choice?: { mine: { unit: number; qty: number }; full: { unit: number; qty: number } } | null
   qty?: number; gold?: number; unit?: number; asked?: number; short?: boolean; trade?: TradeData | null; state?: unknown
 }
@@ -66,6 +66,8 @@ export default function TradeSheet({ offer, onClose, onState }: {
       else if (r.result === 'walk') { setPhase('walk'); hapticNotify('warning') }
       else if (r.result === 'counter' && r.trade) { setD(r.trade); haptic('light') }
       else if (r.result === 'choice' && r.choice) { setD({ ...d, choice: r.choice }); haptic('light') }
+      // оффер сменился на сервере (флаки-сеть) — ресинк на актуальный, без мёртвой ошибки
+      else if (r.result === 'stale') { if (r.trade) { setD(r.trade); haptic('light') } else { setPhase('walk'); hapticNotify('warning') } }
     } catch (e) {
       // 'gone'/'no_tavern' — оффер и правда истёк: купец ушёл (без устаревшей реплики).
       // Сеть/таймаут/сервер — НЕ выдаём за уход: оставляем экран и даём повторить,
@@ -146,6 +148,7 @@ export default function TradeSheet({ offer, onClose, onState }: {
         ) : (
           // ── первый ход: предложи цену ──
           <>
+            {react && <p className="trd-react">{react}</p>}
             <p className="trd-hint">Заломи цену — горожанин поторгуется или возьмёт.</p>
             <div className="trd-tiers">
               {d.prices.map((pp, i) => (
