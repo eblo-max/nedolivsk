@@ -594,6 +594,38 @@ def need_hint(participants: list[dict], trait: tuple | None) -> str:
     return "Состав крепкий — так держать!"
 
 
+def postmortem(rows: list[dict], trait: tuple | None, won: bool) -> dict:
+    """Разбор боя для модалки итогов: ГЛАВНАЯ причина исхода + MVP + число павших.
+    rows — из build_report (role/dmg/fell/name/pid, сорт по урону). Причина поражения
+    приоритетно: нет фронта → не закрыт трейт → просто мало сил. Чистая."""
+    n = len(rows)
+    fell = sum(1 for r in rows if r.get("fell"))
+    mvp = None
+    for r in rows:                                   # MVP — лучший ЖИВОЙ игрок (не болванка)
+        if int(r.get("pid", 1)) > 0 and int(r.get("dmg", 0)) > 0:
+            mvp = {"name": r.get("name", ""), "dmg": int(r.get("dmg", 0)), "role": r.get("role", "ratnik")}
+            break
+    if mvp is None and rows:
+        r = rows[0]
+        mvp = {"name": r.get("name", ""), "dmg": int(r.get("dmg", 0)), "role": r.get("role", "ratnik")}
+    if won:
+        cause = "Строй выдержал натиск — Недоливск отбился."
+    elif n == 0:
+        cause = "На зов никто не встал — орда прошла без боя."
+    else:
+        front = sum(1 for r in rows if r.get("role") in ("tank", "ratnik"))
+        need_role = _ROLE_BY_STANCE.get(trait[3]) if trait else None
+        has_counter = any(r.get("role") == need_role for r in rows) if need_role else True
+        if front < max(1, n // 3):
+            cause = "🛡 Не хватило фронта — орду некому было держать, строй прорвали."
+        elif trait and not has_counter:
+            cause = (f"{trait[1]} Не закрыли слабость «{trait[2]}» — "
+                     f"нужна была стойка «{STANCES.get(trait[3], {}).get('name', '')}».")
+        else:
+            cause = "Орда оказалась сильнее — не хватило явки и силы дружины."
+    return {"cause": cause, "mvp": mvp, "fell": fell, "n": n}
+
+
 # ── Исход и раздача ──────────────────────────────────────────────────────────
 def is_won(inv) -> bool:
     """Победа, если суммарная мощь записавшихся ≥ порога орды."""

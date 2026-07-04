@@ -368,6 +368,26 @@ def test_rewards_toggle_is_wired():
     assert "REWARDS_ENABLED" in src and "return" in src   # награды под гейтом флага
 
 
+def test_postmortem_explains_outcome():
+    """Разбор боя: победа → «выдержал» + MVP из ЖИВЫХ (не болванка); поражение →
+    приоритет причины: нет фронта → не закрыт трейт → мало сил; считает павших."""
+    tr = ("shaman", "💀", "Шаманская орда", "flank", "...")   # контра flank→scout
+    # победа: болванка (pid<0) нанесла больше, но MVP — живой игрок
+    won = inv.postmortem([{"pid": 1, "name": "Гром", "role": "tank", "dmg": 100, "fell": False},
+                          {"pid": -1, "name": "Бот", "role": "archer", "dmg": 300, "fell": False}], tr, True)
+    assert "выдержал" in won["cause"].lower() and won["mvp"]["name"] == "Гром"
+    # поражение без фронта (одни стрелки/разведка)
+    no_front = inv.postmortem([{"pid": 1, "name": "A", "role": "archer", "dmg": 50, "fell": True},
+                               {"pid": 2, "name": "B", "role": "scout", "dmg": 40, "fell": True},
+                               {"pid": 3, "name": "C", "role": "archer", "dmg": 30, "fell": True}], tr, False)
+    assert "фронт" in no_front["cause"].lower() and no_front["fell"] == 3
+    # поражение с фронтом, но трейт (shaman→scout) не закрыт
+    no_ctr = inv.postmortem([{"pid": 1, "name": "A", "role": "tank", "dmg": 50, "fell": False},
+                             {"pid": 2, "name": "B", "role": "tank", "dmg": 40, "fell": False},
+                             {"pid": 3, "name": "C", "role": "ratnik", "dmg": 30, "fell": True}], tr, False)
+    assert "слабость" in no_ctr["cause"].lower()
+
+
 def test_simulate_is_memoized_and_correct():
     """Мемо simulate(): те же входы → тот же объект из кэша (быстро), и он ИДЕНТИЧЕН
     свежему пересчёту _simulate_impl (детерминизм не нарушен)."""

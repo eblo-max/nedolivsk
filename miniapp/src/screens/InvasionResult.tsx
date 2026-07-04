@@ -13,10 +13,11 @@ interface Row {
   fell: boolean; gold: number; rep: number; trophy: string; mine: boolean
 }
 interface Trait { id: string; emoji: string; name: string; blurb: string }
+interface Postmortem { cause: string; mvp?: { name: string; dmg: number; role: string } | null; fell: number; n: number }
 interface Result {
   ok: boolean; available: boolean; won?: boolean; rounds?: number; n?: number
   orc_hp_left?: number; orc_hp_max?: number; rows?: Row[]
-  trait?: Trait; rewards_enabled?: boolean; escal?: number
+  trait?: Trait; rewards_enabled?: boolean; escal?: number; postmortem?: Postmortem
 }
 
 const ROLE_EMO: Record<string, string> = { tank: '🛡', archer: '⚔️', scout: '🔭', ratnik: '🗡' }
@@ -103,6 +104,23 @@ export default function InvasionResult({ onClose }: { onClose: () => void }) {
             background: 'rgba(60,45,28,.4)', border: '1px solid #4a3420' }}>
             <span style={{ fontWeight: 700, color: '#ffcf9a' }}>{d.trait.emoji} {d.trait.name}</span>
             <span style={{ fontSize: 12, color: '#bfa775' }}> — {d.trait.blurb}</span>
+          </div>
+        )}
+
+        {/* Разбор боя: причина исхода + MVP + павшие */}
+        {d.postmortem && (
+          <div style={{ margin: '0 0 10px', padding: '10px 12px', borderRadius: 12,
+            background: won ? 'rgba(50,90,30,.26)' : 'rgba(95,42,30,.3)',
+            border: `1px solid ${won ? '#4a7a2a' : '#7a3a2a'}` }}>
+            <div style={{ fontSize: 13, color: '#ece0c8', fontWeight: 600, lineHeight: 1.4 }}>{d.postmortem.cause}</div>
+            {(d.postmortem.mvp?.dmg || d.postmortem.fell > 0) && (
+              <div style={{ display: 'flex', gap: 14, marginTop: 7, fontSize: 12, color: '#bfa775', flexWrap: 'wrap' }}>
+                {d.postmortem.mvp && d.postmortem.mvp.dmg > 0 && (
+                  <span>👑 <b style={{ color: '#ffcf9a' }}>{d.postmortem.mvp.name}</b> · {d.postmortem.mvp.dmg} урона</span>
+                )}
+                {d.postmortem.fell > 0 && <span>🪦 пало: {d.postmortem.fell}</span>}
+              </div>
+            )}
           </div>
         )}
 

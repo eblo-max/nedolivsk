@@ -42,6 +42,8 @@ def _invasion_report_event(inv, uid: int = 0) -> dict:
         report = invmod.build_report(inv, sim, plan)
         won, rounds, n = sim["won"], sim["rounds"], sim["n"]
         ohl, ohm = sim["orc_hp_left"], sim["orc_hp_max"]
+    # разбор боя (причина исхода + MVP + павшие) — считаем на report С pid, до стрипа
+    pm = invmod.postmortem(report, invmod.trait_of(inv), bool(won))
     rows = [{k: v for k, v in r.items() if k != "pid"}
             | {"mine": bool(uid) and int(r.get("pid", 0)) == uid} for r in report]
     return {
@@ -50,6 +52,7 @@ def _invasion_report_event(inv, uid: int = 0) -> dict:
         "report": True, "won": bool(won), "status": inv.status,
         "rounds": int(rounds or 0), "n": int(n or 0),
         "orc_hp_left": int(ohl or 0), "orc_hp_max": int(ohm or 1), "rows": rows,
+        "postmortem": pm,
     }
 
 

@@ -103,6 +103,19 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
   border-radius:6px;background:#2a0d0a;border:1px solid #5a1e14;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,.6);opacity:0;transition:opacity .3s}
 .orc-ev.battle .hp{opacity:1}
 .orc-ev .hp i{display:block;height:100%;width:100%;border-radius:5px;transition:width .25s linear;background:linear-gradient(180deg,#ff5a3c,#c11e12)}
+/* вторая полоса — HP дружины (зелёная, тоньше, под полосой орды) */
+.orc-ev .ally{position:absolute;left:50%;top:-3px;transform:translateX(-50%);width:104px;height:6px;z-index:3;
+  border-radius:4px;background:#0c1608;border:1px solid rgba(0,0,0,.55);overflow:hidden;opacity:0;transition:opacity .3s}
+.orc-ev.battle .ally,.orc-ev.dead .ally{opacity:1}
+.orc-ev .ally i{display:block;height:100%;width:100%;transition:width .25s linear;background:linear-gradient(180deg,#8fe05a,#3f9a24)}
+/* телеграф способностей орка: иконки активных баффов + «pop» при активации */
+.orc-ev .tel{position:absolute;left:50%;top:-54px;transform:translateX(-50%);white-space:nowrap;z-index:4;
+  font-size:17px;line-height:1;letter-spacing:2px;filter:drop-shadow(0 1px 3px #000);opacity:0;transition:opacity .25s;pointer-events:none}
+.orc-ev.battle .tel{opacity:1}
+.orc-ev .tel.pop{animation:telPop .5s cubic-bezier(.2,.8,.3,1)}
+@keyframes telPop{0%{transform:translateX(-50%) scale(.4);opacity:.2}42%{transform:translateX(-50%) scale(1.4);opacity:1}100%{transform:translateX(-50%) scale(1)}}
+.orc-ev.warded .aura{background:radial-gradient(circle,rgba(120,180,255,.5),rgba(60,120,220,0) 66%)!important}
+.orc-ev.enr .orc{filter:drop-shadow(0 4px 7px rgba(0,0,0,.75)) saturate(1.65) brightness(1.14) hue-rotate(-12deg)}
 .orc-ev .lbl{position:absolute;left:50%;top:-34px;transform:translateX(-50%);white-space:nowrap;z-index:3;
   font:800 12px/1 var(--serif);color:#cdeba6;text-shadow:0 1px 3px #000,0 0 7px rgba(120,200,80,.6);letter-spacing:.3px}
 .orc-ev.battle .lbl{color:#ffcf9a;text-shadow:0 1px 3px #000,0 0 8px rgba(255,90,50,.7)}
@@ -354,7 +367,7 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
 var invLayer=L.layerGroup().addTo(map),invTroops=L.layerGroup().addTo(map);
 var invM=null,invKey='',invData=null,invBaseEl=0,invAtMs=0;
 var troopMarks=[],troopMeta=[],troopInvId=null;
-var invPh='',invResultKey='';   // текущая фаза (для тапа по орку) + дедуп авто-модалки итогов
+var invPh='',invResultKey='',invBuffs='';   // фаза (для тапа) + дедуп модалки + текущий набор баффов орка (телеграф)
 // Итоги боя: просим родителя (React) открыть модалку с полной сводкой. Авто — один
 // раз на нашествие (флаг в localStorage переживает перезаход карты); тап по орку —
 // принудительно (manual), в обход дедупа.
@@ -450,7 +463,7 @@ function renderInv(){
   var key=e.name+'|'+(ph==='battle'?'b':(ph==='won'?'w':(ph==='lost'?'l':'p')));
   if(key!==invKey){invLayer.clearLayers();
     var icon=L.divIcon({className:'orc-ev'+(ph==='battle'?' battle':''),iconSize:[100,76],iconAnchor:[50,76],
-      html:'<div class="aura"></div><div class="fx"></div><div class="boom"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="orc"></div>'});
+      html:'<div class="aura"></div><div class="fx"></div><div class="boom"></div><div class="tel"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="ally"><i></i></div><div class="orc"></div>'});
     invM=L.marker(lair,{icon:icon,zIndexOffset:2000}).addTo(invLayer);
     invM.on('click',function(){   // не релоадим приложение — просим родителя открыть панель поверх карты
       if(invPh==='won'||invPh==='lost'){askResult(invPh==='won',true);return;}   // бой кончился → сводка итогов
@@ -463,13 +476,31 @@ function renderInv(){
     // смерть отыграна давно (перезаход) → орк уже исчез, не переигрываем анимацию
     var bEnd=e.gather_secs+e.march_secs+e.battle_secs;
     el2.style.opacity=(ph==='won'&&el-bEnd>3)?'0':'';
+    // кадр боя по elapsed (как HP) → точные HP/баффы синхронно с симуляцией
+    var tl=e.tl||[],fr=null;
+    if(ph==='battle'&&tl.length){
+      var bp=Math.min(1,(el-e.gather_secs-e.march_secs)/Math.max(1,e.battle_secs));
+      fr=tl[Math.min(tl.length-1,Math.floor(bp*tl.length))];}
     var fill=el2.querySelector('.hp i');
     if(fill){var hp=100;
-      if(ph==='battle'){var bp=Math.min(1,(el-e.gather_secs-e.march_secs)/Math.max(1,e.battle_secs));
-        var endp=e.orc_hp_max?100*e.orc_hp_left/e.orc_hp_max:0;hp=Math.max(endp,100-(100-endp)*bp);}
+      if(ph==='battle')hp=fr?100*fr.h/(e.orc_hp_max||1):100;
       else if(ph==='won')hp=0;
       else if(ph==='lost')hp=e.orc_hp_max?Math.max(6,100*e.orc_hp_left/e.orc_hp_max):50;
       fill.style.width=hp+'%';}
+    // вторая полоса — HP ДРУЖИНЫ: видно, кто кого пересиливает (бой двусторонний)
+    var af=el2.querySelector('.ally i');
+    if(af){var ap=100;
+      if(ph==='battle')ap=fr?100*fr.a/(e.army_hp_max||1):100;
+      else if(ph==='won')ap=fr?Math.max(20,100*fr.a/(e.army_hp_max||1)):60;
+      else if(ph==='lost')ap=8;
+      af.style.width=Math.max(0,Math.min(100,ap))+'%';}
+    // ТЕЛЕГРАФ способностей орка: активные баффы строкой + вспышка при активации
+    var tel=el2.querySelector('.tel');
+    if(tel){var bs=(ph==='battle'&&fr)?((fr.w?'🛡':'')+(fr.c?'💀':'')+(fr.e?'🗣':'')+(fr.d?'🐺':'')):'';
+      if(bs!==invBuffs){invBuffs=bs;tel.textContent=bs;
+        if(bs){tel.classList.remove('pop');void tel.offsetWidth;tel.classList.add('pop');}}
+      el2.classList.toggle('warded',!!(fr&&fr.w));   // щит — подсветка ауры
+      el2.classList.toggle('enr',!!(fr&&fr.e));}      // ярость — орк краснеет
     var lb=el2.querySelector('.lbl');
     if(lb){if(ph==='gather')lb.textContent='🪓 СБОР · '+fmtT(e.gather_secs-el)+' ('+(e.n||0)+')';
       else if(ph==='march')lb.textContent='🪓 ОРДА ИДЁТ!';
@@ -556,6 +587,13 @@ async def _world_invasion(request: web.Request) -> web.Response:
             e = _invasion_event(inv, uid)
             tl = e.get("timeline") or []
             ohl = int(tl[-1].get("hp", 0)) if tl and isinstance(tl[-1], dict) else 0
+            # компактный таймлайн для ЧИТАЕМОСТИ боя на карте: HP орды(h)/дружины(a) +
+            # активные способности по раундам — щит(w)/проклятье(c)/ярость(e)/волки(d).
+            # Клиент по elapsed выбирает кадр (как HP) → телеграф синхронен симуляции.
+            ctl = [{"h": int(f.get("hp", 0)), "a": int(f.get("army", 0)),
+                    "w": 1 if f.get("ward") else 0, "c": 1 if f.get("curse") else 0,
+                    "e": 1 if f.get("enraged") else 0, "d": 1 if (f.get("adds", 0) or 0) > 0 else 0}
+                   for f in tl if isinstance(f, dict)]
             # Позиции войск — по ТОЙ ЖЕ формуле, что таверны-маркеры (_atlas_pos),
             # из id записавшихся → воин встаёт РОВНО у своей таверны (иначе марш шёл
             # мимо, и не совпасть с маркером для «скрыть чужие»). Болванки (отриц. id,
@@ -584,6 +622,7 @@ async def _world_invasion(request: web.Request) -> web.Response:
                 "gather_secs": e.get("gather_secs", 0), "march_secs": e.get("march_secs", 0),
                 "battle_secs": e.get("battle_secs", 0), "elapsed": e.get("elapsed", 0),
                 "orc_hp_max": e.get("orc_hp_max", 1), "orc_hp_left": ohl, "troops": troops,
+                "army_hp_max": int(e.get("army_hp_max", 1) or 1), "tl": ctl,
             }
     return web.json_response({"inv": ev}, headers={"Cache-Control": "no-store"})
 
