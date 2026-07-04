@@ -76,6 +76,17 @@ html,body{margin:0;height:100%;background:#0f1828;overflow:hidden;font-family:sy
 .orc-ev.dead .aura{opacity:.15}
 .orc-ev.dead{animation:orcFade 1.8s ease-out 1.1s forwards}
 @keyframes orcFade{to{opacity:0;transform:translateY(6px) scale(.9)}}
+/* ударная волна на добивании (только победа) */
+.orc-ev .boom{position:absolute;left:50%;top:48%;width:44px;height:44px;transform:translate(-50%,-50%) scale(.2);
+  border-radius:50%;border:4px solid rgba(255,224,150,.95);opacity:0;pointer-events:none;z-index:4;
+  box-shadow:0 0 26px rgba(255,180,90,.9),inset 0 0 20px rgba(255,120,60,.7)}
+.orc-ev.dead .boom{animation:boom .7s cubic-bezier(.15,.7,.3,1) forwards}
+@keyframes boom{0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}14%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(3.6)}}
+/* лёгкая тряска карты на исходе боя (transform-only → композитор, дёшево) */
+#map.shake{animation:mapShake .44s cubic-bezier(.36,.07,.19,.97)}
+@keyframes mapShake{10%{transform:translate(-2px,1px)}25%{transform:translate(3px,-2px)}40%{transform:translate(-4px,2px)}
+  55%{transform:translate(3px,-1px)}70%{transform:translate(-2px,2px)}85%{transform:translate(2px,-1px)}100%{transform:none}}
+@media (prefers-reduced-motion:reduce){#map.shake{animation:none}.orc-ev.dead .boom{animation:none}}
 .orc-ev .aura{position:absolute;left:50%;top:55%;width:132px;height:132px;transform:translate(-50%,-50%);z-index:-1;
   border-radius:50%;background:radial-gradient(circle,rgba(120,200,70,.3),rgba(80,160,40,0) 68%);animation:orcAura 2.3s ease-in-out infinite}
 .orc-ev.battle .aura{background:radial-gradient(circle,rgba(255,70,50,.42),rgba(220,30,20,0) 66%);animation-duration:.9s}
@@ -333,7 +344,7 @@ fetch('/world/taverns.json?uid='+uid).then(function(r){return r.json();}).then(f
 // ── Орда орков на карте: анимированный орк + ПЛАВНЫЙ марш войск + автобой ──
 var invLayer=L.layerGroup().addTo(map),invTroops=L.layerGroup().addTo(map);
 var invM=null,invKey='',invData=null,invBaseEl=0,invAtMs=0;
-var troopMarks=[],troopMeta=[],troopKey='';
+var troopMarks=[],troopMeta=[],troopInvId=null;
 var invPh='',invResultKey='';   // текущая фаза (для тапа по орку) + дедуп авто-модалки итогов
 // Итоги боя: просим родителя (React) открыть модалку с полной сводкой. Авто — один
 // раз на нашествие (флаг в localStorage переживает перезаход карты); тап по орку —
@@ -341,6 +352,13 @@ var invPh='',invResultKey='';   // текущая фаза (для тапа по
 function askResult(won,manual){
   try{parent.postMessage({t:'nedo-orda-result',won:!!won,manual:!!manual},location.origin);}catch(e){}
   if(parent===window){location.href='/app/?startapp=orda_result';}}
+// Кульминация боя: тряска карты (ударная волна на орке — из CSS .dead .boom) + просьба
+// родителю дать сильный гаптик. Один раз на нашествие (вызывается из once-гейта ниже).
+function climax(won){
+  var m=document.getElementById('map');
+  if(m){m.classList.remove('shake');void m.offsetWidth;m.classList.add('shake');
+    setTimeout(function(){m.classList.remove('shake');},480);}
+  try{parent.postMessage({t:'nedo-orda-fx',won:!!won},location.origin);}catch(_){}}
 function maybeAutoResult(e,ph){
   if(ph!=='won'&&ph!=='lost')return;
   var rk='orda-res-'+(e.id||0);
@@ -348,6 +366,7 @@ function maybeAutoResult(e,ph){
   var seen=false;try{seen=localStorage.getItem(rk)==='1';}catch(_){}
   if(seen)return;                                       // уже показывали (перезаход) — не спамим
   try{localStorage.setItem(rk,'1');}catch(_){}
+  climax(ph==='won');                                   // удар/тряска/гаптик В МОМЕНТ исхода
   setTimeout(function(){askResult(ph==='won',false);},1800);}   // дать добить/пасть → всплывает сводка
 function fmtT(s){s=Math.max(0,s|0);var m=(s/60)|0,ss=s%60;return m+':'+(ss<10?'0':'')+ss;}
 function invElapsed(){return invBaseEl+(Date.now()-invAtMs)/1000;}
@@ -357,19 +376,23 @@ function invPhase(e,el){
   var g=e.gather_secs,mr=e.march_secs,b=e.battle_secs;
   if(el<g)return'gather';if(el<g+mr)return'march';if(el<g+mr+b)return'battle';
   return (e.orc_hp_left<=0)?'won':'lost';}   // бой отыгран → ИСХОД сразу по HP (не ждём флип статуса нотифаера)
-// Пересоздаём фигурки ТОЛЬКО при смене состава (иначе марш дёргался — каждый тик
-// маркеры уничтожались/создавались заново). Дальше их плавно ДВИГАЕМ (setLatLng + CSS-transition).
-function rebuildTroops(e){invTroops.clearLayers();troopMarks=[];troopMeta=[];var lair=px(e.x*W,e.y*H);
-  (e.troops||[]).forEach(function(t,i){
-    L.polyline([px(t.x*W,t.y*H),lair],{className:'orc-line'+(t.mine?' mine':''),interactive:false}).addTo(invTroops);
-    var hv='h'+((i%6)+1);
-    var m=L.marker(px(t.x*W,t.y*H),{icon:L.divIcon({className:'orc-fig '+hv+(t.mine?' mine':''),
-      iconSize:[44,55],iconAnchor:[22,50],html:'<div class="hf"></div>'}),
-      interactive:false,keyboard:false,zIndexOffset:2100}).addTo(invTroops);   // ВЫШЕ босса — не прячутся за тушей
-    troopMarks.push(m);
-    // орбита ВОКРУГ босса (кольцо с глубиной): угол по золотому сечению + радиус
-    // СНАРУЖИ туши (иначе прятались за 100px орком)
-    troopMeta.push({tx:t.x,ty:t.y,orbAng:i*2.399963,orbR:0.026+((i*37)%5)*0.003});});}
+// Одна фигурка + её линия к логову. Орбита ВОКРУГ босса (кольцо с глубиной):
+// угол по золотому сечению, радиус СНАРУЖИ туши (иначе прятались за 100px орком).
+function addTroop(t,i,e){var lair=px(e.x*W,e.y*H);
+  L.polyline([px(t.x*W,t.y*H),lair],{className:'orc-line'+(t.mine?' mine':''),interactive:false}).addTo(invTroops);
+  var hv='h'+((i%6)+1);
+  var m=L.marker(px(t.x*W,t.y*H),{icon:L.divIcon({className:'orc-fig '+hv+(t.mine?' mine':''),
+    iconSize:[44,55],iconAnchor:[22,50],html:'<div class="hf"></div>'}),
+    interactive:false,keyboard:false,zIndexOffset:2100}).addTo(invTroops);   // ВЫШЕ босса — не прячутся за тушей
+  troopMarks.push(m);
+  troopMeta.push({tx:t.x,ty:t.y,orbAng:i*2.399963,orbR:0.026+((i*37)%5)*0.003});}
+// ИНКРЕМЕНТАЛЬНО: при входе нового бойца дорисовываем ТОЛЬКО его, а не пересобираем
+// всех — иначе весь строй мигал (DOM пересоздавался, анимация ходьбы рестартовала).
+// Полный пересбор — лишь на новое нашествие или если состав вдруг ужался.
+function syncTroops(e){var list=e.troops||[];
+  if(troopInvId!==e.id||list.length<troopMarks.length){
+    invTroops.clearLayers();troopMarks=[];troopMeta=[];troopInvId=e.id;}
+  for(var i=troopMarks.length;i<list.length;i++)addTroop(list[i],i,e);}
 function moveTroops(e,ph,el){
   var bx=e.x,by=e.y,tt=Date.now()/1000,bEnd=e.gather_secs+e.march_secs+e.battle_secs;
   var march=ph==='gather'?0:(ph==='march'?Math.min(1,(el-e.gather_secs)/Math.max(1,e.march_secs)):1);
@@ -389,15 +412,14 @@ function moveTroops(e,ph,el){
     if(g){g.classList.toggle('atk',atk);g.classList.toggle('dead',dead);
       g.style.opacity=home?'0':'';}}}   // дошли до таверн → плавно исчезли (fade из CSS .orc-fig)
 function renderInv(){
-  if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';troopKey='';troopMarks=[];return;}
+  if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';troopInvId=null;troopMarks=[];troopMeta=[];return;}
   var e=invData,el=invElapsed(),ph=invPhase(e,el),lair=px(e.x*W,e.y*H);
   invPh=ph;maybeAutoResult(e,ph);   // тап по орку знает фазу + авто-модалка итогов (раз на бой)
-  var tk=e.name+'|'+((e.troops||[]).length);
-  if(tk!==troopKey){rebuildTroops(e);troopKey=tk;}
+  syncTroops(e);                    // дорисовать новоприбывших без пересбора всех (без мигания)
   var key=e.name+'|'+(ph==='battle'?'b':(ph==='won'?'w':(ph==='lost'?'l':'p')));
   if(key!==invKey){invLayer.clearLayers();
     var icon=L.divIcon({className:'orc-ev'+(ph==='battle'?' battle':''),iconSize:[100,76],iconAnchor:[50,76],
-      html:'<div class="aura"></div><div class="fx"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="orc"></div>'});
+      html:'<div class="aura"></div><div class="fx"></div><div class="boom"></div><div class="lbl"></div><div class="hp"><i></i></div><div class="orc"></div>'});
     invM=L.marker(lair,{icon:icon,zIndexOffset:2000}).addTo(invLayer);
     invM.on('click',function(){   // не релоадим приложение — просим родителя открыть панель поверх карты
       if(invPh==='won'||invPh==='lost'){askResult(invPh==='won',true);return;}   // бой кончился → сводка итогов
