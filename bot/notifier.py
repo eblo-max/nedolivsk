@@ -58,6 +58,8 @@ async def _apply_invasion(session, inv, plan: dict) -> None:
     """Применить исход ивента «Орда орков»: награды/штраф участникам + личные сводки.
     Капы: золото не уходит в минус, репутация не ниже 0. Идемпотентность — снаружи
     (резолв только при status=='battle' под локом строки ивента)."""
+    if not invmod.REWARDS_ENABLED:      # ⚠️ ТЕСТ-тумблер: награды/штрафы выключены
+        return
     won = plan["won"]
     trophy = plan.get("trophy")
     for pid, dgold in plan["gold"].items():

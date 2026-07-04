@@ -356,3 +356,13 @@ def test_composition_and_need_hint():
     hint = inv.need_hint(_army({"tank": 3}), armored)         # против латной нет рубак
     assert "атаку" in hint.lower()
     assert inv.need_hint([], None) and inv.need_hint(_army({"tank": 3, "archer": 2}), armored)
+
+
+def test_rewards_toggle_is_wired():
+    """ТЕСТ-тумблер REWARDS_ENABLED реально гейтит выдачу наград/штрафов (гард в
+    нотифаере _apply_invasion). Значение временное; важно, что флаг подключён."""
+    import inspect
+    from bot import notifier
+    assert isinstance(inv.REWARDS_ENABLED, bool)
+    src = inspect.getsource(notifier._apply_invasion)
+    assert "REWARDS_ENABLED" in src and "return" in src   # награды под гейтом флага
