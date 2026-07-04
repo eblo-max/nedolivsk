@@ -393,6 +393,20 @@ def test_prep_forge_does_not_thicken_orc():
     assert sf["rounds"] <= sb["rounds"]                  # но усиленная армия валит не медленнее
 
 
+def test_dummy_roster_scales_with_escalation():
+    """Тихий тест-ростер растёт с эскалацией → бой играбелен при любом orc_wins.
+    Фикс-16 после ~11 побед мира гарантированно проигрывал (наблюдалось на проде)."""
+    assert inv.dummy_count_for(1.0) == 16                 # база не меняется
+    assert inv.dummy_count_for(1.96) > 16                 # после побед мира — больше болванок
+    assert inv.dummy_count_for(2.5) <= 48                 # потолок
+    for esc in (1.96, 2.5):                               # масштабированный ростер снова может победить
+        parts = [dict(r, pid=int(p)) for p, r in inv.dummy_roster(inv.dummy_count_for(esc)).items()]
+        wins = sum(inv.simulate(parts, seed=1, escal=esc, trait=t[0])["won"] for t in inv.TRAITS)
+        assert wins >= 3, f"escal={esc}: побед {wins}/5 — мало"
+    fixed = [dict(r, pid=int(p)) for p, r in inv.dummy_roster(16).items()]   # фикс-16 при 1.96 — проигрыш
+    assert not any(inv.simulate(fixed, seed=1, escal=1.96, trait=t[0])["won"] for t in inv.TRAITS)
+
+
 def test_postmortem_explains_outcome():
     """Разбор боя: победа → «выдержал» + MVP из ЖИВЫХ (не болванка); поражение →
     приоритет причины: нет фронта → не закрыт трейт → мало сил; считает павших."""

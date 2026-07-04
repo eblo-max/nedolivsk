@@ -345,9 +345,13 @@ async def _api_invasion_seed(request: web.Request) -> web.Response:
         g_until, r_at = invmod.schedule(now, fast=True)
         inv = repo.create_invasion(s, sprite=invmod.SPRITE, threshold=threshold,
                                    gather_until=g_until, resolve_at=r_at)
-        inv.registered = invmod.dummy_roster()          # болванка — сразу виден марш
         world = await repo.get_or_create_world(s)
         inv.escal = invmod.escalation(getattr(world, "orc_wins", 0))
+        # болваночную армию МАСШТАБИРУЕМ под текущую эскалацию — иначе после N побед
+        # мира орда толстеет (escal↑), а фикс-ростер из 16 болванок гарантированно
+        # проигрывает. Растущий ростер эмулирует «город вырос вместе с угрозой» →
+        # тихий тест всегда даёт играбельный бой на грани при любом orc_wins.
+        inv.registered = invmod.dummy_roster(invmod.dummy_count_for(inv.escal))
         world.invasion_next_at = None                   # активна — авто не спавнит поверх
         await s.flush()                                 # нужен inv.id
         invmod.set_gathering(inv.id)
