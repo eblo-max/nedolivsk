@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
 
@@ -48,7 +49,7 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
   const ready = Math.max(0, Math.min(1, d?.ready ?? 0))
   const win = ready >= 0.7
 
-  return (
+  return createPortal(
     <div className="sv-backdrop" onClick={onClose}>
       <div className="chron-sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 4px 8px' }}>
@@ -131,6 +132,7 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

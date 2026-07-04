@@ -348,19 +348,29 @@ function invPhase(e,el){
 function rebuildTroops(e){invTroops.clearLayers();troopMarks=[];troopMeta=[];var lair=px(e.x*W,e.y*H);
   (e.troops||[]).forEach(function(t,i){
     L.polyline([px(t.x*W,t.y*H),lair],{className:'orc-line'+(t.mine?' mine':''),interactive:false}).addTo(invTroops);
-    var hv='h'+((i%6)+1),ang=i*2.399963,rr=0.5+((i*53)%9)*0.13;
+    var hv='h'+((i%6)+1);
     var m=L.marker(px(t.x*W,t.y*H),{icon:L.divIcon({className:'orc-fig '+hv+(t.mine?' mine':''),
       iconSize:[44,55],iconAnchor:[22,50],html:'<div class="hf"></div>'}),
       interactive:false,keyboard:false,zIndexOffset:1500}).addTo(invTroops);
     troopMarks.push(m);
-    troopMeta.push({tx:t.x,ty:t.y,ex:e.x+Math.cos(ang)*0.006*rr,ey:e.y+Math.sin(ang)*0.006*rr});});}
+    // орбита ВОКРУГ босса (кольцо с глубиной): угол по золотому сечению + свой радиус
+    troopMeta.push({tx:t.x,ty:t.y,orbAng:i*2.399963,orbR:0.011+((i*37)%5)*0.0017});});}
+var wonAt=0;
 function moveTroops(e,ph,el){
-  var prog=ph==='gather'?0:(ph==='march'?Math.min(1,(el-e.gather_secs)/Math.max(1,e.march_secs)):1);
-  for(var i=0;i<troopMarks.length;i++){var mt=troopMeta[i];
-    var fx=mt.tx+(mt.ex-mt.tx)*prog,fy=mt.ty+(mt.ey-mt.ty)*prog;
+  var bx=e.x,by=e.y,tt=Date.now()/1000;
+  if(ph==='won'){if(!wonAt)wonAt=Date.now();}else{wonAt=0;}
+  var march=ph==='gather'?0:(ph==='march'?Math.min(1,(el-e.gather_secs)/Math.max(1,e.march_secs)):1);
+  var retreat=ph==='won'?Math.min(1,(Date.now()-wonAt)/6000):0;   // 6с идут домой
+  for(var i=0;i<troopMarks.length;i++){var mt=troopMeta[i],fx,fy,atk=false,dead=false;
+    var rx=bx+Math.cos(mt.orbAng)*mt.orbR,ry=by+Math.sin(mt.orbAng)*mt.orbR;   // точка на кольце
+    if(ph==='gather'||ph==='march'){fx=mt.tx+(rx-mt.tx)*march;fy=mt.ty+(ry-mt.ty)*march;}   // марш к кольцу
+    else if(ph==='battle'){var a=mt.orbAng+tt*0.5;                              // ХОДЯТ вокруг + бьют
+      fx=bx+Math.cos(a)*mt.orbR;fy=by+Math.sin(a)*mt.orbR;atk=true;}
+    else if(ph==='won'){fx=rx+(mt.tx-rx)*retreat;fy=ry+(mt.ty-ry)*retreat;}     // ПОБЕДА → домой (walk)
+    else{fx=rx;fy=ry;dead=true;}                                                // ПРОРЫВ → падают у босса
     troopMarks[i].setLatLng(px(fx*W,fy*H));
     var g=troopMarks[i].getElement();
-    if(g){g.classList.toggle('atk',ph==='battle');g.classList.toggle('dead',ph==='lost');}}}
+    if(g){g.classList.toggle('atk',atk);g.classList.toggle('dead',dead);}}}
 function renderInv(){
   if(!invData){invLayer.clearLayers();invTroops.clearLayers();invM=null;invKey='';troopKey='';troopMarks=[];return;}
   var e=invData,el=invElapsed(),ph=invPhase(e,el),lair=px(e.x*W,e.y*H);
