@@ -343,8 +343,9 @@ function invElapsed(){return invBaseEl+(Date.now()-invAtMs)/1000;}
 function invPhase(e,el){
   if(e.status==='won')return'won';    // защитники победили → орк ГИБНЕТ
   if(e.status==='lost')return'lost';  // орда прорвалась → воины ГИБНУТ
-  var g=e.gather_secs,mr=e.march_secs;
-  if(el<g)return'gather';if(el<g+mr)return'march';return'battle';}   // после боя держим 'battle' до флипа статуса
+  var g=e.gather_secs,mr=e.march_secs,b=e.battle_secs;
+  if(el<g)return'gather';if(el<g+mr)return'march';if(el<g+mr+b)return'battle';
+  return (e.orc_hp_left<=0)?'won':'lost';}   // бой отыгран → ИСХОД сразу по HP (не ждём флип статуса нотифаера)
 // Пересоздаём фигурки ТОЛЬКО при смене состава (иначе марш дёргался — каждый тик
 // маркеры уничтожались/создавались заново). Дальше их плавно ДВИГАЕМ (setLatLng + CSS-transition).
 function rebuildTroops(e){invTroops.clearLayers();troopMarks=[];troopMeta=[];var lair=px(e.x*W,e.y*H);
@@ -353,10 +354,11 @@ function rebuildTroops(e){invTroops.clearLayers();troopMarks=[];troopMeta=[];var
     var hv='h'+((i%6)+1);
     var m=L.marker(px(t.x*W,t.y*H),{icon:L.divIcon({className:'orc-fig '+hv+(t.mine?' mine':''),
       iconSize:[44,55],iconAnchor:[22,50],html:'<div class="hf"></div>'}),
-      interactive:false,keyboard:false,zIndexOffset:1500}).addTo(invTroops);
+      interactive:false,keyboard:false,zIndexOffset:2100}).addTo(invTroops);   // ВЫШЕ босса — не прячутся за тушей
     troopMarks.push(m);
-    // орбита ВОКРУГ босса (кольцо с глубиной): угол по золотому сечению + свой радиус
-    troopMeta.push({tx:t.x,ty:t.y,orbAng:i*2.399963,orbR:0.011+((i*37)%5)*0.0017});});}
+    // орбита ВОКРУГ босса (кольцо с глубиной): угол по золотому сечению + радиус
+    // СНАРУЖИ туши (иначе прятались за 100px орком)
+    troopMeta.push({tx:t.x,ty:t.y,orbAng:i*2.399963,orbR:0.026+((i*37)%5)*0.003});});}
 var wonAt=0;
 function moveTroops(e,ph,el){
   var bx=e.x,by=e.y,tt=Date.now()/1000;
@@ -366,7 +368,7 @@ function moveTroops(e,ph,el){
   for(var i=0;i<troopMarks.length;i++){var mt=troopMeta[i],fx,fy,atk=false,dead=false;
     var rx=bx+Math.cos(mt.orbAng)*mt.orbR,ry=by+Math.sin(mt.orbAng)*mt.orbR;   // точка на кольце
     if(ph==='gather'||ph==='march'){fx=mt.tx+(rx-mt.tx)*march;fy=mt.ty+(ry-mt.ty)*march;}   // марш к кольцу
-    else if(ph==='battle'){var a=mt.orbAng+tt*0.5;                              // ХОДЯТ вокруг + бьют
+    else if(ph==='battle'){var a=mt.orbAng+tt*1.3;                              // ХОДЯТ вокруг (быстрее) + бьют
       fx=bx+Math.cos(a)*mt.orbR;fy=by+Math.sin(a)*mt.orbR;atk=true;}
     else if(ph==='won'){fx=rx+(mt.tx-rx)*retreat;fy=ry+(mt.ty-ry)*retreat;}     // ПОБЕДА → домой (walk)
     else{fx=rx;fy=ry;dead=true;}                                                // ПРОРЫВ → падают у босса
