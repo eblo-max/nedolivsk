@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api } from '../api'
+import { api, errText } from '../api'
 import { haptic, hapticNotify } from '../telegram'
 import { GoodIcon, ResIcon, fmt } from '../components/icons'
 
@@ -53,10 +53,11 @@ export default function TradeSheet({ offer, onClose, onState }: {
   const [react, setReact] = useState('')
   const [sold, setSold] = useState<{ qty: number; gold: number; unit: number; asked: number; short: boolean } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')          // сетевой сбой ≠ уход купца — даём повтор
 
   async function act(op: string, idx?: number, variant?: string) {
     if (busy) return
-    setBusy(true); haptic('medium')
+    setBusy(true); setErr(''); haptic('medium')
     try {
       const r = await tradeApi(op, idx, d, variant)
       if (r.state) onState?.(r.state)
@@ -65,7 +66,14 @@ export default function TradeSheet({ offer, onClose, onState }: {
       else if (r.result === 'walk') { setPhase('walk'); hapticNotify('warning') }
       else if (r.result === 'counter' && r.trade) { setD(r.trade); haptic('light') }
       else if (r.result === 'choice' && r.choice) { setD({ ...d, choice: r.choice }); haptic('light') }
-    } catch { setPhase('walk') }
+    } catch (e) {
+      // 'gone'/'no_tavern' — оффер и правда истёк: купец ушёл (без устаревшей реплики).
+      // Сеть/таймаут/сервер — НЕ выдаём за уход: оставляем экран и даём повторить,
+      // иначе флаки-связь превращает живую вилку в фантомный «купец ушёл».
+      const code = (e as { code?: string })?.code
+      if (code === 'gone' || code === 'no_tavern') { setReact(''); setPhase('walk'); hapticNotify('warning') }
+      else { setErr(errText(e)); hapticNotify('error') }
+    }
     finally { setBusy(false) }
   }
 
@@ -87,6 +95,10 @@ export default function TradeSheet({ offer, onClose, onState }: {
           <GoodIcon k={d.good} size={34} />
           <div className="trd-want-t"><b>{d.name} ×{d.qty}</b><small>рынок ~{d.fv} 🪙/шт</small></div>
         </div>
+
+        {err && phase === 'deal' && (
+          <div className="trd-err">⚠ {err}<small>Купец ждёт — нажми снова</small></div>
+        )}
 
         {phase === 'sold' ? (
           <>

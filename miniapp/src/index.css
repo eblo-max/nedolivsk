@@ -439,6 +439,13 @@ body {
 .sheet-task .l { flex:1; color:#dccaa6; min-width:0; }
 .sheet-task .r { font-family:var(--num); font-size:12.5px; color:var(--gold); white-space:nowrap; }
 .sheet-note { font-family:var(--text); font-size:13.5px; color:#cbb487; margin-top:10px; line-height:1.4; }
+/* значок «почему касса ≠ привычной» — активное событие спроса */
+.retail-why { display:flex; align-items:center; gap:7px; margin:8px 0 2px; padding:7px 11px;
+  border-radius:10px; font-family:var(--text); font-size:12.5px; font-weight:600; line-height:1.25;
+  background:#1c1207; border:1px solid var(--line); }
+.retail-why .rw-ic { font-size:15px; }
+.retail-why.down { color:#e6a888; border-color:#6e3a2a; background:linear-gradient(#2a1409,#1c0f07); }
+.retail-why.up { color:#a8d99a; border-color:#3f6a38; background:linear-gradient(#152012,#0f1a0d); }
 .sheet-stat { display:flex; justify-content:space-between; gap:8px; font-family:var(--text); font-size:13px;
   color:#cbb487; padding:9px 11px; border-radius:9px; background:#1c1207; border:1px solid var(--line); margin-bottom:11px; }
 .sheet-stat b { font-family:var(--num); color:var(--parch); }
@@ -1875,6 +1882,10 @@ body {
   font-family:var(--num),system-ui,sans-serif; font-weight:900; font-size:34px; color:#7ff0a8; text-shadow:0 2px 16px #2ba35e66; }
 .trd-deal-sub { text-align:center; font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#a99e85; margin-top:2px; }
 .trd-gone { text-align:center; font-family:Georgia,serif; font-style:italic; font-size:12.5px; color:#8a7f6a; margin:6px 0 2px; }
+.trd-err { text-align:center; font-family:var(--text),system-ui,sans-serif; font-size:12.5px; font-weight:700;
+  color:#f0b48a; background:linear-gradient(#3a1e12,#2a1108); border:1px solid #7a3b2e; border-radius:12px;
+  padding:8px 10px; margin:2px 6px 10px; animation:sv-rise .2s both; }
+.trd-err small { display:block; margin-top:2px; font-weight:400; font-size:11px; color:#c99; }
 .brs-mine-x { flex:none; width:46px; border-radius:14px; cursor:pointer; font-size:17px; color:#f0a08a;
   background:linear-gradient(#2c1410,#1a0d08); border:1px solid #7a3b2e; }
 .brs-mine-x:active { transform:scale(.96); }

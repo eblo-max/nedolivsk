@@ -19,6 +19,7 @@ interface Panel {
   pay?: number; goals?: Goal[]; resources?: ResOpt[]
   // retail
   items?: { key: string; name: string; emoji: string; qty: number; price: number; sum: number }[]
+  reason?: { emoji: string; text: string } | null
   empty?: boolean
   // upgrade
   level?: number; next?: number; maxed?: boolean; affordable?: boolean; gold_cost?: number
@@ -49,9 +50,9 @@ const SAMPLE: Record<string, Panel> = {
       { key: 'hops', name: 'Хмель', amount: 8 }, { key: 'ore', name: 'Руда', amount: 6 },
       { key: 'stone', name: 'Камень', amount: 5 }, { key: 'clay', name: 'Глина', amount: 7 },
     ] },
-  retail: { kind: 'retail', total: 84, items: [
-    { key: 'ale1', name: 'Эль', emoji: '🍺', qty: 6, price: 9, sum: 54 },
-    { key: 'pie', name: 'Пирог', emoji: '🥧', qty: 2, price: 15, sum: 30 },
+  retail: { kind: 'retail', total: 71, reason: { emoji: '🦠', text: 'Поветрие: спрос −15%' }, items: [
+    { key: 'ale1', name: 'Эль', emoji: '🍺', qty: 6, price: 8, sum: 46 },
+    { key: 'pie', name: 'Пирог', emoji: '🥧', qty: 2, price: 13, sum: 25 },
   ] },
   upgrade: { kind: 'upgrade', level: 2, next: 3, affordable: true, gold_cost: 715,
     cost: [
@@ -263,6 +264,11 @@ function RetailBody({ p, busy, onFire }: { p: Panel; busy: boolean; onFire: (pat
           </div>
         ))}
       </div>
+      {p.reason && (
+        <div className={`retail-why ${p.reason.text.includes('−') ? 'down' : 'up'}`}>
+          <span className="rw-ic">{p.reason.emoji}</span>{p.reason.text}
+        </div>
+      )}
       <div className="sheet-row" style={{ marginTop: 8 }}>
         <span>Налить гостям на</span><b style={{ color: 'var(--gold-2)', fontSize: 16 }}>{fmt(p.total ?? 0)} 🪙</b>
       </div>

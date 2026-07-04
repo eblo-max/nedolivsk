@@ -213,6 +213,79 @@ def test_retail_show_equals_payout(monkeypatch):
         assert shown == gold, (thief_rank, feast, shown, gold)
 
 
+# ── 11. РОЗНИЦА ПОСТРОЧНО: сумма строк заказа == total (строка не врёт базой) ─
+def test_retail_lines_sum_to_total(monkeypatch):
+    """Регресс (жалоба 04.07): строка «Хлеб ×1 — 6» показывала голую GOODS.price,
+    а total/начисление — с множителями события (5). retail_lines разверстывает
+    РЕАЛЬНУЮ выручку по строкам так, что их сумма ТОЧНО == retail_total, и ни один
+    товар не теряется/не задваивается при округлении."""
+    from bot.game import logic as lg, production as prod, worldevent, buff, factions, fgoal
+    goods = [k for k in prod.GOODS]
+    monkeypatch.setattr(factions, "thief_night_sale_mult", lambda *_a, **_k: 1.0)
+    monkeypatch.setattr(fgoal, "feast_mult", lambda: 1.0)
+    for seed in range(500):
+        r = random.Random(seed)
+        gm = r.choice([0.7, 0.85, 1.0, 1.2, 1.5])          # буф кассы, в т.ч. слабый
+        im = r.choice([0.6, 0.83, 0.9, 1.0, 1.25])         # событие мира — вкл. СНИЖАЮЩЕЕ спрос
+        monkeypatch.setattr(buff, "gold_mult", lambda _p, g=gm: g)
+        monkeypatch.setattr(worldevent, "income_mult", lambda _p, i=im: i)
+        picks = r.sample(goods, r.randint(1, min(4, len(goods))))
+        want = {k: r.randint(1, 25) for k in picks}
+        p = NS(level=5, gold=0, equipment={}, inventory={}, buff_kind=None,
+               buff_until=None, perks={}, econ={}, reputation=50,
+               story={"faction": {}})
+        lines, total = lg.retail_lines(want, p)
+        assert sum(g for _k, _q, _u, g in lines) == total, (seed, lines, total)
+        assert all(g >= 0 for *_x, g in lines)                     # ни одной отрицательной строки
+        assert {k for k, *_ in lines} == set(want)                 # все товары на месте, без дублей
+        assert total == lg.retail_total(want, p)                   # общий итог — та же котировка
+
+
+def test_retail_single_item_line_matches_reduced_total(monkeypatch):
+    """Точный сценарий скриншота: товар за 6, событие режет спрос → в кассу 5.
+    Строка обязана показать 5 (долю реальной выручки), а не голую цену 6."""
+    from bot.game import logic as lg, production as prod, worldevent, buff, factions, fgoal
+    good = next(iter(prod.GOODS))
+    base = prod.GOODS[good].price
+    monkeypatch.setattr(buff, "gold_mult", lambda _p: 1.0)
+    monkeypatch.setattr(worldevent, "income_mult", lambda _p: 0.9)   # «спрос снижен»
+    monkeypatch.setattr(worldevent, "good_price_mult", lambda _g: 1.0)
+    monkeypatch.setattr(factions, "thief_night_sale_mult", lambda *_a, **_k: 1.0)
+    monkeypatch.setattr(fgoal, "feast_mult", lambda: 1.0)
+    p = NS(level=5, gold=0, equipment={}, inventory={}, buff_kind=None,
+           buff_until=None, perks={}, econ={}, reputation=50, story={"faction": {}})
+    want = {good: 1}
+    lines, total = lg.retail_lines(want, p)
+    assert total == int(base * 0.9)                     # 6 → 5
+    assert lines[0][3] == total                         # строка == реальная касса, не 6
+    assert lines[0][3] != base                          # именно не голая цена
+
+
+def test_retail_reason_names_event_and_direction(monkeypatch):
+    """Значок «почему касса иная» называет активное событие и честное направление:
+    снижающее — вниз, поднимающее — вверх; процент = нетто-дельта от total, а не
+    номинал события. Совпадение base==total → значка нет (нечего объяснять)."""
+    from bot.game import logic as lg, worldevent
+    # событие снижает спрос → значок вниз, с именем события
+    down = worldevent.WEvent("plague", "🦠", "Поветрие", "", 5, income=0.85)
+    monkeypatch.setattr(worldevent, "active", lambda: down)
+    monkeypatch.setattr(worldevent, "income_mult", lambda _p=None: 0.85)
+    r = lg.retail_reason({"ale1": 3}, None, base=100, total=85)
+    assert r and r["emoji"] == "🦠" and "Поветрие" in r["text"] and "−15%" in r["text"]
+    # поднимающее событие → вверх
+    up = worldevent.WEvent("bazaar", "🍺", "Базарный гул", "", 4, income=1.15)
+    monkeypatch.setattr(worldevent, "active", lambda: up)
+    monkeypatch.setattr(worldevent, "income_mult", lambda _p=None: 1.15)
+    r2 = lg.retail_reason({"ale1": 3}, None, base=100, total=115)
+    assert r2 and "+15%" in r2["text"]
+    # касса == привычной → значка нет
+    monkeypatch.setattr(worldevent, "active", lambda: None)
+    assert lg.retail_reason({"ale1": 3}, None, base=100, total=100) is None
+    # причина не из события (буф/воры) → общий значок направления, без имени события
+    r3 = lg.retail_reason({"ale1": 3}, None, base=100, total=112)
+    assert r3 and r3["emoji"] == "📈" and "+12%" in r3["text"]
+
+
 # ── 10. ДОХОД: текст-бот и мини-апп показывают ОДНО (единая котировка) ─────
 def test_bot_and_app_income_show_same():
     """Текст-бот (texts) не показывает сырой tavern.income_rate как «Доход/ч» —

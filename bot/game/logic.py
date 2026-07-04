@@ -365,6 +365,57 @@ def retail_total(want: dict | None, player: Player | None = None) -> int:
                * fgoal.feast_mult())     # городской пир (цель недели взята) — как в apply_retail
 
 
+def retail_lines(
+    want: dict | None, player: Player | None = None
+) -> tuple[list[tuple[str, int, int, int]], int]:
+    """Разбивка сбыта по товарам: [(key, qty, unit, gold)] + total, где СУММА gold
+    строк == retail_total (инвариант «показ = действие»). Голая GOODS.price в строке
+    врёт, когда событие мира/буфы двигают кассу: строка показывает свою ДОЛЮ реальной
+    выручки. Развёрстка остатка — по-Хэмилтону (крупнейшие остатки получают +1),
+    чтобы копейки округления не потерялись и суммы точно сошлись с total."""
+    items = [(k, int(q)) for k, q in (want or {}).items()
+             if k in production.GOODS and int(q) > 0]
+    items.sort(key=lambda kv: -production.GOODS[kv[0]].price)
+    total = retail_total(want, player)
+    weights = [q * unit_price(k) for k, q in items]
+    wsum = sum(weights)
+    if not items or wsum <= 0 or total <= 0:
+        return [(k, q, unit_price(k), 0) for k, q in items], total
+    raw = [total * w / wsum for w in weights]
+    gold = [int(x) for x in raw]                       # пол — остаток раздаём ниже
+    rem = total - sum(gold)
+    for i in sorted(range(len(items)), key=lambda i: raw[i] - gold[i], reverse=True)[:rem]:
+        gold[i] += 1                                   # крупнейшие остатки получают +1
+    return [(items[i][0], items[i][1],
+             max(1, round(gold[i] / items[i][1])) if items[i][1] else gold[i],
+             gold[i]) for i in range(len(items))], total
+
+
+def retail_reason(
+    want: dict | None, player: Player | None, base: int, total: int
+) -> dict | None:
+    """Значок-причина, ПОЧЕМУ касса ≠ сумме привычных цен (base) — чтобы игрок не
+    принял разницу за баг. None — если совпадает (±копейки округления). Приоритет —
+    активное мировое событие (его и так видно в вестях); иначе общий значок спроса
+    (буф кассы / ночная скупка воров / городской пир). Процент — честная НЕТТО-дельта
+    от показанного total, а не номинал события (показ = действие)."""
+    if base <= 0 or total <= 0:
+        return None
+    pct = round((total / base - 1) * 100)
+    if pct == 0:                                    # различие только в копейках — не шумим
+        return None
+    sign = f"{'+' if pct > 0 else '−'}{abs(pct)}%"
+    e = worldevent.active()
+    if e is not None:
+        fashion = (e.good_price != 1.0
+                   and any(worldevent.good_price_mult(k) != 1.0 for k in (want or {})))
+        if fashion:
+            return {"emoji": e.emoji, "text": f"{e.name}: товар в моде {sign}"}
+        if worldevent.income_mult(player) != 1.0:
+            return {"emoji": e.emoji, "text": f"{e.name}: спрос {sign}"}
+    return {"emoji": "📉" if pct < 0 else "📈", "text": f"спрос {sign}"}
+
+
 def add_goods_rep_progress(player: Player, tavern: Tavern, points: int) -> int:
     """Копит «очки молвы» в tavern.rep_progress; каждые REP_PROGRESS_PER_POINT очков →
     +1 репутации игроку и таверне. Остаток сохраняется (мелкие продажи не пропадают).

@@ -610,11 +610,14 @@ def _panel_data(p, t, kind: str) -> dict:
         want = story_state.get_retail(p)
         if not want:
             return {"kind": "retail", "empty": True}
+        # строка = ДОЛЯ реальной выручки (та же котировка, что и total/apply_retail),
+        # иначе показ голой цены ≠ факту, когда событие/буфы двигают кассу
+        lines, total = logic.retail_lines(want, p)
         items = [{"key": k, "name": prod.GOODS[k].name, "emoji": prod.GOODS[k].emoji,
-                  "qty": int(n), "price": prod.GOODS[k].price, "sum": int(n) * prod.GOODS[k].price}
-                 for k, n in sorted(want.items(), key=lambda kv: -prod.GOODS[kv[0]].price)
-                 if k in prod.GOODS]
-        return {"kind": "retail", "items": items, "total": logic.retail_total(want, p)}
+                  "qty": q, "price": unit, "sum": gold} for k, q, unit, gold in lines]
+        base = sum(q * prod.GOODS[k].price for k, q, _u, _g in lines)  # привычные цены
+        reason = logic.retail_reason(want, p, base, total)             # значок «почему так»
+        return {"kind": "retail", "items": items, "total": total, "reason": reason}
 
     # expedition — статус бригад, «на что копить», список ресурсов для отправки
     c = logic.expedition_counts(p, t)
