@@ -70,8 +70,11 @@ def _invasion_event(inv, uid: int = 0) -> dict:
 
     # Та же детерминированная симуляция (сид=id) → реальный исход + ТАЙМЛАЙН
     # (HP орды/броня/баффы по раундам) для честной анимации полоски и баффов.
+    # ВАЖНО: с тем же трейтом орды, что нотифаер и модалка итогов — иначе карта
+    # показала бы один исход (HP тает без слабости), а начисление — другой.
     parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
-    sim = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv))
+    sim = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv),
+                          trait=invmod.trait_of(inv)[0])
     result = inv.status if inv.status in ("won", "lost") else ("won" if sim["won"] else "lost")
     # тайминги: сбор — из меток; марш фикс.; БОЙ — по реальному числу раундов (полоска
     # тает в темпе симуляции и заканчивается, когда бой реально завершился).
