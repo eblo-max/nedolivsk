@@ -212,14 +212,19 @@ async def _api_invasion_result(request: web.Request) -> web.Response:
             if inv.status in ("won", "lost") and inv.resolve_at:      # зарезолвлен и недавно
                 ra = inv.resolve_at if inv.resolve_at.tzinfo else inv.resolve_at.replace(tzinfo=timezone.utc)
                 avail = (now - ra).total_seconds() < REPORT_WINDOW_SEC
-            elif inv.status == "battle" and invmod.registered_count(inv) > 0 and inv.gather_until:
-                gu = (inv.gather_until if inv.gather_until.tzinfo       # время боя уже вышло?
+            elif inv.status in ("gathering", "battle") and invmod.registered_count(inv) > 0 and inv.gather_until:
+                # Клиент показывает бой оконченным по ВРЕМЕНИ (elapsed), а нотифаер тикает
+                # раз в 60с и отстаёт — статус может ещё висеть «gathering»/«battle», хотя
+                # анимация уже добила орду. Считаем конец боя сами и ПРЕДСКАЗЫВАЕМ итог (та
+                # же детерминированная симуляция) — иначе модалка ловила available:false и
+                # мгновенно закрывалась (показ = действие: сервер соглашается с анимацией).
+                gu = (inv.gather_until if inv.gather_until.tzinfo
                       else inv.gather_until.replace(tzinfo=timezone.utc))
                 parts = [dict(r, pid=int(pid)) for pid, r in (inv.registered or {}).items()]
                 rounds = invmod.simulate(parts, seed=inv.id, escal=invmod.escal_of(inv),
                                          trait=invmod.trait_of(inv)[0])["rounds"]
                 end = gu + timedelta(seconds=invmod.MARCH_SECONDS + invmod.battle_secs_for(rounds))
-                avail = now >= end
+                avail = now >= end - timedelta(seconds=3)          # +грейс на сетевой/тактовый перекос
         if not avail:
             return web.json_response({"ok": True, "available": False},
                                      headers={"Cache-Control": "no-store"})
