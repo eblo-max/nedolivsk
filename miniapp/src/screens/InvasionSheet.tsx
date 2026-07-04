@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
 import CoachTour, { useFirstVisitTour, type Step } from './CoachTour'
@@ -65,6 +66,8 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
   const tour = useFirstVisitTour('orda')   // онбординг первой орды (1 раз)
   const [tipI, setTipI] = useState(0)      // индекс ротирующейся тактической подсказки
+  const navigate = useNavigate()
+  const wasReg = useRef(false)
 
   // Подсказки крутятся раз в 7с, пока боец в строю и идёт сбор.
   useEffect(() => {
@@ -72,6 +75,18 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
     const id = setInterval(() => setTipI((i) => i + 1), 7000)
     return () => clearInterval(id)
   }, [d?.registered])
+
+  // Сбор перешёл в бой (был active+записан → стал не active): уводим бойца на карту
+  // смотреть бой и закрываем панель — иначе он видит «орда не идёт» и думает, что орда
+  // ушла впустую, хотя бой ИДЁТ на карте.
+  useEffect(() => {
+    if (d?.active && d?.registered) wasReg.current = true
+    else if (wasReg.current && d && !d.active) {
+      wasReg.current = false
+      navigate('/map')
+      onClose()
+    }
+  }, [d?.active, d?.registered, navigate, onClose])
 
   async function load() {
     try { const r = await api<State>('invasion/state', {}); setD(r); if (r.gather_left != null) setLeft(r.gather_left) } catch { /* keep */ }
@@ -119,9 +134,11 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
         </div>
 
         {!active ? (
-          <div style={{ padding: 24, textAlign: 'center', color: '#a99676' }}>
+          <div style={{ padding: '20px 20px 24px', textAlign: 'center', color: '#c2b594' }}>
             <div style={{ fontSize: 40, marginBottom: 8 }}>🏞</div>
-            Орда не идёт. На горизонте тихо — готовь дружину к следующей волне.
+            <div style={{ fontWeight: 700, color: '#e9dcc2', marginBottom: 4 }}>Сейчас орда не наступает.</div>
+            Последнюю волну отбивали всем миром. Как двинется новая — позовём в чат и сюда.
+            <br /><span style={{ fontSize: 12.5, color: '#8a795c' }}>Готовь дружину: снаряга, репутация, ресурсы на приготовления.</span>
           </div>
         ) : (
           <div style={{ padding: '4px 14px 14px' }}>
@@ -166,6 +183,12 @@ export default function InvasionSheet({ onClose }: { onClose: () => void }) {
                 <div style={{ textAlign: 'center', padding: '10px 0 6px', color: '#8fd14f', fontWeight: 700 }}>
                   ✅ Ты в строю ({d.stances?.find((s) => s.id === d.my_stance)?.name || 'в резерве'}) · до боя {fmt(left)}
                 </div>
+
+                {/* Уйти на карту смотреть сбор/бой (чтобы не залипать в панели) */}
+                <button className="btn" onClick={() => { haptic('light'); navigate('/map'); onClose() }}
+                  style={{ width: '100%', margin: '0 0 8px', background: 'rgba(38,54,82,.5)', border: '1px solid #37516e', color: '#cfe0f0' }}>
+                  🗺 Смотреть на карте
+                </button>
 
                 {/* Тактическая подсказка (крутится, пока идёт сбор) */}
                 {(() => {
