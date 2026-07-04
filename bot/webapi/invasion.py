@@ -196,6 +196,10 @@ async def _api_invasion_state(request: web.Request) -> web.Response:
     if not uid:
         return web.json_response({"ok": False, "error": "auth"}, status=401)
     from datetime import datetime, timezone
+    from bot.config import settings
+    if invmod.TEST_MODE and uid != settings.admin_id:     # обкатка: панель — только админу
+        return web.json_response({"ok": True, "active": False},
+                                 headers={"Cache-Control": "no-store"})
     async with session_factory() as s:
         inv = await repo.get_active_invasion(s)
         if inv is None or inv.status != "gathering":
@@ -255,9 +259,11 @@ async def _api_invasion_prepare(request: web.Request) -> web.Response:
         if not inv_res.can_afford(player, cost):
             return web.json_response({"ok": False, "error": "not_enough"})
         new_rec = invmod.apply_prep(rec, prep)
-        ok = await repo.invasion_prepare(s, inv.id, player.id, new_rec)   # атомарно: записан+сбор
+        # атомарно: записан + сбор + prep ЕЩЁ НЕ куплен (SQL-гард от двойного списания
+        # при гонке двойного тапа) → списываем ТОЛЬКО если обновление реально прошло
+        ok = await repo.invasion_prepare(s, inv.id, player.id, new_rec, prep)
         if not ok:
-            return web.json_response({"ok": False, "error": "closed"})
+            return web.json_response({"ok": False, "error": "already"})
         inv_res.pay(player, cost)                                         # списываем в той же транзе
         repo.add_log(s, "player", player.id, f"🛠 приготовил «{invmod.PREPS[prep]['name']}» к обороне")
         await s.commit()

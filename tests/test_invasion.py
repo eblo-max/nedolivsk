@@ -421,6 +421,16 @@ def test_simulate_is_memoized_and_correct():
     assert inv.simulate(parts[:-1], seed=42, escal=1.2, trait="armored") is not a
 
 
+def test_launch_flags_consistent():
+    """Гейты орды согласованы: нельзя открыть УЧАСТИЕ (TEST_MODE=False), не открыв
+    карту (MAP_PUBLIC) и награды (REWARDS_ENABLED). Иначе игроки записываются и тратят
+    ресурсы на приготовления в невидимую тестовую орду без наград — потеря ресурсов."""
+    assert isinstance(inv.TEST_MODE, bool)
+    if not inv.TEST_MODE:                       # участие открыто → и карта, и награды тоже
+        assert inv.MAP_PUBLIC and inv.REWARDS_ENABLED, (
+            "рассинхрон гейтов: участие открыто, а карта/награды закрыты")
+
+
 def test_launch_gate_is_single_flag():
     """Чек-лист запуска: видимость орды на карте/в сводке — единый флаг MAP_PUBLIC,
     подключённый к ОБОИМ гейтам (_world_invasion и _api_invasion_result). Запуск =

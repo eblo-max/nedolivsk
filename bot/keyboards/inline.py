@@ -67,6 +67,7 @@ def regions_kb() -> InlineKeyboardMarkup:
 
 
 def tavern_kb(player: Player, private: bool = True) -> InlineKeyboardMarkup:
+    from bot.config import settings
     from bot.game import buff, newbie, raid as raidmod, story_state
     from bot.game import invasion as invmod
 
@@ -91,7 +92,8 @@ def tavern_kb(player: Player, private: bool = True) -> InlineKeyboardMarkup:
         else:                            # нет короткого имени мини-аппа — чатовая панель (фолбэк)
             kb.button(text=_t, callback_data="raidopen", style="danger")
         sizes.append(1)
-    if invmod.gathering_id() is not None:  # идёт сбор на Орду орков — в строй!
+    # идёт сбор на Орду орков — в строй! (в обкатке TEST_MODE — кнопка только у админа)
+    if invmod.gathering_id() is not None and (not invmod.TEST_MODE or player.id == settings.admin_id):
         kb.button(text="🪓 ОРДА ОРКОВ — В СТРОЙ!", callback_data="invopen", style="danger")
         sizes.append(1)
     # Web-App кнопки Telegram принимает ТОЛЬКО в личке — в группе панель с такой

@@ -177,17 +177,21 @@ async def invasion_register(
 
 
 async def invasion_prepare(
-    session: AsyncSession, inv_id: int, player_id: int, new_record: dict
+    session: AsyncSession, inv_id: int, player_id: int, new_record: dict, prep_id: str
 ) -> bool:
     """Атомарно ЗАМЕНИТЬ запись бойца (усиленную приготовлением) — jsonb_set по своему
-    ключу. Только в фазе СБОРА и если боец уже записан. Не трогает чужие записи.
-    Возвращает True, если обновление прошло (иначе не записан/сбор окончен)."""
+    ключу. Только в фазе СБОРА, если боец записан И это приготовление ЕЩЁ НЕ куплено
+    (проверка в SQL → анти-двойное-списание при гонке двойного тапа). Не трогает чужих.
+    Возвращает True, если обновление прошло (иначе не записан/сбор кончился/уже куплено)."""
     res = await session.execute(
         text("UPDATE invasion SET registered = jsonb_set("
              "COALESCE(registered, '{}'::jsonb), ARRAY[:pid], CAST(:rec AS jsonb)) "
              "WHERE id = :id AND status = 'gathering' "
-             "AND jsonb_exists(COALESCE(registered, '{}'::jsonb), :pid)"),
-        {"pid": str(player_id), "rec": json.dumps(new_record), "id": int(inv_id)},
+             "AND jsonb_exists(COALESCE(registered, '{}'::jsonb), :pid) "
+             "AND NOT COALESCE(registered -> :pid -> 'preps', '[]'::jsonb) "
+             "    @> to_jsonb(:prep ::text)"),
+        {"pid": str(player_id), "rec": json.dumps(new_record),
+         "id": int(inv_id), "prep": prep_id},
     )
     return (res.rowcount or 0) > 0
 
