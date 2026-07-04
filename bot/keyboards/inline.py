@@ -1055,14 +1055,14 @@ def invasion_map_dm_kb(map_url: str) -> InlineKeyboardMarkup:
 
 def invasion_announce_kb(inv_id: int) -> InlineKeyboardMarkup:
     """Кнопка анонса орды. Если настроен Direct-Link Mini App (webapp_short_name +
-    имя бота) — красная url-кнопка ОТКРЫВАЕТ КАРТУ на боссе (вся регистрация там).
-    Иначе фолбэк: обычная запись прямо в чате (callback)."""
+    имя бота) — красная url-кнопка ОТКРЫВАЕТ мини-апп на панели сбора «в строй»
+    (startapp=orda — его ловит Tavern.tsx). Иначе фолбэк: запись прямо в чате."""
     from bot.config import settings
     short = (getattr(settings, "webapp_short_name", "") or "").strip()
     kb = InlineKeyboardBuilder()
     if short and _BOT_USERNAME:
-        kb.button(text="⚔️ К ОРДЕ — открыть карту", style="danger",
-                  url=f"https://t.me/{_BOT_USERNAME}/{short}?startapp=inv{inv_id}")
+        kb.button(text="⚔️ К ОРДЕ — ВСТАТЬ В СТРОЙ!", style="danger",
+                  url=f"https://t.me/{_BOT_USERNAME}/{short}?startapp=orda")
         kb.adjust(1)
         return kb.as_markup()
     kb.button(text="⚔️ Поднять войско", callback_data=f"invjoin:{inv_id}", style="danger")
