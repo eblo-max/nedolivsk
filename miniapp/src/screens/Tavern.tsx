@@ -115,6 +115,20 @@ export default function Tavern() {
     else if (sp === 'notif') setNotifOpen(true)
   }, [])
 
+  // Орда собирается → панель «В строй» всплывает ВСЕМ (один раз на нашествие,
+  // если ещё не записан) — чтобы не искать её на карте.
+  useEffect(() => {
+    let cancel = false
+    api<{ active?: boolean; id?: number; registered?: boolean }>('invasion/state', {})
+      .then((r) => {
+        if (cancel || !r.active || r.registered) return
+        if (String(r.id) !== localStorage.getItem('orda-seen')) {
+          localStorage.setItem('orda-seen', String(r.id)); setInvOpen(true)
+        }
+      }).catch(() => { /* нет орды — тихо */ })
+    return () => { cancel = true }
+  }, [])
+
   // вернулись в приложение — тихо обновляем состояние (таймеры/доход не висят устаревшими)
   useEffect(() => {
     const onVis = () => { if (document.visibilityState === 'visible' && !sheet) reload() }

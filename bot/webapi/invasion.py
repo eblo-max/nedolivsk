@@ -265,7 +265,7 @@ async def _api_invasion_state(request: web.Request) -> web.Response:
             gu = gu.replace(tzinfo=timezone.utc)
         left = max(0, int((gu - datetime.now(timezone.utc)).total_seconds())) if gu else 0
     return web.json_response({
-        "ok": True, "active": True, "n": invmod.registered_count(inv),
+        "ok": True, "active": True, "id": inv.id, "n": invmod.registered_count(inv),
         "ready": round(invmod.readiness(sim), 3), "gather_left": left,
         "registered": me is not None, "my_stance": (me or {}).get("stance") if me else None,
         "trait": {"id": tr[0], "emoji": tr[1], "name": tr[2], "counter": tr[3], "blurb": tr[4]},
