@@ -13,7 +13,6 @@ from bot import autoclean, texts
 from bot.db import repo
 from bot.handlers import common
 from bot.handlers.rating import show_rating
-from bot.handlers.worldmap_cmd import cmd_map
 from bot.keyboards import inline as kb
 
 router = Router()
@@ -61,7 +60,10 @@ async def gg_command(message: Message, session: AsyncSession) -> None:
         autoclean.schedule_message(await message.reply(texts.RULES))
         return
     if section == "map":
-        autoclean.schedule_message(await cmd_map(message, session))
+        # Карта живёт в мини-аппе — вместо картинки-снимка даём кнопку на неё
+        # (в группе — Direct-Link, если настроен; иначе подсказка открыть в личке).
+        mkb = kb.world_map_kb(message.chat.type == "private")
+        autoclean.schedule_message(await message.reply(texts.MAP_HINT, reply_markup=mkb))
         return
     if section == "rating":
         autoclean.schedule_message(await show_rating(message, session))

@@ -100,7 +100,7 @@ def tavern_kb(player: Player, private: bool = True) -> InlineKeyboardMarkup:
         from bot import webapp  # интерактивная карта мира (Mini App) — если хостинг задан
         _murl = webapp.base_url()
         if _murl:
-            kb.button(text="🗺 Карта мира", web_app=WebAppInfo(url=f"{_murl}/map"))
+            kb.button(text="🗺 Карта мира", web_app=WebAppInfo(url=f"{_murl}/world"))
             sizes.append(1)
     if player.chat_id is None:  # одиночка — переключатель вестей мира в ЛС
         on = getattr(player, "dm_news", False)
@@ -995,7 +995,7 @@ def invasion_open_kb(inv_id: int, private: bool, already: bool) -> InlineKeyboar
         kb.button(text="⚔️ Поднять войско", callback_data=f"invjoin:{inv_id}", style="danger")
     b = base_url()
     if b and private:
-        kb.button(text="🗺 На карту — следить за боем", web_app=WebAppInfo(url=f"{b}/map"))
+        kb.button(text="🗺 На карту — следить за боем", web_app=WebAppInfo(url=f"{b}/world"))
     elif b:
         short = (getattr(settings, "webapp_short_name", "") or "").strip()
         if short and _BOT_USERNAME:
@@ -1032,7 +1032,7 @@ def world_map_kb(private: bool) -> InlineKeyboardMarkup | None:
     kb = InlineKeyboardBuilder()
     if private:
         from aiogram.types import WebAppInfo
-        kb.button(text="🗺 Открыть карту мира", web_app=WebAppInfo(url=b + "/map"))
+        kb.button(text="🗺 Открыть карту мира", web_app=WebAppInfo(url=b + "/world"))
         return kb.as_markup()
     short = (getattr(settings, "webapp_short_name", "") or "").strip()
     if short and _BOT_USERNAME:

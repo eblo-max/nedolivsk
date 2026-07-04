@@ -35,9 +35,8 @@ def test_only_market_module_writes_world_market():
 def test_every_api_endpoint_authenticates():
     """Каждый _api_* эндпоинт обязан звать _auth (или это статика/health)."""
     # Осознанные исключения (проверено 02.07):
-    # _api_taverns — публичная карта /world вне Telegram-контекста, чужие id не отдаёт;
     # _api_avatar — собственная HMAC-подпись ссылки (initData в <img src> невозможен).
-    skip = {"_api_health", "_api_taverns", "_api_avatar"}
+    skip = {"_api_health", "_api_avatar"}
     bad = []
     for p in WEBAPI:
         tree = ast.parse(_src(p))

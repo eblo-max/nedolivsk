@@ -1,5 +1,5 @@
-"""Старая карта (/api/taverns: таверны+события для PNG-карты бота) и Орда орков
-(запись в вторжение из мини-аппа). Перенесено из bot/webapp.py дословно (move-only)."""
+"""Орда орков: сводка боя для интерактивной карты (/world) и запись во вторжение
+из мини-аппа (панель «в строй», модалка итогов). Позиции таверн — из worldmap."""
 
 import json
 from datetime import datetime, timedelta, timezone
@@ -8,7 +8,7 @@ from aiohttp import web
 
 from bot.db import repo
 from bot.db.base import session_factory
-from bot.game import balance, worldmap
+from bot.game import worldmap
 from bot.game import invasion as invmod
 from bot.webapi.core import _verify_init_data
 
@@ -96,88 +96,6 @@ def _invasion_event(inv, uid: int = 0) -> dict:
         # полоска дружины: запас HP (для боя) + «готовность к победе» (для сбора)
         "army_hp_max": sim["army_hp_max"], "ready": round(invmod.readiness(sim), 3),
     }
-
-# Самостоятельные анимированные ивент-объекты на карте (НЕ связаны с рейдами).
-# Каждый: sprite (орк 1..3), норм. позиция x/y (на суше!), имя и описание.
-# Список — чтобы легко добавлять новые ивенты. Полная механика — отдельно, позже.
-MAP_EVENTS = [
-    {"sprite": 1, "x": 0.62, "y": 0.16,
-     "name": "Орда орков",
-     "blurb": "Дикая орда встала лагерем в северных снегах. Зреет буря."},
-]
-
-
-async def _api_taverns(request: web.Request) -> web.Response:
-    # uid — telegram-id зрителя (из initDataUnsafe), чтобы подсветить ЕГО таверну.
-    # Чужие id наружу НЕ отдаём (приватность) — только флаг mine у своей.
-    try:
-        uid = int(request.query.get("uid", "0"))
-    except ValueError:
-        uid = 0
-    mill_state = None
-    async with session_factory() as s:
-        rows = await repo.get_map_taverns(s)
-        latest = await repo.latest_invasion(s)
-        if uid:                                  # состояние вылазки телеги для зрителя
-            from bot.game import mill as millmod
-            me = await repo.get_player(s, uid)
-            if me is not None:
-                mill_state = millmod.state(me)
-    now = datetime.now(timezone.utc)
-    live = latest if (latest and latest.status in ("gathering", "battle")) else None
-    report_inv = None
-    # время боя ВЫШЛО (now ≥ resolve_at) → показываем сводку СРАЗУ (предсказанием),
-    # не дожидаясь, пока нотифаер переключит статус/зарезолвит (лаг до тика ~60с).
-    # Важно: НЕ только при status=='battle' — нотифаер мог ещё не флипнуть gathering→battle.
-    if live is not None:
-        # реальный конец боя = сбор + марш + раунды×темп (из той же симуляции, что и
-        # анимация). НЕ полагаемся на resolve_at: при спавне он = дефолт, а нотифаер
-        # уточняет его лишь на тике (лаг ≤60с) — иначе сводка отставала бы от полоски.
-        end = None
-        if invmod.registered_count(live) > 0 and live.gather_until:
-            gu = (live.gather_until if live.gather_until.tzinfo
-                  else live.gather_until.replace(tzinfo=timezone.utc))
-            parts = [dict(r, pid=int(pid)) for pid, r in (live.registered or {}).items()]
-            rounds = invmod.simulate(parts, seed=live.id, escal=invmod.escal_of(live),
-                                     trait=invmod.trait_of(live)[0])["rounds"]
-            end = gu + timedelta(seconds=invmod.MARCH_SECONDS + invmod.battle_secs_for(rounds))
-        elif live.resolve_at:
-            end = (live.resolve_at if live.resolve_at.tzinfo
-                   else live.resolve_at.replace(tzinfo=timezone.utc))
-        if end is not None and now >= end:
-            report_inv, live = live, None
-    # уже зарезолвлен и недавно — показываем сводку из снимка
-    if live is None and report_inv is None and latest and latest.status in ("won", "lost") and latest.resolve_at:
-        ra = latest.resolve_at
-        if ra.tzinfo is None:
-            ra = ra.replace(tzinfo=timezone.utc)
-        if (now - ra).total_seconds() < REPORT_WINDOW_SEC:
-            report_inv = latest
-    out = []
-    for tav, pl in rows:
-        # Со слотом — фикс. позиция; без слота (зона полна) — детерминированная
-        # по региону: на интерактивной карте лимита нет, видны ВСЕ таверны.
-        pos = (worldmap.slot_norm_pos(tav.map_slot) if tav.map_slot is not None
-               else worldmap.region_point(pl.region or "", pl.id))
-        if pos is None:
-            continue
-        out.append({
-            "x": round(pos[0], 4), "y": round(pos[1], 4),
-            "name": tav.name or pl.first_name or "Таверна",
-            "level": tav.level, "region": pl.region or "",
-            "tier": worldmap.sprite_tier(tav.level),   # какой спрайт-здание рисовать
-            "mine": bool(uid) and pl.id == uid,
-        })
-    # Живой ивент (реальный таймлайн) > свежая сводка боя > статичный маркер орды.
-    if live is not None:
-        events = [_invasion_event(live, uid)]
-    elif report_inv is not None:
-        events = [_invasion_report_event(report_inv, uid)]
-    else:
-        events = MAP_EVENTS
-    return web.json_response(
-        {"taverns": out, "regions": balance.REGIONS, "events": events, "mill": mill_state},
-        headers={"Cache-Control": "no-store"})
 
 
 def _stances_dto(counter: str) -> list[dict]:

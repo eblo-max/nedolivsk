@@ -159,7 +159,7 @@ def test_front_line_and_turnout_decide():
 def test_simulate_empty_and_tracks_contribution():
     r0 = inv.simulate([], seed=1)
     assert r0["won"] is False and r0["n"] == 0 and r0["dealt"] == {}
-    # ВСЕ ключи должны быть и у пустого ростера (иначе KeyError на /api/taverns)
+    # ВСЕ ключи должны быть и у пустого ростера (иначе KeyError в сводке боя на карте)
     need = {"timeline", "stats", "dealt", "fell", "events", "won", "rounds",
             "orc_hp_max", "orc_hp_left", "n"}
     assert need <= set(r0) and r0["timeline"] == [] and r0["stats"] == {}
@@ -216,7 +216,7 @@ def test_army_hp_timeline_and_readiness():
     tl = r["timeline"]
     assert all("army" in s for s in tl)
     assert tl[0]["army"] >= tl[-1]["army"]               # дружина только убывает
-    # пустой ростер — ключи на месте (иначе KeyError на /api/taverns)
+    # пустой ростер — ключи на месте (иначе KeyError в сводке боя на карте)
     e = inv.simulate([], seed=1)
     assert e["army_hp_max"] == 0 and e["army_hp_left"] == 0
     # «готовность»: победный состав — в зелёной зоне (≥ рубежа), проигрышный — ниже

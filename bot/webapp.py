@@ -1,16 +1,15 @@
-"""Mini App: интерактивная карта мира (Telegram Web App).
+"""Mini App: React-приложение игры + интерактивная карта мира (Telegram Web App).
 
 Маленький aiohttp-сервер РЯДОМ с ботом (тот же процесс, слушает $PORT — Railway
 выдаёт публичный домен). Отдаёт:
   GET /            — health-check
-  GET /map         — HTML-страница карты (Leaflet CRS.Simple + кластеры)
-  GET /api/taverns — JSON таверн (норм. координаты слота, имя, уровень, регион)
-  /assets/...      — статика (world.png, спрайты)
+  GET /app         — React-мини-апп (сборка miniapp/dist)
+  GET /world       — тайловая интерактивная карта мира (Leaflet), встраивается в мини-апп
+  /assets/...      — статика (спрайты)
 
-Карта — 2.5D-«диорама» на PixiJS (WebGL): нарисованный world.png — это «земля»,
-а каждая таверна — стоячее здание-спрайт (map_tavern_<уровень>.png) с тенью,
-глубиной (depth-sort по Y), плавным pan/zoom (тащить, щипок, колесо) и тапом по
-зданию → карточка. Лимита на число таверн нет. Pixi тянется с CDN.
+Карта — тайловый мир-атлас на Leaflet (пирамида .webp-тайлов из assets/world25.jpg):
+таверны-маркеры с кластеризацией, континенты, короны лидеров, Орда орков. Старая
+PNG/PixiJS-карта (/map) удалена — карта живёт только здесь.
 """
 
 import pathlib
@@ -34,7 +33,7 @@ from bot.webapi.core import (  # noqa: E402,F401 — фасад
 # Старая карта/Орда — bot/webapi/invasion.py (распил, move-only).
 from bot.webapi.invasion import (  # noqa: E402,F401 — фасад
     _api_invasion_join, _api_invasion_result, _api_invasion_seed, _api_invasion_state,
-    _api_taverns, _invasion_event, _invasion_report_event,
+    _invasion_event, _invasion_report_event,
 )
 
 
@@ -69,10 +68,10 @@ from bot.webapi.production import (  # noqa: E402,F401 — фасад
     _api_brew_age, _api_build_start, _api_building, _api_buildings, _api_hunt,
     _api_hunt_fight, _api_hunt_forecast, _api_prod_claim, _api_prod_start,
 )
-# Карты мира (/map, /world, тайлы, таверны с коронами) — bot/webapi/world.py
+# Карта мира (/world, тайлы, таверны с коронами) — bot/webapi/world.py
 # (распил, move-only). Импорт = ре-экспорт для build_app и внешних потребителей.
 from bot.webapi.world import (  # noqa: E402,F401 — фасад
-    _map_page, _world_continents, _world_invasion, _world_page, _world_png,
+    _world_continents, _world_invasion, _world_page,
     _world_slots, _world_taverns, _world_tile,
 )
 
@@ -155,8 +154,7 @@ async def _health(request: web.Request) -> web.Response:
 def build_app() -> web.Application:
     app = web.Application(middlewares=[_api_errors])
     app.router.add_get("/", _health)   # healthcheck Railway
-    app.router.add_get("/map", _map_page)
-    app.router.add_get("/world", _world_page)                 # тайловый мир-атлас (Leaflet)
+    app.router.add_get("/world", _world_page)                 # тайловый мир-атлас (Leaflet) — единственная карта
     app.router.add_get("/world/slots.json", _world_slots)
     app.router.add_get("/world/taverns.json", _world_taverns)
     app.router.add_get("/world/invasion.json", _world_invasion)   # орда орков на карте (поллинг)
@@ -164,7 +162,6 @@ def build_app() -> web.Application:
     app.router.add_get("/world/tiles/{z}/{x}/{y}.jpg", _world_tile)   # старый кэш → отдаём webp-байты
     app.router.add_get("/app", _spa)                  # React-мини-апп (каркас игры)
     app.router.add_get("/app/{tail:.*}", _spa)        # SPA-fallback + статика dist
-    app.router.add_get("/api/taverns", _api_taverns)
     app.router.add_post("/api/invasion/join", _api_invasion_join)
     app.router.add_post("/api/invasion/state", _api_invasion_state)  # панель сбора: трейт/состав/стойки
     app.router.add_post("/api/invasion/result", _api_invasion_result)  # модалка итогов боя (всплывает на карте)
@@ -231,7 +228,6 @@ def build_app() -> web.Application:
     app.router.add_post("/api/notifications/seed_all", _api_notifications_seed_all)  # АДМИН-тест: засеять все типы
     app.router.add_post("/api/notifications/seed_patchnote", _api_notifications_seed_patchnote)  # АДМИН: патчноут в ленту
     app.router.add_post("/api/onboard", _api_onboard)    # создать игрока+таверну (онбординг)
-    app.router.add_get("/assets/world.png", _world_png)   # земля диорамы
     app.router.add_get("/assets/map_tavern_{n}.png", _tavern_sprite)  # здания
     app.router.add_get("/assets/boss/ork{n}_{anim}.png", _event_sprite)  # ивент-анимации
     app.router.add_get("/assets/heroes/hero{n}_{anim}.png", _hero_sprite)  # войска-герои

@@ -36,7 +36,6 @@ from bot.handlers import (
     story,
     tavern,
     trade,
-    worldmap_cmd,
 )
 from bot.middlewares import DbSessionMiddleware, PanelGuardMiddleware
 from bot.notifier import notifier_loop
@@ -54,7 +53,6 @@ async def _setup_commands(bot: Bot) -> None:
         BotCommand(command="city", description="🏛 Расклад фракций"),
         BotCommand(command="citizens", description="👥 Горожане и репутация"),
         BotCommand(command="chronicle", description="📜 Летопись города"),
-        BotCommand(command="map", description="🗺 Карта мира"),
         BotCommand(command="help", description="❓ Правила и помощь"),
     ]
     public = [BotCommand(command="start", description="🍺 Открыть таверну"), *sections]
@@ -118,7 +116,7 @@ async def main() -> None:
     dp.update.middleware(DbSessionMiddleware())
     dp.callback_query.outer_middleware(PanelGuardMiddleware())
     dp.include_routers(
-        admin.router, admin_panel.router, worldmap_cmd.router, rating.router,
+        admin.router, admin_panel.router, rating.router,
         character.router,
         buildings.router, start.router, tavern.router, story.router,
         trade.router, auction.router, commands.router, loot.router,

@@ -63,7 +63,7 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
         from bot.webapp import base_url
         from bot.keyboards.inline import invasion_map_dm_kb
         b = base_url()
-        kb = invasion_map_dm_kb(b + "/map") if b else None
+        kb = invasion_map_dm_kb(b + "/world") if b else None
         timing = (f"⚡ быстрый режим: сбор {invasion.FAST_GATHER_SECONDS}с, "
                   f"бой по темпу (~{invasion.FAST_MARCH_SECONDS}с марш + раунды)" if fast
                   else f"сбор {invasion.GATHER_MINUTES} мин, бой по реальному темпу "

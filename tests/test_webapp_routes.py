@@ -10,7 +10,6 @@ os.environ.setdefault("BOT_TOKEN", "test:test")
 
 ROUTES = [
     "GET / _health",
-    "GET /api/taverns _api_taverns",
     "GET /app _spa",
     "GET /app/{tail} _spa",
     "GET /assets/animals/{name}.png _animal_sprite",
@@ -21,9 +20,7 @@ ROUTES = [
     "GET /assets/heroes/hero{n}_{anim}.png _hero_sprite",
     "GET /assets/hud/squad_globe.png _hud_globe",
     "GET /assets/map_tavern_{n}.png _tavern_sprite",
-    "GET /assets/world.png _world_png",
     "GET /avatar/{uid} _api_avatar",
-    "GET /map _map_page",
     "GET /phasertest _phaser_page",
     "GET /world _world_page",
     "GET /world/slots.json _world_slots",
