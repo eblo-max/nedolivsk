@@ -368,6 +368,23 @@ def test_rewards_toggle_is_wired():
     assert "REWARDS_ENABLED" in src and "return" in src   # награды под гейтом флага
 
 
+def test_simulate_is_memoized_and_correct():
+    """Мемо simulate(): те же входы → тот же объект из кэша (быстро), и он ИДЕНТИЧЕН
+    свежему пересчёту _simulate_impl (детерминизм не нарушен)."""
+    parts = [dict(inv.battle_profile({"damage": 10, "crit": 8, "armor": 6, "luck": 4}, 30), pid=i)
+             for i in range(1, 8)]
+    inv._SIM_CACHE.clear()
+    a = inv.simulate(parts, seed=42, escal=1.2, trait="armored")
+    b = inv.simulate(parts, seed=42, escal=1.2, trait="armored")
+    assert a is b                                        # второй вызов — из кэша (без пересчёта)
+    fresh = inv._simulate_impl(parts, seed=42, escal=1.2, trait="armored")
+    assert a["won"] == fresh["won"] and a["rounds"] == fresh["rounds"]
+    assert a["orc_hp_left"] == fresh["orc_hp_left"] and a["dealt"] == fresh["dealt"]
+    # разный трейт / состав → другой ключ (не переиспользуем чужой результат)
+    assert inv.simulate(parts, seed=42, escal=1.2, trait="shaman") is not a
+    assert inv.simulate(parts[:-1], seed=42, escal=1.2, trait="armored") is not a
+
+
 def test_launch_gate_is_single_flag():
     """Чек-лист запуска: видимость орды на карте/в сводке — единый флаг MAP_PUBLIC,
     подключённый к ОБОИМ гейтам (_world_invasion и _api_invasion_result). Запуск =

@@ -295,13 +295,42 @@ def _unit_output(p: dict, orc_armor: int) -> float:
     return (1 - p["crit"]) * max(1.0, p["dmg"] - orc_armor) + p["crit"] * 2 * p["dmg"]
 
 
+# Мемо детерминированного боя: результат зависит ТОЛЬКО от (ростер, seed, escal,
+# trait), а бой зовётся на каждый поллинг карты/панели (5с) и каждым зрителем. Кэш
+# считает его один раз на неизменный ростер. Ключ — по порядку участников (вызывающие
+# всегда строят parts из registered.items() в одном порядке → стабильно; порядок влияет
+# лишь на редкий тай-брейк фокуса). Результат у всех вызывающих READ-ONLY (не мутируют).
+_SIM_CACHE: dict = {}
+_SIM_CACHE_MAX = 256
+
+
+def _sim_key(participants: list[dict], seed: int, escal: float, trait) -> tuple:
+    return (int(seed or 0), round(float(escal or 1.0), 4), trait, tuple(
+        (p.get("pid"), p.get("role"), round(p.get("dmg", 0), 2), round(p.get("crit", 0), 4),
+         p.get("armor", 0), round(p.get("dodge", 0), 4), p.get("hp", 0))
+        for p in participants))
+
+
 def simulate(participants: list[dict], seed: int = 0, escal: float = 1.0,
              trait: str | None = None) -> dict:
-    """Детерминированный бой армии против орды. participants — боевые профили с
-    полем pid. escal — множитель силы орды (эскалация). trait — варлорд-слабость
-    орды (ФАЗА 1): крутит её параметры, контрится стойкой бойцов.
+    """Детерминированный бой армии против орды (мемоизирован по входам). participants —
+    боевые профили с полем pid. escal — множитель силы орды (эскалация). trait —
+    варлорд-слабость орды (ФАЗА 1): крутит её параметры, контрится стойкой бойцов.
     Возвращает {won, rounds, orc_hp_max, orc_hp_left, dealt:{pid:int},
     fell:[pid], events:[(round, kind, payload)], n}. Чистая — без БД/IO."""
+    key = _sim_key(participants, seed, escal, trait)
+    hit = _SIM_CACHE.get(key)
+    if hit is not None:
+        return hit
+    res = _simulate_impl(participants, seed, escal, trait)
+    if len(_SIM_CACHE) >= _SIM_CACHE_MAX:
+        _SIM_CACHE.clear()                       # простая эвикция всего кэша (боёв немного)
+    _SIM_CACHE[key] = res
+    return res
+
+
+def _simulate_impl(participants: list[dict], seed: int = 0, escal: float = 1.0,
+                   trait: str | None = None) -> dict:
     escal = max(1.0, float(escal or 1.0))
     # варлорд-трейт крутит орка (слабость, контрится нужной стойкой)
     t_armor = 5 if trait == "armored" else 0
