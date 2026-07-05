@@ -50,55 +50,102 @@ function useCountUp(value: number, ms = 650): number {
   return n
 }
 
-/** Факелы-окна: зажигаются, когда стройка доросла до их высоты (y в % снизу). */
-const TORCHES = [{ x: 100, y: 46 }, { x: 31, y: 40 }, { x: 169, y: 40 }, { x: 62, y: 24 }, { x: 138, y: 24 }]
-
-function merlons(x: number, w: number, top: number, n: number) {
-  const mw = w / (n * 2 - 1)
+/** Части крепости в порядке возведения. th — % готовности, когда часть «встаёт». */
+const CASTLE_ORDER = ['base', 'wall', 'towers', 'keep', 'flag'] as const
+const CASTLE_TH: Record<string, number> = { base: 0, wall: 18, towers: 42, keep: 68, flag: 90 }
+function partStates(pct: number): Record<string, string> {
+  const st: Record<string, string> = {}
+  let nowSet = false
+  for (const k of CASTLE_ORDER) {
+    if (pct >= CASTLE_TH[k]) st[k] = 'built'
+    else if (!nowSet) { st[k] = 'now'; nowSet = true }
+    else st[k] = 'ghost'
+  }
+  return st
+}
+/** Зубцы (мерлоны): n сплошных блоков по ширине w, вырезы между ними. */
+function crest(x: number, w: number, topY: number, n: number, mh = 5) {
+  const u = w / (n * 2 - 1)
   return Array.from({ length: n }, (_, i) => (
-    <rect key={i} x={+(x + i * 2 * mw).toFixed(1)} y={top - 4} width={+mw.toFixed(1)} height={5.4} rx={0.6} />
+    <rect key={i} className="cp-stone" x={+(x + i * 2 * u).toFixed(2)} y={topY - mh} width={+u.toFixed(2)} height={mh + 0.6} rx="0.5" />
   ))
 }
-function CastleShapes() {
+
+/** Крепость-чудо: части возводятся по мере готовности (стена → башни → донжон →
+    знамя). Тёплый камень с объёмом (теневая грань), зубцы, окна-огни, светящиеся
+    ворота; знамя загорается по финалу. Не «торт» — читаемый силуэт крепости. */
+function Castle({ pct, done }: { pct: number; done: boolean }) {
+  const s = partStates(pct)
   return (
-    <>
-      <rect x="82" y="40" width="36" height="75" rx="1.5" />{merlons(82, 36, 40, 5)}
-      <rect x="42" y="70" width="116" height="45" rx="1.2" />{merlons(42, 116, 70, 11)}
-      <rect x="18" y="48" width="28" height="67" rx="1.5" />{merlons(18, 28, 48, 4)}
-      <rect x="154" y="48" width="28" height="67" rx="1.5" />{merlons(154, 28, 48, 4)}
-      <path d="M90 115 V100 a10 10 0 0 1 20 0 V115 Z" className="wd2-gate" />
-    </>
-  )
-}
-function CastleArt({ pct, done }: { pct: number; done: boolean }) {
-  const h = 120 * Math.min(100, Math.max(0, pct)) / 100
-  const litUntil = 120 - h                       // всё, что ниже (y>litUntil) — построено
-  return (
-    <svg className="wd2-castle" viewBox="0 0 200 120" preserveAspectRatio="xMidYMax meet">
+    <svg className="wd2-castle" viewBox="0 0 200 128" preserveAspectRatio="xMidYMax meet">
       <defs>
-        <linearGradient id="wstone" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#ffe9b0" /><stop offset="0.4" stopColor="#e0ac54" />
-          <stop offset="0.75" stopColor="#a9793a" /><stop offset="1" stopColor="#6a4d24" />
+        <linearGradient id="cFace" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f0cd85" /><stop offset="0.35" stopColor="#c99a4c" />
+          <stop offset="0.72" stopColor="#8f6531" /><stop offset="1" stopColor="#5a3e1e" />
         </linearGradient>
-        <clipPath id="wrise"><rect x="0" y={120 - h} width="200" height={h + 0.5} /></clipPath>
+        <linearGradient id="cShade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#000" stopOpacity="0.42" /><stop offset="0.6" stopColor="#000" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="cAO" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#000" stopOpacity="0" /><stop offset="1" stopColor="#000" stopOpacity="0.5" />
+        </linearGradient>
+        <radialGradient id="cGate" cx="50%" cy="32%" r="78%">
+          <stop offset="0" stopColor="#ffe6a2" /><stop offset="0.5" stopColor="#d9852a" /><stop offset="1" stopColor="#2a1606" />
+        </radialGradient>
+        <radialGradient id="cGround" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stopColor="#ffb14a" stopOpacity="0.45" /><stop offset="1" stopColor="#ffb14a" stopOpacity="0" />
+        </radialGradient>
       </defs>
-      <g className="wd2-ghost"><CastleShapes /></g>
-      <g className="wd2-mason" clipPath="url(#wrise)"><CastleShapes /></g>
-      {TORCHES.map((t, i) => t.y > litUntil && (
-        <circle key={i} className="wd2-torch" cx={t.x} cy={t.y} r={2} />
-      ))}
-      {pct > 1 && pct < 100 && <line className="wd2-buildline" x1="8" y1={120 - h} x2="192" y2={120 - h} />}
-      {done && <g className="wd2-flag"><line x1="100" y1="40" x2="100" y2="20" /><path d="M100 21 L116 25 L100 30 Z" /></g>}
+
+      <ellipse className="cp-ground" cx="100" cy="120" rx="92" ry="10" fill="url(#cGround)" />
+
+      {/* платформа-основание */}
+      <g className={`cp ${s.base}`}>
+        <path className="cp-stone" d="M16 121 L184 121 L177 109 L23 109 Z" />
+        <rect className="cp-rim" x="24" y="108.4" width="152" height="1.4" rx="0.7" />
+      </g>
+
+      {/* крепостная стена с зубцами */}
+      <g className={`cp ${s.wall}`}>
+        <rect className="cp-stone" x="50" y="88" width="100" height="22" />
+        {crest(50, 100, 88, 9)}
+        <rect x="50" y="103" width="100" height="7" fill="url(#cAO)" />
+      </g>
+
+      {/* фланговые башни */}
+      <g className={`cp ${s.towers}`}>
+        <rect className="cp-stone" x="28" y="64" width="28" height="46" />
+        {crest(28, 28, 64, 4)}
+        <rect x="28" y="64" width="11" height="46" fill="url(#cShade)" />
+        <rect className="cp-win" x="38.5" y="78" width="3" height="6" rx="1.4" />
+        <rect className="cp-win" x="38.5" y="92" width="3" height="6" rx="1.4" />
+        <rect className="cp-stone" x="144" y="64" width="28" height="46" />
+        {crest(144, 28, 64, 4)}
+        <rect x="144" y="64" width="11" height="46" fill="url(#cShade)" />
+        <rect className="cp-win" x="158.5" y="78" width="3" height="6" rx="1.4" />
+        <rect className="cp-win" x="158.5" y="92" width="3" height="6" rx="1.4" />
+      </g>
+
+      {/* центральный донжон + ворота */}
+      <g className={`cp ${s.keep}`}>
+        <rect className="cp-stone" x="78" y="42" width="44" height="68" />
+        {crest(78, 44, 42, 5)}
+        <rect x="78" y="42" width="16" height="68" fill="url(#cShade)" />
+        <path className="cp-gate" d="M91 110 V99 a9 9 0 0 1 18 0 V110 Z" />
+        <rect className="cp-win" x="98" y="56" width="4" height="9" rx="2" />
+        <rect className="cp-win" x="86" y="74" width="3.4" height="7" rx="1.6" />
+        <rect className="cp-win" x="110.6" y="74" width="3.4" height="7" rx="1.6" />
+      </g>
+
+      {/* знамя на донжоне */}
+      <g className={`cp ${s.flag} ${done ? 'lit' : ''}`}>
+        <line className="cp-pole" x1="100" y1="42" x2="100" y2="21" />
+        <path className="cp-flag" d="M100 22 L117 26.5 L100 31 Z" />
+      </g>
     </svg>
   )
 }
 
-function presets(qty: number): { label: string; n: number }[] {
-  const out: { label: string; n: number }[] = []
-  for (const n of [10, 50]) if (n < qty) out.push({ label: `${n}`, n })
-  if (qty > 0) out.push({ label: 'Всё', n: qty })
-  return out
-}
 function goldPresets(g: number): { label: string; n: number }[] {
   const out: { label: string; n: number }[] = []
   for (const n of [100, 500]) if (n < g) out.push({ label: `${n}`, n })
@@ -113,24 +160,32 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [burst, setBurst] = useState(0)          // ключ ре-триггера вспышки при вкладе
+  const [pick, setPick] = useState<Record<string, number>>({})   // обоз: {ключ: сколько грузим}
 
   useEffect(() => {
     (DEV ? Promise.resolve(SAMPLE) : api<Resp>('wonder'))
       .then(setD).catch(() => setD({ wonder: null, zodar: 0, stock: null }))
   }, [])
 
-  async function give(key: string, n: number) {
+  /** Вклад — один атомарный вызов на весь словарь {ключ: кол-во} (сырьё/блюда/золото). */
+  async function contribute(items: Record<string, number>) {
+    const n = Object.values(items).reduce((a, b) => a + (b || 0), 0)
     if (busy || n <= 0) return
     setBusy(true); setErr(''); haptic('medium')
     try {
       const r: Contrib = DEV
         ? { ...SAMPLE, award: 1, zodar: (d?.zodar ?? 0) + 1, wonder: d?.wonder ? { ...d.wonder, progress: d.wonder.progress + n, pct: Math.min(100, Math.round((d.wonder.progress + n) * 100 / d.wonder.target)), mine_pts: d.wonder.mine_pts + n, mine_zodar: d.wonder.mine_zodar + 1 } : null }
-        : await api<Contrib>('wonder/contribute', { items: { [key]: n } })
+        : await api<Contrib>('wonder/contribute', { items })
       setD({ wonder: r.wonder, zodar: r.zodar, stock: r.stock })
-      setBurst((b) => b + 1)
+      setBurst((b) => b + 1); setPick({})
       hapticNotify(r.award > 0 ? 'success' : 'warning')
     } catch (e) { setErr(errText(e)); hapticNotify('error') }
     finally { setBusy(false) }
+  }
+
+  /** Ставим на грузе ровно n единиц (клампим к остатку). */
+  function setLoad(key: string, n: number, qty: number) {
+    setPick((p) => ({ ...p, [key]: Math.max(0, Math.min(qty, Math.round(n))) }))
   }
 
   const w = d?.wonder ?? null
@@ -159,7 +214,7 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
               <div className="wd2-embers">{Array.from({ length: 11 }, (_, i) => (
                 <span key={i} style={{ left: `${7 + i * 8.3}%`, animationDelay: `${(i * 0.7) % 6}s`, animationDuration: `${5 + (i % 4)}s` }} />
               ))}</div>
-              <CastleArt pct={w.pct} done={w.sealed} />
+              <Castle pct={w.pct} done={w.sealed} />
               {burst > 0 && (
                 <div key={burst} className="wd2-burst">
                   <i className="wd2-ring" />
@@ -214,15 +269,38 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
                   {(!d.stock || (!d.stock.res.length && !d.stock.goods.length && !d.stock.gold)) ? (
                     <p className="wd2-note">Погреб и склад пусты — добудь ресурсов или свари снеди для стройки.</p>
                   ) : (
-                    <div className="wd2-give">
-                      {(d.stock?.res ?? []).map((it) => (
-                        <GiveRow key={it.key} icon={<ResIcon k={it.key} size={28} />} name={it.name} qty={it.qty} busy={busy} onGive={(n) => give(it.key, n)} />
-                      ))}
-                      {(d.stock?.goods ?? []).map((it) => (
-                        <GiveRow key={it.key} icon={<GoodIcon k={it.key} size={28} />} name={it.name} qty={it.qty} busy={busy} onGive={(n) => give(it.key, n)} />
-                      ))}
-                      <GiveRow icon={<ResIcon k="gold" size={28} />} name="Золото" qty={d.stock?.gold ?? 0} busy={busy} gold onGive={(n) => give('gold', n)} />
-                    </div>
+                    <>
+                      <div className="wd2-treasury">
+                        <span className="wd2-tr-ic"><ResIcon k="gold" size={26} /></span>
+                        <span className="wd2-tr-meta"><i>Казна</i><b>{fmt(d.stock?.gold ?? 0)}</b></span>
+                        <span className="wd2-tr-chips">
+                          {goldPresets(d.stock?.gold ?? 0).map((o) => (
+                            <button key={o.n} className="wd2-chip" disabled={busy || o.n <= 0} onClick={() => contribute({ gold: o.n })}>{o.label}</button>
+                          ))}
+                        </span>
+                      </div>
+
+                      {((d.stock?.res.length ?? 0) + (d.stock?.goods.length ?? 0)) > 0 && (() => {
+                        const units = Object.values(pick).reduce((a, b) => a + (b || 0), 0)
+                        return (
+                          <>
+                            <div className="wd2-lbl2">Загрузи обоз — сколько чего</div>
+                            <div className="wd2-loaders">
+                              {(d.stock?.res ?? []).map((it) => (
+                                <Loader key={it.key} icon={<ResIcon k={it.key} size={28} />} name={it.name} qty={it.qty} val={pick[it.key] || 0} busy={busy} onSet={(n) => setLoad(it.key, n, it.qty)} />
+                              ))}
+                              {(d.stock?.goods ?? []).map((it) => (
+                                <Loader key={it.key} icon={<GoodIcon k={it.key} size={28} />} name={it.name} qty={it.qty} val={pick[it.key] || 0} busy={busy} onSet={(n) => setLoad(it.key, n, it.qty)} />
+                              ))}
+                            </div>
+                            <div className="wd2-send">
+                              <span className="wd2-send-sum">В обозе <b>{fmt(units)}</b> ед.</span>
+                              <button className="wd2-send-go" disabled={busy || units <= 0} onClick={() => contribute(pick)}>🐎 Отправить</button>
+                            </div>
+                          </>
+                        )
+                      })()}
+                    </>
                   )}
                 </>
               )}
@@ -256,19 +334,27 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
   )
 }
 
-function GiveRow({ icon, name, qty, busy, gold, onGive }: {
-  icon: ReactNode; name: string; qty: number; busy: boolean; gold?: boolean; onGive: (n: number) => void
+/** Погрузка ресурса: слайдер задаёт, сколько единиц грузим (0…остаток). Число на
+    ползунке = ровно то, что уедет (сумма всех → вклад) → показ=действие. */
+function Loader({ icon, name, qty, val, busy, onSet }: {
+  icon: ReactNode; name: string; qty: number; val: number; busy: boolean; onSet: (n: number) => void
 }) {
-  const opts = gold ? goldPresets(qty) : presets(qty)
+  const pctFill = qty > 0 ? Math.round((val / qty) * 100) : 0
   return (
-    <div className="wd2-grow">
-      <span className="wd2-gic">{icon}</span>
-      <span className="wd2-gname">{name}<i>{fmt(qty)}</i></span>
-      <span className="wd2-gchips">
-        {opts.map((o) => (
-          <button key={o.n} className="wd2-chip" disabled={busy || o.n <= 0} onClick={() => onGive(o.n)}>{o.label}</button>
-        ))}
-      </span>
+    <div className={`wd2-load${val > 0 ? ' on' : ''}`}>
+      <span className="wd2-load-ic">{icon}</span>
+      <div className="wd2-load-body">
+        <div className="wd2-load-top">
+          <span className="wd2-load-name">{name}</span>
+          <span className="wd2-load-val"><b>{fmt(val)}</b><i>/{fmt(qty)}</i></span>
+        </div>
+        <div className="wd2-load-row">
+          <input className="wd2-range" type="range" min={0} max={qty} value={val} disabled={busy}
+            style={{ ['--p' as string]: `${pctFill}%` }}
+            onChange={(e) => onSet(+e.target.value)} />
+          <button className="wd2-max" disabled={busy} onClick={() => onSet(val >= qty ? 0 : qty)}>{val >= qty ? '0' : 'Всё'}</button>
+        </div>
+      </div>
     </div>
   )
 }
