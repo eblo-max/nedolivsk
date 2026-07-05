@@ -58,7 +58,8 @@ FIRST_WONDER = "wall"
 
 # Обкатка: вкладка «Стройка города» и эндпоинты — ТОЛЬКО админу (как invasion.TEST_MODE).
 # Открыть всем = поставить False (плюс снять t.admin-гейт кнопки в Tavern.tsx).
-WONDER_ADMIN_ONLY = True
+# 06.07.2026: ОТКРЫТО ВСЕМ после аудита + /wonder wipe me (свежая Твердыня, цель 12600).
+WONDER_ADMIN_ONLY = False
 
 
 def get(key: str) -> WonderDef | None:

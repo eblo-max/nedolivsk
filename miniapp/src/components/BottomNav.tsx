@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { haptic } from '../telegram'
 
-// Обкатка: вкладка «🏛 Стройка» (городские чудеса) видна ТОЛЬКО админу, пока
-// открываем не всем. Открыть всем при запуске = WONDERS_OPEN=true (+ снять
-// WONDER_ADMIN_ONLY на сервере). Флаг админа кладёт Tavern в localStorage('adm').
-const WONDERS_OPEN = false
+// Вкладка «🏛 Стройка» (городские чудеса). 06.07.2026: ОТКРЫТА ВСЕМ
+// (WONDERS_OPEN=true + WONDER_ADMIN_ONLY=False на сервере). adm-флаг из Tavern
+// больше не нужен для показа, но оставлен для совместимости.
+const WONDERS_OPEN = true
 
 const TABS = [
   { to: '/', icon: '🏠', label: 'Таверна' },
