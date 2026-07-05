@@ -167,12 +167,13 @@ async def _settle_wonders(bot: Bot) -> None:
             top = max(contribs.items(), key=lambda kv: int(kv[1].get("pts", 0)),
                       default=None)
             top_name = (top[1].get("name") if top else None) or "город"
-            await repo.add_chronicle(session, repo.GLOBAL_CITY_ID,
-                                     f"🏛 {nm} возведено! Больше всех вложил(а) {top_name}.")
-            announces.append(
-                f"🏛 <b>{(wdef.emoji + ' ') if wdef else ''}{nm} возведено!</b> "
-                f"Город строил всем миром. {wdef.bonus if wdef else ''}. "
-                f"Вкладчики награждены зодарами ⚒.")
+            if not wmod.WONDER_ADMIN_ONLY:       # обкатка: тихо — без летописи и анонса в чаты
+                await repo.add_chronicle(session, repo.GLOBAL_CITY_ID,
+                                         f"🏛 {nm} возведено! Больше всех вложил(а) {top_name}.")
+                announces.append(
+                    f"🏛 <b>{(wdef.emoji + ' ') if wdef else ''}{nm} возведено!</b> "
+                    f"Город строил всем миром. {wdef.bonus if wdef else ''}. "
+                    f"Вкладчики награждены зодарами ⚒.")
             w.status = "done"
         await session.commit()
     for t in announces:                              # сеть — ПОСЛЕ коммита

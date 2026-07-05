@@ -175,6 +175,28 @@ async def cmd_wonder(
     без чат-анонса — вклад через /api/wonder; мини-апп и карта появятся в Фазе 3."""
     if not _is_admin(message):
         return
+    args = (command.args or "").lower().split()
+    if "fill" in args:                       # ТЕСТ: форс-прогресс, чтобы увидеть крепость
+        w = await repo.get_active_wonder(session, lock=True)
+        if w is None:
+            await message.answer("🏛 Сперва заложи чудо: /wonder")
+            return
+        wdef = wmod.get(w.key)
+        p = await repo.get_player(session, message.from_user.id, for_update=True)
+        active = await repo.active_player_count(session)
+        pts = max(1, round(0.4 * int(w.target)))      # +40% текущей фазы за вызов
+        res = wmod.apply_contribution(
+            w, str(p.id), (p.first_name or "Зодчий") if p else "Зодчий", pts, pts, active)
+        w.updated_at = datetime.now(timezone.utc)
+        if p is not None:
+            p.zodar = int(getattr(p, "zodar", 0) or 0) + int(res["award"])
+        repo.add_log(session, "admin", message.from_user.id, f"🏛 /wonder fill +{pts}")
+        state = ("🏁 ЗАВЕРШЕНО (settle тихо на след. тике)" if res["wonder_done"]
+                 else f"фаза {w.phase}/{len(wdef.phases) if wdef else '?'}")
+        await message.answer(
+            f"🏛 fill: +{pts} → <b>{w.progress}/{w.target}</b> ({state}), "
+            f"+{res['award']} ⚒ (баланс {p.zodar if p else 0} ⚒). Обнови мини-апп.")
+        return
     if await repo.get_active_wonder(session) is not None:
         await message.answer("🏛 Стройка уже идёт — сперва доведите текущее чудо.")
         return
