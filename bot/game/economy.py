@@ -30,6 +30,7 @@ SINKS: dict[str, str] = {
     "forge":     "⚒ Кузница (ковка)",
     "shop":      "🛒 Лавка (докупка сырья)",
     "skim":      "💸 Поборы города",
+    "wonder":    "🏛 Стройка чуда",
 }
 LABELS = {**FAUCETS, **SINKS}
 

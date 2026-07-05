@@ -21,6 +21,8 @@ const RaidSheet = lazy(() => import('./RaidSheet'))
 const InvasionSheet = lazy(() => import('./InvasionSheet'))
 const NotificationsSheet = lazy(() => import('./NotificationsSheet'))
 const GuideSheet = lazy(() => import('./GuideSheet'))
+const WonderSheet = lazy(() => import('./WonderSheet'))
+const ArtelSheet = lazy(() => import('./ArtelSheet'))
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
@@ -97,6 +99,8 @@ export default function Tavern() {
   const [raidOpen, setRaidOpen] = useState(false)       // экран рейд-босса
   const [invOpen, setInvOpen] = useState(false)         // панель сбора орды («в строй»)
   const [notifOpen, setNotifOpen] = useState(false)     // лента уведомлений
+  const [wonderOpen, setWonderOpen] = useState(false)   // общая стройка «Чудо города»
+  const [artelOpen, setArtelOpen] = useState(false)     // Лавка Артели (сток зодаров)
   const storySeen = useRef<string | null>(null)        // авто-показ визитёра один раз на его id
   const [trade, setTrade] = useState<TradeData | null>(null)   // заезжий купец (торг)
   const tradeShut = useRef(false)                       // купца закрыли вручную — не нудить повторно
@@ -292,6 +296,7 @@ export default function Tavern() {
             {t.fgoal && <FGoalBanner g={t.fgoal} />}
             <button className="chron-open" onClick={() => { haptic('light'); setChronOpen(true) }}>📜 Летопись города →</button>
             <button className="chron-open" onClick={() => { haptic('light'); setRatingOpen(true) }}>🏆 Топ таверн →</button>
+          {t.admin && <button className="chron-open" onClick={() => { haptic('light'); setWonderOpen(true) }}>🏛 Стройка города → <span style={{ opacity: .6, fontSize: 11 }}>(обкатка, только тебе)</span></button>}
           </div>
         </div>
       )}
@@ -381,6 +386,9 @@ export default function Tavern() {
         {chronOpen && <ChronicleSheet onClose={() => setChronOpen(false)} />}
         {guideOpen && <GuideSheet onClose={() => setGuideOpen(false)} />}
         {ratingOpen && <RatingSheet onClose={() => setRatingOpen(false)} />}
+        {wonderOpen && <WonderSheet onClose={() => { setWonderOpen(false); reload() }}
+          onOpenArtel={() => { setWonderOpen(false); setArtelOpen(true) }} />}
+        {artelOpen && <ArtelSheet onClose={() => setArtelOpen(false)} />}
         {refOpen && <ReferralSheet onClose={() => setRefOpen(false)} />}
         {raidOpen && <RaidSheet onClose={() => { setRaidOpen(false); reload() }} onGold={() => reload()} />}
         {invOpen && <InvasionSheet onClose={() => { setInvOpen(false); reload() }} />}

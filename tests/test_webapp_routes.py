@@ -10,6 +10,8 @@ os.environ.setdefault("BOT_TOKEN", "test:test")
 
 ROUTES = [
     "GET / _health",
+    "POST /api/artel _api_artel",
+    "POST /api/artel/buy _api_artel_buy",
     "GET /app _spa",
     "GET /app/{tail} _spa",
     "GET /assets/animals/{name}.png _animal_sprite",
@@ -95,6 +97,8 @@ ROUTES = [
     "POST /api/trade _api_trade",
     "POST /api/upgrade _api_upgrade",
     "POST /api/whoami _api_whoami",
+    "POST /api/wonder _api_wonder",
+    "POST /api/wonder/contribute _api_wonder_contribute",
 ]
 
 

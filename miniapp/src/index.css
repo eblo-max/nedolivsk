@@ -1886,6 +1886,240 @@ body {
   color:#f0b48a; background:linear-gradient(#3a1e12,#2a1108); border:1px solid #7a3b2e; border-radius:12px;
   padding:8px 10px; margin:2px 6px 10px; animation:sv-rise .2s both; }
 .trd-err small { display:block; margin-top:2px; font-weight:400; font-size:11px; color:#c99; }
+
+/* ══ WonderSheet 2.0 — живая крепость, что растёт снизу вверх ══ */
+.wd2 { position:relative; width:min(560px,94vw); max-height:90vh; margin:auto; overflow:hidden;
+  display:flex; flex-direction:column; border-radius:22px; background:#160f06; border:1px solid #5a4420;
+  box-shadow:0 24px 70px #000b; animation:sv-rise .28s both; }
+.wd2-body { overflow-y:auto; padding:0 15px 18px; -webkit-overflow-scrolling:touch; }
+.wd2-hero { position:relative; height:192px; flex:none; overflow:hidden;
+  background:radial-gradient(120% 100% at 50% 132%, #241a0c 0%, #140e07 55%, #0a0703 100%); }
+.wd2-aurora { position:absolute; inset:-30%; will-change:transform; animation:wd2-aur 15s ease-in-out infinite alternate;
+  background:radial-gradient(38% 30% at 30% 30%, #b8802a40, transparent 70%),
+    radial-gradient(34% 26% at 72% 22%, #7a4fd03a, transparent 70%),
+    radial-gradient(30% 24% at 55% 58%, #e7b54a2a, transparent 70%); }
+@keyframes wd2-aur { 0%{transform:translate3d(-4%,-2%,0) rotate(0deg)} 100%{transform:translate3d(5%,3%,0) rotate(7deg)} }
+.wd2-stars { position:absolute; inset:0; opacity:.7; background-image:
+  radial-gradient(1px 1px at 20% 30%, #fff7, transparent), radial-gradient(1px 1px at 70% 20%, #fff5, transparent),
+  radial-gradient(1px 1px at 45% 14%, #fff6, transparent), radial-gradient(1px 1px at 86% 38%, #fff4, transparent),
+  radial-gradient(1px 1px at 33% 24%, #fff4, transparent); }
+.wd2-embers { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+.wd2-embers span { position:absolute; bottom:8px; width:3px; height:3px; border-radius:50%; opacity:0;
+  background:#ffcf6e; box-shadow:0 0 6px 1px #ffb14a; will-change:transform,opacity; animation:wd2-ember linear infinite; }
+@keyframes wd2-ember { 0%{opacity:0;transform:translateY(0) scale(.6)} 12%{opacity:.9} 82%{opacity:.5} 100%{opacity:0;transform:translateY(-155px) scale(1.1)} }
+.wd2-castle { position:absolute; left:0; right:0; bottom:-1px; width:100%; height:158px; display:block; filter:drop-shadow(0 6px 14px #000a); }
+.wd2-ghost rect, .wd2-ghost path { fill:none; stroke:#e7b54a; stroke-width:.7; opacity:.16; }
+.wd2-mason rect, .wd2-mason path { fill:url(#wstone); stroke:#3a2a12; stroke-width:.4; }
+.wd2-mason .wd2-gate { fill:#1c1206; stroke:#7a5a2e; }
+.wd2-torch { fill:#ffe4a0; filter:drop-shadow(0 0 3px #ffc24a); animation:wd2-flick 2.4s ease-in-out infinite; }
+@keyframes wd2-flick { 0%,100%{opacity:.82} 45%{opacity:1} 62%{opacity:.68} }
+.wd2-buildline { stroke:#ffe9a8; stroke-width:1.4; filter:drop-shadow(0 0 5px #ffcf6e); animation:wd2-glow 1.7s ease-in-out infinite; }
+@keyframes wd2-glow { 0%,100%{opacity:.35} 50%{opacity:.95} }
+.wd2-flag line { stroke:#caa; stroke-width:1.2; } .wd2-flag path { fill:#d24; }
+.wd2-hero-fade { position:absolute; left:0; right:0; bottom:0; height:84px; background:linear-gradient(#160f0600,#160f06); }
+.wd2-x { position:absolute; top:12px; left:12px; width:30px; height:30px; border-radius:50%; cursor:pointer; z-index:3;
+  color:#e7d4a6; font-size:14px; background:#0009; border:1px solid #ffffff22; }
+.wd2-burst { position:absolute; left:50%; top:58%; transform:translate(-50%,-50%); pointer-events:none; z-index:2; }
+.wd2-ring { position:absolute; left:-32px; top:-32px; width:64px; height:64px; border-radius:50%; border:2px solid #ffdf8f;
+  animation:wd2-ring .55s ease-out forwards; }
+@keyframes wd2-ring { 0%{opacity:.9;transform:scale(.3)} 100%{opacity:0;transform:scale(1.7)} }
+.wd2-burst b { position:absolute; width:4px; height:4px; border-radius:50%; background:#ffe08a; box-shadow:0 0 6px #ffcf6e;
+  animation:wd2-spark .52s ease-out forwards; }
+@keyframes wd2-spark { 0%{opacity:1;transform:rotate(var(--a)) translateX(4px) scale(1)} 100%{opacity:0;transform:rotate(var(--a)) translateX(42px) scale(.4)} }
+/* чистая шапка: заголовок на солидной полосе + крупный % чистым sans */
+.wd2-head2 { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:14px 0 11px; }
+.wd2-h2l { min-width:0; }
+.wd2-name { font-family:var(--head,Georgia),serif; font-weight:800; font-size:21px; color:#f4e6bf; }
+.wd2-phase { font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#a2906a; margin-top:2px; }
+.wd2-pct2 { flex:none; font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; font-weight:800;
+  font-size:42px; line-height:.82; letter-spacing:-2px; color:#e7b54a; }
+.wd2-pct2 i { font-style:normal; font-size:18px; font-weight:700; color:#a5822e; margin-left:1px; }
+.wd2-substats { display:flex; flex-wrap:wrap; gap:5px 16px; padding:10px 0; margin-bottom:2px;
+  border-top:1px solid #ffffff0e; border-bottom:1px solid #ffffff0e;
+  font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#9c8a63; }
+.wd2-substats b { font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; font-weight:800; color:#f0dfb6; }
+.wd2-timeline { display:flex; gap:6px; margin:14px 0 8px; }
+.wd2-seg { position:relative; flex:1; height:20px; border-radius:10px; overflow:hidden; background:#1a1206; border:1px solid #4a3719; }
+.wd2-seg i { position:absolute; inset:0; width:0; background:linear-gradient(90deg,#8a6a2e,#e7b54a); transition:width .5s ease; }
+.wd2-seg span { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:11px; color:#d9c79c; text-shadow:0 1px 2px #000a; }
+.wd2-seg.now { border-color:#e7b54a88; box-shadow:0 0 10px #e7b54a33; }
+.wd2-seg.done span { color:#0d2417; }
+.wd2-stat { font-family:var(--text),system-ui,sans-serif; font-size:12.5px; color:#a99e85; text-align:center; }
+.wd2-stat b { font-family:var(--num); color:#f0dfb6; }
+.wd2-plaque { font-family:Georgia,serif; font-style:italic; font-size:13.5px; color:#cbb487; line-height:1.45;
+  margin:10px 0; padding:9px 12px; border-left:2px solid #6a5124; background:#ffffff06; border-radius:0 10px 10px 0; }
+.wd2-bonus { display:flex; gap:6px; font-family:var(--text),system-ui,sans-serif; font-size:12.5px; color:#a8d99a; margin-bottom:2px; }
+.wd2-lbl { font-family:var(--text),system-ui,sans-serif; font-size:11px; letter-spacing:.15em; text-transform:uppercase; color:#8f7c55; margin:14px 0 7px; }
+.wd2-sealed { text-align:center; color:#e7c98a; padding:16px; font-family:var(--text),system-ui,sans-serif; }
+.wd2-note { font-family:var(--text),system-ui,sans-serif; font-size:12.5px; color:#a99e85; text-align:center; margin:6px; }
+.wd2-give { display:flex; flex-direction:column; gap:6px; }
+.wd2-grow { display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:13px;
+  background:linear-gradient(#26190b,#191006); border:1px solid var(--line,#4a3719); }
+.wd2-gic { flex:none; display:flex; filter:drop-shadow(0 2px 4px #0006); }
+.wd2-gname { flex:1; min-width:0; font-family:var(--text),system-ui,sans-serif; font-size:14px; color:#e6d3a8; }
+.wd2-gname i { display:block; font-style:normal; font-family:var(--num); font-size:11.5px; color:#8f7c55; }
+.wd2-gchips { display:flex; gap:5px; }
+.wd2-chip { padding:6px 12px; border-radius:10px; cursor:pointer; font-family:var(--num),system-ui,sans-serif;
+  font-size:12.5px; font-weight:800; color:#f4e3b3; background:linear-gradient(#4a3816,#2c2009); border:1px solid #7a5c28; }
+.wd2-chip:active { transform:scale(.93); } .wd2-chip:disabled { opacity:.4; }
+.wd2-board { display:flex; flex-direction:column; gap:5px; }
+.wd2-brow { display:flex; align-items:center; gap:10px; padding:7px 11px; border-radius:11px; background:#1c1207;
+  border:1px solid #38290f; font-family:var(--text),system-ui,sans-serif; font-size:13.5px; color:#dccaa6; }
+.wd2-brow.r1 { background:linear-gradient(90deg,#3a2c0e,#1c1207); border-color:#a5822e; }
+.wd2-medal { flex:none; width:20px; font-size:15px; text-align:center; }
+.wd2-bname { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wd2-bpts { font-family:var(--num); font-size:12px; color:#a99e85; }
+.wd2-bz { font-family:var(--num); font-size:13px; color:#ffdf8f; }
+.wd2-artel { display:flex; flex-direction:column; align-items:center; gap:0; width:100%; margin-top:16px;
+  padding:11px; border-radius:14px; cursor:pointer; color:#241501; background:linear-gradient(#f6d885,#cf9a3c);
+  border:1px solid #f6dd92; box-shadow:0 5px 18px #cf9a3c44; }
+.wd2-artel:active { transform:translateY(1px); }
+.wd2-artel-ic { font-size:19px; } .wd2-artel > span:nth-child(2){ font-family:var(--text); font-weight:800; font-size:15px; }
+.wd2-artel small { font-weight:600; font-size:11px; opacity:.72; }
+.wd2-err { font-family:var(--text),system-ui,sans-serif; font-size:12.5px; text-align:center; color:#f0b48a;
+  background:linear-gradient(#3a1e12,#2a1108); border:1px solid #7a3b2e; border-radius:12px; padding:8px; margin:10px 0; font-weight:700; }
+.wd2-err small { display:block; font-weight:400; font-size:11px; color:#c99; }
+.wd2-empty { text-align:center; padding:52px 18px; } .wd2-empty-ic { font-size:58px; }
+.wd2-empty p { font-family:Georgia,serif; font-style:italic; color:#cbb487; line-height:1.5; margin:16px 0 24px; }
+
+/* ── beauty-пасс: кинематографичный свет, глянец, свечения ── */
+.wd2-sun { position:absolute; left:50%; bottom:-46px; transform:translateX(-50%); width:300px; height:210px; pointer-events:none;
+  background:radial-gradient(closest-side, #ffb54a4d, #ff8a2a26 46%, transparent 72%); }
+.wd2-hero::before { content:''; position:absolute; left:0; right:0; bottom:0; height:64px; pointer-events:none; z-index:1;
+  background:radial-gradient(130% 100% at 50% 132%, #ffae4a4a, transparent 62%); }
+.wd2-hero::after { content:''; position:absolute; inset:0; pointer-events:none; z-index:1;
+  box-shadow:inset 0 0 64px 10px #0a0602a6, inset 0 22px 40px -22px #000; }
+.wd2-mason { filter:drop-shadow(0 -1px 5px #ffcf6e3a); }
+.wd2-torch { filter:drop-shadow(0 0 5px #ffc24a) drop-shadow(0 0 1.5px #fff8); }
+.wd2-buildline { stroke-width:2.2; filter:drop-shadow(0 0 7px #ffcf6e); }
+.wd2-pct2 { text-shadow:0 0 22px #e7b54a4d, 0 2px 6px #0009; }
+.wd2-name { text-shadow:0 0 16px #e7b54a2b, 0 1px 2px #0008; }
+.wd2-seg { box-shadow:inset 0 2px 4px #0006; }
+.wd2-seg i { box-shadow:inset 0 1px 0 #ffffff44; background:linear-gradient(#a5822e,#f0c463); }
+.wd2-seg.now { box-shadow:0 0 12px #e7b54a44, inset 0 2px 4px #0006; }
+.wd2-substats { background:linear-gradient(#ffffff05,#ffffff00); }
+.wd2-plaque { background:linear-gradient(100deg,#ffffff0a,#ffffff02); border-left-color:#a5822e; }
+.wd2-grow { background:linear-gradient(#2e1f0d,#180f05); box-shadow:inset 0 1px 0 #ffffff14, 0 3px 9px #0007; border-color:#3f2e13; }
+.wd2-gic { width:40px; height:40px; border-radius:12px; align-items:center; justify-content:center;
+  background:#00000038; box-shadow:inset 0 0 0 1px #ffffff12; }
+.wd2-chip { color:#ffe8b0; background:linear-gradient(#5c4517,#33260b); border-color:#8a6a2e;
+  box-shadow:inset 0 1px 0 #ffffff2e, 0 2px 6px #0007; }
+.wd2-chip:active { box-shadow:inset 0 2px 5px #0008; }
+.wd2-medal { font-size:17px; }
+.wd2-brow.r1 { box-shadow:0 0 16px #a5822e2b, inset 0 1px 0 #ffffff16; }
+.wd2-artel { position:relative; overflow:hidden; box-shadow:0 6px 22px #cf9a3c55, inset 0 1px 0 #fff6; }
+.wd2-artel::after { content:''; position:absolute; top:0; left:-70%; width:45%; height:100%; pointer-events:none;
+  background:linear-gradient(100deg,transparent,#ffffff66,transparent); transform:skewX(-18deg); animation:wd2-sheen 4.5s ease-in-out infinite; }
+@keyframes wd2-sheen { 0%,62%{left:-70%} 86%,100%{left:150%} }
+
+/* ══ chrome 2026: типографика · кнопки · рамки · поверхности (не свет) ══ */
+.wd2 { border:1px solid #ffffff12; }
+.wd2-body { padding:0 16px 20px; }
+.wd2-name { font-size:22px; letter-spacing:.2px; color:#f4e8cc; }
+.wd2-phase { font-size:11.5px; color:#9a875f; }
+.wd2-pct2 { font-weight:700; letter-spacing:-2.5px; }
+.wd2-lbl { font-size:10.5px; letter-spacing:.16em; color:#80704d; margin:18px 0 9px; }
+.wd2-substats { gap:6px 18px; padding:12px 0; border-top-color:#ffffff10; border-bottom-color:#ffffff10; font-size:11.5px; color:#8a7952; }
+.wd2-substats b { color:#efe4c8; font-weight:600; }
+.wd2-plaque { border-radius:0 12px 12px 0; border-left:2px solid #e7b54a80; padding:11px 14px; font-size:13.5px; line-height:1.5; background:#ffffff06; }
+.wd2-timeline { gap:7px; margin:16px 0 2px; }
+.wd2-seg { height:6px; border-radius:99px; border:none; background:#ffffff14; box-shadow:none; }
+.wd2-seg i { border-radius:99px; box-shadow:none; background:#e7b54a; }
+.wd2-seg span { display:none; }
+.wd2-seg.now { box-shadow:none; }
+.wd2-grow { padding:9px 11px; border-radius:14px; border:1px solid #ffffff10; background:#ffffff07; box-shadow:none; }
+.wd2-gic { width:38px; height:38px; border-radius:11px; border:1px solid #ffffff0d; background:#ffffff08; box-shadow:none; }
+.wd2-gname { font-size:14.5px; font-weight:500; color:#ece0c4; }
+.wd2-gname i { font-size:11px; color:#8a7952; margin-top:1px; }
+.wd2-gchips { gap:6px; }
+.wd2-chip { min-width:40px; padding:8px 0; border-radius:11px; box-shadow:none;
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif; font-weight:600; font-size:13px; letter-spacing:.01em;
+  color:#d9c79c; background:transparent; border:1px solid #ffffff1c; }
+.wd2-chip:active { transform:scale(.94); background:#ffffff14; }
+.wd2-chip:last-child { color:#1a1206; background:#e7b54a; border-color:#e7b54a; padding:8px 14px; }
+.wd2-brow { padding:9px 12px; border-radius:12px; border:1px solid #ffffff0d; background:#ffffff06; }
+.wd2-brow.r1 { border-color:#e7b54a38; background:#e7b54a12; box-shadow:none; }
+.wd2-bname { font-size:13.5px; color:#e6d9bd; }
+.wd2-bpts { color:#8a7952; }
+.wd2-bz { color:#e7b54a; }
+.wd2-artel { border-radius:14px; padding:13px; gap:2px; background:#e7b54a; border:none; box-shadow:0 8px 24px #e7b54a2e; color:#1a1206; }
+.wd2-artel::after { display:none; }
+.wd2-artel > span:nth-child(2){ font-weight:700; font-size:15px; }
+.wd2-artel small { color:#1a1206; opacity:.55; font-weight:500; }
+.wd2-artel-ic { font-size:18px; }
+.wd2-x { background:#00000055; border:1px solid #ffffff20; }
+
+/* ══ Apple-style: материалы · SF-типографика · inset-grouped списки · tinted-кнопки ══ */
+.wd2 { --acc:#e7b54a; --acc-tint:rgba(231,181,74,.15);
+  font-family:-apple-system,system-ui,'SF Pro Text','Segoe UI',Roboto,sans-serif; border-radius:26px; border:1px solid #ffffff10; }
+.wd2 * { font-variant-numeric:tabular-nums; }
+.wd2-body { padding:0 16px 22px; }
+.wd2-head2 { align-items:center; margin:16px 0 12px; }
+.wd2-name { font-weight:700; font-size:23px; letter-spacing:-.4px; color:#f4ecd8; }
+.wd2-phase { font-size:13px; color:#ffffff5c; letter-spacing:-.1px; margin-top:3px; }
+.wd2-pct2 { font-weight:700; font-size:44px; letter-spacing:-2px; color:var(--acc); text-shadow:none; }
+.wd2-pct2 i { font-size:19px; color:#ffffff40; margin-left:2px; }
+.wd2-timeline { gap:5px; margin:18px 0 4px; }
+.wd2-seg { height:5px; border-radius:99px; background:#ffffff14; }
+.wd2-seg i { background:var(--acc); }
+.wd2-substats { gap:4px 20px; padding:14px 0; border-top:1px solid #ffffff0d; border-bottom:1px solid #ffffff0d; font-size:12.5px; color:#ffffff55; }
+.wd2-substats b { color:#f0e8d4; font-weight:600; }
+.wd2-plaque { border:none; border-radius:16px; padding:14px 16px; font-size:14px; line-height:1.5; background:#ffffff08; box-shadow:inset 0 1px 0 #ffffff0c; color:#e6dbc0; }
+.wd2-bonus { font-size:13px; margin:12px 2px 2px; }
+.wd2-lbl { font-size:12px; font-weight:600; letter-spacing:-.1px; text-transform:none; color:#ffffff50; margin:20px 0 10px; }
+.wd2-give { gap:0; border-radius:18px; overflow:hidden; background:#ffffff07; border:1px solid #ffffff0d; box-shadow:inset 0 1px 0 #ffffff0a; }
+.wd2-grow { border:none; border-radius:0; background:transparent; box-shadow:none; padding:11px 14px; gap:12px; }
+.wd2-grow:not(:last-child) { box-shadow:inset 0 -1px 0 #ffffff0c; }
+.wd2-gic { width:40px; height:40px; border-radius:11px; background:#ffffff0c; border:none; box-shadow:none; }
+.wd2-gname { font-size:15px; font-weight:500; color:#efe6d0; }
+.wd2-gname i { font-size:12.5px; color:#ffffff45; font-weight:400; margin-top:1px; }
+.wd2-gchips { gap:7px; }
+.wd2-chip { min-width:42px; padding:8px 0; border-radius:999px; border:none; box-shadow:none; font-weight:600; font-size:14px; letter-spacing:-.2px; color:var(--acc); background:var(--acc-tint); }
+.wd2-chip:active { transform:scale(.92); background:var(--acc-tint); }
+.wd2-chip:last-child { color:#1a1206; background:var(--acc); padding:8px 15px; }
+.wd2-board { gap:0; border-radius:18px; overflow:hidden; background:#ffffff07; border:1px solid #ffffff0d; }
+.wd2-brow { border:none; border-radius:0; background:transparent; box-shadow:none; padding:11px 14px; }
+.wd2-brow:not(:last-child) { box-shadow:inset 0 -1px 0 #ffffff0c; }
+.wd2-brow.r1 { background:var(--acc-tint); }
+.wd2-medal { font-size:18px; }
+.wd2-bname { font-size:14.5px; color:#ece2c8; }
+.wd2-bpts { color:#ffffff45; }
+.wd2-bz { color:var(--acc); font-weight:600; }
+.wd2-artel { border-radius:16px; padding:15px; gap:2px; background:var(--acc); color:#1a1206; border:none; box-shadow:0 10px 30px -8px #e7b54a66; }
+.wd2-artel::after { display:none; }
+.wd2-artel-ic { font-size:19px; }
+.wd2-artel > span:nth-child(2){ font-weight:700; font-size:16px; letter-spacing:-.2px; }
+.wd2-artel small { color:#1a1206; opacity:.55; font-weight:500; font-size:11.5px; }
+.wd2-x { width:32px; height:32px; background:#00000059; border:1px solid #ffffff1c; font-size:13px; }
+/* Apple-сдержанность: приглушить игровую атмосферу hero */
+.wd2-hero::after { box-shadow:inset 0 0 70px 14px #0a06029e, inset 0 20px 36px -22px #000; }
+.wd2-aurora { opacity:.7; }
+
+/* ── Лавка Артели (ArtelSheet) ── */
+.ar-sheet { position:relative; width:min(560px,94vw); max-height:88vh; overflow-y:auto;
+  margin:auto; padding:16px 15px 18px; border-radius:20px; background:linear-gradient(#231708,#160f06);
+  border:1px solid #5a4420; box-shadow:0 20px 60px #000a; animation:sv-rise .25s both; }
+/* (старые .wd-* удалены — WonderSheet 2.0 использует .wd2-*) */
+/* Лавка */
+.ar-head { display:flex; align-items:center; justify-content:space-between; gap:9px; }
+.ar-title { font-family:var(--head,Georgia),serif; font-weight:800; font-size:18px; color:var(--parch,#f0dfb6); }
+.ar-bal { font-family:var(--num),system-ui,sans-serif; font-weight:900; font-size:16px; color:#e7c98a;
+  padding:4px 9px; border-radius:11px; background:#1c1207; border:1px solid #5a4420; }
+.ar-lore { font-family:Georgia,serif; font-style:italic; font-size:12.5px; color:#a08c66; margin:6px 2px 12px; }
+.ar-list { display:flex; flex-direction:column; gap:8px; }
+.ar-card { display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:13px;
+  background:linear-gradient(#26190b,#1a1107); border:1px solid var(--line,#4a3719); }
+.ar-card.owned { opacity:.7; border-color:#3f6a38; }
+.ar-emo { font-size:26px; flex:none; }
+.ar-body { flex:1; min-width:0; }
+.ar-name { font-family:var(--text),system-ui,sans-serif; font-weight:700; font-size:14px; color:#f0dfb6; }
+.ar-desc { font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#a99e85; line-height:1.35; }
+.ar-buy { flex:none; padding:8px 13px !important; margin:0 !important; width:auto !important;
+  font-family:var(--num),system-ui,sans-serif; font-weight:800 !important; color:#241501 !important;
+  border-color:#f6dd92 !important; background:linear-gradient(var(--gold-2,#f6d885),#cf9a3c) !important; }
+.ar-buy:disabled { opacity:.4; }
+.ar-have { flex:none; font-family:var(--text),system-ui,sans-serif; font-size:12.5px; color:#a8d99a; }
 .brs-mine-x { flex:none; width:46px; border-radius:14px; cursor:pointer; font-size:17px; color:#f0a08a;
   background:linear-gradient(#2c1410,#1a0d08); border:1px solid #7a3b2e; }
 .brs-mine-x:active { transform:scale(.96); }

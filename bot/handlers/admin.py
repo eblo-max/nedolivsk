@@ -12,7 +12,7 @@ from bot import announce, texts
 from bot.config import settings
 from bot.db import repo
 from bot.db.models import Player, Tavern
-from bot.game import balance, economy, invasion
+from bot.game import balance, economy, invasion, wonder as wmod
 from bot.game import world as wld
 from bot.keyboards.inline import invasion_announce_kb
 from bot.sender import deliver
@@ -41,17 +41,19 @@ async def cmd_orc(message: Message, command: CommandObject, session: AsyncSessio
                           if a.startswith("wins") and a[4:].isdigit()), None)
     now = datetime.now(timezone.utc)
     total = await repo.world_might_sum(session)
+    world = await repo.get_or_create_world(session)
     threshold = invasion.horde_threshold(total)
     g_until, r_at = invasion.schedule(now, fast=fast)
     inv = repo.create_invasion(session, sprite=invasion.SPRITE, threshold=threshold,
                                gather_until=g_until, resolve_at=r_at)
     if seed_army:
         inv.registered = invasion.dummy_roster()   # 16 бойцов с человеч. никами
-    world = await repo.get_or_create_world(session)
     world.invasion_next_at = None          # активна — авто не спавнит поверх
     wins_for_escal = (wins_override if wins_override is not None
                       else getattr(world, "orc_wins", 0))
-    inv.escal = invasion.escalation(wins_for_escal)   # снимок эскалации при спавне
+    # Твердыня (готовое чудо) РЕАЛЬНО ослабляет Орду через escal (он влияет на
+    # simulate; threshold — лишь эталон сложности). Снимок при спавне (показ=действие).
+    inv.escal = invasion.escalation(wins_for_escal) * wmod.invasion_escal_mult(world)
     await session.flush()                  # нужен inv.id для кнопок
     invasion.set_gathering(inv.id)         # меню таверны сразу покажет «в строй» у ВСЕХ
     gsec = round((g_until - now).total_seconds())
@@ -163,6 +165,33 @@ async def cmd_fair(message: Message, session: AsyncSession) -> None:
         f"🎪 Ярмарка открыта вручную на {balance.FAIR_DURATION_HOURS} ч. "
         f"Спрос ×{balance.FAIR_DEMAND_MULT:g}. Анонс ушёл в чаты: {len(chat_ids)}."
     )
+
+
+@router.message(Command("wonder"))
+async def cmd_wonder(
+    message: Message, command: CommandObject, session: AsyncSession
+) -> None:
+    """Заложить общую стройку «Чудо города» (одна живая на весь мир). Фаза 1:
+    без чат-анонса — вклад через /api/wonder; мини-апп и карта появятся в Фазе 3."""
+    if not _is_admin(message):
+        return
+    if await repo.get_active_wonder(session) is not None:
+        await message.answer("🏛 Стройка уже идёт — сперва доведите текущее чудо.")
+        return
+    key = wmod.FIRST_WONDER
+    wdef = wmod.get(key)
+    if wdef is None:
+        await message.answer("Нет такого чуда в реестре.")
+        return
+    active = await repo.active_player_count(session)
+    target = wmod.phase_target(wdef.phases[0].base_target, active)
+    repo.create_wonder(session, key=key, target=target)
+    repo.add_log(session, "admin", message.from_user.id,
+                 f"🏛 заложено чудо «{wdef.name}» (цель фазы 1 {target}, активных {active})")
+    await message.answer(
+        f"🏛 Заложено чудо «{wdef.emoji} {wdef.name}». Фаза 1 «{wdef.phases[0].title}», "
+        f"цель <b>{target}</b> очков (активных {active}). Вклад — через /api/wonder. "
+        f"Эффект по готовности: {wdef.bonus}.")
 
 
 @router.message(Command("econ"))

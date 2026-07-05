@@ -129,6 +129,58 @@ async def _notify(bot: Bot, player: Player, text: str, markup) -> None:
                   what=f"увед→личка{player.id}")
 
 
+async def _settle_wonders(bot: Bot) -> None:
+    """ИЗОЛИРОВАННО (своя сессия): доплатить перцентильный бонус вкладчикам
+    ЗАВЕРШЁННОГО чуда (status='sealing'), включить глоб-бафф, летопись, перевести
+    в 'done'. Атомарно — сбой откатывает ТОЛЬКО settle (не весь тик), без частичного
+    коммита → без двойной выплаты. Порядок локов чудо→игрок (как во вкладе). Анонс
+    в чаты — ПОСЛЕ коммита (сеть не под локом). Безопасно: к 'sealing' уже никто не
+    контрибьютит, инкременты зодаров без дедлока."""
+    from sqlalchemy import text as _sql
+
+    from bot.game import wonder as wmod
+    async with session_factory() as session:
+        wonders = await repo.sealing_wonders(session)
+        if not wonders:
+            return
+        world = await repo.get_or_create_world(session)
+        chat_ids = await repo.all_chat_ids(session)
+        announces: list[str] = []
+        for w in wonders:
+            wdef = wmod.get(w.key)
+            nm = wdef.name if wdef else w.key
+            contribs = w.contributions or {}
+            for pid, b in wmod.phase_bonus(contribs).items():
+                if b > 0:
+                    await session.execute(
+                        _sql("UPDATE players SET zodar = zodar + :b WHERE id = :id"),
+                        {"b": int(b), "id": int(pid)})
+                    repo.queue_notify(session, int(pid),
+                                      f"🏛 {nm} возведено! Артель отсыпала +{b} ⚒ "
+                                      f"за твой вклад в стройку.", kind="wonder")
+            live = dict(world.live or {})            # глоб-бафф — единый источник
+            done = list(live.get("wonders_done") or [])
+            if w.key not in done:
+                done.append(w.key)
+            live["wonders_done"] = done
+            world.live = live
+            top = max(contribs.items(), key=lambda kv: int(kv[1].get("pts", 0)),
+                      default=None)
+            top_name = (top[1].get("name") if top else None) or "город"
+            await repo.add_chronicle(session, repo.GLOBAL_CITY_ID,
+                                     f"🏛 {nm} возведено! Больше всех вложил(а) {top_name}.")
+            announces.append(
+                f"🏛 <b>{(wdef.emoji + ' ') if wdef else ''}{nm} возведено!</b> "
+                f"Город строил всем миром. {wdef.bonus if wdef else ''}. "
+                f"Вкладчики награждены зодарами ⚒.")
+            w.status = "done"
+        await session.commit()
+    for t in announces:                              # сеть — ПОСЛЕ коммита
+        for cid in chat_ids:
+            await deliver(lambda c=cid, _t=t: bot.send_message(c, _t),
+                          what="wonder-done")
+
+
 async def notifier_loop(bot: Bot) -> None:
     """Раз в минуту проверяет завершённые вылазки и шлёт уведомления."""
     while True:
@@ -140,6 +192,10 @@ async def notifier_loop(bot: Bot) -> None:
             await _snapshot_rating()           # тренд лидерборда — база всегда свежая
         except Exception:  # noqa: BLE001 — снимок не критичен, тик не роняет
             logger.exception("Сбой снимка рейтинга")
+        try:
+            await _settle_wonders(bot)         # доплата бонусов/бафф завершённого чуда (изолированно)
+        except Exception:  # noqa: BLE001 — стройка не роняет цикл
+            logger.exception("Сбой settle чудес")
         await asyncio.sleep(CHECK_INTERVAL_SECONDS)
 
 

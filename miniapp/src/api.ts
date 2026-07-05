@@ -52,6 +52,8 @@ export function errText(e: unknown, fallback = 'Не вышло'): string {
     case 'timeout': return 'Сервер не ответил — попробуй ещё раз'
     case 'network': return 'Нет связи — проверь интернет'
     case 'no_tavern': return 'Сначала создай таверну'
+    case 'no_wonder': return 'Стройка уже завершена или ещё не начата'
+    case 'empty': return 'Нечего вложить — выбери, что нести'
     default: return code ? `Ошибка: ${code}` : fallback
   }
 }

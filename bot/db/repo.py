@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
     Chronicle, CityState, Invasion, KnownChat, LogEntry, LootDrop, MarketOrder,
-    Notification, NotifFeed, Player, RaidBoss, RankSnap, Tavern, WorldState,
+    Notification, NotifFeed, Player, RaidBoss, RankSnap, Tavern, Wonder, WorldState,
 )
 from bot.game import balance, economy
 
@@ -194,6 +194,41 @@ async def invasion_prepare(
          "id": int(inv_id), "prep": prep_id},
     )
     return (res.rowcount or 0) > 0
+
+
+async def get_active_wonder(
+    session: AsyncSession, *, lock: bool = False
+) -> Wonder | None:
+    """Живое чудо (строится ИЛИ ждёт доплаты на финише). Одно на весь мир."""
+    stmt = (select(Wonder).where(Wonder.status.in_(("building", "sealing")))
+            .order_by(Wonder.id.desc()).limit(1))
+    if lock:
+        stmt = stmt.with_for_update()
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
+def create_wonder(session: AsyncSession, *, key: str, target: int) -> Wonder:
+    """Заложить чудо в фазе 1 (цель фазы — снимок при закладке)."""
+    w = Wonder(key=key, phase=1, progress=0, target=int(target), status="building")
+    session.add(w)
+    return w
+
+
+async def sealing_wonders(session: AsyncSession) -> list[Wonder]:
+    """Готовые к доплате чуда (status='sealing') — для settle в нотифаере. Лочим,
+    пропуская занятые (skip_locked), как live_invasions — без гонок тика с тиком."""
+    return list((await session.execute(
+        select(Wonder).where(Wonder.status == "sealing")
+        .with_for_update(skip_locked=True))).scalars().all())
+
+
+async def active_player_count(session: AsyncSession, days: int = 7) -> int:
+    """Сколько игроков активны за окно (для масштаба цели фазы под размер мира)."""
+    from datetime import datetime, timedelta, timezone
+    cut = datetime.now(timezone.utc) - timedelta(days=days)
+    return int((await session.execute(
+        select(func.count()).select_from(Player)
+        .where(Player.last_seen_at >= cut))).scalar_one() or 0)
 
 
 async def world_might_sum(session: AsyncSession) -> int:

@@ -119,6 +119,11 @@ class Player(Base):
     # сток — минус. Накопитель для замера потоков (см. bot/game/economy.py, /econ).
     econ: Mapped[dict] = mapped_column(_JDICT, default=dict)
 
+    # «Зодар» — редкая валюта Артели зодчих: даётся ТОЛЬКО за участие в общих
+    # стройках (чудесах), НЕ покупается и НЕ торгуется (bind-on-earn). Тратится
+    # в Лавке Артели на престиж и эксклюзивные рецепты. См. docs/wonders.md.
+    zodar: Mapped[int] = mapped_column(default=0)
+
     tavern: Mapped["Tavern | None"] = relationship(
         back_populates="player", uselist=False, lazy="selectin"
     )
@@ -340,6 +345,30 @@ class Invasion(Base):
     )
     gather_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolve_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Wonder(Base):
+    """Общая стройка города — «чудо» (одно живое на весь мир, модель Ишгарда).
+    Фазы копятся вкладом ВСЕХ игроков (ресурсы/товары/золото → очки по ценности);
+    на закрытии фазы — глобальный бафф городу + зодары вкладчикам по перцентилю.
+    Тип чуда и его фазы/буфы — в bot/game/wonder.WONDERS[key].
+
+    contributions: {str(player_id): {"pts": int, "zodar": int, "name": str,
+    "last": iso}} — суммарный вклад и начисленные зодары каждого (доска+капстоун)."""
+
+    __tablename__ = "wonders"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(32))          # тип чуда (WONDERS[key])
+    phase: Mapped[int] = mapped_column(default=1)         # текущая фаза (1..N)
+    progress: Mapped[int] = mapped_column(default=0)      # очки в текущей фазе
+    target: Mapped[int] = mapped_column(default=0)        # цель фазы (снимок при старте фазы)
+    contributions: Mapped[dict] = mapped_column(_JDICT, default=dict)
+    status: Mapped[str] = mapped_column(String(10), default="building")  # building | done
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class LogEntry(Base):

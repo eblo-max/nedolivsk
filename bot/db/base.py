@@ -361,3 +361,9 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE world ADD COLUMN IF NOT EXISTS event_good VARCHAR(16)"
         ))
+        # «Зодар» — валюта общих строек (Артель зодчих), bind-on-earn. Таблица
+        # wonders создаётся авто через create_all. См. docs/wonders.md.
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "zodar INTEGER NOT NULL DEFAULT 0"
+        ))

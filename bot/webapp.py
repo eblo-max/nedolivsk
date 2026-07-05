@@ -112,6 +112,12 @@ from bot.webapi.nightrun import (  # noqa: E402,F401 — фасад
     _api_nightrun_push, _api_nightrun_quiz, _api_nightrun_start,
 )
 
+# Общие стройки «Чудеса города» — bot/webapi/wonder.py (Фаза 1).
+from bot.webapi.wonder import _api_wonder, _api_wonder_contribute  # noqa: E402,F401
+
+# Лавка Артели зодчих (сток зодаров) — bot/webapi/artel.py (Фаза 2).
+from bot.webapi.artel import _api_artel, _api_artel_buy  # noqa: E402,F401
+
 
 async def _api_whoami(request: web.Request) -> web.Response:
     """Кто я: флаг админа (для гейта вкладки «Карта» в мини-аппе). Auth — initData."""
@@ -213,6 +219,10 @@ def build_app() -> web.Application:
     app.router.add_post("/api/rating", _api_rating)              # доска почёта (топ таверн по ВВП)
     app.router.add_get("/avatar/{uid}", _api_avatar)            # фото профиля игрока (лидерборд)
     app.router.add_post("/api/reputation", _api_reputation)      # репутация у фракций/NPC
+    app.router.add_post("/api/wonder", _api_wonder)              # общая стройка: состояние
+    app.router.add_post("/api/wonder/contribute", _api_wonder_contribute)  # вложить в стройку
+    app.router.add_post("/api/artel", _api_artel)               # Лавка Артели: каталог+зодары
+    app.router.add_post("/api/artel/buy", _api_artel_buy)       # купить награду за зодары
     app.router.add_post("/api/torg", _api_torg)                  # вкладка Торг (скупщик), гейт
     app.router.add_post("/api/torg/buy", _api_torg_buy)          # купить сырьё у скупщика
     app.router.add_post("/api/auction", _api_auction)            # аукцион: стейт (лот/форма)
