@@ -193,12 +193,27 @@ async def cmd_wonder(
         active = await repo.active_player_count(session)
         target = wmod.phase_target(wdef.phases[0].base_target, active)
         repo.create_wonder(session, key=wmod.FIRST_WONDER, target=target)
+        # опц. «me»: снести ЛИЧНЫЕ тест-награды вызвавшего админа (титулы/фасады/рецепты
+        # из story['artel'] + зодары) — чтобы стартовать с чистого листа, как все.
+        me_line = ""
+        if "me" in args:
+            me = await repo.get_player(session, message.from_user.id, for_update=True)
+            if me is not None:
+                a = (me.story or {}).get("artel") or {}
+                nt = len(a.get("titles") or [])
+                nf = len(a.get("facades") or []) or (1 if a.get("facade") else 0)
+                nr = len(a.get("recipes") or [])
+                z0 = int(getattr(me, "zodar", 0) or 0)
+                st = dict(me.story or {}); st.pop("artel", None); me.story = st
+                me.zodar = 0
+                me_line = (f" Личные тест-награды снесены: титулов {nt}, фасадов {nf}, "
+                           f"рецептов {nr}, зодаров {z0}→0.")
         repo.add_log(session, "admin", message.from_user.id,
-                     f"🏛 /wonder wipe — погашено {len(live_ws)}, сняты буфы {had}, свежее (цель {target})")
+                     f"🏛 /wonder wipe — погашено {len(live_ws)}, сняты буфы {had}, свежее (цель {target}){me_line}")
         await message.answer(
             f"🏛 <b>Вайп выполнен.</b> Погашено активных чудес: <b>{len(live_ws)}</b>, "
             f"снят глоб-бафф: {had or '—'}. Заложено свежее «{wdef.emoji} {wdef.name}»: "
-            f"фаза 1 «{wdef.phases[0].title}», цель <b>{target}</b> очков (активных {active}). "
+            f"фаза 1 «{wdef.phases[0].title}», цель <b>{target}</b> очков (активных {active}).{me_line} "
             f"Готово к открытию всем.")
         return
     if "reset" in args or "stop" in args:    # закрыть текущую стройку (тихо), чтобы начать заново
