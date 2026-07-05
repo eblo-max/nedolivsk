@@ -8,10 +8,10 @@ import CoachTour, { useFirstVisitTour } from './CoachTour'
 import ReputationSheet from './ReputationSheet'
 
 interface Slot { slot: string; slot_name: string; id?: string; name?: string; tier?: number; sprite?: string; trophy?: boolean
-  plus?: number; sharpen?: { next: number; cost: number; chance: number; gain?: string } }
+  plus?: number; rarity?: string; gain?: Record<string, number>; sharpen?: { next: number; cost: number; chance: number; gain?: string } }
 interface Craft { state: string; name?: string; tier?: number; minutes?: number; sprite?: string }
 interface HealOpt { key: string; name: string; emoji: string; hp: number; qty: number }
-interface StashItem { entry: string; id: string; name: string; slot: string; slot_name: string; tier: number; plus: number; sprite: string; trophy: boolean; gain: Record<string, number> }
+interface StashItem { entry: string; id: string; name: string; slot: string; slot_name: string; tier: number; plus: number; sprite: string; trophy: boolean; gain: Record<string, number>; rarity?: string }
 interface PBadge { key: string; emoji: string; short: string; style?: string; tier?: string; shown: boolean }
 interface Prestige { titles: PBadge[]; facades: PBadge[]; has: boolean }
 interface CharState {
@@ -77,10 +77,10 @@ const SAMPLE: CharState = {
   ok: true, name: 'ХОЗЯИН', worn: 3, slots_total: 11,
   hp: { cur: 78, max: 100, regen: 44 }, damage: 25, crit: 12, armor: 18, luck: 8, vylazka: 16,
   equipment: [
-    { slot: 'head', slot_name: 'Голова', id: 'leather_cap', name: 'Шапка трактирщика фарта +2', tier: 2, sprite: 'shapka', plus: 2, sharpen: { next: 3, cost: 195, chance: 90 } },
-    { slot: 'chest', slot_name: 'Грудь', id: 'fartuk', name: 'Фартук трактирщика', tier: 1, sprite: 'bronya', plus: 0, sharpen: { next: 1, cost: 30, chance: 100 } },
+    { slot: 'head', slot_name: 'Голова', id: 'leather_cap', name: 'Шапка трактирщика фарта +2', tier: 2, sprite: 'shapka', plus: 2, rarity: 'common', gain: { armor: 6, vitality: 6 }, sharpen: { next: 3, cost: 195, chance: 90 } },
+    { slot: 'chest', slot_name: 'Грудь', id: 'fartuk', name: 'Фартук трактирщика', tier: 1, sprite: 'bronya', plus: 0, rarity: 'common', gain: { armor: 12, vitality: 6 }, sharpen: { next: 1, cost: 30, chance: 100 } },
     { slot: 'left_hand', slot_name: 'Левая рука' },
-    { slot: 'right_hand', slot_name: 'Правая рука', id: 'master_axe', name: 'Топор хозяйский', tier: 1, sprite: 'master_axe' },
+    { slot: 'right_hand', slot_name: 'Правая рука', id: 'master_axe', name: 'Топор хозяйский', tier: 1, sprite: 'master_axe', rarity: 'common', gain: { damage: 8 } },
     { slot: 'weapon', slot_name: 'Оружие' }, { slot: 'belt', slot_name: 'Пояс' },
     { slot: 'legs', slot_name: 'Ноги' }, { slot: 'boots', slot_name: 'Сапоги' },
     { slot: 'amulet', slot_name: 'Амулет' }, { slot: 'talisman', slot_name: 'Талисман' },
@@ -93,9 +93,11 @@ const SAMPLE: CharState = {
     { key: 'ale1', name: 'Эль', emoji: '🍺', hp: 4, qty: 12 },
   ] },
   stash: [
-    { entry: 'kovsh:2', id: 'kovsh', name: 'Ковш боевой ★★', slot: 'weapon', slot_name: 'Оружие', tier: 2, plus: 0, sprite: 'oruzhie', trophy: false, gain: { damage: 20, crit: 9 } },
-    { entry: 'fang_cleaver:1', id: 'fang_cleaver', name: 'Клычный тесак', slot: 'weapon', slot_name: 'Оружие', tier: 1, plus: 0, sprite: 'fang_cleaver', trophy: false, gain: { damage: 22, crit: 8 } },
-    { entry: 'wolf_totem:1', id: 'wolf_totem', name: 'Тотем зверолова', slot: 'amulet', slot_name: 'Амулет', tier: 1, plus: 0, sprite: 'wolf_totem', trophy: false, gain: { crit: 3, luck: 6, vitality: 5 } },
+    { entry: 'kovsh:2', id: 'kovsh', name: 'Ковш боевой', slot: 'weapon', slot_name: 'Оружие', tier: 2, plus: 0, sprite: 'oruzhie', trophy: false, gain: { damage: 20, crit: 9 }, rarity: 'common' },
+    { entry: 'fang_cleaver:1', id: 'fang_cleaver', name: 'Клычный тесак', slot: 'weapon', slot_name: 'Оружие', tier: 1, plus: 0, sprite: 'fang_cleaver', trophy: false, gain: { damage: 22, crit: 8 }, rarity: 'rare' },
+    { entry: 'wolf_totem:1', id: 'wolf_totem', name: 'Тотем зверолова', slot: 'amulet', slot_name: 'Амулет', tier: 1, plus: 0, sprite: 'wolf_totem', trophy: false, gain: { crit: 3, luck: 6, vitality: 5 }, rarity: 'rare' },
+    { entry: 'orc_axe:3', id: 'orc_axe', name: 'Секира орды', slot: 'weapon', slot_name: 'Оружие', tier: 3, plus: 2, sprite: 'orc_axe', trophy: false, gain: { damage: 57, crit: 20 }, rarity: 'epic' },
+    { entry: 'dragon_fang:2', id: 'dragon_fang', name: 'Клык Древнего Змея', slot: 'weapon', slot_name: 'Оружие', tier: 2, plus: 0, sprite: 'dragon_fang', trophy: true, gain: { damage: 61, crit: 21 }, rarity: 'legendary' },
   ],
   prestige: {
     has: true,
@@ -119,6 +121,25 @@ const CHAR_TOUR = [
   { sel: '[data-tut="forge-btn"]', emoji: '⚒', title: 'Кузница и заточка',
     body: 'Тут куёшь новые вещи из сырья, а надетые — точишь. Заточка заметно усиливает вещь (кнопка в детали вещи). Первая ковка — со скидкой, начни с неё.', place: 'top' as const },
 ]
+
+// Карточка-артефакт для инвентаря: спрайт в самоцвет-гнезде, рамка/сияние по
+// редкости (common→rare→epic→legendary), ярус-звёзды, статы, действие. Вся
+// карточка — кнопка (тап = надеть/снять).
+type GearLike = { sprite?: string; name?: string; tier?: number; plus?: number; trophy?: boolean; rarity?: string; gain?: Record<string, number> }
+function GearCard({ s, action, onTap, busy }: { s: GearLike; action: string; onTap: () => void; busy: boolean }) {
+  const off = action === 'Снять'
+  return (
+    <button className={`inv-card rq-${s.rarity || 'common'}${off ? ' worn' : ''}`} disabled={busy} onClick={onTap}>
+      <div className="inv-gem"><ItemImg className="inv-cimg" s={s.sprite} /></div>
+      {(s.tier || s.plus) ? (
+        <div className="inv-stars">{stars(s.tier)}{s.plus ? <span className="inv-plus">+{s.plus}</span> : null}</div>
+      ) : null}
+      <div className="inv-cname">{s.trophy ? '🏆 ' : ''}{s.name}</div>
+      {s.gain && Object.keys(s.gain).length > 0 && <div className="inv-cgain">{gainStr(s.gain)}</div>}
+      <div className={`inv-cact ${off ? 'off' : 'on'}`}>{action}</div>
+    </button>
+  )
+}
 
 export default function Character() {
   const charTour = useFirstVisitTour('character')
@@ -312,31 +333,20 @@ export default function Character() {
 
         <div className="inv-sec rise">
           <div className="inv-h">🎽 Надето <small>{equipped.length}/{c.slots_total}</small></div>
-          <div className="inv-list">
-            {equipped.length === 0 && <div className="inv-empty">Голышом. Надень что-нибудь из стока или скуй в кузнице.</div>}
-            {equipped.map((s) => (
-              <div key={s.slot} className="inv-row">
-                <ItemImg className="inv-img" s={s.sprite} />
-                <span className="inv-txt"><b>{s.trophy ? '🏆 ' : ''}{s.name} <span className="stars">{stars(s.tier)}</span></b><small>{s.slot_name}</small></span>
-                <button className="inv-btn off" disabled={busy} onClick={() => unequip(s.slot)}>Снять</button>
-              </div>
-            ))}
-          </div>
+          {equipped.length === 0
+            ? <div className="inv-empty">Голышом. Надень что-нибудь из стока или скуй в кузнице.</div>
+            : <div className="inv-grid">{equipped.map((s) => (
+                <GearCard key={s.slot} s={s} action="Снять" busy={busy} onTap={() => unequip(s.slot)} />
+              ))}</div>}
         </div>
 
         <div className="inv-sec rise" style={{ animationDelay: '.04s' }}>
           <div className="inv-h">📦 Сток <small>{stash.length}</small></div>
-          <div className="inv-list">
-            {stash.length === 0 && <div className="inv-empty">Сток пуст. Скуёшь новую вещь в занятый слот — старая ляжет сюда, не пропадёт.</div>}
-            {stash.map((s) => (
-              <div key={s.entry} className="inv-row">
-                <ItemImg className="inv-img" s={s.sprite} />
-                <span className="inv-txt"><b>{s.trophy ? '🏆 ' : ''}{s.name} <span className="stars">{stars(s.tier)}</span></b>
-                  <small>{s.slot_name}{Object.keys(s.gain).length ? ` · ${gainStr(s.gain)}` : ''}</small></span>
-                <button className="inv-btn on" disabled={busy} onClick={() => equip(s.entry)}>Надеть</button>
-              </div>
-            ))}
-          </div>
+          {stash.length === 0
+            ? <div className="inv-empty">Сток пуст. Скуёшь новую вещь в занятый слот — старая ляжет сюда, не пропадёт.</div>
+            : <div className="inv-grid">{stash.map((s) => (
+                <GearCard key={s.entry} s={s} action="Надеть" busy={busy} onTap={() => equip(s.entry)} />
+              ))}</div>}
         </div>
 
         {pr && pr.has && pr.titles.length > 0 && (

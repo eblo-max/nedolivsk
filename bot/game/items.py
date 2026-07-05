@@ -120,6 +120,20 @@ ITEM_SOURCE = {
 }
 
 
+# Редкость вещи (для лут-визуала инвентаря) по источнику: чем труднее добыть —
+# тем «дороже» цвет рамки. common(камень)→rare(синь)→epic(фиолет)→legendary(оранж).
+RARITY_BY_SOURCE = {
+    "forge": "common", "hunt": "rare", "region": "rare", "orc": "epic",
+    "raid_rat": "epic", "raid_troll": "epic", "raid_demon": "legendary",
+    "raid_dragon": "legendary", "wonder": "legendary",
+}
+
+
+def item_rarity(item_id: str) -> str:
+    """Ярус редкости вещи для рамки карточки инвентаря."""
+    return RARITY_BY_SOURCE.get(ITEM_SOURCE.get(item_id, "forge"), "common")
+
+
 def item_budget_points(item: "Item") -> float:
     """Сколько «очков силы» реально сидит в предмете (для теста бюджета)."""
     pts = 0.0

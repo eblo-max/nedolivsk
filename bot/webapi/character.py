@@ -38,7 +38,8 @@ def _character_state(p) -> dict:
             row = {"slot": slot_key, "slot_name": slot_name, "id": item.id,
                    "name": it.display_name(entry), "tier": tier,
                    "sprite": item.sprite or item.id, "trophy": not item.craftable,
-                   "plus": plus}
+                   "plus": plus, "rarity": it.item_rarity(item.id),
+                   "gain": it.item_combat_gain(entry)}
             gain_nxt = it.item_combat_gain(entry, plus + 1) if plus < it.PLUS_MAX else {}
             if gain_nxt:                          # точить есть смысл (боевые статы)
                 nxt = plus + 1
@@ -109,7 +110,8 @@ def _stash_items(p) -> list:
         out.append({"entry": entry, "id": iid, "name": it.display_name(entry),
                     "slot": cit.slot, "slot_name": it.SLOTS.get(cit.slot, cit.slot),
                     "tier": tier, "plus": plus, "sprite": cit.sprite or iid,
-                    "trophy": not cit.craftable, "gain": it.item_combat_gain(entry)})
+                    "trophy": not cit.craftable, "gain": it.item_combat_gain(entry),
+                    "rarity": it.item_rarity(iid)})
     return out
 
 
