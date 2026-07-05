@@ -83,6 +83,7 @@ def _character_state(p) -> dict:
                   "hp": combat.heal_amount(p, k), "qty": int(prods.get(k, 0))}
                  for k in bal.HEAL_VALUES if k in prod.GOODS and int(prods.get(k, 0)) > 0]
 
+    from bot.game import artel_shop
     return {
         "ok": True, "name": (p.first_name or "Хозяин").upper(),
         "worn": len(eq), "slots_total": len(it.SLOTS),
@@ -91,7 +92,25 @@ def _character_state(p) -> dict:
         "vylazka": bal.lucky_chance(cs["luck"]),
         "equipment": slots, "bonuses": bonuses, "orc": orc, "craft": craft,
         "heal": {"can": hp_cur < hp_max, "full": hp_cur >= hp_max, "options": heal_opts},
+        "stash": _stash_items(p),                      # сток неодетых вещей (инвентарь)
+        "prestige": artel_shop.prestige_options_dto(p),  # купленные звания/фасады + выбор
     }
+
+
+def _stash_items(p) -> list:
+    """Неодетые вещи (сток) для инвентаря: имя/слот/ярус/заточка/статы — надеть."""
+    from bot.game import items as it
+    out = []
+    for entry in it.stash_of(p):
+        iid, tier, plus, _aff = it.parse_full(entry)
+        cit = it.CATALOG.get(iid)
+        if cit is None:
+            continue
+        out.append({"entry": entry, "id": iid, "name": it.display_name(entry),
+                    "slot": cit.slot, "slot_name": it.SLOTS.get(cit.slot, cit.slot),
+                    "tier": tier, "plus": plus, "sprite": cit.sprite or iid,
+                    "trophy": not cit.craftable, "gain": it.item_combat_gain(entry)})
+    return out
 
 
 def _forge_state(p) -> dict:
@@ -224,6 +243,45 @@ async def _api_sharpen(request: web.Request) -> web.Response:
             "gold": int(p.gold), "name": it.display_name(eq[slot]),
             "gain": gain,
         }, headers={"Cache-Control": "no-store"})
+
+
+async def _api_gear_equip(request: web.Request) -> web.Response:
+    """Надеть вещь из стока (items.equip): прежняя в слоте — обратно в сток."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import items as it
+    entry = str((body or {}).get("entry") or "")
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        ok, reason = it.equip(p, entry)
+        if not ok:                                     # not_owned | unknown
+            return web.json_response({"ok": False, "error": reason, "character": _character_state(p)})
+        repo.add_log(s, "player", p.id, f"🎽 надел «{it.display_name(entry)}»")
+        await s.commit()
+        return web.json_response({"ok": True, "character": _character_state(p)},
+                                 headers={"Cache-Control": "no-store"})
+
+
+async def _api_gear_unequip(request: web.Request) -> web.Response:
+    """Снять надетую вещь в сток (items.unequip)."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    from bot.game import items as it
+    slot = str((body or {}).get("slot") or "")
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None or not p.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        if not it.unequip(p, slot):
+            return web.json_response({"ok": False, "error": "empty_slot", "character": _character_state(p)})
+        repo.add_log(s, "player", p.id, f"🧥 снял ({it.SLOTS.get(slot, slot)})")
+        await s.commit()
+        return web.json_response({"ok": True, "character": _character_state(p)},
+                                 headers={"Cache-Control": "no-store"})
 
 
 async def _api_heal(request: web.Request) -> web.Response:

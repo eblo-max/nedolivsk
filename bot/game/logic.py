@@ -628,9 +628,13 @@ def claim_craft(player: Player) -> CraftClaim:
     prev = equipment.get(item.slot)
     prev_id, _pt, prev_plus, prev_aff = items.parse_full(prev) if prev else (None, 0, 0, "")
     if prev_id == item_id:
-        plus, affix = prev_plus, prev_aff
+        plus, affix = prev_plus, prev_aff       # перековка того же — заточка/аффикс переезжают
     else:
         plus, affix = 0, roll_affix(tier)
+        if prev:                                # ДРУГАЯ вещь была в слоте — в сток, не терять
+            stash = list(getattr(player, "gear_stash", None) or [])
+            stash.append(prev)
+            player.gear_stash = stash
     equipment[item.slot] = items.make_entry(item_id, tier, plus, affix)
     player.equipment = equipment
     player.craft_item = None

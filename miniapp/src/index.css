@@ -1551,8 +1551,39 @@ body {
 .rep-empty { font-family:Georgia,serif; font-style:italic; font-size:13.5px; color:#c2b594; line-height:1.5; text-align:center; padding:14px 6px; }
 .rep-close { margin-top:12px; flex:none; }
 
-.char-cta { display:flex; gap:9px; padding:0 14px; margin-top:6px; }
-.char-cta .btn { flex:1; margin:0; }
+.char-cta { display:flex; gap:9px; padding:0 14px; margin-top:6px; flex-wrap:wrap; }
+.char-cta .btn { flex:1; min-width:96px; margin:0; }
+
+/* ── Инвентарь (вкладка Персонажа): сток снаряги + выбор звания/фасада ── */
+.inv-sec { margin:10px 12px 0; }
+.inv-h { display:flex; align-items:baseline; gap:8px; margin:0 2px 7px;
+  font-family:var(--head,Georgia),serif; font-weight:800; font-size:14px; color:#e7c98a; }
+.inv-h small { font-family:var(--text),system-ui,sans-serif; font-weight:500; font-size:11px; color:#8f7d5c; }
+.inv-list { display:flex; flex-direction:column; gap:7px; }
+.inv-empty { font-family:var(--text),system-ui,sans-serif; font-size:12px; font-style:italic; color:#8a7f6a; padding:6px 4px; }
+.inv-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:12px;
+  background:linear-gradient(#241708,#180f06); border:1px solid var(--line,#4a3719); }
+.inv-img { width:38px; height:38px; flex:none; object-fit:contain; filter:drop-shadow(0 2px 3px #000a); }
+.inv-txt { flex:1; min-width:0; display:flex; flex-direction:column; }
+.inv-txt b { font-family:var(--text),system-ui,sans-serif; font-weight:700; font-size:13px; color:#f0dfb6;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.inv-txt small { font-family:var(--text),system-ui,sans-serif; font-size:10.5px; color:#a99e85; }
+.inv-txt .stars { color:#e7b54a; font-size:11px; }
+.inv-btn { flex:none; padding:6px 14px; border-radius:9px; font-family:var(--num),system-ui,sans-serif;
+  font-weight:800; font-size:12.5px; cursor:pointer; border:1px solid; }
+.inv-btn.on { color:#241501; background:linear-gradient(#f6d885,#cf9a3c); border-color:#f6dd92; }
+.inv-btn.off { color:#e8c9a0; background:#2a1c0d; border-color:#6a4f28; }
+.inv-btn:disabled { opacity:.5; }
+.inv-badges { display:flex; flex-wrap:wrap; gap:8px; }
+.inv-badge { padding:5px 12px; border-radius:9px; font-family:var(--head,Georgia),serif; font-weight:800;
+  font-size:12.5px; cursor:pointer; opacity:.6; transition:opacity .15s, transform .1s; }
+.inv-badge.sel { opacity:1; outline:2px solid #ffe79a; outline-offset:1px; }
+.inv-badge:active { transform:scale(.96); }
+.inv-badge.plain { color:#c9b48a; background:#241708; border:1px solid #5a4420; }
+.inv-badge:disabled { cursor:default; }
+/* в инвентаре анимации бейджей выключены — чистые состояния dim/выбран (Android-safe) */
+.inv-badges [class*="st-"] { animation:none !important; }
+.inv-badges .st-holo::after { display:none; }
 
 /* ── Торг: ЗАКРЫТО — ставни лавки с замком ── */
 .torg-closed { align-items:center; text-align:center; gap:14px; padding:18px 24px calc(24px + var(--sa-bottom,0px)); }

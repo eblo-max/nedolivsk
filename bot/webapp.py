@@ -60,8 +60,8 @@ from bot.webapi.tavern import (  # noqa: E402,F401 — фасад
 )
 # Персонаж/кузница — bot/webapi/character.py (распил, move-only).
 from bot.webapi.character import (  # noqa: E402,F401 — фасад
-    _api_character, _api_craft_claim, _api_forge, _api_forge_make, _api_heal,
-    _api_sharpen,
+    _api_character, _api_craft_claim, _api_forge, _api_forge_make,
+    _api_gear_equip, _api_gear_unequip, _api_heal, _api_sharpen,
 )
 # Двор/производство/охота — bot/webapi/production.py (распил, move-only).
 from bot.webapi.production import (  # noqa: E402,F401 — фасад
@@ -116,7 +116,7 @@ from bot.webapi.nightrun import (  # noqa: E402,F401 — фасад
 from bot.webapi.wonder import _api_wonder, _api_wonder_contribute  # noqa: E402,F401
 
 # Лавка Артели зодчих (сток зодаров) — bot/webapi/artel.py (Фаза 2).
-from bot.webapi.artel import _api_artel, _api_artel_buy  # noqa: E402,F401
+from bot.webapi.artel import _api_artel, _api_artel_buy, _api_artel_prestige  # noqa: E402,F401
 
 
 async def _api_whoami(request: web.Request) -> web.Response:
@@ -198,6 +198,8 @@ def build_app() -> web.Application:
     app.router.add_post("/api/craft_claim", _api_craft_claim)  # забрать готовую вещь
     app.router.add_post("/api/heal", _api_heal)          # подлечиться (еда из погреба)
     app.router.add_post("/api/sharpen", _api_sharpen)   # заточка вещи (кузница 2.0)
+    app.router.add_post("/api/gear/equip", _api_gear_equip)      # надеть вещь из стока
+    app.router.add_post("/api/gear/unequip", _api_gear_unequip)  # снять вещь в сток
     app.router.add_post("/api/buildings", _api_buildings)    # список пристроек
     app.router.add_post("/api/building", _api_building)       # деталь/производство здания
     app.router.add_post("/api/build_start", _api_build_start)  # заложить пристройку
@@ -223,6 +225,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/wonder/contribute", _api_wonder_contribute)  # вложить в стройку
     app.router.add_post("/api/artel", _api_artel)               # Лавка Артели: каталог+зодары
     app.router.add_post("/api/artel/buy", _api_artel_buy)       # купить награду за зодары
+    app.router.add_post("/api/artel/prestige", _api_artel_prestige)  # выбрать титул/фасад к показу
     app.router.add_post("/api/torg", _api_torg)                  # вкладка Торг (скупщик), гейт
     app.router.add_post("/api/torg/buy", _api_torg_buy)          # купить сырьё у скупщика
     app.router.add_post("/api/auction", _api_auction)            # аукцион: стейт (лот/форма)

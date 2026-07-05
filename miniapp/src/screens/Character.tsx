@@ -11,6 +11,9 @@ interface Slot { slot: string; slot_name: string; id?: string; name?: string; ti
   plus?: number; sharpen?: { next: number; cost: number; chance: number; gain?: string } }
 interface Craft { state: string; name?: string; tier?: number; minutes?: number; sprite?: string }
 interface HealOpt { key: string; name: string; emoji: string; hp: number; qty: number }
+interface StashItem { entry: string; id: string; name: string; slot: string; slot_name: string; tier: number; plus: number; sprite: string; trophy: boolean; gain: Record<string, number> }
+interface PBadge { key: string; emoji: string; short: string; style?: string; tier?: string; shown: boolean }
+interface Prestige { titles: PBadge[]; facades: PBadge[]; has: boolean }
 interface CharState {
   ok: boolean; name: string; worn: number; slots_total: number
   hp: { cur: number; max: number; regen: number }
@@ -19,6 +22,8 @@ interface CharState {
   orc: { damage: number; crit: number; armor: number; luck: number; vitality?: number; income: number } | null
   craft: Craft
   heal: { can: boolean; full: boolean; options: HealOpt[] }
+  stash?: StashItem[]
+  prestige?: Prestige
 }
 interface ForgeCost { key: string; name: string; emoji?: string; need: number; have: number; ok: boolean }
 interface ForgeItem {
@@ -29,6 +34,9 @@ interface ForgeItem {
 interface ForgeState { ok: boolean; pouch: Record<string, number>; items: ForgeItem[]; craft: { state: string; minutes: number } }
 
 const stars = (t?: number) => '★'.repeat(t || 0)
+const GICO: Record<string, string> = { damage: '⚔', crit: '💥', armor: '🛡', luck: '🍀', vitality: '❤' }
+const gainStr = (g: Record<string, number>) =>
+  Object.entries(g).map(([k, v]) => `+${v}${GICO[k] || k}${k === 'crit' ? '%' : ''}`).join(' ')
 const TIER_NAME: Record<number, string> = { 1: 'обычный', 2: 'добротный', 3: 'мастерский' }
 const sprite = (s?: string) => `${import.meta.env.BASE_URL}items/${s}.png`
 
@@ -84,6 +92,23 @@ const SAMPLE: CharState = {
     { key: 'roast', name: 'Жаркое', emoji: '🍖', hp: 12, qty: 4 },
     { key: 'ale1', name: 'Эль', emoji: '🍺', hp: 4, qty: 12 },
   ] },
+  stash: [
+    { entry: 'kovsh:2', id: 'kovsh', name: 'Ковш боевой ★★', slot: 'weapon', slot_name: 'Оружие', tier: 2, plus: 0, sprite: 'oruzhie', trophy: false, gain: { damage: 20, crit: 9 } },
+    { entry: 'fang_cleaver:1', id: 'fang_cleaver', name: 'Клычный тесак', slot: 'weapon', slot_name: 'Оружие', tier: 1, plus: 0, sprite: 'fang_cleaver', trophy: false, gain: { damage: 22, crit: 8 } },
+    { entry: 'wolf_totem:1', id: 'wolf_totem', name: 'Тотем зверолова', slot: 'amulet', slot_name: 'Амулет', tier: 1, plus: 0, sprite: 'wolf_totem', trophy: false, gain: { crit: 3, luck: 6, vitality: 5 } },
+  ],
+  prestige: {
+    has: true,
+    titles: [
+      { key: 'keeper', emoji: '🛡', short: 'Хранитель Твердыни', style: 'gold', shown: false },
+      { key: 'spark', emoji: '⚡', short: 'Искра Артели', style: 'neon', shown: true },
+      { key: 'legend', emoji: '👑', short: 'Вечный Зодчий', style: 'holo', shown: false },
+    ],
+    facades: [
+      { key: 'carved', emoji: '🪵', short: 'Резной фасад', tier: 'bronze', shown: false },
+      { key: 'blazing', emoji: '🔥', short: 'Пылающий герб', tier: 'legendary', shown: true },
+    ],
+  },
 }
 
 const CHAR_TOUR = [
@@ -98,7 +123,7 @@ const CHAR_TOUR = [
 export default function Character() {
   const charTour = useFirstVisitTour('character')
   const { data, loading, error, set, reload } = useApi<CharState>('character', SAMPLE)
-  const [view, setView] = useState<'doll' | 'forge'>('doll')
+  const [view, setView] = useState<'doll' | 'inv' | 'forge'>('doll')
   const [forge, setForge] = useState<ForgeState | null>(null)
   const [pick, setPick] = useState<ForgeItem | null>(null)
   const [pickSlot, setPickSlot] = useState<Slot | null>(null)
@@ -177,6 +202,33 @@ export default function Character() {
     } catch { hapticNotify('warning'); flash('Лечиться нечем') }
     finally { setBusy(false) }
   }
+  async function equip(entry: string) {
+    if (busy) return
+    haptic('medium'); setBusy(true)
+    try {
+      const r = await api<{ character: CharState }>('gear/equip', { entry })
+      set(r.character); hapticNotify('success'); flash('Надето')
+    } catch { hapticNotify('warning'); flash('Не вышло надеть') }
+    finally { setBusy(false) }
+  }
+  async function unequip(slot: string) {
+    if (busy) return
+    haptic('medium'); setBusy(true)
+    try {
+      const r = await api<{ character: CharState }>('gear/unequip', { slot })
+      set(r.character); hapticNotify('success'); flash('Снято в сток')
+    } catch { hapticNotify('warning'); flash('Слот пуст') }
+    finally { setBusy(false) }
+  }
+  async function pickPrestige(kind: 'title' | 'facade', key: string) {
+    if (busy) return
+    haptic('light'); setBusy(true)
+    try {
+      const r = await api<{ prestige: Prestige }>('artel/prestige', { kind, key })
+      set({ ...c, prestige: r.prestige }); hapticNotify('success')
+    } catch { hapticNotify('warning') }
+    finally { setBusy(false) }
+  }
   async function make(item: ForgeItem) {
     if (busy) return
     haptic('medium'); setBusy(true)
@@ -246,6 +298,80 @@ export default function Character() {
     )
   }
 
+  // ── ИНВЕНТАРЬ (сток снаряги + выбор звания/фасада) ──
+  if (view === 'inv') {
+    const equipped = c.equipment.filter((s) => s.id)
+    const stash = c.stash ?? []
+    const pr = c.prestige
+    return (
+      <>
+        <div className="hero rise" style={{ paddingTop: 2 }}>
+          <div className="nm" style={{ fontSize: 22 }}>🎒 ИНВЕНТАРЬ</div>
+          <div className="flavor">«Что надел — то и в бой. Остальное лежит в мешке, ждёт своего часа.»</div>
+        </div>
+
+        <div className="inv-sec rise">
+          <div className="inv-h">🎽 Надето <small>{equipped.length}/{c.slots_total}</small></div>
+          <div className="inv-list">
+            {equipped.length === 0 && <div className="inv-empty">Голышом. Надень что-нибудь из стока или скуй в кузнице.</div>}
+            {equipped.map((s) => (
+              <div key={s.slot} className="inv-row">
+                <ItemImg className="inv-img" s={s.sprite} />
+                <span className="inv-txt"><b>{s.trophy ? '🏆 ' : ''}{s.name} <span className="stars">{stars(s.tier)}</span></b><small>{s.slot_name}</small></span>
+                <button className="inv-btn off" disabled={busy} onClick={() => unequip(s.slot)}>Снять</button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="inv-sec rise" style={{ animationDelay: '.04s' }}>
+          <div className="inv-h">📦 Сток <small>{stash.length}</small></div>
+          <div className="inv-list">
+            {stash.length === 0 && <div className="inv-empty">Сток пуст. Скуёшь новую вещь в занятый слот — старая ляжет сюда, не пропадёт.</div>}
+            {stash.map((s) => (
+              <div key={s.entry} className="inv-row">
+                <ItemImg className="inv-img" s={s.sprite} />
+                <span className="inv-txt"><b>{s.trophy ? '🏆 ' : ''}{s.name} <span className="stars">{stars(s.tier)}</span></b>
+                  <small>{s.slot_name}{Object.keys(s.gain).length ? ` · ${gainStr(s.gain)}` : ''}</small></span>
+                <button className="inv-btn on" disabled={busy} onClick={() => equip(s.entry)}>Надеть</button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {pr && pr.has && pr.titles.length > 0 && (
+          <div className="inv-sec rise" style={{ animationDelay: '.08s' }}>
+            <div className="inv-h">🏛 Звание <small>у имени</small></div>
+            <div className="inv-badges">
+              {pr.titles.map((t) => (
+                <button key={t.key} className={`inv-badge st-${t.style || 'gold'}${t.shown ? ' sel' : ''}`}
+                  disabled={busy} onClick={() => pickPrestige('title', t.key)}>{t.emoji} {t.short}</button>
+              ))}
+              <button className={`inv-badge plain${pr.titles.every((t) => !t.shown) ? ' sel' : ''}`}
+                disabled={busy} onClick={() => pickPrestige('title', '')}>авто · высший</button>
+            </div>
+          </div>
+        )}
+        {pr && pr.has && pr.facades.length > 0 && (
+          <div className="inv-sec rise" style={{ animationDelay: '.1s' }}>
+            <div className="inv-h">🪧 Фасад <small>вывески</small></div>
+            <div className="inv-badges">
+              {pr.facades.map((f) => (
+                <button key={f.key} className={`inv-badge rar-${f.tier || 'gold'}${f.shown ? ' sel' : ''}`}
+                  disabled={busy} onClick={() => pickPrestige('facade', f.key)}>{f.emoji} {f.short}</button>
+              ))}
+              <button className={`inv-badge plain${pr.facades.every((f) => !f.shown) ? ' sel' : ''}`}
+                disabled={busy} onClick={() => pickPrestige('facade', '')}>без фасада</button>
+            </div>
+          </div>
+        )}
+
+        <button className="btn rise" onClick={() => { haptic('light'); setView('doll') }}>← Персонаж</button>
+        {toast && <div className="toast">{toast}</div>}
+      </>
+    )
+  }
+
   // ── ПЕРСОНАЖ (кукла) ──
   return (
     <>
@@ -308,6 +434,7 @@ export default function Character() {
       <div className="flavor rise" style={{ margin: '8px 14px 4px', fontSize: 13.5, animationDelay: '.14s' }}>«Голый трактирщик — смешной трактирщик. Загляни в кузницу.»</div>
       <div className="char-cta rise" style={{ animationDelay: '.16s' }}>
         <button className="btn gold" data-tut="forge-btn" onClick={openForge}>⚒ В кузницу</button>
+        <button className="btn" onClick={() => { haptic('light'); setView('inv') }}>🎒 Инвентарь</button>
         <button className="btn" onClick={() => { haptic('light'); setRepOpen(true) }}>🤝 Репутация</button>
       </div>
       {pick && <ItemSheet item={pick} worn={pickSlot} busy={busy} craftState={c.craft.state} onMake={make} onSharpen={sharpen} onClose={() => { setPick(null); setPickSlot(null) }} />}

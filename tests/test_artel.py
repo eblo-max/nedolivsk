@@ -148,6 +148,47 @@ def test_exotic_styles_present_and_legend_is_holo():
     assert d["f_blazing"]["tier"] == "legendary"   # фасады — по-прежнему ярус
 
 
+def test_title_shown_selection_overrides_highest():
+    p = _pl(zodar=9999)
+    shop.apply(p, shop.get("t_keeper"))              # ранг ниже
+    shop.apply(p, shop.get("t_spark"))              # ранг выше → авто-высший
+    assert shop.top_title(p)["key"] == "spark"
+    assert shop.set_title_shown(p, "keeper") is True
+    assert shop.top_title(p)["key"] == "keeper"     # показывается выбранный
+    assert shop.set_title_shown(p, "") is True      # снять выбор → снова авто
+    assert shop.top_title(p)["key"] == "spark"
+    assert shop.set_title_shown(p, "legend") is False   # не владеет — нельзя
+
+
+def test_facades_collected_and_selectable():
+    p = _pl(zodar=9999)
+    shop.apply(p, shop.get("f_carved"))
+    shop.apply(p, shop.get("f_gilded"))             # оба куплены, новый выбран
+    assert shop.owns(p, shop.get("f_carved")) and shop.owns(p, shop.get("f_gilded"))
+    assert shop.facade_badge(p)["key"] == "gilded"
+    assert shop.set_facade(p, "carved") is True
+    assert shop.facade_badge(p)["key"] == "carved"
+    assert shop.set_facade(p, "") is True           # снять вывеску
+    assert shop.facade_badge(p) is None
+    assert shop.set_facade(p, "crested") is False   # не владеет
+
+
+def test_facade_backward_compat_single_string():
+    p = _pl(story={"artel": {"facade": "carved"}})   # старый формат — одиночный фасад
+    assert shop.owns(p, shop.get("f_carved"))        # владение читается из списка-конверсии
+    assert shop.facade_badge(p)["key"] == "carved"
+
+
+def test_prestige_options_dto_shape():
+    p = _pl(zodar=9999)
+    shop.apply(p, shop.get("t_zodchy"))
+    shop.apply(p, shop.get("f_carved"))
+    dto = shop.prestige_options_dto(p)
+    assert dto["has"] and len(dto["titles"]) == 1 and len(dto["facades"]) == 1
+    assert dto["titles"][0]["key"] == "zodchy" and dto["titles"][0]["shown"] is True
+    assert dto["facades"][0]["shown"] is True
+
+
 def test_zodar_not_earnable_or_tradeable_here():
     """Инвариант bind-on-earn: в Лавке зодар только ТРАТЯТ (кран/торговля — нигде)."""
     import inspect

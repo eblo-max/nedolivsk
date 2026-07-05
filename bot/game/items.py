@@ -558,6 +558,47 @@ def wonder_gear_locked(player, item_id: str) -> bool:
     return not artel_shop.owns_recipe(player, item_id)
 
 
+# ── Инвентарь: сток снятых/накрафченных вещей + надеть/снять ──────────────
+def stash_of(player) -> list[str]:
+    """Список entry-строк в стоке снаряги (неодетые вещи игрока)."""
+    return list(getattr(player, "gear_stash", None) or [])
+
+
+def unequip(player, slot: str) -> bool:
+    """Снять надетую вещь в сток. False — слот пуст/некорректен."""
+    eq = dict(getattr(player, "equipment", None) or {})
+    entry = eq.get(slot)
+    if not entry:
+        return False
+    stash = stash_of(player)
+    stash.append(entry)
+    del eq[slot]
+    player.equipment = eq
+    player.gear_stash = stash
+    return True
+
+
+def equip(player, entry: str) -> tuple[bool, str]:
+    """Надеть вещь ИЗ СТОКА в её слот. Старая в слоте — обратно в сток (свободная
+    смена, ничего не теряется). reason: not_owned | unknown."""
+    stash = stash_of(player)
+    if entry not in stash:
+        return False, "not_owned"
+    item_id, _t, _p, _a = parse_full(entry)
+    it = CATALOG.get(item_id)
+    if it is None:
+        return False, "unknown"
+    eq = dict(getattr(player, "equipment", None) or {})
+    stash.remove(entry)                         # ровно одну копию
+    old = eq.get(it.slot)
+    if old:
+        stash.append(old)                       # прежняя — в сток
+    eq[it.slot] = entry
+    player.equipment = eq
+    player.gear_stash = stash
+    return True, ""
+
+
 def equipped_items(equipment: dict | None) -> list[tuple[Item, int]]:
     """[(предмет, ярус), ...] — статы предмета умножаются на ярус."""
     if not equipment:

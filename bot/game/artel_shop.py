@@ -85,10 +85,26 @@ def get(item_id: str) -> Reward | None:
 
 
 def _artel(player) -> dict:
-    """Состояние Лавки игрока (владение): {titles:[...], facade: id|None, recipes:[...]}"""
+    """Владение игрока: titles[] (купленные звания), facades[] (купленные фасады),
+    facade (ВЫБРАННЫЙ к показу), title_shown (ВЫБРАННОЕ звание; None=авто-высший),
+    recipes[]. Обр.совместимость: одиночный старый `facade` → список facades."""
     a = (getattr(player, "story", None) or {}).get("artel") or {}
-    return {"titles": list(a.get("titles") or []), "facade": a.get("facade"),
+    facades = list(a.get("facades") or [])
+    if not facades and a.get("facade"):
+        facades = [a["facade"]]
+    return {"titles": list(a.get("titles") or []),
+            "facades": facades, "facade": a.get("facade"),
+            "title_shown": a.get("title_shown"),
             "recipes": list(a.get("recipes") or [])}
+
+
+def _save(player, a: dict) -> None:
+    """Записать состояние Лавки (переприсваивание story — для JSONB)."""
+    st = dict(player.story or {})
+    st["artel"] = {"titles": a["titles"], "facades": a["facades"],
+                   "facade": a.get("facade"), "title_shown": a.get("title_shown"),
+                   "recipes": a["recipes"]}
+    player.story = st
 
 
 def owns(player, r: Reward) -> bool:
@@ -96,7 +112,7 @@ def owns(player, r: Reward) -> bool:
     if r.kind == "title":
         return r.payload in a["titles"]
     if r.kind == "facade":
-        return a["facade"] == r.payload
+        return r.payload in a["facades"]        # владение = в списке купленных
     if r.kind == "recipe":
         return r.payload in a["recipes"]
     return False
@@ -119,19 +135,52 @@ def owned_ids(player) -> set[str]:
 
 
 def apply(player, r: Reward) -> None:
-    """Выдать награду (мутирует player.story — переприсваивание для JSONB)."""
+    """Выдать награду. Титул/фасад копятся в списки; новый фасад сразу выбирается
+    к показу (можно потом сменить в инвентаре)."""
     a = _artel(player)
     if r.kind == "title":
         if r.payload not in a["titles"]:
             a["titles"].append(r.payload)
     elif r.kind == "facade":
-        a["facade"] = r.payload
+        if r.payload not in a["facades"]:
+            a["facades"].append(r.payload)
+        a["facade"] = r.payload                 # новый фасад — сразу на вывеску
     elif r.kind == "recipe":
         if r.payload not in a["recipes"]:
             a["recipes"].append(r.payload)
-    st = dict(player.story or {})
-    st["artel"] = a
-    player.story = st
+    _save(player, a)
+
+
+def set_title_shown(player, payload: str) -> bool:
+    """Выбрать показываемое звание (payload; '' — авто-высший). False — не владеет."""
+    a = _artel(player)
+    if payload and payload not in a["titles"]:
+        return False
+    a["title_shown"] = payload or None
+    _save(player, a)
+    return True
+
+
+def set_facade(player, payload: str) -> bool:
+    """Выбрать фасад вывески (payload; '' — снять). False — не владеет."""
+    a = _artel(player)
+    if payload and payload not in a["facades"]:
+        return False
+    a["facade"] = payload or None
+    _save(player, a)
+    return True
+
+
+def prestige_options_dto(player) -> dict:
+    """Купленные звания/фасады для выбора в инвентаре: бейдж + флаг `shown`."""
+    a = _artel(player)
+    shown = top_title(player)
+    titles = [{"key": k, **TITLE_BADGE[k], "shown": bool(shown and shown["key"] == k)}
+              for k in TITLE_RANK if k in a["titles"]]
+    fsel = a.get("facade")
+    facades = [{"key": k, **FACADE_BADGE[k], "shown": k == fsel}
+               for k in FACADE_RANK if k in a["facades"]]
+    return {"titles": titles, "facades": facades, "has": bool(titles or facades)}
 
 
 # ── Показ престижа: титул у имени + фасад вывески ──────────────────────────
@@ -184,18 +233,24 @@ def reward_style(r: Reward) -> str:
 
 
 def top_title(player) -> dict | None:
-    """Высший купленный титул для показа у имени: {key,emoji,short,tier}. None — нет."""
-    owned = set(_artel(player)["titles"])
-    for key in reversed(TITLE_RANK):            # с самого престижного вниз
+    """Показываемое звание у имени: ВЫБРАННОЕ (title_shown) если владеет, иначе
+    авто-высший по рангу. {key,emoji,short,style}. None — нет титулов."""
+    a = _artel(player)
+    owned = set(a["titles"])
+    chosen = a.get("title_shown")
+    if chosen and chosen in owned and chosen in TITLE_BADGE:
+        return {"key": chosen, **TITLE_BADGE[chosen]}
+    for key in reversed(TITLE_RANK):            # авто — с самого престижного вниз
         if key in owned:
             return {"key": key, **TITLE_BADGE[key]}
     return None
 
 
 def facade_badge(player) -> dict | None:
-    """Купленный фасад вывески: {key,emoji,short,tier}. None — нет."""
-    f = _artel(player)["facade"]
-    return {"key": f, **FACADE_BADGE[f]} if f in FACADE_BADGE else None
+    """ВЫБРАННЫЙ фасад вывески (если куплен): {key,emoji,short,tier}. None — нет/снят."""
+    a = _artel(player)
+    f = a.get("facade")
+    return {"key": f, **FACADE_BADGE[f]} if f and f in a["facades"] and f in FACADE_BADGE else None
 
 
 def prestige_dto(player) -> dict:

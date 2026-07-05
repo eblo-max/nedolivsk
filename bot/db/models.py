@@ -56,6 +56,7 @@ class Player(Base):
 
     # Экипировка и крафт
     equipment: Mapped[dict] = mapped_column(_JDICT, default=dict)
+    gear_stash: Mapped[list] = mapped_column(_JLIST, default=list)   # снятые/накрафченные вещи (сток)
     craft_item: Mapped[str | None] = mapped_column(String(32))
     craft_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     craft_notified: Mapped[bool] = mapped_column(default=False)

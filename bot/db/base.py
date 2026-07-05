@@ -367,3 +367,8 @@ async def create_tables() -> None:
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "zodar INTEGER NOT NULL DEFAULT 0"
         ))
+        # Сток снаряги (инвентарь): снятые/накрафченные вещи вне слотов.
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
+            "gear_stash JSONB NOT NULL DEFAULT '[]'::jsonb"
+        ))

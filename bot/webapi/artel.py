@@ -63,3 +63,28 @@ async def _api_artel_buy(request: web.Request) -> web.Response:
         await s.commit()
         out = {"ok": True, "bought": r.id, **_state(p)}
     return web.json_response(out, headers={"Cache-Control": "no-store"})
+
+
+async def _api_artel_prestige(request: web.Request) -> web.Response:
+    """Сменить ПОКАЗЫВАЕМОЕ звание/фасад (выбор из купленных). Не про обкатку —
+    оперирует тем, чем игрок уже владеет; поэтому без _gated."""
+    uid, body = await _auth(request)
+    if uid is None:
+        return body
+    kind = str((body or {}).get("kind") or "")           # 'title' | 'facade'
+    key = str((body or {}).get("key") or "")             # payload или '' (снять/авто)
+    async with session_factory() as s:
+        p = await repo.get_player(s, uid, for_update=True)
+        if p is None:
+            return web.json_response({"ok": False, "error": "no_player"})
+        if kind == "title":
+            ok = artel_shop.set_title_shown(p, key)
+        elif kind == "facade":
+            ok = artel_shop.set_facade(p, key)
+        else:
+            return web.json_response({"ok": False, "error": "bad"})
+        if not ok:
+            return web.json_response({"ok": False, "error": "not_owned"})
+        await s.commit()
+        out = {"ok": True, "prestige": artel_shop.prestige_options_dto(p)}
+    return web.json_response(out, headers={"Cache-Control": "no-store"})
