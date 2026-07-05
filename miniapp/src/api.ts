@@ -54,6 +54,8 @@ export function errText(e: unknown, fallback = 'Не вышло'): string {
     case 'no_tavern': return 'Сначала создай таверну'
     case 'no_wonder': return 'Стройка уже завершена или ещё не начата'
     case 'empty': return 'Нечего вложить — выбери, что нести'
+    case 'locked': return 'Нужен рецепт из Лавки Артели'
+    case 'owned': return 'Уже куплено'
     default: return code ? `Ошибка: ${code}` : fallback
   }
 }

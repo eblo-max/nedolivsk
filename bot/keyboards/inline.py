@@ -781,7 +781,7 @@ def auction_price_kb(good: str, qty: int, prices: list[int]) -> InlineKeyboardMa
 
 
 def forge_kb(player: Player | None = None) -> InlineKeyboardMarkup:
-    from bot.game.items import CATALOG, REGION_GEAR, TIER_STARS, equipped_tier
+    from bot.game.items import CATALOG, REGION_GEAR, WONDER_GEAR, TIER_STARS, equipped_tier
 
     equipment = getattr(player, "equipment", None) if player else None
     region = getattr(player, "region", None) if player else None
@@ -791,6 +791,8 @@ def forge_kb(player: Player | None = None) -> InlineKeyboardMarkup:
             continue
         if item.id in REGION_GEAR and REGION_GEAR[item.id] != region:
             continue                  # чужой региональный пояс — скрафтить нельзя, скрываем
+        if item.id in WONDER_GEAR:    # эксклюзив зодчих — куётся только в мини-аппе (там и рецепт)
+            continue
         tier = equipped_tier(equipment, item.id)
         label = f"{item.name} {TIER_STARS[tier]}" if tier else item.name
         kb.button(text=label, callback_data=f"forge_item:{item.id}")
@@ -904,6 +906,8 @@ def production_kb(player, tavern, building) -> InlineKeyboardMarkup:
                       style="success")
         elif state == "none":
             for recipe in prod.RECIPES[bid]:
+                if recipe in prod.EXCLUSIVE:      # эксклюзив зодчих — варится только в мини-аппе
+                    continue
                 g = prod.GOODS[recipe]
                 kb.button(text=f"{g.emoji} {g.name}", callback_data=f"rcp:{bid}:{recipe}")
         kb.button(text="↩️ К пристройкам", callback_data="buildings")

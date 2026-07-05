@@ -56,13 +56,12 @@ def _nightrun_state(p) -> dict:
         base["run"] = None
         # фляга на дорожку: что есть в погребе (глоток красит подход на всю ночь)
         prods = (p.tavern.products if p.tavern else None) or {}
+        # все фляги из погреба; хинт — ЭФФЕКТ В ХОДКЕ (подход/выносливость), не урон
         base["flask"] = [
             {"key": k, "name": prodm.GOODS[k].name, "emoji": prodm.GOODS[k].emoji,
-             "hint": hint, "qty": int(prods.get(k, 0))}
-            for k, hint in (("ale1", "смелее в драке"), ("ale2", "смелее в драке"),
-                            ("ale3", "смелее в драке"), ("mead", "легче тишком"),
-                            ("wine", "фарт в лихо"), ("sbiten", "гасит дурноту города"))
-            if k in prodm.GOODS and int(prods.get(k, 0)) > 0]
+             "hint": nr.flask_hint(k), "qty": int(prods.get(k, 0))}
+            for k in bal.FLASK_EFFECTS
+            if k in prodm.GOODS and int(prods.get(k, 0)) > 0 and nr.flask_hint(k) != "—"]
         return base
     st = run.get("state")
     r = {"leg": run["leg"], "state": st, "hp": run["hp"],

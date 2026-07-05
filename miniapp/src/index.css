@@ -2092,9 +2092,29 @@ body {
 .wd2-artel > span:nth-child(2){ font-weight:700; font-size:16px; letter-spacing:-.2px; }
 .wd2-artel small { color:#1a1206; opacity:.55; font-weight:500; font-size:11.5px; }
 .wd2-x { width:32px; height:32px; background:#00000059; border:1px solid #ffffff1c; font-size:13px; }
-/* Apple-сдержанность: приглушить игровую атмосферу hero */
-.wd2-hero::after { box-shadow:inset 0 0 70px 14px #0a06029e, inset 0 20px 36px -22px #000; }
-.wd2-aurora { opacity:.7; }
+/* ══ vibrant 2026: градиент-меш · стекло · крупная типографика ══ */
+.wd2 { background:#141019; }
+.wd2-hero { height:200px; background:
+  radial-gradient(85% 68% at 50% 120%, #e7b54a33, transparent 60%),
+  radial-gradient(66% 58% at 16% 28%, #7a4fd040, transparent 66%),
+  radial-gradient(64% 56% at 86% 22%, #d0517e30, transparent 66%),
+  linear-gradient(#1d1628,#100b17); }
+.wd2-aurora { opacity:1; mix-blend-mode:screen; }
+.wd2-hero::after { box-shadow:inset 0 0 74px 12px #0b0713a6, inset 0 20px 40px -24px #000; }
+.wd2-pct2 { font-size:50px; letter-spacing:-2.5px;
+  background:linear-gradient(180deg,#fff3cc,#e7b54a 62%,#d99a3a); -webkit-background-clip:text; background-clip:text;
+  -webkit-text-fill-color:transparent; color:transparent; }
+.wd2-pct2 i { -webkit-text-fill-color:#e7b54a; color:#e7b54a; }
+.wd2-name { color:#f6efe0; }
+.wd2-give, .wd2-board { background:#ffffff0a; border-color:#ffffff18; box-shadow:inset 0 1px 0 #ffffff16; }
+.wd2-plaque { background:#ffffff0a; }
+.wd2-gic { background:#ffffff14; }
+.wd2-chip { background:rgba(231,181,74,.2); }
+.wd2-chip:last-child { background:linear-gradient(#f2c96a,#e0a63e); }
+.wd2-artel { background:linear-gradient(#f2c96a,#e0a63e); box-shadow:0 12px 34px -8px #e7b54a70; }
+.wd2-substats { border-top-color:#ffffff18; border-bottom-color:#ffffff18; }
+.wd2-brow.r1 { background:rgba(231,181,74,.16); }
+.wd2-seg i { background:linear-gradient(90deg,#e7b54a,#f2c96a); }
 
 /* ── Лавка Артели (ArtelSheet) ── */
 .ar-sheet { position:relative; width:min(560px,94vw); max-height:88vh; overflow-y:auto;
@@ -2119,7 +2139,20 @@ body {
   font-family:var(--num),system-ui,sans-serif; font-weight:800 !important; color:#241501 !important;
   border-color:#f6dd92 !important; background:linear-gradient(var(--gold-2,#f6d885),#cf9a3c) !important; }
 .ar-buy:disabled { opacity:.4; }
-.ar-have { flex:none; font-family:var(--text),system-ui,sans-serif; font-size:12.5px; color:#a8d99a; }
+.ar-have { flex:none; font-family:var(--text),system-ui,sans-serif; font-size:12.5px; color:#a8d99a; align-self:center; }
+/* секции каталога (Ф2b): престиж vs эксклюзив-рецепты */
+.ar-group { margin-top:6px; }
+.ar-group + .ar-group { margin-top:14px; }
+.ar-sec { display:flex; flex-direction:column; gap:1px; margin:2px 2px 8px;
+  font-family:var(--head,Georgia),serif; font-weight:800; font-size:13.5px; color:#e7c98a; letter-spacing:.2px; }
+.ar-sec small { font-family:var(--text),system-ui,sans-serif; font-weight:500; font-size:11px; color:#8f7d5c; }
+.ar-card.recipe { align-items:flex-start; border-color:#7a5a24;
+  background:linear-gradient(#2c1d0a,#1c1206); }
+.ar-card.recipe .ar-emo { font-size:24px; margin-top:1px; }
+.ar-eff { display:inline-block; margin:3px 0 4px; padding:2px 8px; border-radius:8px;
+  font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:11.5px; color:#241501;
+  background:linear-gradient(#f6d885,#d8a340); }
+.ar-where { margin-top:4px; font-family:var(--text),system-ui,sans-serif; font-size:11px; color:#c79a5e; }
 .brs-mine-x { flex:none; width:46px; border-radius:14px; cursor:pointer; font-size:17px; color:#f0a08a;
   background:linear-gradient(#2c1410,#1a0d08); border:1px solid #7a3b2e; }
 .brs-mine-x:active { transform:scale(.96); }

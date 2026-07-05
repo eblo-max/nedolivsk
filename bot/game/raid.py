@@ -245,15 +245,41 @@ def player_power(player) -> int:
     return max(1, round(base * (1 + crit)))
 
 
+# В рейде у игрока нет HP/уворота (это DPS-гонка по боссу, он не бьёт в ответ),
+# поэтому «сытость» (hp-фляга) и «ловкость» (уворот-фляга) НЕ пропадали бы зря —
+# конвертируем их в доп. урон за удар: сытый/ловкий боец бьёт крепче и чище.
+# Так эксклюзив-«Пир зодчих» (+45❤) и обычные жаркое/пирог/мёд перестают быть
+# мёртвым грузом в рейде. dmg/crit/antidote применяются как есть.
+RAID_HP_TO_DMG = 3      # 1 урон за каждые 3 ❤ фляги (feast 45 → +15 урона)
+RAID_DODGE_TO_DMG = 4   # 1 урон за каждые 4% уворота фляги (loaf 28 → +7 урона)
+
+
 def flask_mods(keys: list[str] | None) -> dict:
-    """Суммарный боевой эффект выпитого на рейд: урон/крит/противоядие."""
+    """Суммарный боевой эффект выпитого на рейд: урон (вкл. конверсию hp/уворота)/
+    крит/противоядие. См. RAID_HP_TO_DMG — почему сытость/ловкость идут в урон."""
     out = {"dmg": 0, "crit": 0, "antidote": False}
     for k in keys or []:
         eff = balance.FLASK_EFFECTS.get(k) or {}
-        out["dmg"] += eff.get("dmg", 0)
+        out["dmg"] += (eff.get("dmg", 0)
+                       + eff.get("hp", 0) // RAID_HP_TO_DMG
+                       + eff.get("dodge", 0) // RAID_DODGE_TO_DMG)
         out["crit"] += eff.get("crit", 0)
         out["antidote"] = out["antidote"] or bool(eff.get("antidote"))
     return out
+
+
+def flask_label(key: str) -> str:
+    """Что фляга даёт ИМЕННО В РЕЙДЕ (показ=действие: та же flask_mods, что и в бою).
+    Метка из FLASK_EFFECTS («+45❤») в рейде врала бы — hp/уворот тут идут в урон."""
+    m = flask_mods([key])
+    parts = []
+    if m["dmg"]:
+        parts.append(f"+{m['dmg']} урона")
+    if m["crit"]:
+        parts.append(f"+{m['crit']}% крита")
+    if m["antidote"]:
+        parts.append("снимает проклятье")
+    return ", ".join(parts) or "—"
 
 
 def player_damage(player, rng: random.Random | None = None,

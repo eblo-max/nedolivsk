@@ -714,14 +714,14 @@ def production_screen(building, player: Player, tavern: Tavern) -> str:
             status = "🍽 Готово — забирай в погреб!"
         else:
             status = "😴 Простаивает — выбери, что готовить."
-        stock = " · ".join(f"{prod.GOODS[rc].emoji} {prods.get(rc, 0)}"
-                           for rc in prod.RECIPES[building.id])
+        rlist = [rc for rc in prod.RECIPES[building.id] if rc not in prod.EXCLUSIVE]
+        stock = " · ".join(f"{prod.GOODS[rc].emoji} {prods.get(rc, 0)}" for rc in rlist)
         recipes = [
             _recipe_line(player, prod.GOODS[rc].emoji, prod.GOODS[rc].name,
                          prod.recipe_output(building.id, rc, L),
                          f"{prod.recipe_hours(building.id, rc)} ч",
                          prod.recipe_inputs(building.id, rc, L))
-            for rc in prod.RECIPES[building.id]]
+            for rc in rlist]
         return "\n".join([head, "", f"🛢 В погребе: {stock}", status, "",
                           "\n\n".join(recipes)])
 

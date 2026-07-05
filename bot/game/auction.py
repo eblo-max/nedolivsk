@@ -36,7 +36,8 @@ def is_due(tavern, now: datetime | None = None) -> bool:
 
 def sellable_goods(tavern) -> list[str]:
     prods = tavern.products or {}
-    return [k for k in prod.GOODS if prods.get(k, 0) > 0]
+    # эксклюзив зодчих на аукцион НПС не выставляется — только P2P на бирже
+    return [k for k in prod.GOODS if prods.get(k, 0) > 0 and prod.npc_tradable(k)]
 
 
 def fair_value(world, good: str) -> float:
@@ -70,8 +71,8 @@ def create(player, tavern, good: str, qty: int, unit_min: int) -> tuple[bool, st
     if active(tavern):
         return False, "busy"
     stock = int((tavern.products or {}).get(good, 0))
-    if good not in prod.GOODS or stock <= 0:
-        return False, "empty"
+    if good not in prod.GOODS or stock <= 0 or not prod.npc_tradable(good):
+        return False, "empty"                 # эксклюзив зодчих на аукцион нельзя (серверный гейт)
     if unit_min < 1:
         return False, "price"
     qty = max(1, min(qty, stock, balance.AUCTION_QTY_MAX))

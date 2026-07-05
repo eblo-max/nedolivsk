@@ -290,7 +290,8 @@ def _retail_demand(
     premium = int(demand * share)
     commoner = demand - premium
 
-    keys = [k for k in products if k in production.DRINKS and products[k] > 0]
+    keys = [k for k in products if k in production.DRINKS and products[k] > 0
+            and production.npc_tradable(k)]   # эксклюзив зодчих гости не пьют — только биржа
     by_price = sorted(keys, key=lambda k: production.DRINKS[k].price)
     # Состоятельные пьют только «дорогое пойло» (≥ порога), дороже первым. Остаток
     # бюджета (не нашлось дорогого) = богачи, что уйдут недовольными.
@@ -313,7 +314,8 @@ def _retail_demand(
     # еда не простаивала вечно за спиной дорогой.
     hunger = int(tavern.capacity * balance.FOOD_DEMAND_PER_CAPACITY * hours
                  * demand_mult * food_mult)
-    foods = [k for k in products if k in production.FOODS and products[k] > 0]
+    foods = [k for k in products if k in production.FOODS and products[k] > 0
+             and production.npc_tradable(k)]   # эксклюзив зодчих гости не едят — только биржа
     by_food_price = sorted(foods, key=lambda k: production.FOODS[k].price)
     food_premium = int(hunger * share)
     food_common = hunger - food_premium
@@ -542,7 +544,7 @@ def craft_state(player: Player) -> tuple[str, int]:
 @dataclass
 class CraftStart:
     ok: bool
-    reason: str = ""  # busy | unknown | not_enough | max_tier
+    reason: str = ""  # busy | unknown | locked | not_enough | max_tier
     item: object = None
     tier: int = 1
     cost: dict | None = None
@@ -563,6 +565,8 @@ def start_craft(player: Player, item_id: str) -> CraftStart:
     item = items.CATALOG.get(item_id)
     if item is None or not item.craftable:   # эксклюзив боссов не куётся
         return CraftStart(ok=False, reason="unknown")
+    if items.wonder_gear_locked(player, item_id):   # эксклюзив зодчих — нужен рецепт из Лавки
+        return CraftStart(ok=False, reason="locked", item=item)
 
     tier = next_craft_tier(player, item_id)
     if tier > items.TIER_MAX:

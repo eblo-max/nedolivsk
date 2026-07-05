@@ -178,17 +178,45 @@ def satchel_value(satchel: dict) -> int:
 # Фляга на ходку: глоток красит ПОДХОД на всю ночь (эль — драка, медовуха —
 # тишком, вино — азарт), сбитень гасит штраф городской ситуации.
 FLASK_APPROACH = {"ale1": "fight", "ale2": "fight", "ale3": "fight",
-                  "mead": "sneak", "wine": "gamble"}
+                  "mead": "sneak", "wine": "gamble",
+                  # эксклюзив зодчих (Ф2b): под свой подход, как обычные фляги.
+                  # zodchy_feast (hp) approach-бонуса не даёт — вместо этого стартовая
+                  # выносливость (см. start(): hp-фляги поднимают HP ходки).
+                  "thunder_sbiten": "fight", "artel_nectar": "gamble", "mason_loaf": "sneak"}
 FLASK_P_BONUS = 0.06
+
+
+def _flask_hp_bonus(flask: list[str] | None) -> int:
+    """Суммарный +HP на ходку от выпитых hp-фляг (жаркое/пирог/Пир зодчих).
+    В ночной ходке HP — главный ресурс (засады/привалы), поэтому «сытость» даёт
+    выносливость: глубже заходишь, дольше держишься."""
+    return sum((balance.FLASK_EFFECTS.get(k) or {}).get("hp", 0) for k in (flask or []))
+
+
+def flask_hint(key: str) -> str:
+    """Что фляга даёт ИМЕННО В НОЧНОЙ ХОДКЕ (показ=действие: подход из FLASK_APPROACH
+    + выносливость от hp). Метка урона/крита из FLASK_EFFECTS тут врала бы — в ходке
+    исход решают шанс-под-подход и запас HP, а не урон за удар."""
+    if key == "sbiten":                                   # особый: гасит городскую дурноту (ситуацию)
+        return "гасит дурноту города"
+    parts = []
+    ap = FLASK_APPROACH.get(key)
+    parts += [{"fight": "смелее в драке", "sneak": "легче тишком",
+               "gamble": "фарт в лихо"}[ap]] if ap else []
+    hp = (balance.FLASK_EFFECTS.get(key) or {}).get("hp", 0)
+    if hp:
+        parts.append(f"+{hp} выносливости")
+    return ", ".join(parts) or "—"
 
 
 def start(player, region: str, situation: str | None = None,
           seed: int | None = None, now: datetime | None = None,
           flask: list[str] | None = None) -> dict:
-    """Завести ходку: этап 1, полное здоровье, пустая котомка."""
+    """Завести ходку: этап 1, полное здоровье (+ выносливость от hp-фляг), котомка."""
+    mx = combat.max_hp(player) + _flask_hp_bonus(flask)   # Пир зодчих/жаркое/пирог → дольше держишься
     return {
-        "leg": 1, "state": "fork", "hp": combat.max_hp(player),
-        "hp_max": combat.max_hp(player), "satchel": {},
+        "leg": 1, "state": "fork", "hp": mx,
+        "hp_max": mx, "satchel": {},
         "region": region or "", "situation": situation,
         "flask": list(flask or []),
         "seed": seed if seed is not None else random.randint(1, 10**9),

@@ -183,17 +183,19 @@ async def _api_raid(request: web.Request) -> web.Response:
         if boss is not None and boss.status in ("gathering", "active"):
             dto = _raid_dto(boss, uid)
             # фляга: что уже выпито на этот бой + что есть в погребе (эль/вино/сбитень)
-            from bot.game import balance as bal, production as prodm
+            from bot.game import balance as bal, production as prodm, raid as rd
             p = await repo.get_player(s, uid)
             prods = (p.tavern.products if p and p.tavern else None) or {}
             me = (boss.contributions or {}).get(str(uid)) or {}
             dto["flask"] = {
                 "drunk": me.get("flask"),
+                # все фляги из погреба; метка — РЕЙД-эффект (rd.flask_label), т.к. в
+                # рейде hp/уворот идут в урон — «+45❤» тут было бы показ≠действие.
                 "options": [{"key": k, "name": prodm.GOODS[k].name,
                              "emoji": prodm.GOODS[k].emoji,
-                             "label": bal.FLASK_EFFECTS[k]["label"],
+                             "label": rd.flask_label(k),
                              "qty": int(prods.get(k, 0))}
-                            for k in ("ale1", "ale2", "ale3", "wine", "sbiten")
+                            for k in bal.FLASK_EFFECTS
                             if k in prodm.GOODS and int(prods.get(k, 0)) > 0],
             }
         elif boss is not None and boss.status in ("dead", "expired"):

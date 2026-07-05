@@ -103,12 +103,16 @@ SOURCE_MULT = {
     "region": 1.2,       # региональные пояса
     "orc": 1.45,         # орочий сет (сет-бонус — сверх бюджета, за сбор)
     "raid_rat": 1.35, "raid_troll": 1.6, "raid_demon": 1.85, "raid_dragon": 2.1,
+    # чудо города (Ф2b): рецепт из Лавки Артели за зодары — самый дорогой чейз в
+    # игре (кооп-мегастройка), потому и БиС-бюджет выше рейд-дракона.
+    "wonder": 2.6,
 }
 ITEM_SOURCE = {
     "skinner_knife": "hunt", "wolf_totem": "hunt",
     "fur_coat": "hunt", "fang_cleaver": "hunt", "swift_boots": "hunt", "prestige_ring": "hunt",
     "lynx_belt": "region", "tusk_belt": "region", "chitin_belt": "region",
     "orc_helm": "orc", "orc_plate": "orc", "orc_axe": "orc",
+    "zodchy_hammer": "wonder",
     "rat_crown": "raid_rat", "rat_pelt": "raid_rat", "rat_tail": "raid_rat",
     "troll_club": "raid_troll", "troll_hide": "raid_troll", "troll_eye": "raid_troll",
     "demon_fang": "raid_demon", "demon_hide": "raid_demon", "demon_core": "raid_demon",
@@ -440,6 +444,17 @@ CATALOG: dict[str, Item] = {
             cost={"gold": 1500, "ingot": 10, "orc_scrap": 4},
             craft_hours=8, damage=26, crit=9, sprite="orc_axe",
         ),
+        # ═══════ ЭКСКЛЮЗИВ ЗОДЧИХ (Ф2b): куётся ТОЛЬКО с рецептом «Молот Зодчего»
+        # из Лавки Артели (за зодары — награда за вклад в чудо города). Куётся как
+        # обычная снаряга (ярусы/заточка), но бюджет — БиС (источник 'wonder'):
+        # сильнейшее оружие Недоливска, «навсегда» — надел и владеешь. ═══════
+        Item(
+            id="zodchy_hammer", slot="weapon", name="Молот Зодчего",
+            description="Артельный молот, что бил камень для стен города. Тяжёл, как "
+                        "чужой долг, и решает любой спор с одного маха.",
+            cost={"gold": 4000, "ingot": 16},
+            craft_hours=8, damage=50, crit=15, sprite="zodchy_hammer",
+        ),
         # ═══════ ЭКСКЛЮЗИВ РЕЙД-БОССОВ (craftable=False, только выбить) ═══════
         # Статы множатся на ярус; падают рандомным ярусом, ★★★ — редчайшее.
         # cost — прокси-стоимость для ВВП (не куётся, цена символическая).
@@ -529,6 +544,18 @@ REGION_GEAR = {
     "tusk_belt": "green_valleys",
     "chitin_belt": "red_wastes",
 }
+
+# Эксклюзив-снаряга зодчих (Ф2b): куётся ТОЛЬКО с рецептом из Лавки Артели.
+# Форж показывает вещь и даёт ковать лишь владельцу рецепта (гейт — как у поясов).
+WONDER_GEAR = {"zodchy_hammer"}
+
+
+def wonder_gear_locked(player, item_id: str) -> bool:
+    """Эксклюзив-шмотка зодчих, на которую у игрока ещё нет рецепта из Лавки."""
+    if item_id not in WONDER_GEAR:
+        return False
+    from bot.game import artel_shop
+    return not artel_shop.owns_recipe(player, item_id)
 
 
 def equipped_items(equipment: dict | None) -> list[tuple[Item, int]]:

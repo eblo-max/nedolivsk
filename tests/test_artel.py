@@ -18,7 +18,9 @@ def test_catalog_self_consistent():
     assert len(ids) == len(set(ids)), "дубли id в каталоге"
     for r in shop.CATALOG:
         assert r.cost > 0 and r.name and r.emoji
-        assert r.kind in ("title", "facade") and r.payload
+        assert r.kind in ("title", "facade", "recipe") and r.payload
+        if r.kind == "recipe":                       # Ф2b: рецепт знает, где готовится и что даёт
+            assert r.building and r.effect
         assert shop.get(r.id) is r
     assert shop.get("_нет_") is None
 
@@ -58,6 +60,35 @@ def test_catalog_dto_flags_match_state():
     shop.apply(rich, r)
     owned_dto = {d["id"]: d for d in shop.catalog_dto(rich)}[r.id]
     assert owned_dto["owned"] is True
+
+
+def test_recipe_owns_apply_and_lookup():
+    """Ф2b: покупка рецепта кладётся в story['artel']['recipes'], owns_recipe видит его."""
+    p = _pl(zodar=1000)
+    r = next(x for x in shop.CATALOG if x.kind == "recipe")
+    assert not shop.owns(p, r) and not shop.owns_recipe(p, r.payload)
+    shop.apply(p, r)
+    assert shop.owns(p, r) and shop.owns_recipe(p, r.payload)
+    assert r.payload in shop.owned_recipe_ids(p)
+    assert r.payload in p.story["artel"]["recipes"]
+    shop.apply(p, r)                                   # повторно — без дублей
+    assert p.story["artel"]["recipes"].count(r.payload) == 1
+
+
+def test_recipes_cover_all_exclusive_targets():
+    """Каждый эксклюзив-таргет (production.EXCLUSIVE + items.WONDER_GEAR) имеет рецепт в Лавке."""
+    from bot.game import items, production
+    recipe_payloads = {r.payload for r in shop.CATALOG if r.kind == "recipe"}
+    for key in set(production.EXCLUSIVE) | set(items.WONDER_GEAR):
+        assert key in recipe_payloads, f"нет рецепта в Лавке для {key}"
+
+
+def test_recipe_dto_carries_building_and_effect():
+    p = _pl(zodar=1000)
+    r = next(x for x in shop.CATALOG if x.kind == "recipe")
+    dto = {d["id"]: d for d in shop.catalog_dto(p)}[r.id]
+    assert dto["building"] == r.building and dto["effect"] == r.effect
+    assert dto["kind"] == "recipe"
 
 
 def test_zodar_not_earnable_or_tradeable_here():

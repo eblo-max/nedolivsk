@@ -43,6 +43,8 @@ RECIPES = {
     "bakery": {
         "bread": ({"flour": 8, "water": 6}, 5, 12),
         "pie":   ({"flour": 8, "berries": 6, "honey": 4}, 8, 10),
+        # эксклюзив зодчих (Ф2b): рецепт из Лавки Артели, гейт по владению (EXCLUSIVE)
+        "mason_loaf": ({"flour": 10, "milk": 6, "honey": 4, "salt": 3}, 8, 10),
     },
     "smokehouse": {
         "cured":       ({"game": 8, "salt": 4}, 8, 12),
@@ -60,11 +62,15 @@ PRODUCERS = ({"mill", "brewery", "meadery", "kitchen", "winery", "smelter"}
 # Кухня: рецепт -> (вход на 1 уровень, часы, выход порций на уровень)
 KITCHEN = {
     "roast": ({"game": 6, "grain": 6, "herbs": 4}, 6, 12),  # Жаркое
+    # эксклюзив зодчих (Ф2b): «Пир зодчих» — рецепт из Лавки Артели (EXCLUSIVE)
+    "zodchy_feast": ({"game": 10, "herbs": 6, "honey": 5, "salt": 3}, 10, 10),
 }
 
 # Винокурня: рецепт -> (вход, часы, выход). Берри-тяжёлое премиум-вино.
 WINERY = {
     "wine": ({"berries": 22, "honey": 6, "water": 6}, 12, 12),
+    # эксклюзив зодчих (Ф2b): «Артельный нектар» — рецепт из Лавки Артели
+    "artel_nectar": ({"berries": 24, "honey": 10, "herbs": 5}, 12, 10),
 }
 
 # Медоварня: рецепт -> (вход на 1 уровень, часы, выход кружек на уровень).
@@ -72,7 +78,38 @@ WINERY = {
 MEADERY = {
     "mead":   ({"honey": 10, "water": 8}, 8, 12),            # паритет 10×12/8=15/ч
     "sbiten": ({"honey": 8, "herbs": 6, "water": 6}, 10, 12),  # пряный премиум, травы
+    # эксклюзив зодчих (Ф2b): «Громовой сбитень» — рецепт из Лавки Артели
+    "thunder_sbiten": ({"honey": 12, "herbs": 8, "hops": 6, "water": 6}, 10, 10),
 }
+
+# ── Эксклюзив-рецепты зодчих (Ф2b) ────────────────────────────────────────
+# Варить может ТОЛЬКО владелец рецепта, купленного в Лавке Артели за зодары
+# (bind-on-earn, см. bot/game/artel_shop.py). Гейт двойной: в списке рецептов
+# (webapi скрывает невладеемые) И в start_* (серверная защита ниже). ключ→здание.
+EXCLUSIVE = {
+    "zodchy_feast": "kitchen",
+    "artel_nectar": "winery",
+    "thunder_sbiten": "meadery",
+    "mason_loaf": "bakery",
+}
+
+
+def owns_recipe(player, key: str) -> bool:
+    """Куплен ли рецепт эксклюзив-товара (владение из Лавки Артели)."""
+    from bot.game import artel_shop
+    return artel_shop.owns_recipe(player, key)
+
+
+def recipe_locked(player, key: str) -> bool:
+    """Эксклюзив-рецепт, которым игрок ещё не владеет (варить нельзя)."""
+    return key in EXCLUSIVE and not owns_recipe(player, key)
+
+
+def npc_tradable(key: str) -> bool:
+    """Продаётся ли товар НПС (розница гостям, заезжий купец, аукцион). Эксклюзив
+    зодчих — НЕТ: имба ходит ТОЛЬКО P2P на бирже между игроками (не сливается НПС
+    за золото и не выпивается гостями). Биржа проверяет владение отдельно."""
+    return key not in EXCLUSIVE
 
 
 def meadery_inputs(recipe: str, level: int) -> dict:
@@ -114,6 +151,9 @@ DRINKS: dict[str, Drink] = {
 DRINKS["mead"] = Drink("mead", "🍶", "Медовуха", 10)
 DRINKS["sbiten"] = Drink("sbiten", "🌿", "Сбитень", 13)
 DRINKS["wine"] = Drink("wine", "🍷", "Вино", 15)
+# эксклюзив зодчих (Ф2b): премиум-напитки, самые дорогие в погребе (берут богачи)
+DRINKS["artel_nectar"] = Drink("artel_nectar", "🍷", "Артельный нектар", 35)
+DRINKS["thunder_sbiten"] = Drink("thunder_sbiten", "⚡", "Громовой сбитень", 30)
 
 # Еда (Кухня/Пекарня/Коптильня/Сыроварня): отдельный пул спроса (голод).
 FOODS: dict[str, Drink] = {
@@ -124,6 +164,9 @@ FOODS: dict[str, Drink] = {
     "smoked_fish": Drink("smoked_fish", "🐠", "Копчёная рыба", 9),
     "cheese": Drink("cheese", "🧀", "Сыр", 12),
     "butter": Drink("butter", "🧈", "Масло", 10),
+    # эксклюзив зодчих (Ф2b): премиум-стол
+    "zodchy_feast": Drink("zodchy_feast", "🍗", "Пир зодчих", 30),
+    "mason_loaf": Drink("mason_loaf", "🍞", "Каравай каменщика", 28),
 }
 
 # Всё, что лежит в погребе/кладовой (для ВВП и названий при сбыте)
@@ -216,9 +259,11 @@ def recipe_output(building: str, recipe: str, level: int) -> int:
 
 def start_recipe(player, tavern, building: str, recipe: str
                  ) -> tuple[bool, str, dict | None]:
-    """(ok, reason, inputs). reason: unknown | busy | not_enough."""
+    """(ok, reason, inputs). reason: unknown | locked | busy | not_enough."""
     if building not in RECIPES or recipe not in RECIPES[building]:
         return False, "unknown", None
+    if recipe_locked(player, recipe):             # эксклюзив без рецепта из Лавки
+        return False, "locked", None
     if state(tavern, building)[0] != "none":
         return False, "busy", None
     level = tavern.level
@@ -357,9 +402,11 @@ def claim_brew(player, tavern) -> tuple[str, int, int] | None:
 
 
 def start_meadery(player, tavern, recipe: str) -> tuple[bool, str, dict | None]:
-    """(ok, reason, inputs). reason: unknown | busy | not_enough."""
+    """(ok, reason, inputs). reason: unknown | locked | busy | not_enough."""
     if recipe not in MEADERY:
         return False, "unknown", None
+    if recipe_locked(player, recipe):
+        return False, "locked", None
     if state(tavern, "meadery")[0] != "none":
         return False, "busy", None
     level = tavern.level
@@ -404,6 +451,8 @@ def kitchen_output(recipe: str, level: int) -> int:
 def start_kitchen(player, tavern, recipe: str) -> tuple[bool, str, dict | None]:
     if recipe not in KITCHEN:
         return False, "unknown", None
+    if recipe_locked(player, recipe):
+        return False, "locked", None
     if state(tavern, "kitchen")[0] != "none":
         return False, "busy", None
     level = tavern.level
@@ -447,6 +496,8 @@ def winery_output(recipe: str, level: int) -> int:
 def start_winery(player, tavern, recipe: str) -> tuple[bool, str, dict | None]:
     if recipe not in WINERY:
         return False, "unknown", None
+    if recipe_locked(player, recipe):
+        return False, "locked", None
     if state(tavern, "winery")[0] != "none":
         return False, "busy", None
     level = tavern.level

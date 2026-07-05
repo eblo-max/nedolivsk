@@ -128,7 +128,8 @@ def _forge_state(p) -> dict:
         }
 
     out = [mk(i, False) for i in it.CATALOG.values()
-           if i.craftable and not (i.id in it.REGION_GEAR and it.REGION_GEAR[i.id] != p.region)]
+           if i.craftable and not (i.id in it.REGION_GEAR and it.REGION_GEAR[i.id] != p.region)
+           and not it.wonder_gear_locked(p, i.id)]   # эксклюзив зодчих виден лишь с рецептом
     out += [mk(i, True) for i in it.CATALOG.values()
             if not i.craftable and it.equipped_tier(eq, i.id)]
     pouch = {k: (int(p.gold) if k == "gold" else int(inv.get(k, 0)))

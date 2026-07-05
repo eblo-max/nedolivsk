@@ -147,7 +147,8 @@ def visit_chance(base: float, now=None) -> float:
 
 def has_sellable(tavern) -> bool:
     prods = tavern.products or {}
-    return any(v > 0 and k in prod.GOODS for k, v in prods.items())
+    return any(v > 0 and k in prod.GOODS and prod.npc_tradable(k)
+               for k, v in prods.items())
 
 
 def _pick_good(prods: dict, pref: str, rng: random.Random) -> str:
@@ -164,7 +165,7 @@ def make_offer(tavern, player, fair: bool, rng: random.Random | None = None,
                world=None) -> dict | None:
     rng = rng or random
     prods = {k: v for k, v in (tavern.products or {}).items()
-             if v > 0 and k in prod.GOODS}
+             if v > 0 and k in prod.GOODS and prod.npc_tradable(k)}  # эксклюзив — не купцу, только биржа
     if not prods:
         return None
     cit = npc.random_trader(rng)        # живой горожанин пришёл за товаром

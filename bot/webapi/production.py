@@ -131,6 +131,7 @@ def _building_produces(bid: str) -> list:
         keys, good = list(prod.WINERY), True
     else:
         return []
+    keys = [k for k in keys if k not in prod.EXCLUSIVE]   # эксклюзив зодчих — не в превью стройки
     brew_name = {"ale1": "Эль ★", "ale2": "Светлое ★★", "ale3": "Праздничное ★★★"}
     out = []
     for k in keys:
@@ -265,7 +266,7 @@ def _production_state(p, bid: str) -> dict:
 
     # ── Рецептурные/одиночные (вход → товар в погреб) ─────────────────────
     if bid in prod.RECIPES:                                   # пекарня/коптильня/сыроварня
-        rmap = list(prod.RECIPES[bid].keys())
+        rmap = [rc for rc in prod.RECIPES[bid] if not prod.recipe_locked(p, rc)]
         hours_of = lambda rc: prod.recipe_hours(bid, rc)      # noqa: E731
         recipes = [{"key": rc, "name": gname(rc), "emoji": gemoji(rc), "good": True,
                     "out_qty": prod.recipe_output(bid, rc, L),
@@ -276,7 +277,7 @@ def _production_state(p, bid: str) -> dict:
                   "winery": (prod.WINERY, prod.winery_inputs, prod.winery_hours, prod.winery_output),
                   "meadery": (prod.MEADERY, prod.meadery_inputs, prod.meadery_hours, prod.meadery_output)}[bid]
         cat, f_in, f_hr, f_out = single
-        rmap = list(cat.keys())
+        rmap = [rc for rc in cat if not prod.recipe_locked(p, rc)]  # эксклюзив скрыт до покупки рецепта
         hours_of = f_hr
         recipes = [{"key": rc, "name": gname(rc), "emoji": gemoji(rc), "good": True,
                     "out_qty": f_out(rc, L), "time": f"{f_hr(rc)} ч",
