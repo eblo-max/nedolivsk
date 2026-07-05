@@ -5,7 +5,7 @@ import { haptic, hapticNotify } from '../telegram'
 interface Reward {
   id: string; emoji: string; name: string; desc: string
   cost: number; kind: string; owned: boolean; affordable: boolean
-  building?: string; effect?: string; tier?: string
+  building?: string; effect?: string; tier?: string; style?: string
 }
 interface Resp { ok?: boolean; zodar: number; catalog: Reward[] }
 
@@ -13,11 +13,16 @@ const DEV = import.meta.env.DEV
 const SAMPLE: Resp = {
   zodar: 620,
   catalog: [
-    { id: 't_zodchy', emoji: '🔨', name: 'Титул «Зодчий»', desc: 'Первый камень лёг твоей рукой — город запомнил.', cost: 10, kind: 'title', owned: false, affordable: true, tier: 'bronze' },
-    { id: 't_mason', emoji: '🧱', name: 'Титул «Каменщик Недоливска»', desc: 'Цех каменщиков жмёт тебе руку.', cost: 25, kind: 'title', owned: false, affordable: true, tier: 'bronze' },
-    { id: 't_pillar', emoji: '🏛', name: 'Титул «Столп Общины»', desc: 'На таких, как ты, держится весь город.', cost: 80, kind: 'title', owned: false, affordable: true, tier: 'silver' },
-    { id: 't_keeper', emoji: '🛡', name: 'Титул «Хранитель Твердыни»', desc: 'Стены стоят твоим радением — Орда обходит город.', cost: 200, kind: 'title', owned: false, affordable: true, tier: 'gold' },
-    { id: 't_legend', emoji: '👑', name: 'Титул «Вечный Зодчий»', desc: 'Высшее имя Артели. Тебя впишут в летопись.', cost: 500, kind: 'title', owned: false, affordable: true, tier: 'legendary' },
+    { id: 't_zodchy', emoji: '🔨', name: 'Титул «Зодчий»', desc: 'Первый камень лёг твоей рукой — город запомнил.', cost: 10, kind: 'title', owned: false, affordable: true, style: 'stone' },
+    { id: 't_mason', emoji: '🧱', name: 'Титул «Каменщик Недоливска»', desc: 'Цех каменщиков жмёт тебе руку.', cost: 25, kind: 'title', owned: false, affordable: true, style: 'bronze' },
+    { id: 't_pillar', emoji: '🏛', name: 'Титул «Столп Общины»', desc: 'На таких, как ты, держится весь город.', cost: 80, kind: 'title', owned: false, affordable: true, style: 'silver' },
+    { id: 't_keeper', emoji: '🛡', name: 'Титул «Хранитель Твердыни»', desc: 'Стены стоят твоим радением — Орда обходит город.', cost: 200, kind: 'title', owned: false, affordable: true, style: 'gold' },
+    { id: 't_spark', emoji: '⚡', name: 'Титул «Искра Артели»', desc: 'Имя горит электрическим неоном.', cost: 220, kind: 'title', owned: false, affordable: true, style: 'neon' },
+    { id: 't_mirage', emoji: '🔮', name: 'Титул «Мираж Недоливска»', desc: 'Имя мерцает, как марево над степью.', cost: 260, kind: 'title', owned: false, affordable: true, style: 'plasma' },
+    { id: 't_frost', emoji: '❄', name: 'Титул «Хладный Мастер»', desc: 'Имя дышит инеем — кладка ровна, как лёд.', cost: 300, kind: 'title', owned: false, affordable: true, style: 'frost' },
+    { id: 't_ember', emoji: '🔥', name: 'Титул «Пламенный Зодчий»', desc: 'Имя тлеет жаром кузнечного горна.', cost: 320, kind: 'title', owned: false, affordable: true, style: 'ember' },
+    { id: 't_void', emoji: '🌑', name: 'Титул «Тень Основания»', desc: 'Имя дышит бездной — ты был у первого камня.', cost: 400, kind: 'title', owned: false, affordable: true, style: 'void' },
+    { id: 't_legend', emoji: '👑', name: 'Титул «Вечный Зодчий»', desc: 'Высшее имя — переливается, как самоцвет-голограмма.', cost: 500, kind: 'title', owned: false, affordable: true, style: 'holo' },
     { id: 'f_carved', emoji: '🪵', name: 'Резной фасад', desc: 'Артель вырежет узор по вывеске.', cost: 40, kind: 'facade', owned: false, affordable: true, tier: 'bronze' },
     { id: 'f_gilded', emoji: '✨', name: 'Златая вывеска', desc: 'Сусальное золото по краю — видно за версту.', cost: 120, kind: 'facade', owned: false, affordable: true, tier: 'silver' },
     { id: 'f_crested', emoji: '💎', name: 'Самоцветный герб', desc: 'Герб Артели с самоцветами над дверью.', cost: 300, kind: 'facade', owned: false, affordable: true, tier: 'gold' },
@@ -32,6 +37,10 @@ const SAMPLE: Resp = {
 
 const RAR_LABEL: Record<string, string> = {
   bronze: 'обычный', silver: 'редкий', gold: 'эпический', legendary: 'легендарный',
+}
+const STYLE_LABEL: Record<string, string> = {
+  stone: 'камень', bronze: 'медь', silver: 'серебро', gold: 'золото',
+  neon: 'неон', plasma: 'плазма', frost: 'иней', ember: 'жар', void: 'бездна', holo: 'голограмма',
 }
 
 /** Лавка Артели зодчих — трата редкой валюты «Зодар» на престиж. */
@@ -84,13 +93,15 @@ export default function ArtelSheet({ onClose }: { onClose: () => void }) {
                   </div>
                   <div className="ar-list">
                     {rows.map((r) => (
-                      <div key={r.id} className={`ar-card${r.owned ? ' owned' : ''}${r.kind === 'recipe' ? ' recipe' : ''}${r.tier ? ' t-' + r.tier : ''}`}>
+                      <div key={r.id} className={`ar-card${r.owned ? ' owned' : ''}${r.kind === 'recipe' ? ' recipe' : ''}${r.style ? ' s-' + r.style : ''}${r.tier ? ' t-' + r.tier : ''}`}>
                         <span className="ar-emo">{r.emoji}</span>
                         <div className="ar-body">
                           <div className="ar-head-row">
                             <div className="ar-name">
                               {r.name}
-                              {r.tier && <span className={`ar-rar rar-${r.tier}`}>{RAR_LABEL[r.tier] || ''}</span>}
+                              {r.style
+                                ? <span className={`ar-rar st-${r.style}`}>{STYLE_LABEL[r.style] || ''}</span>
+                                : r.tier && <span className={`ar-rar rar-${r.tier}`}>{RAR_LABEL[r.tier] || ''}</span>}
                             </div>
                             {r.owned ? (
                               <span className="ar-have">✓ есть</span>

@@ -30,7 +30,7 @@ class Reward:
 # Каталог Лавки. Престиж 10–80 ⚒; эксклюзив-рецепты (Ф2b) 220–450 ⚒ — самый
 # долгий чейз (несколько чудес), потому и товар с них — имба (мотив вкладываться).
 CATALOG: list[Reward] = [
-    # ── Эпик-лестница ТИТУЛОВ (bronze→silver→gold→legendary) ──
+    # ── ТИТУЛЫ: у каждого СВОЙ визуальный стиль (не оттенки золота) ──
     Reward("t_zodchy", "🔨", "Титул «Зодчий»",
            "Первый камень лёг твоей рукой — город запомнил.", 10, "title", "zodchy"),
     Reward("t_mason", "🧱", "Титул «Каменщик Недоливска»",
@@ -39,8 +39,18 @@ CATALOG: list[Reward] = [
            "На таких, как ты, держится весь город. Имя звучит на площади.", 80, "title", "pillar"),
     Reward("t_keeper", "🛡", "Титул «Хранитель Твердыни»",
            "Стены стоят твоим радением — Орда обходит город стороной.", 200, "title", "keeper"),
+    Reward("t_spark", "⚡", "Титул «Искра Артели»",
+           "Твой запал зажигает всю стройку — имя горит электрическим неоном.", 220, "title", "spark"),
+    Reward("t_mirage", "🔮", "Титул «Мираж Недоливска»",
+           "Имя мерцает и плывёт, как марево над степью в полдень.", 260, "title", "mirage"),
+    Reward("t_frost", "❄", "Титул «Хладный Мастер»",
+           "Кладка ровна, как лёд, и так же холодно-безупречна. Имя дышит инеем.", 300, "title", "frostw"),
+    Reward("t_ember", "🔥", "Титул «Пламенный Зодчий»",
+           "Строишь с огнём в руках — имя тлеет жаром кузнечного горна.", 320, "title", "emberw"),
+    Reward("t_void", "🌑", "Титул «Тень Основания»",
+           "Ты был у первого камня, когда города ещё не существовало. Имя дышит бездной.", 400, "title", "voidw"),
     Reward("t_legend", "👑", "Титул «Вечный Зодчий»",
-           "Высшее имя Артели. Тебя впишут в летопись, что переживёт стены.", 500, "title", "legend"),
+           "Высшее имя Артели — переливается всеми огнями, как самоцвет-голограмма.", 500, "title", "legend"),
     # ── Эпик-лестница ФАСАДОВ вывески ──
     Reward("f_carved", "🪵", "Резной фасад",
            "Артель вырежет узор по вывеске — гости заглядываются.", 40, "facade", "carved"),
@@ -124,16 +134,31 @@ def apply(player, r: Reward) -> None:
     player.story = st
 
 
-# ── Показ престижа: титул у имени + фасад вывески (эпик-ярусы редкости) ─────
-# tier ∈ bronze<silver<gold<legendary — драйвит визуал (цвет/сияние/шиммер).
-# Ранг титулов по возрастанию престижа — у имени показываем ВЫСШИЙ купленный.
-TITLE_RANK = ("zodchy", "mason", "pillar", "keeper", "legend")
+# ── Показ престижа: титул у имени + фасад вывески ──────────────────────────
+# У ТИТУЛОВ — уникальный `style` (визуальная тема, не оттенки золота):
+#   stone/bronze/silver/gold — классика; neon/plasma/frost/ember/void/holo —
+#   необычные (неон, плазма, иней, жар, бездна, голограмма). style драйвит вид.
+# У ФАСАДОВ — классический `tier` (металлик вывески). Ранг титулов по цене —
+# у имени показываем ВЫСШИЙ купленный.
+TITLE_RANK = ("zodchy", "mason", "pillar", "keeper",
+              "spark", "mirage", "frostw", "emberw", "voidw", "legend")
 TITLE_BADGE = {
-    "zodchy": {"emoji": "🔨", "short": "Зодчий", "tier": "bronze"},
-    "mason":  {"emoji": "🧱", "short": "Каменщик", "tier": "bronze"},
-    "pillar": {"emoji": "🏛", "short": "Столп Общины", "tier": "silver"},
-    "keeper": {"emoji": "🛡", "short": "Хранитель Твердыни", "tier": "gold"},
-    "legend": {"emoji": "👑", "short": "Вечный Зодчий", "tier": "legendary"},
+    "zodchy": {"emoji": "🔨", "short": "Зодчий", "style": "stone"},
+    "mason":  {"emoji": "🧱", "short": "Каменщик", "style": "bronze"},
+    "pillar": {"emoji": "🏛", "short": "Столп Общины", "style": "silver"},
+    "keeper": {"emoji": "🛡", "short": "Хранитель Твердыни", "style": "gold"},
+    "spark":  {"emoji": "⚡", "short": "Искра Артели", "style": "neon"},
+    "mirage": {"emoji": "🔮", "short": "Мираж", "style": "plasma"},
+    "frostw": {"emoji": "❄", "short": "Хладный Мастер", "style": "frost"},
+    "emberw": {"emoji": "🔥", "short": "Пламенный Зодчий", "style": "ember"},
+    "voidw":  {"emoji": "🌑", "short": "Тень Основания", "style": "void"},
+    "legend": {"emoji": "👑", "short": "Вечный Зодчий", "style": "holo"},
+}
+# Короткая подпись стиля (лента на карточке Лавки) — по-русски и с характером.
+STYLE_LABEL = {
+    "stone": "камень", "bronze": "медь", "silver": "серебро", "gold": "золото",
+    "neon": "неон", "plasma": "плазма", "frost": "иней", "ember": "жар",
+    "void": "бездна", "holo": "голограмма",
 }
 FACADE_RANK = ("carved", "gilded", "crested", "blazing")
 FACADE_BADGE = {
@@ -145,11 +170,16 @@ FACADE_BADGE = {
 
 
 def reward_tier(r: Reward) -> str:
-    """Ярус редкости награды (для эпик-визуала карточки Лавки). '' — у рецептов."""
-    if r.kind == "title":
-        return TITLE_BADGE.get(r.payload, {}).get("tier", "")
+    """Ярус редкости ФАСАДА (для визуала карточки Лавки). '' — не фасад."""
     if r.kind == "facade":
         return FACADE_BADGE.get(r.payload, {}).get("tier", "")
+    return ""
+
+
+def reward_style(r: Reward) -> str:
+    """Визуальный стиль ТИТУЛА (neon/ember/holo/…). '' — не титул."""
+    if r.kind == "title":
+        return TITLE_BADGE.get(r.payload, {}).get("style", "")
     return ""
 
 
@@ -184,5 +214,5 @@ def catalog_dto(player) -> list[dict]:
                     "cost": r.cost, "kind": r.kind, "owned": have,
                     "affordable": z >= r.cost,
                     "building": r.building, "effect": r.effect,
-                    "tier": reward_tier(r)})
+                    "tier": reward_tier(r), "style": reward_style(r)})
     return out

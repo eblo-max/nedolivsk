@@ -1336,6 +1336,47 @@ body {
 @keyframes rar-pulse { 0%,100%{box-shadow:0 0 14px #ffcf6a99,0 0 6px #ffe8a0,inset 0 1px 2px #fff9,inset 0 -2px 4px #b57c1e77}
   50%{box-shadow:0 0 24px #ffe08fe0,0 0 10px #fff0c0,inset 0 1px 2px #fff9,inset 0 -2px 4px #b57c1e77} }
 @keyframes rar-sheen { 0%,58%{left:-45%} 82%,100%{left:135%} }
+
+/* ═══ СТИЛИ ТИТУЛОВ — у каждого свой характер (не оттенки золота) ═══
+   Классика: stone/bronze/silver/gold (металл, камень). Необычные: neon (электро-
+   циан), plasma (магента), frost (лёд), ember (жар), void (бездна), holo (радуга-
+   голограмма). Анимации лёгкие; в плотном списке рейтинга отключены (Android-safe). */
+[class*="st-"] { position:relative; overflow:hidden; isolation:isolate; font-weight:800; letter-spacing:.2px; }
+.st-stone { color:#e8e0d0; background:linear-gradient(158deg,#4a453c,#2a2620); border:1px solid #6a6152;
+  text-shadow:0 1px 0 #000a; box-shadow:inset 0 1px 1px #ffffff18, 0 1px 2px #000a; }
+.st-bronze { color:#2e1707; background:linear-gradient(158deg,#f2c184,#c47c3c 46%,#8f501f); border:1px solid #7a4a1e;
+  text-shadow:0 1px 0 #ffdca877; box-shadow:inset 0 1px 1px #ffe0b088, 0 1px 2px #000a; }
+.st-silver { color:#141d2b; background:linear-gradient(158deg,#ffffff,#c6cfdb 46%,#8b99ad); border:1px solid #8996a8;
+  text-shadow:0 1px 0 #ffffffaa; box-shadow:inset 0 1px 1px #ffffffcc, 0 0 8px #cfe0f066, 0 1px 2px #000a; }
+.st-gold { color:#2a1600; background:linear-gradient(158deg,#fff2b8,#f0c552 46%,#bf862a); border:1px solid #b58a2c;
+  text-shadow:0 1px 0 #fff3c499; box-shadow:inset 0 1px 1px #fff3c4cc, 0 0 14px #f0b84088, 0 1px 2px #000a; }
+.st-neon { color:#8dfcff; background:#08131a; border:1px solid #22e0ff;
+  text-shadow:0 0 4px #22e0ff,0 0 9px #22e0ff,0 0 16px #22e0ff88;
+  box-shadow:0 0 10px #22e0ff88, inset 0 0 9px #22e0ff2a; animation:st-flick 4.6s steps(1) infinite; }
+@keyframes st-flick { 0%,87%,100%{opacity:1} 88%{opacity:.5} 90%{opacity:1} 91%{opacity:.82} 93%{opacity:1} }
+.st-plasma { color:#ffa6f0; background:#160a18; border:1px solid #ff33d6;
+  text-shadow:0 0 4px #ff33d6,0 0 9px #ff33d6,0 0 16px #ff33d688;
+  box-shadow:0 0 11px #ff33d688, inset 0 0 9px #ff33d62a; }
+.st-frost { color:#eafaff; background:linear-gradient(158deg,#1c3d4e,#0c2230); border:1px solid #a6ecff;
+  text-shadow:0 0 5px #bff0ff,0 0 10px #7fd8ff; box-shadow:0 0 11px #9fe8ff66, inset 0 1px 3px #ffffff66; }
+.st-ember { color:#ffe1b3; background:linear-gradient(#3a1400,#170700); border:1px solid #ff6a1a;
+  text-shadow:0 0 5px #ff8a2a,0 0 11px #ff3a00; box-shadow:0 0 12px #ff5a1a99, inset 0 -3px 7px #ff3a0044;
+  animation:st-ember 2s ease-in-out infinite; }
+@keyframes st-ember { 0%,100%{box-shadow:0 0 10px #ff5a1a88,inset 0 -3px 7px #ff3a0044} 50%{box-shadow:0 0 19px #ff8a2add,inset 0 -3px 9px #ff5a0066} }
+.st-void { color:#dcb8ff; background:radial-gradient(circle at 50% 25%,#2c1246,#0b0512); border:1px solid #7e3aff;
+  text-shadow:0 0 6px #9a4aff,0 0 13px #6a1aff; box-shadow:0 0 13px #7e3aff88, inset 0 0 11px #4a1a8a55;
+  animation:st-void 3.2s ease-in-out infinite; }
+@keyframes st-void { 0%,100%{box-shadow:0 0 11px #7e3aff77,inset 0 0 11px #4a1a8a55} 50%{box-shadow:0 0 21px #a05affbb,inset 0 0 15px #5a2a9a66} }
+.st-holo { color:#fff; text-shadow:0 1px 2px #0009,0 0 6px #ffffff77; border:1px solid #ffffffbb;
+  background:linear-gradient(100deg,#ff6b8b,#ffd36b,#8bffb0,#6bb8ff,#c46bff,#ff6b8b); background-size:320% 100%;
+  animation:st-holo 4.2s linear infinite; box-shadow:0 0 15px #ffffff55, inset 0 0 8px #fff5; }
+@keyframes st-holo { 0%{background-position:0%} 100%{background-position:320%} }
+.st-holo::after { content:''; position:absolute; inset:0 auto 0 -45%; width:34%; z-index:1;
+  background:linear-gradient(100deg,transparent,#ffffffcc,transparent); transform:skewX(-16deg);
+  animation:rar-sheen 3.2s ease-in-out infinite; }
+/* плотный список рейтинга — без анимаций (стиль остаётся, движение убрано) */
+.lb-list [class*="st-"], .lb-podium [class*="st-"] { animation:none !important; }
+.lb-list .st-holo::after, .lb-podium .st-holo::after { display:none; }
 .lb-meta { font-family:system-ui,sans-serif; font-size:10.5px; color:#8a7f6a; margin-top:1px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .lb-bar { margin-top:5px; height:4px; border-radius:3px; background:rgba(0,0,0,.32); overflow:hidden; }
@@ -2216,6 +2257,21 @@ body {
   background:radial-gradient(120% 90% at 50% -10%, #4a3510 0%, #241705 55%, #170f04 100%); }
 .ar-card.t-legendary .ar-emo { filter:drop-shadow(0 0 8px #ffce6a99); }
 .ar-card.t-legendary .ar-name { color:#ffe9b0; text-shadow:0 0 8px #ffcf6a55; }
+/* карточки титулов по стилю — рамка/подсветка под характер */
+.ar-card.s-silver { border-color:#8996a8; }
+.ar-card.s-gold { border-color:#b58a2c; box-shadow:0 0 12px #e7b8403a; }
+.ar-card.s-neon { border-color:#22e0ff; box-shadow:0 0 13px #22e0ff33; background:linear-gradient(#08161d,#06101a); }
+.ar-card.s-neon .ar-emo { filter:drop-shadow(0 0 6px #22e0ffaa); }
+.ar-card.s-plasma { border-color:#ff33d6; box-shadow:0 0 13px #ff33d633; background:linear-gradient(#180a1a,#120814); }
+.ar-card.s-plasma .ar-emo { filter:drop-shadow(0 0 6px #ff33d6aa); }
+.ar-card.s-frost { border-color:#a6ecff; box-shadow:0 0 12px #9fe8ff2a; background:linear-gradient(#0e2632,#0a1a24); }
+.ar-card.s-ember { border-color:#ff6a1a; box-shadow:0 0 14px #ff5a1a33; background:linear-gradient(#2a1204,#180a04); }
+.ar-card.s-ember .ar-emo { filter:drop-shadow(0 0 7px #ff6a1aaa); }
+.ar-card.s-void { border-color:#7e3aff; box-shadow:0 0 15px #7e3aff33;
+  background:radial-gradient(120% 90% at 50% -10%,#1e0f30,#130a1e 60%,#0d0714); }
+.ar-card.s-void .ar-emo { filter:drop-shadow(0 0 7px #9a5affaa); }
+.ar-card.s-holo { border-color:#ffffffcc; box-shadow:0 0 18px #ffffff30; background:linear-gradient(#241a2e,#160f1e); }
+.ar-card.s-holo .ar-name { color:#fff; text-shadow:0 0 8px #ffffff66; }
 .brs-mine-x { flex:none; width:46px; border-radius:14px; cursor:pointer; font-size:17px; color:#f0a08a;
   background:linear-gradient(#2c1410,#1a0d08); border:1px solid #7a3b2e; }
 .brs-mine-x:active { transform:scale(.96); }
