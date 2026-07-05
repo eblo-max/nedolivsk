@@ -130,10 +130,10 @@ function GearCard({ s, action, onTap, busy }: { s: GearLike; action: string; onT
   const off = action === 'Снять'
   return (
     <button className={`inv-card rq-${s.rarity || 'common'}${off ? ' worn' : ''}`} disabled={busy} onClick={onTap}>
-      <div className="inv-gem"><ItemImg className="inv-cimg" s={s.sprite} /></div>
       {(s.tier || s.plus) ? (
-        <div className="inv-stars">{stars(s.tier)}{s.plus ? <span className="inv-plus">+{s.plus}</span> : null}</div>
+        <div className="inv-tier">{stars(s.tier)}{s.plus ? <span className="inv-plus">+{s.plus}</span> : null}</div>
       ) : null}
+      <div className="inv-gem"><ItemImg className="inv-cimg" s={s.sprite} /></div>
       <div className="inv-cname">{s.trophy ? '🏆 ' : ''}{s.name}</div>
       {s.gain && Object.keys(s.gain).length > 0 && <div className="inv-cgain">{gainStr(s.gain)}</div>}
       <div className={`inv-cact ${off ? 'off' : 'on'}`}>{action}</div>
@@ -145,6 +145,7 @@ export default function Character() {
   const charTour = useFirstVisitTour('character')
   const { data, loading, error, set, reload } = useApi<CharState>('character', SAMPLE)
   const [view, setView] = useState<'doll' | 'inv' | 'forge'>('doll')
+  const [invTab, setInvTab] = useState<'gear' | 'prestige'>('gear')
   const [forge, setForge] = useState<ForgeState | null>(null)
   const [pick, setPick] = useState<ForgeItem | null>(null)
   const [pickSlot, setPickSlot] = useState<Slot | null>(null)
@@ -328,52 +329,63 @@ export default function Character() {
       <>
         <div className="hero rise" style={{ paddingTop: 2 }}>
           <div className="nm" style={{ fontSize: 22 }}>🎒 ИНВЕНТАРЬ</div>
-          <div className="flavor">«Что надел — то и в бой. Остальное лежит в мешке, ждёт своего часа.»</div>
+          <div className="flavor">«Что надел — то и в бой. Регалии — то, что заслужил.»</div>
         </div>
 
-        <div className="inv-sec rise">
-          <div className="inv-h">🎽 Надето <small>{equipped.length}/{c.slots_total}</small></div>
-          {equipped.length === 0
-            ? <div className="inv-empty">Голышом. Надень что-нибудь из стока или скуй в кузнице.</div>
-            : <div className="inv-grid">{equipped.map((s) => (
-                <GearCard key={s.slot} s={s} action="Снять" busy={busy} onTap={() => unequip(s.slot)} />
-              ))}</div>}
+        <div className="inv-tabs rise">
+          <button className={invTab === 'gear' ? 'on' : ''} onClick={() => { haptic('light'); setInvTab('gear') }}>⚔️ Снаряга</button>
+          <button className={invTab === 'prestige' ? 'on' : ''} onClick={() => { haptic('light'); setInvTab('prestige') }}>🏆 Регалии</button>
         </div>
 
-        <div className="inv-sec rise" style={{ animationDelay: '.04s' }}>
-          <div className="inv-h">📦 Сток <small>{stash.length}</small></div>
-          {stash.length === 0
-            ? <div className="inv-empty">Сток пуст. Скуёшь новую вещь в занятый слот — старая ляжет сюда, не пропадёт.</div>
-            : <div className="inv-grid">{stash.map((s) => (
-                <GearCard key={s.entry} s={s} action="Надеть" busy={busy} onTap={() => equip(s.entry)} />
-              ))}</div>}
-        </div>
-
-        {pr && pr.has && pr.titles.length > 0 && (
-          <div className="inv-sec rise" style={{ animationDelay: '.08s' }}>
-            <div className="inv-h">🏛 Звание <small>у имени</small></div>
-            <div className="inv-badges">
-              {pr.titles.map((t) => (
-                <button key={t.key} className={`inv-badge st-${t.style || 'gold'}${t.shown ? ' sel' : ''}`}
-                  disabled={busy} onClick={() => pickPrestige('title', t.key)}>{t.emoji} {t.short}</button>
-              ))}
-              <button className={`inv-badge plain${pr.titles.every((t) => !t.shown) ? ' sel' : ''}`}
-                disabled={busy} onClick={() => pickPrestige('title', '')}>авто · высший</button>
+        {invTab === 'gear' ? (
+          <>
+            <div className="inv-sec rise">
+              <div className="inv-h">🎽 Надето <small>{equipped.length}/{c.slots_total}</small></div>
+              {equipped.length === 0
+                ? <div className="inv-empty">Голышом. Надень что-нибудь из стока или скуй в кузнице.</div>
+                : <div className="inv-grid">{equipped.map((s) => (
+                    <GearCard key={s.slot} s={s} action="Снять" busy={busy} onTap={() => unequip(s.slot)} />
+                  ))}</div>}
             </div>
-          </div>
-        )}
-        {pr && pr.has && pr.facades.length > 0 && (
-          <div className="inv-sec rise" style={{ animationDelay: '.1s' }}>
-            <div className="inv-h">🪧 Фасад <small>вывески</small></div>
-            <div className="inv-badges">
-              {pr.facades.map((f) => (
-                <button key={f.key} className={`inv-badge rar-${f.tier || 'gold'}${f.shown ? ' sel' : ''}`}
-                  disabled={busy} onClick={() => pickPrestige('facade', f.key)}>{f.emoji} {f.short}</button>
-              ))}
-              <button className={`inv-badge plain${pr.facades.every((f) => !f.shown) ? ' sel' : ''}`}
-                disabled={busy} onClick={() => pickPrestige('facade', '')}>без фасада</button>
+            <div className="inv-sec rise" style={{ animationDelay: '.04s' }}>
+              <div className="inv-h">📦 Сток <small>{stash.length}</small></div>
+              {stash.length === 0
+                ? <div className="inv-empty">Сток пуст. Скуёшь новую вещь в занятый слот — старая ляжет сюда, не пропадёт.</div>
+                : <div className="inv-grid">{stash.map((s) => (
+                    <GearCard key={s.entry} s={s} action="Надеть" busy={busy} onTap={() => equip(s.entry)} />
+                  ))}</div>}
             </div>
-          </div>
+          </>
+        ) : (
+          <>
+            {(!pr || !pr.has) && <div className="inv-empty" style={{ textAlign: 'center', padding: '22px 20px' }}>Регалий пока нет. Строй чудеса города — Артель наградит званиями и фасадами.</div>}
+            {pr && pr.titles.length > 0 && (
+              <div className="inv-sec rise">
+                <div className="inv-h">🏛 Звание <small>у имени</small></div>
+                <div className="inv-badges">
+                  {pr.titles.map((t) => (
+                    <button key={t.key} className={`inv-badge st-${t.style || 'gold'}${t.shown ? ' sel' : ''}`}
+                      disabled={busy} onClick={() => pickPrestige('title', t.key)}>{t.emoji} {t.short}</button>
+                  ))}
+                  <button className={`inv-badge plain${pr.titles.every((t) => !t.shown) ? ' sel' : ''}`}
+                    disabled={busy} onClick={() => pickPrestige('title', '')}>авто · высший</button>
+                </div>
+              </div>
+            )}
+            {pr && pr.facades.length > 0 && (
+              <div className="inv-sec rise" style={{ animationDelay: '.04s' }}>
+                <div className="inv-h">🪧 Фасад <small>вывески</small></div>
+                <div className="inv-badges">
+                  {pr.facades.map((f) => (
+                    <button key={f.key} className={`inv-badge rar-${f.tier || 'gold'}${f.shown ? ' sel' : ''}`}
+                      disabled={busy} onClick={() => pickPrestige('facade', f.key)}>{f.emoji} {f.short}</button>
+                  ))}
+                  <button className={`inv-badge plain${pr.facades.every((f) => !f.shown) ? ' sel' : ''}`}
+                    disabled={busy} onClick={() => pickPrestige('facade', '')}>без фасада</button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <button className="btn rise" onClick={() => { haptic('light'); setView('doll') }}>← Персонаж</button>
