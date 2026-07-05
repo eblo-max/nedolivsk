@@ -176,6 +176,15 @@ async def cmd_wonder(
     if not _is_admin(message):
         return
     args = (command.args or "").lower().split()
+    if "reset" in args or "stop" in args:    # закрыть текущую стройку (тихо), чтобы начать заново
+        w = await repo.get_active_wonder(session, lock=True)
+        if w is None:
+            await message.answer("🏛 Активной стройки нет — закладывай: <b>/wonder</b>")
+            return
+        w.status = "expired"                 # не building/sealing → нотифаер не трогает, буф не жмёт
+        repo.add_log(session, "admin", message.from_user.id, f"🏛 /wonder reset — «{w.key}» закрыта")
+        await message.answer("🏛 Стройка закрыта. Заложить новую: <b>/wonder</b>")
+        return
     if "fill" in args:                       # ТЕСТ: форс-прогресс, чтобы увидеть крепость
         w = await repo.get_active_wonder(session, lock=True)
         if w is None:
