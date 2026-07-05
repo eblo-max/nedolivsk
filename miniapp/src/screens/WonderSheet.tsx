@@ -11,8 +11,8 @@ interface Wonder {
   progress: number; target: number; pct: number; sealed: boolean
   mine_pts: number; mine_zodar: number; board: Board[]
 }
-interface Item { key: string; name: string; qty: number }
-interface Stock { gold: number; res: Item[]; goods: Item[] }
+interface Item { key: string; name: string; qty: number; pts?: number }
+interface Stock { gold: number; gold_pts?: number; res: Item[]; goods: Item[] }
 interface Resp { ok?: boolean; wonder: Wonder | null; zodar: number; stock: Stock | null }
 interface Contrib extends Resp { award: number }
 
@@ -28,7 +28,7 @@ const SAMPLE: Resp = {
     board: [{ name: 'Синий Гоблин', pts: 3400, zodar: 18 }, { name: 'Wendigo', pts: 2100, zodar: 11 }, { name: 'Елена', pts: 1240, zodar: 6 }],
   },
   zodar: 6,
-  stock: { gold: 4366, res: [{ key: 'wood', name: 'Древесина', qty: 260 }, { key: 'stone', name: 'Камень', qty: 90 }, { key: 'clay', name: 'Глина', qty: 40 }], goods: [{ key: 'ale1', name: 'Эль', qty: 12 }, { key: 'roast', name: 'Жаркое', qty: 7 }] },
+  stock: { gold: 4366, gold_pts: 0.5, res: [{ key: 'wood', name: 'Древесина', qty: 260, pts: 2 }, { key: 'stone', name: 'Камень', qty: 90, pts: 2.5 }, { key: 'clay', name: 'Глина', qty: 40, pts: 2 }], goods: [{ key: 'ale1', name: 'Эль', qty: 12, pts: 5 }, { key: 'roast', name: 'Жаркое', qty: 7, pts: 12 }] },
 }
 
 /** Кинетический счётчик: плавно догоняет значение (rAF, ease-out). */
@@ -279,9 +279,15 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
                           ))}
                         </span>
                       </div>
+                      {(d.stock?.gold ?? 0) > 0 && (
+                        <div className="wd2-goldhint">🪙 Золото ценится вполовину: 100 = {Math.round(100 * (d.stock?.gold_pts ?? 0.5))} в стройку</div>
+                      )}
 
                       {((d.stock?.res.length ?? 0) + (d.stock?.goods.length ?? 0)) > 0 && (() => {
+                        const items = [...(d.stock?.res ?? []), ...(d.stock?.goods ?? [])]
                         const units = Object.values(pick).reduce((a, b) => a + (b || 0), 0)
+                        const value = Math.trunc(Object.entries(pick).reduce(
+                          (a, [k, v]) => a + (v || 0) * (items.find((i) => i.key === k)?.pts ?? 0), 0))
                         return (
                           <>
                             <div className="wd2-lbl2">Загрузи обоз — сколько чего</div>
@@ -294,7 +300,7 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
                               ))}
                             </div>
                             <div className="wd2-send">
-                              <span className="wd2-send-sum">В обозе <b>{fmt(units)}</b> ед.</span>
+                              <span className="wd2-send-sum">В стройку <b>{fmt(value)}</b> ценности <i>({fmt(units)} ед.)</i></span>
                               <button className="wd2-send-go" disabled={busy || units <= 0} onClick={() => contribute(pick)}>🐎 Отправить</button>
                             </div>
                           </>

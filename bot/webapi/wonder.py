@@ -50,17 +50,21 @@ def _wonder_dto(w, pid: int) -> dict:
 
 
 def _stock(p) -> dict | None:
-    """Что игрок может НЕСТИ в стройку: сырьё (инвентарь), блюда (погреб), золото."""
+    """Что игрок может НЕСТИ в стройку: сырьё (инвентарь), блюда (погреб), золото.
+    Отдаём и ЦЕННОСТЬ за единицу (pts) — та же, что копит item_points, — чтобы
+    экран показывал, сколько очков реально уйдёт в стройку (показ=действие).
+    Золото ценится вполовину (gold_pts=GOLD_POINT_RATE): труд ценнее денег."""
     if p is None or p.tavern is None:
         return None
-    from bot.game import balance as bal, production as prod
+    from bot.game import balance as bal, production as prod, wonder as wmod
     inv = p.inventory or {}
     prods = p.tavern.products or {}
     return {
-        "gold": int(p.gold),
-        "res": [{"key": k, "name": bal.RESOURCE_NAMES.get(k, k), "qty": int(inv.get(k, 0))}
+        "gold": int(p.gold), "gold_pts": wmod.GOLD_POINT_RATE,
+        "res": [{"key": k, "name": bal.RESOURCE_NAMES.get(k, k), "qty": int(inv.get(k, 0)),
+                 "pts": bal.RESOURCE_PRICE.get(k, 0)}
                 for k in bal.RESOURCES if int(inv.get(k, 0)) > 0],
-        "goods": [{"key": k, "name": prod.GOODS[k].name, "qty": int(v)}
+        "goods": [{"key": k, "name": prod.GOODS[k].name, "qty": int(v), "pts": prod.GOODS[k].price}
                   for k, v in prods.items() if int(v) > 0 and k in prod.GOODS],
     }
 

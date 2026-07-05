@@ -2144,6 +2144,7 @@ body {
 .wd2-tr-meta b { font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:19px; color:#ffe0a0; line-height:1.1; }
 .wd2-tr-chips { display:flex; gap:5px; }
 .wd2-tr-chips .wd2-chip { min-width:0; padding:6px 10px; }
+.wd2-goldhint { margin:6px 2px 0; font-family:var(--text),system-ui,sans-serif; font-size:11px; color:#9a875f; }
 
 .wd2-lbl2 { font-family:var(--text),system-ui,sans-serif; font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:#8f7c55; margin:15px 0 8px; }
 .wd2-loaders { display:flex; flex-direction:column; gap:7px; }
@@ -2175,6 +2176,7 @@ body {
   border:1px solid #7a5c28; background:linear-gradient(#2e2009,#1a1106); box-shadow:inset 0 1px 0 #ffffff10; }
 .wd2-send-sum { flex:1; min-width:0; font-family:var(--text),system-ui,sans-serif; font-size:13px; color:#c8b489; }
 .wd2-send-sum b { font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:16px; color:#ffe0a0; }
+.wd2-send-sum i { font-style:normal; font-family:var(--num),system-ui,sans-serif; font-size:11.5px; color:#8f7c55; }
 .wd2-send-go { flex:none; padding:11px 20px; border:none; border-radius:11px; cursor:pointer; color:#241501;
   font-family:var(--text),system-ui,sans-serif; font-weight:800; font-size:14px;
   background:linear-gradient(#f6d885,#cf9a3c); box-shadow:0 5px 16px #cf9a3c44; }
