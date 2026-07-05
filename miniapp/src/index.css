@@ -99,8 +99,10 @@ body {
 .hero .nm.fac-legendary .fac-mark { animation:fac-flicker 1.7s ease-in-out infinite; }
 @keyframes fac-flicker { 0%,100%{filter:drop-shadow(0 0 4px #ff9a3c) drop-shadow(0 1px 3px #000a)} 50%{filter:drop-shadow(0 0 9px #ffce6a) drop-shadow(0 1px 3px #000a)} }
 /* Артель-звание зодчего под названием таверны (визуал — из яруса rar-*) */
-.hero .atitle-badge { display:inline-block; margin:6px auto 0; padding:2px 12px; border-radius:9px;
-  font-family:var(--head,Georgia),serif; font-weight:800; font-size:12.5px; letter-spacing:.2px; box-shadow:0 1px 4px #0006; }
+.hero .atitle-badge { display:inline-block; margin:7px auto 0; padding:3px 14px; border-radius:10px;
+  font-family:var(--head,Georgia),serif; font-weight:800; font-size:13.5px; letter-spacing:.3px;
+  vertical-align:middle; }
+.hero .atitle-badge.rar-legendary { padding:3px 16px; font-size:14px; }
 .hero .meta { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:7px; flex-wrap:wrap; }
 .lvl { font-family:var(--disp); font-weight:700; font-size:11px; letter-spacing:1px; color:#231603;
   background:linear-gradient(#d6ab66,#8a5f2c); border:1px solid #5a4320; border-radius:5px; padding:3px 9px;
@@ -1306,17 +1308,34 @@ body {
 .tp-atitle { margin:2px auto 0; font-family:var(--head,Georgia),serif; font-weight:800; font-size:12px;
   border-radius:8px; padding:2px 10px; width:fit-content; }
 
-/* ═══ ЭПИК-ЯРУСЫ РЕДКОСТИ престижа (bronze<silver<gold<legendary) ═══ */
-.rar-bronze { color:#3a1e08; background:linear-gradient(#e2ac6a,#ac6730); border:1px solid #7a4a1e; }
-.rar-silver { color:#20293a; background:linear-gradient(#f0f5fb,#a7b4c6); border:1px solid #7d8ba0;
-  box-shadow:0 0 6px #cfe0f055; }
-.rar-gold { color:#241501; background:linear-gradient(#f8e08c,#d29c3d); border:1px solid #8a6a22;
-  box-shadow:0 0 9px #e7b84066; }
-.rar-legendary { color:#2a1400; border:1px solid #ffe79a; text-shadow:0 1px 1px #fff7;
-  background:linear-gradient(100deg,#ffd76a 0%,#fff3c4 25%,#eaa63e 50%,#fff3c4 75%,#ffd76a 100%);
-  background-size:230% 100%; animation:rar-shimmer 2.8s linear infinite;
-  box-shadow:0 0 13px #ffcf6aaa, inset 0 0 7px #fff5; }
-@keyframes rar-shimmer { 0%{background-position:0% 50%} 100%{background-position:230% 50%} }
+/* ═══ СУПЕРМЕГА-ЭПИК ЯРУСЫ РЕДКОСТИ (bronze<silver<gold<legendary) ═══
+   Металлик-градиент под углом + эмбосс (inset-highlight сверху, тень-текст),
+   растущее сияние-гало. Легендарка — живая: золотой шиммер + пульс гало +
+   пробегающий блик. Анимация ТОЛЬКО у легендарки (редкая → Android-safe). */
+[class*="rar-"] { position:relative; overflow:hidden; isolation:isolate;
+  font-weight:800; letter-spacing:.2px; }
+.rar-bronze { color:#2e1707; border:1px solid #7a4a1e; text-shadow:0 1px 0 #ffdca877;
+  background:linear-gradient(158deg,#f2c184 0%,#c47c3c 46%,#8f501f 100%);
+  box-shadow:inset 0 1px 1px #ffe0b088, inset 0 -2px 3px #5a2f0f66, 0 1px 2px #000a; }
+.rar-silver { color:#141d2b; border:1px solid #8996a8; text-shadow:0 1px 0 #ffffffaa;
+  background:linear-gradient(158deg,#ffffff 0%,#c6cfdb 46%,#8b99ad 100%);
+  box-shadow:inset 0 1px 1px #ffffffcc, inset 0 -2px 3px #6b7688aa, 0 0 8px #cfe0f066, 0 1px 2px #000a; }
+.rar-gold { color:#2a1600; border:1px solid #b58a2c; text-shadow:0 1px 0 #fff3c499;
+  background:linear-gradient(158deg,#fff2b8 0%,#f0c552 46%,#bf862a 100%);
+  box-shadow:inset 0 1px 1px #fff3c4cc, inset 0 -2px 3px #7a531566, 0 0 14px #f0b84088, 0 1px 2px #000a; }
+.rar-legendary { color:#2a1400; border:1px solid #ffe79a; text-shadow:0 1px 2px #fff9, 0 0 7px #ffcf6aaa;
+  background:linear-gradient(100deg,#ffd76a 0%,#fff6d6 24%,#f0b040 50%,#fff6d6 76%,#ffd76a 100%);
+  background-size:250% 100%;
+  animation:rar-shimmer 2.6s linear infinite, rar-pulse 2.4s ease-in-out infinite;
+  box-shadow:0 0 16px #ffcf6ac0, 0 0 6px #ffe8a0, inset 0 1px 2px #fff9, inset 0 -2px 4px #b57c1e77; }
+/* пробегающий блик (только легендарка) */
+.rar-legendary::after { content:''; position:absolute; top:0; bottom:0; left:-45%; width:34%; z-index:1;
+  background:linear-gradient(100deg,transparent,#ffffffcc,transparent); transform:skewX(-16deg);
+  animation:rar-sheen 3.2s ease-in-out infinite; }
+@keyframes rar-shimmer { 0%{background-position:0% 50%} 100%{background-position:250% 50%} }
+@keyframes rar-pulse { 0%,100%{box-shadow:0 0 14px #ffcf6a99,0 0 6px #ffe8a0,inset 0 1px 2px #fff9,inset 0 -2px 4px #b57c1e77}
+  50%{box-shadow:0 0 24px #ffe08fe0,0 0 10px #fff0c0,inset 0 1px 2px #fff9,inset 0 -2px 4px #b57c1e77} }
+@keyframes rar-sheen { 0%,58%{left:-45%} 82%,100%{left:135%} }
 .lb-meta { font-family:system-ui,sans-serif; font-size:10.5px; color:#8a7f6a; margin-top:1px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .lb-bar { margin-top:5px; height:4px; border-radius:3px; background:rgba(0,0,0,.32); overflow:hidden; }
@@ -2158,37 +2177,45 @@ body {
   padding:4px 9px; border-radius:11px; background:#1c1207; border:1px solid #5a4420; }
 .ar-lore { font-family:Georgia,serif; font-style:italic; font-size:12.5px; color:#a08c66; margin:6px 2px 12px; }
 .ar-list { display:flex; flex-direction:column; gap:8px; }
-.ar-card { display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:13px;
+.ar-card { display:flex; align-items:flex-start; gap:11px; padding:10px 11px; border-radius:13px;
   background:linear-gradient(#26190b,#1a1107); border:1px solid var(--line,#4a3719); }
 .ar-card.owned { opacity:.7; border-color:#3f6a38; }
-.ar-emo { font-size:26px; flex:none; }
+.ar-emo { font-size:26px; flex:none; margin-top:1px; }
 .ar-body { flex:1; min-width:0; }
-.ar-name { font-family:var(--text),system-ui,sans-serif; font-weight:700; font-size:14px; color:#f0dfb6; }
+/* верхняя строка карточки: имя (тянется) + цена/статус (фикс, справа-сверху) —
+   цена больше НЕ сжимается плашкой-эффектом (та ушла на всю ширину ниже). */
+.ar-head-row { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.ar-name { flex:1; min-width:0; font-family:var(--text),system-ui,sans-serif; font-weight:700; font-size:14px; color:#f0dfb6; }
 .ar-desc { font-family:var(--text),system-ui,sans-serif; font-size:12px; color:#a99e85; line-height:1.35; }
-.ar-buy { flex:none; padding:8px 13px !important; margin:0 !important; width:auto !important;
+.ar-buy { flex:none; align-self:flex-start; padding:7px 12px !important; margin:0 !important; width:auto !important;
+  white-space:nowrap; border-radius:10px !important;
   font-family:var(--num),system-ui,sans-serif; font-weight:800 !important; color:#241501 !important;
   border-color:#f6dd92 !important; background:linear-gradient(var(--gold-2,#f6d885),#cf9a3c) !important; }
 .ar-buy:disabled { opacity:.4; }
-.ar-have { flex:none; font-family:var(--text),system-ui,sans-serif; font-size:12.5px; color:#a8d99a; align-self:center; }
+.ar-have { flex:none; align-self:flex-start; margin-top:2px; white-space:nowrap;
+  font-family:var(--text),system-ui,sans-serif; font-size:12.5px; color:#a8d99a; }
 /* секции каталога (Ф2b): престиж vs эксклюзив-рецепты */
 .ar-group { margin-top:6px; }
 .ar-group + .ar-group { margin-top:14px; }
 .ar-sec { display:flex; flex-direction:column; gap:1px; margin:2px 2px 8px;
   font-family:var(--head,Georgia),serif; font-weight:800; font-size:13.5px; color:#e7c98a; letter-spacing:.2px; }
 .ar-sec small { font-family:var(--text),system-ui,sans-serif; font-weight:500; font-size:11px; color:#8f7d5c; }
-.ar-card.recipe { align-items:flex-start; border-color:#7a5a24;
-  background:linear-gradient(#2c1d0a,#1c1206); }
-.ar-card.recipe .ar-emo { font-size:24px; margin-top:1px; }
-.ar-eff { display:inline-block; margin:3px 0 4px; padding:2px 8px; border-radius:8px;
-  font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:11.5px; color:#241501;
-  background:linear-gradient(#f6d885,#d8a340); }
+.ar-card.recipe { border-color:#7a5a24; background:linear-gradient(#2c1d0a,#1c1206); }
+.ar-card.recipe .ar-emo { font-size:24px; }
+.ar-eff { display:block; width:fit-content; max-width:100%; margin:5px 0 5px; padding:3px 10px; border-radius:8px;
+  font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:11.5px; line-height:1.3; color:#241501;
+  background:linear-gradient(#ffe6a0,#e6b34e); box-shadow:inset 0 1px 1px #fff5, 0 1px 2px #0006; }
 .ar-where { margin-top:4px; font-family:var(--text),system-ui,sans-serif; font-size:11px; color:#c79a5e; }
 /* Лавка: эпик-ярус карточки престижа (рамка/сияние) + лента редкости у имени */
 .ar-rar { display:inline-block; margin-left:8px; padding:0 6px; border-radius:6px; font-size:8.5px; font-weight:800;
   vertical-align:middle; letter-spacing:.4px; text-transform:uppercase; }
-.ar-card.t-silver { border-color:#7d8ba0; }
-.ar-card.t-gold { border-color:#a5822e; box-shadow:0 0 11px #e7b84033; }
-.ar-card.t-legendary { border-color:#ffe08a; box-shadow:0 0 18px #ffcf6a40; background:linear-gradient(#2e2510,#1a1206); }
+.ar-card.t-bronze { border-color:#8a5a2a; }
+.ar-card.t-silver { border-color:#8996a8; box-shadow:0 0 10px #b9cbe022; }
+.ar-card.t-gold { border-color:#b58a2c; box-shadow:0 0 14px #e7b8404a; background:linear-gradient(#2b2109,#1a1206); }
+.ar-card.t-legendary { border:1px solid #ffe08a; box-shadow:0 0 22px #ffcf6a55, inset 0 0 30px #ffb84018;
+  background:radial-gradient(120% 90% at 50% -10%, #4a3510 0%, #241705 55%, #170f04 100%); }
+.ar-card.t-legendary .ar-emo { filter:drop-shadow(0 0 8px #ffce6a99); }
+.ar-card.t-legendary .ar-name { color:#ffe9b0; text-shadow:0 0 8px #ffcf6a55; }
 .brs-mine-x { flex:none; width:46px; border-radius:14px; cursor:pointer; font-size:17px; color:#f0a08a;
   background:linear-gradient(#2c1410,#1a0d08); border:1px solid #7a3b2e; }
 .brs-mine-x:active { transform:scale(.96); }

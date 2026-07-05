@@ -87,7 +87,18 @@ export default function ArtelSheet({ onClose }: { onClose: () => void }) {
                       <div key={r.id} className={`ar-card${r.owned ? ' owned' : ''}${r.kind === 'recipe' ? ' recipe' : ''}${r.tier ? ' t-' + r.tier : ''}`}>
                         <span className="ar-emo">{r.emoji}</span>
                         <div className="ar-body">
-                          <div className="ar-name">{r.name}{r.tier && <span className={`ar-rar rar-${r.tier}`}>{RAR_LABEL[r.tier] || ''}</span>}</div>
+                          <div className="ar-head-row">
+                            <div className="ar-name">
+                              {r.name}
+                              {r.tier && <span className={`ar-rar rar-${r.tier}`}>{RAR_LABEL[r.tier] || ''}</span>}
+                            </div>
+                            {r.owned ? (
+                              <span className="ar-have">✓ есть</span>
+                            ) : (
+                              <button className="btn ar-buy" disabled={busy || !r.affordable}
+                                onClick={() => buy(r)}>{r.cost} ⚒</button>
+                            )}
+                          </div>
                           {r.kind === 'recipe' && r.effect && (
                             <div className="ar-eff">💥 {r.effect}</div>
                           )}
@@ -96,12 +107,6 @@ export default function ArtelSheet({ onClose }: { onClose: () => void }) {
                             <div className="ar-where">🏭 {r.building}</div>
                           )}
                         </div>
-                        {r.owned ? (
-                          <span className="ar-have">✓ есть</span>
-                        ) : (
-                          <button className="btn ar-buy" disabled={busy || !r.affordable}
-                            onClick={() => buy(r)}>{r.cost} ⚒</button>
-                        )}
                       </div>
                     ))}
                   </div>
