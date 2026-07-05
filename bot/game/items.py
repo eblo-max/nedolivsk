@@ -181,21 +181,27 @@ def plus_bonus(v: int, plus: int) -> int:
 
 
 def item_combat_gain(entry: str, next_plus: int | None = None) -> dict:
-    """Боевые статы вещи на текущей заточке (или дельта до next_plus) — для UI."""
-    item_id, tier, plus, _aff = parse_full(entry)
+    """Боевые статы вещи на текущей заточке (или дельта до next_plus) — для UI.
+    Показ = действие: включает АФФИКС (плоский бонус ×ярус), как combat_stats —
+    иначе карточка/кузница занижали статы аффикс-вещей (напр. kreposti не давал
+    брони на показе). Дельта (next_plus) аффикс НЕ трогает — он постоянен."""
+    item_id, tier, plus, aff = parse_full(entry)
     it = CATALOG.get(item_id)
     if it is None:
         return {}
+    aff_bonus = AFFIXES[aff][1] if aff else {}
     out = {}
     for k in ("damage", "crit", "armor", "luck", "vitality"):
         v = _cmul(getattr(it, k), tier)
-        if v <= 0:
-            continue
-        if next_plus is None:
-            out[k] = v + plus_bonus(v, plus)
-        else:
-            out[k] = plus_bonus(v, next_plus) - plus_bonus(v, plus)
-    return {k: n for k, n in out.items() if n > 0}
+        if next_plus is None:                       # текущие статы вещи (карточка/кузница)
+            total = v + plus_bonus(v, plus) + aff_bonus.get(k, 0) * tier
+            if total > 0:
+                out[k] = total
+        elif v > 0:                                 # дельта заточки — только plus, аффикс постоянен
+            d = plus_bonus(v, next_plus) - plus_bonus(v, plus)
+            if d > 0:
+                out[k] = d
+    return out
 
 # Аффиксы ковки: суффикс имени (родительный падеж — не зависит от рода вещи)
 # + плоский боевой бонус ×ярус вещи. Ролл при заборе крафта T2+.

@@ -356,8 +356,8 @@ export default function Character() {
               <div className="inv-h">📦 Сток <small>{stash.length}</small></div>
               {stash.length === 0
                 ? <div className="inv-empty">Сток пуст. Скуёшь новую вещь в занятый слот — старая ляжет сюда, не пропадёт.</div>
-                : <div className="inv-grid">{stash.map((s) => (
-                    <GearCard key={s.entry} s={s} action="Надеть" busy={busy} onTap={() => equip(s.entry, s.rarity)} />
+                : <div className="inv-grid">{stash.map((s, i) => (
+                    <GearCard key={s.entry + '#' + i} s={s} action="Надеть" busy={busy} onTap={() => equip(s.entry, s.rarity)} />
                   ))}</div>}
             </div>
           </>
