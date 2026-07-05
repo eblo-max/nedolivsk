@@ -147,17 +147,24 @@ def apply_contribution(wonder, pid: str, name: str, raw_points: int,
     capstone = phase_done and before < target       # именно этот вклад закрыл фазу
     wonder_done = False
     if phase_done:
-        last_phase = bool(wdef) and int(wonder.phase) >= len(wdef.phases)
-        if last_phase:
-            wonder.progress = target
-            wonder.status = "sealing"   # вклады закрыты; бонус/буф доплатит нотифаер
-            wonder_done = True
-        else:                                        # перелив уносим в следующую фазу
-            over = after - target
+        # КАСКАД: большой обоз может закрыть НЕСКОЛЬКО фаз за один вклад — переливаем
+        # остаток, пока он не станет меньше цели фазы или не упрёмся в финал (иначе
+        # чудо застревало бы на 100%, не сейлясь). См. аудит перед запуском.
+        over = after - target
+        while True:
+            last_phase = bool(wdef) and int(wonder.phase) >= len(wdef.phases)
+            if last_phase:
+                wonder.progress = int(wonder.target)
+                wonder.status = "sealing"   # вклады закрыты; бонус/буф доплатит нотифаер
+                wonder_done = True
+                break
             wonder.phase = int(wonder.phase) + 1
             nb = wdef.phases[int(wonder.phase) - 1].base_target if wdef else target
             wonder.target = phase_target(nb, active)
-            wonder.progress = over
+            if over < int(wonder.target):
+                wonder.progress = over
+                break
+            over -= int(wonder.target)               # и эта фаза закрыта — переливаем дальше
     else:
         wonder.progress = after
     return {"award": award, "phase_done": phase_done,

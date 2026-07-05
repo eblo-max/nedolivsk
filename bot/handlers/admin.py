@@ -176,6 +176,31 @@ async def cmd_wonder(
     if not _is_admin(message):
         return
     args = (command.args or "").lower().split()
+    if "wipe" in args:                       # ЧИСТЫЙ СТАРТ перед запуском всем: погасить ВСЕ живые
+        from sqlalchemy import select as _select   # чуда + снять глоб-баффы + заложить свежее по
+        from bot.db.models import Wonder           # актуальной калибровке. Устраняет тест-остатки.
+        live_ws = list((await session.execute(
+            _select(Wonder).where(Wonder.status.in_(("building", "sealing")))
+            .with_for_update())).scalars().all())
+        for w in live_ws:
+            w.status = "expired"             # не building/sealing → нотифаер не трогает
+        world = await repo.get_or_create_world(session)
+        lv = dict(world.live or {})
+        had = list(lv.get("wonders_done") or [])
+        lv["wonders_done"] = []              # снять глоб-баффы готовых чудес (заработаются заново)
+        world.live = lv
+        wdef = wmod.get(wmod.FIRST_WONDER)
+        active = await repo.active_player_count(session)
+        target = wmod.phase_target(wdef.phases[0].base_target, active)
+        repo.create_wonder(session, key=wmod.FIRST_WONDER, target=target)
+        repo.add_log(session, "admin", message.from_user.id,
+                     f"🏛 /wonder wipe — погашено {len(live_ws)}, сняты буфы {had}, свежее (цель {target})")
+        await message.answer(
+            f"🏛 <b>Вайп выполнен.</b> Погашено активных чудес: <b>{len(live_ws)}</b>, "
+            f"снят глоб-бафф: {had or '—'}. Заложено свежее «{wdef.emoji} {wdef.name}»: "
+            f"фаза 1 «{wdef.phases[0].title}», цель <b>{target}</b> очков (активных {active}). "
+            f"Готово к открытию всем.")
+        return
     if "reset" in args or "stop" in args:    # закрыть текущую стройку (тихо), чтобы начать заново
         w = await repo.get_active_wonder(session, lock=True)
         if w is None:

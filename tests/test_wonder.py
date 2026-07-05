@@ -131,6 +131,25 @@ def test_apply_contribution_finishes_wonder_on_last_phase():
     assert r["wonder_done"] and w.status == "sealing" and w.progress == 500
 
 
+def test_big_convoy_cascades_through_multiple_phases_no_stall():
+    """Один большой обоз может закрыть НЕСКОЛЬКО фаз за вклад — не застрять на 100%.
+    Регресс: раньше перелив уносился лишь на 1 фазу → чудо висло на 100%, не сейлясь."""
+    p = wonder.WONDERS["wall"].phases
+    # обоз, перекрывающий все три фазы (base×active=1) сразу → сразу sealing
+    w = _wonder(phase=1, target=p[0].base_target, progress=0)
+    r = wonder.apply_contribution(w, "1", "Кит", raw_points=10 ** 6,
+                                  eff_points=0, active=1)
+    assert r["wonder_done"] and w.status == "sealing" and w.phase == len(p)
+    assert w.progress == w.target                    # запечатано ровно на цели финала
+    # обоз, закрывающий фазы 1+2 и с недобором до 3 — стоит на фазе 3 с переливом
+    w2 = _wonder(phase=1, target=p[0].base_target, progress=0)
+    over = p[0].base_target + p[1].base_target + 60  # 200+300+60
+    r2 = wonder.apply_contribution(w2, "1", "Я", raw_points=over,
+                                   eff_points=0, active=1)
+    assert w2.phase == 3 and w2.progress == 60 and w2.status == "building"
+    assert not r2["wonder_done"] and r2["phase_done"] and r2["capstone"]
+
+
 def test_apply_contribution_awards_zodar_via_carry():
     w = _wonder(target=10 ** 9)                               # не закрыть — только копим
     r = wonder.apply_contribution(w, "7", "Гоблин", raw_points=400,
