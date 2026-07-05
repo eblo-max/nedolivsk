@@ -12,6 +12,7 @@ import Tavern from './screens/Tavern'
 const Character = lazy(() => import('./screens/Character'))
 const Sorties = lazy(() => import('./screens/Sorties'))
 const Buildings = lazy(() => import('./screens/Buildings'))
+const Wonders = lazy(() => import('./screens/Wonders'))
 const Market = lazy(() => import('./screens/Market'))
 const WorldMap = lazy(() => import('./screens/WorldMap'))
 const Tutorial = lazy(() => import('./screens/Tutorial'))
@@ -81,11 +82,12 @@ export default function App() {
       {!intro && !tut && chan && <ChannelModal onClose={() => setChan(false)} />}
       <div className="app">
         {/* место под фикс. тикер резервируем только на Таверне (он там и рендерится) */}
-        <div className={`scroll${['/buildings', '/character', '/sorties', '/market', '/map'].includes(loc.pathname) ? '' : ' with-ticker'}`}>
+        <div className={`scroll${['/buildings', '/wonders', '/character', '/sorties', '/market', '/map'].includes(loc.pathname) ? '' : ' with-ticker'}`}>
           <Suspense fallback={LOADING}>
             <Routes>
               <Route path="/" element={<Tavern />} />
               <Route path="/buildings" element={<Buildings />} />
+              <Route path="/wonders" element={<Wonders />} />
               <Route path="/character" element={<Character />} />
               <Route path="/sorties" element={<Sorties />} />
               <Route path="/market" element={<Market />} />

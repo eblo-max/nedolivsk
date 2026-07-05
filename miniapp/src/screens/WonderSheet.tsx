@@ -106,8 +106,8 @@ function goldPresets(g: number): { label: string; n: number }[] {
   return out
 }
 
-export default function WonderSheet({ onClose, onOpenArtel }: {
-  onClose: () => void; onOpenArtel: () => void
+export default function WonderSheet({ onClose, onOpenArtel, page }: {
+  onClose: () => void; onOpenArtel: () => void; page?: boolean
 }) {
   const [d, setD] = useState<Resp | null>(null)
   const [busy, setBusy] = useState(false)
@@ -139,7 +139,7 @@ export default function WonderSheet({ onClose, onOpenArtel }: {
   const mine = useCountUp(w?.mine_pts ?? 0)
 
   return (
-    <div className="sv-backdrop" onClick={onClose}>
+    <div className={page ? 'wd2-page' : 'sv-backdrop'} onClick={page ? undefined : onClose}>
       <div className="wd2" onClick={(e) => e.stopPropagation()}>
         {d === null ? (
           <div className="center" style={{ padding: '80px 0' }}><div className="spin" /></div>
