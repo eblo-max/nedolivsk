@@ -36,7 +36,7 @@ interface RaidSummary {
   status: 'gathering' | 'active' | 'dead' | 'expired'; me_registered: boolean
   n: number; left?: number; hp_pct?: number; phase?: number
 }
-interface Badge { key: string; emoji: string; short: string }
+interface Badge { key: string; emoji: string; short: string; tier: string }
 interface TavernState {
   ok: boolean
   name: string; level: number; region: string; flavor: string
@@ -60,7 +60,7 @@ interface TavernState {
 // образец для оффлайн-превью (форма 1:1 как у /api/state)
 const SAMPLE: TavernState = {
   ok: true, name: 'Кривая Кружка', level: 2, region: 'Изумрудная Чарка',
-  artel: { title: { key: 'pillar', emoji: '🏛', short: 'Столп общины' }, facade: { key: 'carved', emoji: '🪵', short: 'Резной фасад' } },
+  artel: { title: { key: 'legend', emoji: '👑', short: 'Вечный Зодчий', tier: 'legendary' }, facade: { key: 'blazing', emoji: '🔥', short: 'Пылающий герб', tier: 'legendary' } },
   flavor: 'Свечи оплыли, эль выдохся, но гости всё прут — знать, иначе некуда.',
   gold: 1340, income_rate: 18, income_ready: 126, reputation: 27,
   capacity: 24, comfort: 12, luck_pct: 8, gear_worn: 1, gear_slots: 11,
@@ -202,12 +202,12 @@ export default function Tavern() {
           🔔{(t.notif_unread ?? 0) > 0 &&
             <span className="nf-badge">{(t.notif_unread ?? 0) > 99 ? '99+' : t.notif_unread}</span>}
         </button>
-        <div className={`nm${t.artel?.facade ? ' facaded' : ''}`}>
+        <div className={`nm${t.artel?.facade ? ` facaded fac-${t.artel.facade.tier}` : ''}`}>
           {t.artel?.facade && <span className="fac-mark" title={t.artel.facade.short}>{t.artel.facade.emoji}</span>}
           {t.name}
         </div>
         {t.artel?.title && (
-          <div className="atitle-badge" title="Звание за вклад в чудеса города">
+          <div className={`atitle-badge rar-${t.artel.title.tier}`} title="Звание за вклад в чудеса города">
             {t.artel.title.emoji} {t.artel.title.short}
           </div>
         )}

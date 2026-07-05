@@ -298,8 +298,14 @@ body.far .tav-pin .crown{opacity:0}
 .tav-pin.crowned .glow{width:24px;height:24px;box-shadow:0 0 15px 5px rgba(255,200,95,.85),0 0 6px 2px rgba(255,235,180,1)}
 .leaflet-tooltip.tav-label.tl-crown{border-color:#c9a24f;color:#ffe9a8;box-shadow:0 0 8px rgba(231,180,74,.5)}
 .tav-pop .title{margin:2px 0;font:700 11.5px/1.3 var(--serif);color:#ffd97a}
-.tav-pop .atitle{display:inline-block;margin:3px 0 1px;padding:1px 7px;border-radius:7px;font:800 10.5px/1.3 var(--serif);
-  color:#241405;background:linear-gradient(180deg,#f2d488,#cf9a3c);border:1px solid #8a6a22}
+.tav-pop .atitle{display:inline-block;margin:3px 0 1px;padding:1px 7px;border-radius:7px;font:800 10.5px/1.3 var(--serif);color:#241405}
+.tav-pop .atitle.rar-bronze{background:linear-gradient(180deg,#e2ac6a,#ac6730);border:1px solid #7a4a1e;color:#3a1e08}
+.tav-pop .atitle.rar-silver{background:linear-gradient(180deg,#f0f5fb,#a7b4c6);border:1px solid #7d8ba0;color:#20293a}
+.tav-pop .atitle.rar-gold{background:linear-gradient(180deg,#f8e08c,#d29c3d);border:1px solid #8a6a22}
+.tav-pop .atitle.rar-legendary{border:1px solid #ffe79a;color:#2a1400;text-shadow:0 1px 1px #fff7;
+  background:linear-gradient(100deg,#ffd76a,#fff3c4,#eaa63e,#fff3c4,#ffd76a);background-size:230% 100%;
+  animation:rarsh 2.8s linear infinite;box-shadow:0 0 12px #ffcf6a99}
+@keyframes rarsh{0%{background-position:0% 50%}100%{background-position:230% 50%}}
 .tav-pop .facd{margin:3px 0 1px;font:600 10.5px/1.3 var(--serif);color:#c79a5e}
 .tav-pin .lv{position:absolute;top:-3px;right:-3px;min-width:15px;height:15px;padding:0 3px;box-sizing:border-box;
   display:flex;align-items:center;justify-content:center;border-radius:999px;font:700 10px/1 var(--serif);
@@ -426,7 +432,7 @@ var TITLES={gdp:'👑 Богатейший кабак города',rep:'⭐ С�
 function crownEmoji(cr){return cr.indexOf('gdp')>=0?'👑':(cr.indexOf('rep')>=0?'⭐':'🏆');}
 function card(t){
   var titles=(t.crowns||[]).map(function(k){return '<div class="title">'+TITLES[k]+'</div>';}).join('');
-  var at=t.atitle?'<div class="atitle">'+t.atitle.emoji+' '+esc(t.atitle.short)+'</div>':'';
+  var at=t.atitle?'<div class="atitle rar-'+(t.atitle.tier||'gold')+'">'+t.atitle.emoji+' '+esc(t.atitle.short)+'</div>':'';
   var fac=t.facade?'<div class="facd">'+t.facade.emoji+' '+esc(t.facade.short)+'</div>':'';
   return '<div class="tav-pop"><div class="h">'+(t.facade?t.facade.emoji:'🏰')+' '+esc(t.name)+'</div>'+
     '<div class="o">хозяин: '+esc(t.owner)+'</div>'+at+titles+fac+

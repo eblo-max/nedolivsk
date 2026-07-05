@@ -116,13 +116,31 @@ def test_facade_and_prestige_dto():
     assert shop.prestige_dto(p)["facade"]["key"] == "carved"
 
 
-def test_all_titles_and_facades_have_badges():
-    """Инвариант: у каждого продаваемого титула/фасада есть бейдж для показа."""
+_TIERS = {"bronze", "silver", "gold", "legendary"}
+
+
+def test_all_titles_and_facades_have_badges_and_tiers():
+    """Инвариант: у каждого титула/фасада есть бейдж + валидный ярус редкости."""
     for r in shop.CATALOG:
         if r.kind == "title":
             assert r.payload in shop.TITLE_BADGE and r.payload in shop.TITLE_RANK
+            assert shop.TITLE_BADGE[r.payload]["tier"] in _TIERS
         if r.kind == "facade":
-            assert r.payload in shop.FACADE_BADGE
+            assert r.payload in shop.FACADE_BADGE and r.payload in shop.FACADE_RANK
+            assert shop.FACADE_BADGE[r.payload]["tier"] in _TIERS
+        assert shop.reward_tier(r) in (_TIERS | {""})   # рецепты — ''
+
+
+def test_top_tier_prestige_is_legendary():
+    """Вершина лестницы — легендарка (для эпик-визуала шиммера)."""
+    assert shop.TITLE_BADGE[shop.TITLE_RANK[-1]]["tier"] == "legendary"
+    assert shop.FACADE_BADGE[shop.FACADE_RANK[-1]]["tier"] == "legendary"
+    p = _pl(zodar=9999)
+    shop.apply(p, shop.get("t_legend"))
+    tt = shop.top_title(p)
+    assert tt["key"] == "legend" and tt["tier"] == "legendary"
+    d = {x["id"]: x for x in shop.catalog_dto(p)}
+    assert d["t_legend"]["tier"] == "legendary" and d["f_blazing"]["tier"] == "legendary"
 
 
 def test_zodar_not_earnable_or_tradeable_here():

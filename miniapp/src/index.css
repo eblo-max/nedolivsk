@@ -89,12 +89,18 @@ body {
 .hero { position:relative; text-align:center; padding:6px 0 2px; }
 .hero .nm { font-family:var(--disp); font-weight:900; font-size:clamp(21px,6vw,28px); letter-spacing:2px;
   color:#f3e8cb; text-shadow:0 1px 0 #000,0 3px 10px #000a; line-height:1.05; }
-.hero .nm .fac-mark { margin-right:6px; -webkit-text-fill-color:initial; filter:drop-shadow(0 1px 2px #000a); }
+.hero .nm .fac-mark { margin-right:6px; -webkit-text-fill-color:initial; filter:drop-shadow(0 1px 3px #000a); }
 .hero .nm.facaded { text-shadow:0 1px 0 #000,0 0 14px #e7b54a55,0 3px 10px #000a; }
-/* Артель-звание зодчего под названием таверны */
-.hero .atitle-badge { display:inline-block; margin:6px auto 0; padding:2px 11px; border-radius:9px;
-  font-family:var(--head,Georgia),serif; font-weight:800; font-size:12.5px; color:#241501;
-  background:linear-gradient(#f4d789,#d29c3d); border:1px solid #8a6a22; box-shadow:0 1px 4px #0006; }
+.hero .nm.fac-silver { text-shadow:0 1px 0 #000,0 0 16px #cfe0f088,0 3px 10px #000a; }
+.hero .nm.fac-gold { text-shadow:0 1px 0 #000,0 0 20px #ffcf6a99,0 3px 10px #000a; }
+.hero .nm.fac-legendary { text-shadow:0 1px 0 #000,0 0 26px #ff9a3caa,0 0 12px #ffe08a88,0 3px 10px #000a;
+  animation:fac-burn 2.6s ease-in-out infinite; }
+@keyframes fac-burn { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.18)} }
+.hero .nm.fac-legendary .fac-mark { animation:fac-flicker 1.7s ease-in-out infinite; }
+@keyframes fac-flicker { 0%,100%{filter:drop-shadow(0 0 4px #ff9a3c) drop-shadow(0 1px 3px #000a)} 50%{filter:drop-shadow(0 0 9px #ffce6a) drop-shadow(0 1px 3px #000a)} }
+/* Артель-звание зодчего под названием таверны (визуал — из яруса rar-*) */
+.hero .atitle-badge { display:inline-block; margin:6px auto 0; padding:2px 12px; border-radius:9px;
+  font-family:var(--head,Georgia),serif; font-weight:800; font-size:12.5px; letter-spacing:.2px; box-shadow:0 1px 4px #0006; }
 .hero .meta { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:7px; flex-wrap:wrap; }
 .lvl { font-family:var(--disp); font-weight:700; font-size:11px; letter-spacing:1px; color:#231603;
   background:linear-gradient(#d6ab66,#8a5f2c); border:1px solid #5a4320; border-radius:5px; padding:3px 9px;
@@ -1293,13 +1299,24 @@ body {
   display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .lb-you { flex:none; font-size:9.5px; font-weight:800; letter-spacing:.5px; color:#1c150a; background:linear-gradient(95deg,#f7d488,#e7a843);
   border-radius:5px; padding:1px 5px; text-transform:uppercase; }
-/* Артель-звание зодчего у имени (рейтинг + профиль) */
-.lb-atitle { flex:none; font-size:9.5px; font-weight:800; color:#241501; border-radius:5px; padding:1px 6px;
-  background:linear-gradient(#f2d488,#cf9a3c); border:1px solid #8a6a22; }
-.lb-patitle { margin:1px auto 0; max-width:100%; font-size:9px; font-weight:800; color:#241501; border-radius:5px; padding:0 5px;
-  background:linear-gradient(#f2d488,#cf9a3c); border:1px solid #8a6a22; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.tp-atitle { margin:2px auto 0; font-family:var(--head,Georgia),serif; font-weight:800; font-size:12px; color:#241501;
-  background:linear-gradient(#f2d488,#cf9a3c); border:1px solid #8a6a22; border-radius:8px; padding:2px 10px; width:fit-content; }
+/* Артель-звание зодчего у имени (рейтинг + профиль) — визуал из яруса rar-* */
+.lb-atitle { flex:none; font-size:9.5px; font-weight:800; border-radius:5px; padding:1px 6px; }
+.lb-patitle { margin:1px auto 0; max-width:100%; font-size:9px; font-weight:800; border-radius:5px; padding:0 5px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tp-atitle { margin:2px auto 0; font-family:var(--head,Georgia),serif; font-weight:800; font-size:12px;
+  border-radius:8px; padding:2px 10px; width:fit-content; }
+
+/* ═══ ЭПИК-ЯРУСЫ РЕДКОСТИ престижа (bronze<silver<gold<legendary) ═══ */
+.rar-bronze { color:#3a1e08; background:linear-gradient(#e2ac6a,#ac6730); border:1px solid #7a4a1e; }
+.rar-silver { color:#20293a; background:linear-gradient(#f0f5fb,#a7b4c6); border:1px solid #7d8ba0;
+  box-shadow:0 0 6px #cfe0f055; }
+.rar-gold { color:#241501; background:linear-gradient(#f8e08c,#d29c3d); border:1px solid #8a6a22;
+  box-shadow:0 0 9px #e7b84066; }
+.rar-legendary { color:#2a1400; border:1px solid #ffe79a; text-shadow:0 1px 1px #fff7;
+  background:linear-gradient(100deg,#ffd76a 0%,#fff3c4 25%,#eaa63e 50%,#fff3c4 75%,#ffd76a 100%);
+  background-size:230% 100%; animation:rar-shimmer 2.8s linear infinite;
+  box-shadow:0 0 13px #ffcf6aaa, inset 0 0 7px #fff5; }
+@keyframes rar-shimmer { 0%{background-position:0% 50%} 100%{background-position:230% 50%} }
 .lb-meta { font-family:system-ui,sans-serif; font-size:10.5px; color:#8a7f6a; margin-top:1px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .lb-bar { margin-top:5px; height:4px; border-radius:3px; background:rgba(0,0,0,.32); overflow:hidden; }
@@ -2166,6 +2183,12 @@ body {
   font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:11.5px; color:#241501;
   background:linear-gradient(#f6d885,#d8a340); }
 .ar-where { margin-top:4px; font-family:var(--text),system-ui,sans-serif; font-size:11px; color:#c79a5e; }
+/* Лавка: эпик-ярус карточки престижа (рамка/сияние) + лента редкости у имени */
+.ar-rar { display:inline-block; margin-left:8px; padding:0 6px; border-radius:6px; font-size:8.5px; font-weight:800;
+  vertical-align:middle; letter-spacing:.4px; text-transform:uppercase; }
+.ar-card.t-silver { border-color:#7d8ba0; }
+.ar-card.t-gold { border-color:#a5822e; box-shadow:0 0 11px #e7b84033; }
+.ar-card.t-legendary { border-color:#ffe08a; box-shadow:0 0 18px #ffcf6a40; background:linear-gradient(#2e2510,#1a1206); }
 .brs-mine-x { flex:none; width:46px; border-radius:14px; cursor:pointer; font-size:17px; color:#f0a08a;
   background:linear-gradient(#2c1410,#1a0d08); border:1px solid #7a3b2e; }
 .brs-mine-x:active { transform:scale(.96); }

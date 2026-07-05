@@ -30,14 +30,26 @@ class Reward:
 # Каталог Лавки. Престиж 10–80 ⚒; эксклюзив-рецепты (Ф2b) 220–450 ⚒ — самый
 # долгий чейз (несколько чудес), потому и товар с них — имба (мотив вкладываться).
 CATALOG: list[Reward] = [
+    # ── Эпик-лестница ТИТУЛОВ (bronze→silver→gold→legendary) ──
     Reward("t_zodchy", "🔨", "Титул «Зодчий»",
-           "Звание у имени — ты поднимал чудеса города.", 10, "title", "zodchy"),
+           "Первый камень лёг твоей рукой — город запомнил.", 10, "title", "zodchy"),
     Reward("t_mason", "🧱", "Титул «Каменщик Недоливска»",
-           "Уважение цеха каменщиков за вклад в стройки.", 25, "title", "mason"),
-    Reward("f_carved", "🪵", "Резной фасад таверны",
-           "Артель украсит твою вывеску — видно гостям и на карте.", 40, "facade", "carved"),
-    Reward("t_pillar", "🏛", "Титул «Столп общины»",
-           "Высшее звание строителя — имя, что помнит весь город.", 80, "title", "pillar"),
+           "Цех каменщиков жмёт тебе руку: стены помнят твой пот.", 25, "title", "mason"),
+    Reward("t_pillar", "🏛", "Титул «Столп Общины»",
+           "На таких, как ты, держится весь город. Имя звучит на площади.", 80, "title", "pillar"),
+    Reward("t_keeper", "🛡", "Титул «Хранитель Твердыни»",
+           "Стены стоят твоим радением — Орда обходит город стороной.", 200, "title", "keeper"),
+    Reward("t_legend", "👑", "Титул «Вечный Зодчий»",
+           "Высшее имя Артели. Тебя впишут в летопись, что переживёт стены.", 500, "title", "legend"),
+    # ── Эпик-лестница ФАСАДОВ вывески ──
+    Reward("f_carved", "🪵", "Резной фасад",
+           "Артель вырежет узор по вывеске — гости заглядываются.", 40, "facade", "carved"),
+    Reward("f_gilded", "✨", "Златая вывеска",
+           "Сусальное золото по краю вывески — видно за версту.", 120, "facade", "gilded"),
+    Reward("f_crested", "💎", "Самоцветный герб",
+           "Герб Артели с самоцветами над дверью — богатеи кивают уважительно.", 300, "facade", "crested"),
+    Reward("f_blazing", "🔥", "Пылающий герб Артели",
+           "Герб, что тлеет вечным углём Твердыни. Легенда среди вывесок.", 600, "facade", "blazing"),
     # ── Эксклюзив-рецепты (Ф2b): чертёж куплен раз — варишь/куёшь навсегда ──
     Reward("r_feast", "🍗", "Рецепт «Пир зодчих»",
            "Чертёж артельного стола. Варишь на КУХНЕ — снедь, что ставит бойца на ноги.",
@@ -112,21 +124,37 @@ def apply(player, r: Reward) -> None:
     player.story = st
 
 
-# ── Показ престижа: титул у имени + фасад вывески (Ф2b-финиш) ──────────────
+# ── Показ престижа: титул у имени + фасад вывески (эпик-ярусы редкости) ─────
+# tier ∈ bronze<silver<gold<legendary — драйвит визуал (цвет/сияние/шиммер).
 # Ранг титулов по возрастанию престижа — у имени показываем ВЫСШИЙ купленный.
-TITLE_RANK = ("zodchy", "mason", "pillar")
+TITLE_RANK = ("zodchy", "mason", "pillar", "keeper", "legend")
 TITLE_BADGE = {
-    "zodchy": {"emoji": "🔨", "short": "Зодчий"},
-    "mason":  {"emoji": "🧱", "short": "Каменщик"},
-    "pillar": {"emoji": "🏛", "short": "Столп общины"},
+    "zodchy": {"emoji": "🔨", "short": "Зодчий", "tier": "bronze"},
+    "mason":  {"emoji": "🧱", "short": "Каменщик", "tier": "bronze"},
+    "pillar": {"emoji": "🏛", "short": "Столп Общины", "tier": "silver"},
+    "keeper": {"emoji": "🛡", "short": "Хранитель Твердыни", "tier": "gold"},
+    "legend": {"emoji": "👑", "short": "Вечный Зодчий", "tier": "legendary"},
 }
+FACADE_RANK = ("carved", "gilded", "crested", "blazing")
 FACADE_BADGE = {
-    "carved": {"emoji": "🪵", "short": "Резной фасад"},
+    "carved":  {"emoji": "🪵", "short": "Резной фасад", "tier": "bronze"},
+    "gilded":  {"emoji": "✨", "short": "Златая вывеска", "tier": "silver"},
+    "crested": {"emoji": "💎", "short": "Самоцветный герб", "tier": "gold"},
+    "blazing": {"emoji": "🔥", "short": "Пылающий герб", "tier": "legendary"},
 }
+
+
+def reward_tier(r: Reward) -> str:
+    """Ярус редкости награды (для эпик-визуала карточки Лавки). '' — у рецептов."""
+    if r.kind == "title":
+        return TITLE_BADGE.get(r.payload, {}).get("tier", "")
+    if r.kind == "facade":
+        return FACADE_BADGE.get(r.payload, {}).get("tier", "")
+    return ""
 
 
 def top_title(player) -> dict | None:
-    """Высший купленный титул для показа у имени: {key,emoji,short}. None — нет."""
+    """Высший купленный титул для показа у имени: {key,emoji,short,tier}. None — нет."""
     owned = set(_artel(player)["titles"])
     for key in reversed(TITLE_RANK):            # с самого престижного вниз
         if key in owned:
@@ -135,7 +163,7 @@ def top_title(player) -> dict | None:
 
 
 def facade_badge(player) -> dict | None:
-    """Купленный фасад вывески: {key,emoji,short}. None — нет."""
+    """Купленный фасад вывески: {key,emoji,short,tier}. None — нет."""
     f = _artel(player)["facade"]
     return {"key": f, **FACADE_BADGE[f]} if f in FACADE_BADGE else None
 
@@ -155,5 +183,6 @@ def catalog_dto(player) -> list[dict]:
         out.append({"id": r.id, "emoji": r.emoji, "name": r.name, "desc": r.desc,
                     "cost": r.cost, "kind": r.kind, "owned": have,
                     "affordable": z >= r.cost,
-                    "building": r.building, "effect": r.effect})
+                    "building": r.building, "effect": r.effect,
+                    "tier": reward_tier(r)})
     return out
