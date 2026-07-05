@@ -1599,6 +1599,24 @@ body {
 .inv-cact { width:100%; margin-top:3px; padding:3px 0; border-radius:8px; font-family:var(--num),system-ui,sans-serif; font-weight:800; font-size:10.5px; }
 .inv-cact.on { color:#241501; background:linear-gradient(#f6d885,#cf9a3c); }
 .inv-cact.off { color:#d8b98a; background:#2a1c0d; border:1px solid #5a4020; }
+
+/* Вспышка-бёрст при надел/снятии: свечение + кольцо + 8 искр, цвет — по редкости */
+.inv-burst { position:fixed; inset:0; z-index:60; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+.inv-burst.rq-common { --rq:#e6d9bf; }
+.inv-burst.rq-rare { --rq:#7fc0ff; }
+.inv-burst.rq-epic { --rq:#d492ff; }
+.inv-burst.rq-legendary { --rq:#ffd77a; }
+.ib-flash { position:absolute; width:150px; height:150px; border-radius:50%;
+  background:radial-gradient(circle, var(--rq) 0%, transparent 60%); animation:ib-flash .5s ease-out forwards; }
+.ib-ring { position:absolute; width:46px; height:46px; border-radius:50%; border:3px solid var(--rq);
+  box-shadow:0 0 14px var(--rq); animation:ib-ring .55s cubic-bezier(.2,.7,.3,1) forwards; }
+.ib-spark { position:absolute; width:4px; height:16px; border-radius:2px; background:var(--rq);
+  box-shadow:0 0 6px var(--rq); animation:ib-spark .55s ease-out forwards; }
+@keyframes ib-flash { 0%{opacity:.85; transform:scale(.35)} 100%{opacity:0; transform:scale(1.5)} }
+@keyframes ib-ring { 0%{opacity:.95; transform:scale(.3)} 100%{opacity:0; transform:scale(2.8)} }
+@keyframes ib-spark {
+  0%{opacity:1; transform:rotate(var(--a)) translateY(-16px) scaleY(1)}
+  100%{opacity:0; transform:rotate(var(--a)) translateY(-70px) scaleY(.4)} }
 .inv-badges { display:flex; flex-wrap:wrap; gap:8px; }
 .inv-badge { padding:5px 12px; border-radius:9px; font-family:var(--head,Georgia),serif; font-weight:800;
   font-size:12.5px; cursor:pointer; opacity:.6; transition:opacity .15s, transform .1s; }

@@ -146,6 +146,7 @@ export default function Character() {
   const { data, loading, error, set, reload } = useApi<CharState>('character', SAMPLE)
   const [view, setView] = useState<'doll' | 'inv' | 'forge'>('doll')
   const [invTab, setInvTab] = useState<'gear' | 'prestige'>('gear')
+  const [burst, setBurst] = useState<{ n: number; rq: string } | null>(null)
   const [forge, setForge] = useState<ForgeState | null>(null)
   const [pick, setPick] = useState<ForgeItem | null>(null)
   const [pickSlot, setPickSlot] = useState<Slot | null>(null)
@@ -224,18 +225,22 @@ export default function Character() {
     } catch { hapticNotify('warning'); flash('Лечиться нечем') }
     finally { setBusy(false) }
   }
-  async function equip(entry: string) {
+  function popBurst(rq?: string) {                  // вспышка-бёрст при надел/снятии
+    setBurst({ n: Date.now(), rq: rq || 'common' })
+    setTimeout(() => setBurst((b) => (b && Date.now() - b.n >= 600 ? null : b)), 650)
+  }
+  async function equip(entry: string, rarity?: string) {
     if (busy) return
-    haptic('medium'); setBusy(true)
+    haptic('medium'); popBurst(rarity); setBusy(true)
     try {
       const r = await api<{ character: CharState }>('gear/equip', { entry })
       set(r.character); hapticNotify('success'); flash('Надето')
     } catch { hapticNotify('warning'); flash('Не вышло надеть') }
     finally { setBusy(false) }
   }
-  async function unequip(slot: string) {
+  async function unequip(slot: string, rarity?: string) {
     if (busy) return
-    haptic('medium'); setBusy(true)
+    haptic('medium'); popBurst(rarity); setBusy(true)
     try {
       const r = await api<{ character: CharState }>('gear/unequip', { slot })
       set(r.character); hapticNotify('success'); flash('Снято в сток')
@@ -344,7 +349,7 @@ export default function Character() {
               {equipped.length === 0
                 ? <div className="inv-empty">Голышом. Надень что-нибудь из стока или скуй в кузнице.</div>
                 : <div className="inv-grid">{equipped.map((s) => (
-                    <GearCard key={s.slot} s={s} action="Снять" busy={busy} onTap={() => unequip(s.slot)} />
+                    <GearCard key={s.slot} s={s} action="Снять" busy={busy} onTap={() => unequip(s.slot, s.rarity)} />
                   ))}</div>}
             </div>
             <div className="inv-sec rise" style={{ animationDelay: '.04s' }}>
@@ -352,7 +357,7 @@ export default function Character() {
               {stash.length === 0
                 ? <div className="inv-empty">Сток пуст. Скуёшь новую вещь в занятый слот — старая ляжет сюда, не пропадёт.</div>
                 : <div className="inv-grid">{stash.map((s) => (
-                    <GearCard key={s.entry} s={s} action="Надеть" busy={busy} onTap={() => equip(s.entry)} />
+                    <GearCard key={s.entry} s={s} action="Надеть" busy={busy} onTap={() => equip(s.entry, s.rarity)} />
                   ))}</div>}
             </div>
           </>
@@ -389,6 +394,15 @@ export default function Character() {
         )}
 
         <button className="btn rise" onClick={() => { haptic('light'); setView('doll') }}>← Персонаж</button>
+        {burst && (
+          <div key={burst.n} className={`inv-burst rq-${burst.rq}`}>
+            <div className="ib-flash" />
+            <div className="ib-ring" />
+            {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <i key={i} className="ib-spark" style={{ ['--a' as string]: `${i * 45}deg` }} />
+            ))}
+          </div>
+        )}
         {toast && <div className="toast">{toast}</div>}
       </>
     )
