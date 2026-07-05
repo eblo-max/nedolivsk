@@ -91,6 +91,40 @@ def test_recipe_dto_carries_building_and_effect():
     assert dto["kind"] == "recipe"
 
 
+def test_top_title_returns_highest_prestige():
+    """У имени показываем ВЫСШИЙ купленный титул (ранг zodchy<mason<pillar)."""
+    p = _pl(zodar=1000)
+    assert shop.top_title(p) is None                       # нет титулов
+    shop.apply(p, shop.get("t_zodchy"))
+    assert shop.top_title(p)["key"] == "zodchy"
+    shop.apply(p, shop.get("t_pillar"))                    # выше по рангу
+    assert shop.top_title(p)["key"] == "pillar"
+    shop.apply(p, shop.get("t_mason"))                     # ниже pillar — не перебивает
+    assert shop.top_title(p)["key"] == "pillar"
+    tt = shop.top_title(p)
+    assert tt["emoji"] and tt["short"]
+
+
+def test_facade_and_prestige_dto():
+    p = _pl(zodar=1000)
+    assert shop.facade_badge(p) is None
+    dto = shop.prestige_dto(p)
+    assert dto == {"title": None, "facade": None}
+    shop.apply(p, shop.get("f_carved"))
+    fb = shop.facade_badge(p)
+    assert fb["key"] == "carved" and fb["emoji"] and fb["short"]
+    assert shop.prestige_dto(p)["facade"]["key"] == "carved"
+
+
+def test_all_titles_and_facades_have_badges():
+    """Инвариант: у каждого продаваемого титула/фасада есть бейдж для показа."""
+    for r in shop.CATALOG:
+        if r.kind == "title":
+            assert r.payload in shop.TITLE_BADGE and r.payload in shop.TITLE_RANK
+        if r.kind == "facade":
+            assert r.payload in shop.FACADE_BADGE
+
+
 def test_zodar_not_earnable_or_tradeable_here():
     """Инвариант bind-on-earn: в Лавке зодар только ТРАТЯТ (кран/торговля — нигде)."""
     import inspect

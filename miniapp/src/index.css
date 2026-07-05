@@ -89,6 +89,12 @@ body {
 .hero { position:relative; text-align:center; padding:6px 0 2px; }
 .hero .nm { font-family:var(--disp); font-weight:900; font-size:clamp(21px,6vw,28px); letter-spacing:2px;
   color:#f3e8cb; text-shadow:0 1px 0 #000,0 3px 10px #000a; line-height:1.05; }
+.hero .nm .fac-mark { margin-right:6px; -webkit-text-fill-color:initial; filter:drop-shadow(0 1px 2px #000a); }
+.hero .nm.facaded { text-shadow:0 1px 0 #000,0 0 14px #e7b54a55,0 3px 10px #000a; }
+/* Артель-звание зодчего под названием таверны */
+.hero .atitle-badge { display:inline-block; margin:6px auto 0; padding:2px 11px; border-radius:9px;
+  font-family:var(--head,Georgia),serif; font-weight:800; font-size:12.5px; color:#241501;
+  background:linear-gradient(#f4d789,#d29c3d); border:1px solid #8a6a22; box-shadow:0 1px 4px #0006; }
 .hero .meta { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:7px; flex-wrap:wrap; }
 .lvl { font-family:var(--disp); font-weight:700; font-size:11px; letter-spacing:1px; color:#231603;
   background:linear-gradient(#d6ab66,#8a5f2c); border:1px solid #5a4320; border-radius:5px; padding:3px 9px;
@@ -1287,6 +1293,13 @@ body {
   display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .lb-you { flex:none; font-size:9.5px; font-weight:800; letter-spacing:.5px; color:#1c150a; background:linear-gradient(95deg,#f7d488,#e7a843);
   border-radius:5px; padding:1px 5px; text-transform:uppercase; }
+/* Артель-звание зодчего у имени (рейтинг + профиль) */
+.lb-atitle { flex:none; font-size:9.5px; font-weight:800; color:#241501; border-radius:5px; padding:1px 6px;
+  background:linear-gradient(#f2d488,#cf9a3c); border:1px solid #8a6a22; }
+.lb-patitle { margin:1px auto 0; max-width:100%; font-size:9px; font-weight:800; color:#241501; border-radius:5px; padding:0 5px;
+  background:linear-gradient(#f2d488,#cf9a3c); border:1px solid #8a6a22; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tp-atitle { margin:2px auto 0; font-family:var(--head,Georgia),serif; font-weight:800; font-size:12px; color:#241501;
+  background:linear-gradient(#f2d488,#cf9a3c); border:1px solid #8a6a22; border-radius:8px; padding:2px 10px; width:fit-content; }
 .lb-meta { font-family:system-ui,sans-serif; font-size:10.5px; color:#8a7f6a; margin-top:1px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .lb-bar { margin-top:5px; height:4px; border-radius:3px; background:rgba(0,0,0,.32); overflow:hidden; }

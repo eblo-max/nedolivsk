@@ -3,7 +3,13 @@ import { api } from '../api'
 import { haptic } from '../telegram'
 
 type MetricKey = 'gdp' | 'rep' | 'level'
-interface Row { place: number; name: string; id?: number; ava?: string; owner: string; level: number; loc: string; gdp: number; rep: number; cap?: number; comfort?: number; builds?: number; mine: boolean; trend?: number | null }
+interface Row { place: number; name: string; id?: number; ava?: string; owner: string; level: number; loc: string; gdp: number; rep: number; cap?: number; comfort?: number; builds?: number; mine: boolean; trend?: number | null; atitle?: { emoji: string; short: string } | null }
+
+/** Артель-звание зодчего у имени (за вклад в чудеса города). */
+function ATitle({ a }: { a?: { emoji: string; short: string } | null }) {
+  if (!a) return null
+  return <span className="lb-atitle" title="Звание за вклад в чудеса города">{a.emoji} {a.short}</span>
+}
 interface Board { rows: Row[]; me: Row | null }
 interface Rating { boards: Record<MetricKey, Board>; total_gdp: number; total: number }
 
@@ -52,6 +58,7 @@ function TavernProfile({ r, boards, onClose }: { r: Row; boards: Record<MetricKe
       <div className="tp-card" onClick={(e) => e.stopPropagation()}>
         <Avatar ava={r.ava} name={r.name} rank={titles.length ? 1 : 99} />
         <div className="tp-name">{r.name}{r.mine && <span className="lb-you">ты</span>}</div>
+        {r.atitle && <div className="tp-atitle">{r.atitle.emoji} {r.atitle.short}</div>}
         <div className="tp-owner">хозяин: {r.owner} · 📍 {r.loc}</div>
         {titles.length > 0 && (
           <div className="tp-titles">{titles.map((k) => <div key={k} className="tp-title">{TITLES[k]}</div>)}</div>
@@ -78,11 +85,11 @@ function TavernProfile({ r, boards, onClose }: { r: Row; boards: Record<MetricKe
 // Демо ТОЛЬКО в dev-превью (import.meta.env.DEV). В прод-сборке вырезается.
 const DEV = import.meta.env.DEV
 const DEMO_ROWS: Omit<Row, 'place' | 'mine'>[] = [
-  { name: 'Кривая Кружка', id: 1, owner: 'Барон', level: 7, loc: 'Изумрудная Чарка', gdp: 1340, rep: 27, cap: 26, comfort: 14, builds: 6 },
-  { name: 'Пьяный Гусь', id: 2, owner: 'Прохор', level: 6, loc: 'Зелёный Змий', gdp: 1180, rep: 31, cap: 22, comfort: 11, builds: 5 },
+  { name: 'Кривая Кружка', id: 1, owner: 'Барон', level: 7, loc: 'Изумрудная Чарка', gdp: 1340, rep: 27, cap: 26, comfort: 14, builds: 6, atitle: { emoji: '🏛', short: 'Столп общины' } },
+  { name: 'Пьяный Гусь', id: 2, owner: 'Прохор', level: 6, loc: 'Зелёный Змий', gdp: 1180, rep: 31, cap: 22, comfort: 11, builds: 5, atitle: { emoji: '🔨', short: 'Зодчий' } },
   { name: 'Косая Бочка', id: 3, owner: 'Фёкла', level: 6, loc: 'Сухой Закон', gdp: 1020, rep: 18 },
   { name: 'Тёплый Подвал', id: 4, owner: 'Гаврила', level: 5, loc: 'Рассольник', gdp: 880, rep: 22 },
-  { name: 'Сухое Горло', id: 5, owner: 'Тихон', level: 5, loc: 'Похмельные Дюны', gdp: 760, rep: 12 },
+  { name: 'Сухое Горло', id: 5, owner: 'Тихон', level: 5, loc: 'Похмельные Дюны', gdp: 760, rep: 12, atitle: { emoji: '🧱', short: 'Каменщик' } },
   { name: 'Бычий Глаз', id: 6, owner: 'Марфа', level: 4, loc: 'Чекушкины Холмы', gdp: 640, rep: 15 },
   { name: 'Хмельной Кот', id: 7, owner: 'Степан', level: 4, loc: 'Бражные Поля', gdp: 520, rep: 9 },
   { name: 'Дно Бутылки', id: 8, owner: 'Аграфена', level: 3, loc: 'Старый Запой', gdp: 410, rep: 7 },
@@ -186,6 +193,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                     {r.place === 1 && <div className="lb-crown">👑</div>}
                     <Avatar ava={r.ava} name={r.name} rank={r.place} />
                     <div className="lb-pname">{r.name}</div>
+                    {r.atitle && <div className="lb-patitle">{r.atitle.emoji} {r.atitle.short}</div>}
                     <div className="lb-pval">{m.fmt(m.val(r))}</div>
                     <Trend t={r.trend} />
                     <div className="lb-ped"><span>{r.place}</span></div>
@@ -204,7 +212,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                     <div className="lb-rank">{r.place}<Trend t={r.trend} /></div>
                     <Avatar ava={r.ava} name={r.name} rank={r.place} sm />
                     <div className="lb-info">
-                      <div className="lb-name">{r.name}{r.mine && <span className="lb-you">ты</span>}</div>
+                      <div className="lb-name">{r.name}{r.mine && <span className="lb-you">ты</span>}<ATitle a={r.atitle} /></div>
                       <div className="lb-meta">📍 {r.loc} · {r.owner}</div>
                       <div className="lb-bar"><i style={{ width: `${pct}%` }} /></div>
                     </div>

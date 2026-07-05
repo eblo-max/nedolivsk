@@ -21,6 +21,7 @@ _RATING_TOP = 50                              # длина каждой доск
 def _rating_entries(rows: list) -> tuple[list[dict], int]:
     """Сводка по всем тавернам: id/имя/владелец/уровень/локация + метрики gdp/rep.
     ВВП считается ОДИН раз (как «рп топ» в боте) — дальше сортируем по любой метрике."""
+    from bot.game import artel_shop
     from bot.game import buildings as bld
     from bot.game import items as it
     from bot.game import production as prodmod
@@ -40,6 +41,7 @@ def _rating_entries(rows: list) -> tuple[list[dict], int]:
             "cap": int(tavern.capacity or 0), "comfort": int(tavern.comfort or 0),
             "builds": len(tavern.buildings or []),   # для мини-профиля таверны
             "ava": f"{player.id}.{_ava_sig(int(player.id))}",   # подписанная ссылка на аватар
+            "atitle": artel_shop.top_title(player),   # артель-титул зодчего (у имени)
         })
     return entries, sum(e["gdp"] for e in entries)
 

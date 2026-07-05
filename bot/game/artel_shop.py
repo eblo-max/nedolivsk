@@ -112,6 +112,39 @@ def apply(player, r: Reward) -> None:
     player.story = st
 
 
+# ── Показ престижа: титул у имени + фасад вывески (Ф2b-финиш) ──────────────
+# Ранг титулов по возрастанию престижа — у имени показываем ВЫСШИЙ купленный.
+TITLE_RANK = ("zodchy", "mason", "pillar")
+TITLE_BADGE = {
+    "zodchy": {"emoji": "🔨", "short": "Зодчий"},
+    "mason":  {"emoji": "🧱", "short": "Каменщик"},
+    "pillar": {"emoji": "🏛", "short": "Столп общины"},
+}
+FACADE_BADGE = {
+    "carved": {"emoji": "🪵", "short": "Резной фасад"},
+}
+
+
+def top_title(player) -> dict | None:
+    """Высший купленный титул для показа у имени: {key,emoji,short}. None — нет."""
+    owned = set(_artel(player)["titles"])
+    for key in reversed(TITLE_RANK):            # с самого престижного вниз
+        if key in owned:
+            return {"key": key, **TITLE_BADGE[key]}
+    return None
+
+
+def facade_badge(player) -> dict | None:
+    """Купленный фасад вывески: {key,emoji,short}. None — нет."""
+    f = _artel(player)["facade"]
+    return {"key": f, **FACADE_BADGE[f]} if f in FACADE_BADGE else None
+
+
+def prestige_dto(player) -> dict:
+    """Витрина престижа игрока (титул + фасад) — для экрана таверны/рейтинга/карты."""
+    return {"title": top_title(player), "facade": facade_badge(player)}
+
+
 def catalog_dto(player) -> list[dict]:
     """Каталог для экрана: цена, куплено ли, по карману ли (показ=действие: cost тот
     же, что спишется). Для рецептов — где варится и что даёт."""

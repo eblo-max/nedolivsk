@@ -196,8 +196,10 @@ def _tavern_state(p, t) -> dict:
     cellar = [{"key": k, "name": prod.GOODS[k].name, "qty": int(q)}
               for k, q in (t.products or {}).items() if q and k in prod.GOODS]
 
+    from bot.game import artel_shop
     return {
         "ok": True, "name": t.name, "level": int(t.level),
+        "artel": artel_shop.prestige_dto(p),                 # титул у имени + фасад вывески
         "region": worldmap.continent_name(p.region, p.id),   # локация = континент своей зоны
         "flavor": texts._flavor_line(p, t, chat_id, seasonmod, citymod),
         "gold": int(p.gold), "income_rate": logic.income_rate_quote(p, t),
