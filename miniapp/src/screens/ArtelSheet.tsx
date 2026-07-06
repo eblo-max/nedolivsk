@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, errText } from '../api'
+import { Zodar } from '../components/icons'
 import { haptic, hapticNotify } from '../telegram'
 
 interface Reward {
@@ -70,8 +71,8 @@ export default function ArtelSheet({ onClose }: { onClose: () => void }) {
     <div className="sv-backdrop" onClick={onClose}>
       <div className="ar-sheet" onClick={(e) => e.stopPropagation()}>
         <div className="ar-head">
-          <span className="ar-title">⚒ Лавка Артели зодчих</span>
-          <span className="ar-bal" title="Зодары — только за стройки">{d?.zodar ?? 0} ⚒</span>
+          <span className="ar-title"><Zodar size={18} /> Лавка Артели зодчих</span>
+          <span className="ar-bal" title="Зодары — только за стройки">{d?.zodar ?? 0} <Zodar /></span>
         </div>
         <p className="ar-lore">«Зодар не купишь и не пропьёшь — его вручают за руки, что подняли чудеса города.»</p>
 
@@ -107,7 +108,7 @@ export default function ArtelSheet({ onClose }: { onClose: () => void }) {
                               <span className="ar-have">✓ есть</span>
                             ) : (
                               <button className="btn ar-buy" disabled={busy || !r.affordable}
-                                onClick={() => buy(r)}>{r.cost} ⚒</button>
+                                onClick={() => buy(r)}>{r.cost} <Zodar size={13} /></button>
                             )}
                           </div>
                           {r.kind === 'recipe' && r.effect && (

@@ -237,6 +237,7 @@ body {
 /* иконки ресурсов (PNG из assets/resurs) */
 .ric { width:22px; height:22px; object-fit:contain; flex:0 0 auto; filter:drop-shadow(0 1px 1px #000a); }
 .ric-e { font-size:18px; width:22px; text-align:center; flex:0 0 auto; filter:drop-shadow(0 1px 1px #000); }
+.zic { display:inline-block; vertical-align:-.16em; object-fit:contain; filter:drop-shadow(0 1px 1px #000a); }
 
 /* всплывающее уведомление */
 .toast { position:fixed; left:50%; bottom:calc(var(--nav-h) + 18px + var(--sa-bottom));

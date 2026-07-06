@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { api, errText } from '../api'
 import { haptic, hapticNotify } from '../telegram'
-import { GoodIcon, ResIcon, fmt } from '../components/icons'
+import { GoodIcon, ResIcon, Zodar, fmt } from '../components/icons'
 
 interface Board { name: string; pts: number; zodar: number }
 interface Phase { key: string; title: string }
@@ -253,7 +253,7 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
               <div className="wd2-substats">
                 <span>Собрано <b>{fmt(w.progress)}</b> из {fmt(w.target)}</span>
                 <span>Вклад <b>{fmt(mine)}</b></span>
-                <span>Заработано <b>{zodar} ⚒</b></span>
+                <span>Заработано <b>{zodar} <Zodar /></b></span>
               </div>
 
               <div className="wd2-plaque">{w.blurb}</div>
@@ -320,7 +320,7 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
                         <span className="wd2-medal">{['🥇', '🥈', '🥉'][i] ?? i + 1}</span>
                         <span className="wd2-bname">{b.name}</span>
                         <span className="wd2-bpts">{fmt(b.pts)}</span>
-                        <span className="wd2-bz">{b.zodar} ⚒</span>
+                        <span className="wd2-bz">{b.zodar} <Zodar size={13} /></span>
                       </div>
                     ))}
                   </div>
@@ -328,7 +328,7 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
               )}
 
               <button className="wd2-artel" onClick={() => { haptic('light'); onOpenArtel() }}>
-                <span className="wd2-artel-ic">⚒</span>
+                <span className="wd2-artel-ic"><Zodar size={19} /></span>
                 <span>Лавка Артели</span>
                 <small>потратить зодары на престиж</small>
               </button>

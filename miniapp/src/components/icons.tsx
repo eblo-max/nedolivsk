@@ -26,6 +26,12 @@ const GOOD_ICON: Record<string, string> = {
   zodchy_feast: 'zodchy_feast', mason_loaf: 'mason_loaf',
   artel_nectar: 'artel_nectar', thunder_sbiten: 'thunder_sbiten',
 }
+// зодар — валюта чуда: самоцвет вместо ⚒ (miniapp/public/ui/zodar.png)
+export function Zodar({ size = 15 }: { size?: number }) {
+  return <img className="zic" style={{ width: size, height: size }}
+    src={`${import.meta.env.BASE_URL}ui/zodar.png`} alt="зодар" loading="lazy" />
+}
+
 export function GoodIcon({ k, size }: { k: string; size?: number }) {
   const st = size ? { width: size, height: size } : undefined
   const f = GOOD_ICON[k]
