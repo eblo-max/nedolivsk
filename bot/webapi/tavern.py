@@ -378,22 +378,24 @@ async def _api_collect(request: web.Request) -> web.Response:
         if order:
             from bot.game import story_state
             story_state.set_retail(p, order)
-        # Заезжий купец — как в боте (tavern.py): на сбор дохода заглядывает покупатель
-        # готового товара (чаще/богаче на ярмарке). Розница приоритетнее — тогда не катим.
+        # Заезжий купец катится НЕЗАВИСИМО от розницы. Раньше `if not order` давал
+        # рознице приоритет, но активная таверна почти всегда рождает заказ → купца
+        # не видели неделями. Теперь при обоих оффер копится в story['trade'] и
+        # всплывает ПОСЛЕ розницы (через опрос состояния); busy-гейт держит одного
+        # за раз — без спама и без двух окон разом.
         trade_offer = None
-        if not order:
-            import random as _rnd
-            from bot.game import story_state as _ss, trade as _trade, balance as _bal, world as _wld
-            busy = _ss.get_pending(p) or _ss.get_trade(p)
-            if not busy and _trade.has_sellable(p.tavern):
-                chance = _trade.visit_chance(
-                    _bal.TRADE_FAIR_CHANCE if _wld.is_fair() else _bal.TRADE_CHANCE)
-                if _rnd.random() < chance:
-                    world = await repo.get_or_create_world(s)
-                    offer = _trade.make_offer(p.tavern, p, _wld.is_fair(), world=world)
-                    if offer is not None:
-                        _ss.set_trade(p, offer)
-                        trade_offer = offer
+        import random as _rnd
+        from bot.game import story_state as _ss, trade as _trade, balance as _bal, world as _wld
+        busy = _ss.get_pending(p) or _ss.get_trade(p)
+        if not busy and _trade.has_sellable(p.tavern):
+            chance = _trade.visit_chance(
+                _bal.TRADE_FAIR_CHANCE if _wld.is_fair() else _bal.TRADE_CHANCE)
+            if _rnd.random() < chance:
+                world = await repo.get_or_create_world(s)
+                offer = _trade.make_offer(p.tavern, p, _wld.is_fair(), world=world)
+                if offer is not None:
+                    _ss.set_trade(p, offer)
+                    trade_offer = offer
         await s.commit()
         st = _tavern_state(p, p.tavern)
     return web.json_response({"ok": True, "collected": collected, "state": st,
