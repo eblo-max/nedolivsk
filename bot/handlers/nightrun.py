@@ -107,13 +107,21 @@ async def _render_state(cb: CallbackQuery, p, run: dict,
 
 
 async def _apply_factions(session: AsyncSession, p, factions) -> None:
-    """Применить сдвиг силы фракций к ЕДИНОМУ мировому городу. Город лочим
-    FOR UPDATE — как в событиях, безопасно при параллели."""
+    """Применить выбор ходки: сдвиг ЛИЧНОЙ репутации игрока (свой/враг — обе стороны,
+    повторяемый путь к дружбе с любой фракцией) И силы фракции в мировом городе.
+    Город лочим FOR UPDATE — как в событиях, безопасно при параллели."""
     if not factions:
         return
+    from bot.game import factions as fx, story_state
+    for fac, delta in factions:                      # ЛИЧНАЯ репутация: делаешь выбор — фракция помнит ТЕБЯ
+        o, n = story_state.adjust_faction(p, fac, delta)
+        if n != o:
+            repo.feed_push(session, p.id,
+                           f"{'⚖️' if n > o else '🕳'} {fx.name(fac)} теперь считает тебя: "
+                           f"«{fx.rank_label(n)}»", kind="rep")
     city = await repo.get_world_city(session, lock=True)
     fp = dict(city.faction_power or {})
-    for fac, delta in factions:
+    for fac, delta in factions:                      # МИРОВАЯ сила фракции (городская ситуация)
         fp[fac] = max(balance.FACTION_MIN, min(balance.FACTION_MAX, fp.get(fac, 0) + delta))
     city.faction_power = fp
 

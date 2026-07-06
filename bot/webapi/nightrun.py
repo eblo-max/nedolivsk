@@ -203,7 +203,14 @@ async def _api_nightrun_meet(request: web.Request) -> web.Response:
             return web.json_response({"ok": False, "error": "stale"})
         out = nr.meet_resolve(run, p, opt)
         if out.get("factions"):
-            city = await repo.get_world_city(s, lock=True)   # единый мир
+            from bot.game import factions as fx, story_state
+            for fac, delta in out["factions"]:   # ЛИЧНАЯ репутация игрока (свой/враг — обе стороны)
+                o, n = story_state.adjust_faction(p, fac, delta)
+                if n != o:
+                    repo.feed_push(s, p.id,
+                                   f"{'⚖️' if n > o else '🕳'} {fx.name(fac)} теперь считает тебя: "
+                                   f"«{fx.rank_label(n)}»", kind="rep")
+            city = await repo.get_world_city(s, lock=True)   # единый мир — сила фракции в городе
             fp = dict(city.faction_power or {})
             for fac, delta in out["factions"]:  # клампим как в текст-боте (иначе за ±100)
                 fp[fac] = max(bal.FACTION_MIN, min(bal.FACTION_MAX, fp.get(fac, 0) + delta))
