@@ -434,7 +434,10 @@ async def _api_bourse_act(request: web.Request) -> web.Response:
                 if order.side != "buy":
                     return web.json_response({"ok": False, "error": "gone"})
                 buyer = await repo.get_player(s, order.seller_id, for_update=True)
-                if buyer is None or buyer.tavern is None:
+                # buyer=None при seller_id<0 — заявка ГОРОЖАНИНА (NPC-трейдер): продать
+                # МОЖНО (товар уходит горожанину молча). Сносим лишь осиротевшую заявку
+                # удалённого ИГРОКА (id>=0) или игрока без таверны.
+                if (buyer is None and order.seller_id >= 0) or (buyer is not None and buyer.tavern is None):
                     await repo.delete_order(s, order.id)
                     await s.commit()
                     return web.json_response({"ok": False, "error": "gone"})

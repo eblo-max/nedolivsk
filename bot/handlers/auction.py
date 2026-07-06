@@ -542,19 +542,24 @@ async def _match_sell(session: AsyncSession, player: Player,
         if bo.qty <= 0:
             continue
         buyer = await repo.get_player(session, bo.seller_id, for_update=True)
-        if buyer is None or buyer.tavern is None:  # сиротская заявка — снести
+        if buyer is None and bo.seller_id >= 0:   # сиротская заявка удалённого ИГРОКА — снести
             await repo.delete_order(session, bo.id)
             continue
+        if buyer is not None and buyer.tavern is None:
+            await repo.delete_order(session, bo.id)
+            continue
+        # buyer=None при seller_id<0 — заявка ГОРОЖАНИНА (NPC): сделка идёт, товар молча
         k = min(remaining, bo.qty)
         gross = k * bo.unit_price            # по цене заявки
         net = bourse.net_to_seller(gross)
         bourse.freeze(player.tavern, good, k)  # списать у продавца
         player.gold += net
         _seller_fame(player, k)                # молва + рейтинг продавцу
-        _give(buyer.tavern, good, k)           # покупателю (оплачено из залога)
-        repo.queue_notify(session, buyer.id,
-                          f"📥 По твоей заявке свели {k}×{nm} (из залога {gross} 🪙)", kind="auction")
-        repo.add_log(session, "player", buyer.id, f"📥 заявка свелась: {k}×{nm}")
+        if buyer is not None:
+            _give(buyer.tavern, good, k)           # игроку-покупателю (оплачено из залога)
+            repo.queue_notify(session, buyer.id,
+                              f"📥 По твоей заявке свели {k}×{nm} (из залога {gross} 🪙)", kind="auction")
+            repo.add_log(session, "player", buyer.id, f"📥 заявка свелась: {k}×{nm}")
         bo.qty -= k
         if bo.qty <= 0:
             await repo.delete_order(session, bo.id)
@@ -650,7 +655,9 @@ async def _do_buy(session: AsyncSession, player: Player, chat_id: int | None,
 
 
 async def _do_fill(session: AsyncSession, player: Player, chat_id: int | None,
-                   order, qty: int, buyer: Player) -> str:
+                   order, qty: int, buyer: Player | None) -> str:
+    # buyer=None → заявка ГОРОЖАНИНА (NPC-трейдер, seller_id<0): сделка идёт, но
+    # доставка/уведомление только реальному игроку — NPC потребляет товар молча.
     good, nm = order.good, _gname(order.good)
     gross = qty * order.unit_price
     net = bourse.net_to_seller(gross)
@@ -660,10 +667,11 @@ async def _do_fill(session: AsyncSession, player: Player, chat_id: int | None,
     from bot.game import fgoal, rumors
     fgoal.note("gold_trade", net)             # продажа игрока двигает цель недели
     rumors.note("trade", player, net)         # крупная продажа — пища для сплетен
-    _give(buyer.tavern, good, qty)
-    repo.queue_notify(session, buyer.id,
-                      f"📥 По твоей заявке доставили {qty}×{nm} (из залога {gross} 🪙)", kind="auction")
-    repo.add_log(session, "player", buyer.id, f"📥 заявка: получил {qty}×{nm}")
+    if buyer is not None:
+        _give(buyer.tavern, good, qty)
+        repo.queue_notify(session, buyer.id,
+                          f"📥 По твоей заявке доставили {qty}×{nm} (из залога {gross} 🪙)", kind="auction")
+        repo.add_log(session, "player", buyer.id, f"📥 заявка: получил {qty}×{nm}")
     order.qty -= qty
     if order.qty <= 0:
         await repo.delete_order(session, order.id)
@@ -847,7 +855,9 @@ async def on_bourse_input(message: Message, session: AsyncSession,
             await message.answer("Заявка недоступна.", reply_markup=kb.auction_kb(player.tavern))
             return
         buyer = await repo.get_player(session, order.seller_id, for_update=True)
-        if buyer is None or buyer.tavern is None:
+        # buyer=None при seller_id<0 — заявка ГОРОЖАНИНА (NPC), это норм. Сносим только
+        # осиротевшую заявку удалённого ИГРОКА (id>=0) или игрока без таверны.
+        if (buyer is None and order.seller_id >= 0) or (buyer is not None and buyer.tavern is None):
             await repo.delete_order(session, order.id)
             await state.clear()
             await message.answer("Заявка протухла — хозяин сгинул.",
