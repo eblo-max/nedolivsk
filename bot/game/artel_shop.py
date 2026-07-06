@@ -269,5 +269,8 @@ def catalog_dto(player) -> list[dict]:
                     "cost": r.cost, "kind": r.kind, "owned": have,
                     "affordable": z >= r.cost,
                     "building": r.building, "effect": r.effect,
+                    # ключ товара рецепта — фронт рисует РЕАЛЬНУЮ иконку блюда/шмотки
+                    # вместо эмодзи (у титулов/фасадов good пустой → остаётся эмодзи)
+                    "good": r.payload if r.kind == "recipe" else "",
                     "tier": reward_tier(r), "style": reward_style(r)})
     return out

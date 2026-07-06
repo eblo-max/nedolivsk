@@ -29,6 +29,8 @@ const GOOD_ICON: Record<string, string> = {
   // эксклюзив-фляги Артели (Ф2b): раньше падали в заглушку 🍽 — теперь свои иконки
   zodchy_feast: 'zodchy_feast', mason_loaf: 'mason_loaf',
   artel_nectar: 'artel_nectar', thunder_sbiten: 'thunder_sbiten',
+  // эксклюзив-оружие Артели: иконка для карточки рецепта в Лавке
+  zodchy_hammer: 'zodchy_hammer',
 }
 // зодар — валюта чуда: самоцвет вместо ⚒ (miniapp/public/ui/zodar.png)
 export function Zodar({ size = 15 }: { size?: number }) {

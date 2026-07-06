@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api, errText } from '../api'
-import { Zodar } from '../components/icons'
+import { Zodar, GoodIcon } from '../components/icons'
 import { haptic, hapticNotify } from '../telegram'
 
 interface Reward {
   id: string; emoji: string; name: string; desc: string
   cost: number; kind: string; owned: boolean; affordable: boolean
   building?: string; effect?: string; tier?: string; style?: string
+  good?: string           // ключ товара рецепта — рисуем реальную иконку вместо эмодзи
 }
 interface Resp { ok?: boolean; zodar: number; catalog: Reward[] }
 
@@ -28,11 +29,11 @@ const SAMPLE: Resp = {
     { id: 'f_gilded', emoji: '✨', name: 'Златая вывеска', desc: 'Сусальное золото по краю — видно за версту.', cost: 120, kind: 'facade', owned: false, affordable: true, tier: 'silver' },
     { id: 'f_crested', emoji: '💎', name: 'Самоцветный герб', desc: 'Герб Артели с самоцветами над дверью.', cost: 300, kind: 'facade', owned: false, affordable: true, tier: 'gold' },
     { id: 'f_blazing', emoji: '🔥', name: 'Пылающий герб Артели', desc: 'Герб, что тлеет вечным углём Твердыни.', cost: 600, kind: 'facade', owned: false, affordable: true, tier: 'legendary' },
-    { id: 'r_feast', emoji: '🍗', name: 'Рецепт «Пир зодчих»', desc: 'Чертёж артельного стола. Варишь на КУХНЕ — снедь, что ставит бойца на ноги.', cost: 220, kind: 'recipe', owned: false, affordable: true, building: 'Кухня', effect: '+45 ❤ на бой (лучшая еда в игре)' },
-    { id: 'r_loaf', emoji: '🍞', name: 'Рецепт «Каравай каменщика»', desc: 'Чертёж плотного каравая. Печёшь в ПЕКАРНЕ — держит удар и рушит яд.', cost: 240, kind: 'recipe', owned: true, affordable: true, building: 'Пекарня', effect: '+28% уворота и антидот на бой' },
-    { id: 'r_nectar', emoji: '🍷', name: 'Рецепт «Артельный нектар»', desc: 'Чертёж крепкого нектара. Гонишь в ВИНОКУРНЕ — рука бьёт без промаха.', cost: 260, kind: 'recipe', owned: false, affordable: true, building: 'Винокурня', effect: '+20% крита на бой' },
-    { id: 'r_sbiten', emoji: '⚡', name: 'Рецепт «Громовой сбитень»', desc: 'Чертёж грозового сбитня. Варишь в МЕДОВАРНЕ — удар как обвал стены.', cost: 260, kind: 'recipe', owned: false, affordable: true, building: 'Медоварня', effect: '+22 урона на бой' },
-    { id: 'r_hammer', emoji: '⚒', name: 'Чертёж «Молот Зодчего»', desc: 'Чертёж артельного молота. Куёшь в КУЗНИЦЕ — сильнейшее оружие Недоливска, надел и владеешь.', cost: 450, kind: 'recipe', owned: false, affordable: false, building: 'Кузница', effect: 'Оружие: урон 50, крит 15 (БиС)' },
+    { id: 'r_feast', emoji: '🍗', good: 'zodchy_feast', name: 'Рецепт «Пир зодчих»', desc: 'Чертёж артельного стола. Варишь на КУХНЕ — снедь, что ставит бойца на ноги.', cost: 220, kind: 'recipe', owned: false, affordable: true, building: 'Кухня', effect: '+45 ❤ на бой (лучшая еда в игре)' },
+    { id: 'r_loaf', emoji: '🍞', good: 'mason_loaf', name: 'Рецепт «Каравай каменщика»', desc: 'Чертёж плотного каравая. Печёшь в ПЕКАРНЕ — держит удар и рушит яд.', cost: 240, kind: 'recipe', owned: true, affordable: true, building: 'Пекарня', effect: '+28% уворота и антидот на бой' },
+    { id: 'r_nectar', emoji: '🍷', good: 'artel_nectar', name: 'Рецепт «Артельный нектар»', desc: 'Чертёж крепкого нектара. Гонишь в ВИНОКУРНЕ — рука бьёт без промаха.', cost: 260, kind: 'recipe', owned: false, affordable: true, building: 'Винокурня', effect: '+20% крита на бой' },
+    { id: 'r_sbiten', emoji: '⚡', good: 'thunder_sbiten', name: 'Рецепт «Громовой сбитень»', desc: 'Чертёж грозового сбитня. Варишь в МЕДОВАРНЕ — удар как обвал стены.', cost: 260, kind: 'recipe', owned: false, affordable: true, building: 'Медоварня', effect: '+22 урона на бой' },
+    { id: 'r_hammer', emoji: '⚒', good: 'zodchy_hammer', name: 'Чертёж «Молот Зодчего»', desc: 'Чертёж артельного молота. Куёшь в КУЗНИЦЕ — сильнейшее оружие Недоливска, надел и владеешь.', cost: 450, kind: 'recipe', owned: false, affordable: false, building: 'Кузница', effect: 'Оружие: урон 50, крит 15 (БиС)' },
   ],
 }
 
@@ -95,7 +96,11 @@ export default function ArtelSheet({ onClose }: { onClose: () => void }) {
                   <div className="ar-list">
                     {rows.map((r) => (
                       <div key={r.id} className={`ar-card${r.owned ? ' owned' : ''}${r.kind === 'recipe' ? ' recipe' : ''}${r.style ? ' s-' + r.style : ''}${r.tier ? ' t-' + r.tier : ''}`}>
-                        <span className="ar-emo">{r.emoji}</span>
+                        <span className="ar-emo">
+                          {r.kind === 'recipe' && r.good
+                            ? <GoodIcon k={r.good} size={38} />
+                            : r.emoji}
+                        </span>
                         <div className="ar-body">
                           <div className="ar-head-row">
                             <div className="ar-name">
