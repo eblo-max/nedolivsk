@@ -27,10 +27,14 @@ def base_price(good: str) -> int:
 
 
 def price_floor(good: str) -> int:
+    if prod.free_price(good):          # баф-еда: своя цена — нижняя защита лишь ≥1
+        return 1
     return max(1, math.ceil(base_price(good) * balance.BOURSE_PRICE_FLOOR))
 
 
 def price_ceil(good: str) -> int:
+    if prod.free_price(good):          # баф-еда: потолок — только анти-абуз перекачки
+        return balance.BOURSE_FREE_PRICE_MAX
     return max(price_floor(good), math.floor(base_price(good) * balance.BOURSE_PRICE_CEIL))
 
 

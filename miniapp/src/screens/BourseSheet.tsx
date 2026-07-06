@@ -4,9 +4,9 @@ import { haptic, hapticNotify } from '../telegram'
 import { GoodIcon, ResIcon, fmt } from '../components/icons'
 
 interface BOrder { id: number; side: string; qty: number; unit: number; key: string; name: string; emoji: string; who?: string }
-interface BRow { key: string; name: string; emoji: string; ask?: number | null; ask_qty?: number | null; bid?: number | null; bid_qty?: number | null; floor: number; ceil: number }
+interface BRow { key: string; name: string; emoji: string; ask?: number | null; ask_qty?: number | null; bid?: number | null; bid_qty?: number | null; floor: number; ceil: number; free?: boolean }
 interface BSeller { name: string; sold: number; me: boolean }
-interface BGood { key: string; name: string; emoji: string; stock: number; floor: number; ceil: number; presets: number[]; room: number }
+interface BGood { key: string; name: string; emoji: string; stock: number; floor: number; ceil: number; presets: number[]; room: number; free?: boolean }
 interface BState {
   ok: boolean; open: boolean; admin?: boolean; gold?: number; done?: string
   sells?: BOrder[]; buys?: BOrder[]; mine?: BOrder[]; board?: BRow[]; sellers?: BSeller[]; goods?: BGood[]
@@ -30,6 +30,7 @@ const DEMO: BState = {
     { key: 'ale1', name: 'Хмельной эль', emoji: '🍺', ask: 6, ask_qty: 30, bid: 4, bid_qty: 15, floor: 3, ceil: 9 },
     { key: 'mead', name: 'Медовуха', emoji: '🍯', ask: 19, ask_qty: 12, bid: 14, bid_qty: 4, floor: 7, ceil: 22 },
     { key: 'cheese', name: 'Сыр', emoji: '🧀', ask: 14, ask_qty: 10, bid: 16, bid_qty: 8, floor: 6, ceil: 24 },
+    { key: 'steak', name: 'Стейк', emoji: '🥩', ask: 45, ask_qty: 6, bid: null, bid_qty: null, floor: 1, ceil: 200, free: true },
   ],
   sellers: [
     { name: 'Кривая Кружка', sold: 240, me: false },
@@ -37,6 +38,7 @@ const DEMO: BState = {
     { name: 'У дохлого песца', sold: 90, me: false },
   ],
   goods: [
+    { key: 'steak', name: 'Стейк', emoji: '🥩', stock: 12, floor: 1, ceil: 200, presets: [12, 14, 18], room: 60, free: true },
     { key: 'cheese', name: 'Сыр', emoji: '🧀', stock: 18, floor: 6, ceil: 24, presets: [10, 12, 16], room: 60 },
     { key: 'mead', name: 'Медовуха', emoji: '🍯', stock: 9, floor: 7, ceil: 22, presets: [8, 11, 14], room: 60 },
     { key: 'ale1', name: 'Хмельной эль', emoji: '🍺', stock: 0, floor: 3, ceil: 9, presets: [4, 5, 7], room: 60 },
@@ -201,7 +203,7 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
                         {list.map((g) => (
                           <button key={g.key} className="auc-gtile" onClick={() => { haptic('light'); setPick(g); setQty(Math.min(5, side === 'sell' ? g.stock : g.room)); setPrice(g.presets[1] ?? g.floor) }}>
                             <GoodIcon k={g.key} size={34} /><span className="auc-gnm">{g.name}</span>
-                            <span className="auc-gstock">{side === 'sell' ? `×${g.stock}` : `${g.floor}–${g.ceil}🪙`}</span>
+                            <span className="auc-gstock">{side === 'sell' ? `×${g.stock}` : g.free ? '🔓 своя цена' : `${g.floor}–${g.ceil}🪙`}</span>
                           </button>
                         ))}
                       </div>
@@ -215,7 +217,7 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
                   <>
                     <button className="auc-back" onClick={() => { setPick(null) }}>‹ другой товар</button>
                     <div className="brs-act-h"><GoodIcon k={pick.key} size={40} />
-                      <div><b>{pick.name}</b><small>{side === 'sell' ? `в погребе ${pick.stock}` : `лимит ${pick.room}`} · коридор {pick.floor}–{pick.ceil} 🪙</small></div></div>
+                      <div><b>{pick.name}</b><small>{side === 'sell' ? `в погребе ${pick.stock}` : `лимит ${pick.room}`} · {pick.free ? `🔓 своя цена, до ${pick.ceil} 🪙` : `коридор ${pick.floor}–${pick.ceil} 🪙`}</small></div></div>
                     <div className="brs-cap">Объём · до {max}</div>
                     <div className="brs-qtys">
                       {[5, 10, 25].filter((n) => n <= max).map((n) => (
@@ -223,12 +225,21 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
                       ))}
                       {max > 0 && <button className={`auc-qty${q === max ? ' on' : ''}`} onClick={() => setQty(max)}>Всё {max}</button>}
                     </div>
-                    <div className="brs-cap">Цена за штуку · коридор {pick.floor}–{pick.ceil}</div>
+                    <div className="brs-cap">{pick.free ? `Цена за штуку · своя, до ${pick.ceil}` : `Цена за штуку · коридор ${pick.floor}–${pick.ceil}`}</div>
                     <div className="brs-qtys">
                       {pick.presets.map((pp) => (
                         <button key={pp} className={`auc-qty${price === pp ? ' on' : ''}`} onClick={() => { haptic('light'); setPrice(pp) }}>{pp} 🪙</button>
                       ))}
                     </div>
+                    {pick.free && (
+                      <div className="auc-custom">
+                        <span className="auc-custom-coin"><ResIcon k="gold" size={15} /></span>
+                        <input className="auc-price-inp" type="number" inputMode="numeric" min={1} max={pick.ceil}
+                          placeholder="своя цена" value={price || ''}
+                          onChange={(e) => setPrice(Math.min(pick.ceil, Number(e.target.value.replace(/[^\d]/g, '')) || 0))} />
+                        <span className="brs-custom-tot">{price >= 1 ? <>≈ {fmt(q * price)} 🪙</> : `до ${pick.ceil}`}</span>
+                      </div>
+                    )}
                     <button className={`btn brs-go${side === 'sell' ? ' sell' : ''}`} disabled={busy || q <= 0 || !inRange}
                       onClick={() => run({ op: side, good: pick.key, qty: q, price })}>
                       {side === 'sell' ? <>📤 Выставить {q} по {price} 🪙</> : <>📣 Куплю {q} по {price} 🪙 (залог {fmt(q * price)})</>}
@@ -295,15 +306,19 @@ export default function BourseSheet({ onClose }: { onClose: () => void }) {
                             {b.ask != null ? (<><span className="brs-dp-bar" style={{ width: `${askW}%` }} /><span className="brs-dp-px">{b.ask}{b.ask_qty ? <i>×{b.ask_qty}</i> : null}</span></>) : <span className="brs-dp-none">нет лотов</span>}
                           </div>
                         </div>
-                        <div className="brs-dp-corr">
-                          <span className="brs-dp-edge">{b.floor}</span>
-                          <div className="brs-dp-track">
-                            {bidPos != null && askPos != null && askPos >= bidPos && <span className="brs-dp-fill" style={{ left: `${bidPos}%`, width: `${askPos - bidPos}%` }} />}
-                            {bidPos != null && <span className="brs-dp-mark bid" style={{ left: `${bidPos}%` }} />}
-                            {askPos != null && <span className="brs-dp-mark ask" style={{ left: `${askPos}%` }} />}
+                        {b.free ? (
+                          <div className="brs-dp-corr free"><span className="brs-dp-freetag">🔓 свободная цена — назначает продавец</span></div>
+                        ) : (
+                          <div className="brs-dp-corr">
+                            <span className="brs-dp-edge">{b.floor}</span>
+                            <div className="brs-dp-track">
+                              {bidPos != null && askPos != null && askPos >= bidPos && <span className="brs-dp-fill" style={{ left: `${bidPos}%`, width: `${askPos - bidPos}%` }} />}
+                              {bidPos != null && <span className="brs-dp-mark bid" style={{ left: `${bidPos}%` }} />}
+                              {askPos != null && <span className="brs-dp-mark ask" style={{ left: `${askPos}%` }} />}
+                            </div>
+                            <span className="brs-dp-edge">{b.ceil}</span>
                           </div>
-                          <span className="brs-dp-edge">{b.ceil}</span>
-                        </div>
+                        )}
                       </div>
                     )
                   }) : <p className="auc-empty">«Пусто — ни лотов, ни заявок.»</p>}

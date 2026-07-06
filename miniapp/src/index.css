@@ -1938,6 +1938,9 @@ body {
 
 /* коридор цены: floor — дорожка с позициями bid/ask и спред-заливкой — ceil */
 .brs-dp-corr { display:flex; align-items:center; gap:8px; margin-top:7px; }
+.brs-dp-corr.free { justify-content:center; }
+.brs-dp-freetag { font-size:10.5px; font-weight:700; color:#caa64e; letter-spacing:.2px; }
+.brs-custom-tot { flex:1; font-family:var(--num),system-ui,sans-serif; font-size:12px; font-weight:700; color:#caa64e; }
 .brs-dp-edge { flex:none; font-family:var(--num),system-ui,sans-serif; font-size:9.5px; color:#7d7256; min-width:14px; text-align:center; }
 .brs-dp-track { position:relative; flex:1; height:4px; border-radius:99px;
   background:repeating-linear-gradient(90deg, #ffffff10 0 1px, transparent 1px 100%) , #ffffff0a;

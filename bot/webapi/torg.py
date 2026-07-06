@@ -349,12 +349,14 @@ async def _bourse_state(s, p) -> dict:
 
     board_list = [{**_good_dto(k), "ask": b.get("ask"), "ask_qty": b.get("ask_qty"),
                    "bid": b.get("bid"), "bid_qty": b.get("bid_qty"),
-                   "floor": bourse.price_floor(k), "ceil": bourse.price_ceil(k)}
+                   "floor": bourse.price_floor(k), "ceil": bourse.price_ceil(k),
+                   "free": prod.free_price(k)}
                   for k, b in sorted(board.items())]
     prods = p.tavern.products or {}
     goods = [{**_good_dto(k), "stock": int(prods.get(k, 0)),
               "floor": bourse.price_floor(k), "ceil": bourse.price_ceil(k),
-              "presets": bourse.price_tiers(k), "room": bourse.buy_room(p, k)}
+              "presets": bourse.price_tiers(k), "room": bourse.buy_room(p, k),
+              "free": prod.free_price(k)}
              for k in prod.GOODS]
     return {
         "gold": p.gold,

@@ -195,6 +195,21 @@ FOODS: dict[str, Drink] = {
 # Всё, что лежит в погребе/кладовой (для ВВП и названий при сбыте)
 GOODS: dict[str, Drink] = {**DRINKS, **FOODS}
 
+# Новые баф-блюда: на БИРЖЕ продаются по СВОБОДНОЙ цене — игрок сам назначает,
+# сколько просить (ценовой коридор floor..ceil не действует, только планка анти-абуза
+# BOURSE_FREE_PRICE_MAX). Смысл: биржа — живой P2P, покупатель сам решает, стоит ли
+# баф этих денег. Розница/касса/ВВП/чудо/купец — по обычной .price. Старьё и эксклюзив
+# зодчих ходят по обычному коридору.
+FREE_PRICE_GOODS = frozenset({
+    "kebab", "steak", "pohlebka", "salat", "sausage",
+    "salo", "bliny", "patties", "nalivka", "kvas",
+})
+
+
+def free_price(good: str) -> bool:
+    """Продаётся ли товар на бирже по свободной цене (баф-блюда)."""
+    return good in FREE_PRICE_GOODS
+
 
 def ale_key(tier: int) -> str:
     return f"ale{tier}"
