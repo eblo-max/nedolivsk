@@ -8,6 +8,8 @@ dict (иначе SQLAlchemy не заметит). Хелперы делают э
 import random
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from bot.db.models import Player
 from bot.game import balance
 
@@ -18,6 +20,11 @@ def _st(player: Player) -> dict:
 
 def _save(player: Player, st: dict) -> None:
     player.story = st
+    # ФОРСИМ пометку JSONB как изменённого. Иначе мутация ВЛОЖЕННОГО объекта «на месте»
+    # (напр. offer['choice']/['counter'] у оффера, полученного через get_trade — это
+    # ссылка внутрь story) не детектится: shallow-copy делит тот же объект, старое==новое,
+    # UPDATE не шлётся → торг терял counter и вилку (take → stale, продажа не проходила).
+    flag_modified(player, "story")
 
 
 # ── Флаги-факты (вечные) ───────────────────────────────────────────────
