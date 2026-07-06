@@ -22,6 +22,9 @@ const GOOD_ICON: Record<string, string> = {
   ale1: 'ale', ale2: 'ale', ale3: 'ale', mead: 'mead', sbiten: 'sbiten', wine: 'wine',
   roast: 'roast', bread: 'bread', pie: 'pie', cured: 'cured', smoked_fish: 'smoked_fish',
   cheese: 'cheese', butter: 'butter',
+  // эксклюзив-фляги Артели (Ф2b): раньше падали в заглушку 🍽 — теперь свои иконки
+  zodchy_feast: 'zodchy_feast', mason_loaf: 'mason_loaf',
+  artel_nectar: 'artel_nectar', thunder_sbiten: 'thunder_sbiten',
 }
 export function GoodIcon({ k, size }: { k: string; size?: number }) {
   const st = size ? { width: size, height: size } : undefined
