@@ -225,6 +225,30 @@ async def cmd_wonder(
         repo.add_log(session, "admin", message.from_user.id, f"🏛 /wonder reset — «{w.key}» закрыта")
         await message.answer("🏛 Стройка закрыта. Заложить новую: <b>/wonder</b>")
         return
+    if "retarget" in args:                   # пересчитать цель ТЕКУЩЕЙ фазы вживую (тюнинг темпа):
+        w = await repo.get_active_wonder(session, lock=True)  # /wonder retarget [N] — N явно ИЛИ
+        if w is None or w.status != "building":               # по обновлённой base×активные. Прогресс цел.
+            await message.answer("🏛 Нет активной строящейся стройки.")
+            return
+        wdef = wmod.get(w.key)
+        active = await repo.active_player_count(session)
+        ph = int(w.phase)
+        nums = [int(x) for x in args if x.isdigit()]
+        if nums:
+            new_t = max(int(w.progress) + 1, nums[0])
+        else:
+            base = (wdef.phases[ph - 1].base_target
+                    if wdef and 0 < ph <= len(wdef.phases) else int(w.target))
+            new_t = max(int(w.progress) + 1, wmod.phase_target(base, active))
+        old_t = int(w.target)
+        w.target = new_t
+        w.updated_at = datetime.now(timezone.utc)
+        repo.add_log(session, "admin", message.from_user.id,
+                     f"🏛 /wonder retarget — фаза {ph}: {old_t}→{new_t}")
+        await message.answer(
+            f"🏛 Цель фазы {ph} пересчитана: <b>{old_t} → {new_t}</b> очков "
+            f"(активных {active}). Прогресс {w.progress} сохранён — фаза стала длиннее.")
+        return
     if "fill" in args:                       # ТЕСТ: форс-прогресс, чтобы увидеть крепость
         w = await repo.get_active_wonder(session, lock=True)
         if w is None:
