@@ -44,6 +44,7 @@ RECIPES = {
         "bread": ({"flour": 8, "water": 6}, 5, 12),
         "pie":   ({"flour": 8, "berries": 6, "honey": 4}, 8, 10),
         "bliny": ({"flour": 8, "milk": 6, "honey": 3}, 7, 12),   # Блины (паритет ~15/ч)
+        "patties": ({"flour": 8, "game": 4, "herbs": 3}, 7, 12),  # Пирожки (мясные)
         # эксклюзив зодчих (Ф2b): рецепт из Лавки Артели, гейт по владению (EXCLUSIVE)
         "mason_loaf": ({"flour": 10, "milk": 6, "honey": 4, "salt": 3}, 8, 10),
     },
@@ -51,6 +52,7 @@ RECIPES = {
         "cured":       ({"game": 8, "salt": 4}, 8, 12),
         "smoked_fish": ({"fish": 10, "salt": 4}, 7, 12),
         "sausage":     ({"game": 7, "salt": 4, "herbs": 3}, 8, 12),  # Колбаса
+        "salo":        ({"game": 6, "salt": 5}, 7, 12),              # Сало (антидот)
     },
     "dairy": {
         "cheese": ({"milk": 12, "salt": 3}, 10, 12),
@@ -65,6 +67,9 @@ PRODUCERS = ({"mill", "brewery", "meadery", "kitchen", "winery", "smelter"}
 KITCHEN = {
     "roast": ({"game": 6, "grain": 6, "herbs": 4}, 6, 12),  # Жаркое
     "kebab": ({"game": 8, "herbs": 4, "salt": 3}, 9, 12),   # Шашлык (премиум-мясо)
+    "steak": ({"game": 10, "herbs": 4, "salt": 3}, 11, 12),  # Стейк (премиум-выживание)
+    "pohlebka": ({"game": 4, "grain": 8, "water": 4}, 5, 12),  # Похлёбка (дёшево)
+    "salat": ({"berries": 6, "herbs": 6, "honey": 3}, 6, 12),  # Салат (лёгкий)
     # эксклюзив зодчих (Ф2b): «Пир зодчих» — рецепт из Лавки Артели (EXCLUSIVE)
     "zodchy_feast": ({"game": 10, "herbs": 6, "honey": 5, "salt": 3}, 10, 10),
 }
@@ -72,6 +77,7 @@ KITCHEN = {
 # Винокурня: рецепт -> (вход, часы, выход). Берри-тяжёлое премиум-вино.
 WINERY = {
     "wine": ({"berries": 22, "honey": 6, "water": 6}, 12, 12),
+    "nalivka": ({"berries": 18, "honey": 8, "water": 4}, 10, 12),  # Наливка (+10% крита)
     # эксклюзив зодчих (Ф2b): «Артельный нектар» — рецепт из Лавки Артели
     "artel_nectar": ({"berries": 24, "honey": 10, "herbs": 5}, 12, 10),
 }
@@ -80,6 +86,7 @@ WINERY = {
 # Ключ рецепта = ключ напитка в погребе.
 MEADERY = {
     "mead":   ({"honey": 10, "water": 8}, 8, 12),            # паритет 10×12/8=15/ч
+    "kvas":   ({"malt": 6, "honey": 4, "water": 8}, 6, 12),  # Квас (+4 урона, дёшево)
     "sbiten": ({"honey": 8, "herbs": 6, "water": 6}, 10, 12),  # пряный премиум, травы
     # эксклюзив зодчих (Ф2b): «Громовой сбитень» — рецепт из Лавки Артели
     "thunder_sbiten": ({"honey": 12, "herbs": 8, "hops": 6, "water": 6}, 10, 10),
@@ -154,6 +161,9 @@ DRINKS: dict[str, Drink] = {
 DRINKS["mead"] = Drink("mead", "🍶", "Медовуха", 10)
 DRINKS["sbiten"] = Drink("sbiten", "🌿", "Сбитень", 13)
 DRINKS["wine"] = Drink("wine", "🍷", "Вино", 15)
+# новые напитки (иконки из food-пака) + бафф на бой
+DRINKS["kvas"] = Drink("kvas", "🍯", "Квас", 7)               # Медоварня — +4 урона
+DRINKS["nalivka"] = Drink("nalivka", "🍹", "Наливка", 12)     # Винокурня — +10% крита
 # эксклюзив зодчих (Ф2b): премиум-напитки, самые дорогие в погребе (берут богачи)
 DRINKS["artel_nectar"] = Drink("artel_nectar", "🍷", "Артельный нектар", 35)
 DRINKS["thunder_sbiten"] = Drink("thunder_sbiten", "⚡", "Громовой сбитень", 30)
@@ -167,10 +177,15 @@ FOODS: dict[str, Drink] = {
     "smoked_fish": Drink("smoked_fish", "🐠", "Копчёная рыба", 9),
     "cheese": Drink("cheese", "🧀", "Сыр", 12),
     "butter": Drink("butter", "🧈", "Масло", 10),
-    # новые блюда (иконки из food-пака): свой пул спроса, продаются гостям/купцу/бирже
-    "kebab": Drink("kebab", "🍢", "Шашлык", 11),        # Кухня
-    "sausage": Drink("sausage", "🌭", "Колбаса", 10),   # Коптильня
-    "bliny": Drink("bliny", "🥞", "Блины", 9),          # Пекарня
+    # новые блюда (иконки из food-пака): свой пул спроса + БАФФ на бой (FLASK_EFFECTS)
+    "kebab":    Drink("kebab", "🍢", "Шашлык", 11),        # Кухня — +9 урона
+    "steak":    Drink("steak", "🥩", "Стейк", 14),         # Кухня — +18 ❤
+    "pohlebka": Drink("pohlebka", "🍲", "Похлёбка", 6),    # Кухня — +8 ❤ (дёшево)
+    "salat":    Drink("salat", "🥗", "Салат", 7),          # Кухня — +8% уворота
+    "sausage":  Drink("sausage", "🌭", "Колбаса", 10),     # Коптильня — +6 урона
+    "salo":     Drink("salo", "🥓", "Сало", 9),            # Коптильня — антидот
+    "bliny":    Drink("bliny", "🥞", "Блины", 9),          # Пекарня — +6% крита
+    "patties":  Drink("patties", "🥟", "Пирожки", 8),      # Пекарня — +10 ❤
     # эксклюзив зодчих (Ф2b): премиум-стол
     "zodchy_feast": Drink("zodchy_feast", "🍗", "Пир зодчих", 30),
     "mason_loaf": Drink("mason_loaf", "🍞", "Каравай каменщика", 28),

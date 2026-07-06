@@ -187,6 +187,10 @@ def satchel_value(satchel: dict) -> int:
 # тишком, вино — азарт), сбитень гасит штраф городской ситуации.
 FLASK_APPROACH = {"ale1": "fight", "ale2": "fight", "ale3": "fight",
                   "mead": "sneak", "wine": "gamble",
+                  "kvas": "fight", "nalivka": "gamble",   # новые напитки — под подход
+                  "kebab": "fight", "sausage": "fight",   # мясо (урон) — драка
+                  "bliny": "gamble", "salat": "sneak",    # крит — лихо, уворот — тишком
+                  # steak/pohlebka/patties (hp) approach-бонуса не дают — стартовая выносливость
                   # эксклюзив зодчих (Ф2b): под свой подход, как обычные фляги.
                   # zodchy_feast (hp) approach-бонуса не даёт — вместо этого стартовая
                   # выносливость (см. start(): hp-фляги поднимают HP ходки).
