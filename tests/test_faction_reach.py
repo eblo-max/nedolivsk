@@ -24,9 +24,9 @@ def _meet_factions() -> dict[str, set[int]]:
 
 
 def test_night_factions_have_both_directions():
-    """У каждой ночной фракции (корона/стража/церковь/воры) есть выбор + И выбор −."""
+    """У КАЖДОЙ фракции (включая купцов) есть ночной выбор + И выбор − — обе стороны."""
     signs = _meet_factions()
-    for fac in ("crown", "watch", "church", "thieves"):
+    for fac in ("crown", "watch", "church", "thieves", "merchants"):
         assert signs.get(fac) == {1, -1}, f"{fac}: односторонняя ({signs.get(fac)})"
 
 
