@@ -250,16 +250,15 @@ def evaluate(offer: dict, unit: int) -> tuple[str, int]:
 
 
 def push(offer: dict, rng: random.Random | None = None) -> tuple[str, int]:
-    """Дожим контр-цены: ('concede'|'hold'|'walk', цена). По характеру."""
-    rng = rng or random
+    """Дожим контр-цены: ('concede'|'hold', цена). Купец НИКОГДА не уходит от дожима
+    (жалобы «дожал — купец сбежал, вернуло в начало»): щедрый уступает до истинного
+    потолка, жадный УПИРАЕТСЯ (hold), но сделку не бросает — «Дожать» всегда безопасно."""
     greed = offer["greed"]
     ceiling = int(round(offer["max_unit"]))
     current = int(offer.get("counter", ceiling))
     if greed < 0.55 and ceiling > current:
         return "concede", ceiling           # уступает до истинного потолка
-    if greed >= 0.75 and rng.random() < 0.5:
-        return "walk", 0                     # жадный обижается и уходит
-    return "hold", current                   # стоит на своём
+    return "hold", current                   # стоит на своём — но не уходит
 
 
 def reaction(offer: dict, kind: str, price: int | None = None) -> str:
