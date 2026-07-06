@@ -71,6 +71,7 @@ def _raid_dto(boss, uid: int = 0) -> dict | None:
         "me_registered": rd.is_registered(boss, uid) if uid else False,
         "roster": _raid_roster(boss, uid),
         "gear_pct": rd.gear_drop_pct(boss.boss_key), "loot": _raid_loot_dto(boss.boss_key),
+        "barks": dict(spec.barks),   # реплики-субтитры босса (пусто → молчит)
     }
     if boss.status == "gathering":
         base["gather_left"] = _secs_until(boss.gather_until, now)

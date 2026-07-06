@@ -2858,6 +2858,18 @@ body {
   14%{ opacity:1; transform:scale(1.15); } 28%{ transform:scale(1); }
   72%{ opacity:1; } 100%{ opacity:0; transform:scale(1.05) translateY(-12px); } }
 
+/* Реплика-субтитр босса (barks): нижняя треть, как киносубтитр. pointer-events:none —
+   не блокирует тап по боссу. Без backdrop-filter (лагает на Android). */
+.raid-bark { position:absolute; left:50%; bottom:27%; transform:translateX(-50%); z-index:6;
+  max-width:90%; padding:9px 15px; border-radius:13px; text-align:center; pointer-events:none;
+  background:rgba(22,15,10,.86); border:1px solid rgba(202,166,78,.4); box-shadow:0 6px 22px #0008;
+  font-size:14.5px; line-height:1.32; color:#f1e2bf; animation:raid-barkin .24s ease-out; }
+.raid-bark-nm { color:#e7b54a; font-weight:800; margin-right:6px; }
+.raid-bark-tx { font-weight:600; }
+.raid-bark-cur { color:#e7b54a; animation:raid-barkblink 1s steps(1) infinite; }
+@keyframes raid-barkin { from{ opacity:0; transform:translate(-50%,10px); } to{ opacity:1; transform:translate(-50%,0); } }
+@keyframes raid-barkblink { 50%{ opacity:0; } }
+
 /* ── ауры арены под щитом/проклятьем: краевое свечение во весь экран, живёт пока
    эффект активен (вне трясущейся арены, в .raid-root). Цвет кодирует эффект. ── */
 .raid-aura { position:absolute; inset:0; pointer-events:none; z-index:1; }

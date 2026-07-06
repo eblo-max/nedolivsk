@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { api } from '../api'
 import { haptic, hapticNotify } from '../telegram'
 import { fmt } from '../components/icons'
-import BossSprite, { FireProjectile, useBossDirector } from '../components/BossSprite'
+import BossSprite, { FireProjectile, useBossDirector, bossCfg } from '../components/BossSprite'
 
 // ── Типы (зеркалят DTO из webapp._raid_dto / _api_raid_hit) ──────────────────
 interface RaidLoot { icon: string; label: string; pct: number; gear?: boolean }
@@ -18,6 +18,7 @@ export interface RaidState {
   my_cd?: number; my_stunned?: boolean
   report?: boolean; won?: boolean; top?: Fighter[]; my_gold?: number; i_fought?: boolean
   flask?: { drunk?: string[] | null; options: { key: string; name: string; emoji: string; label: string; qty: number }[] }
+  barks?: Record<string, string>   // реплики босса-субтитры: intro/ward/curse/summon/roar/death
 }
 interface Victory {
   name: string; emoji: string; sprite: string; top: Fighter[]
@@ -35,25 +36,47 @@ const DEV = import.meta.env.DEV
 
 // ── DEV-демо: в превью нет Telegram-подписи → бэкенд не пускает. Локальный бой
 // в памяти, чтобы прощёлкать сбор → битву → победу. В прод-сборке вырезается. ──
-const demoBoss = (): RaidState => ({
-  id: 1, key: 'demon_slime', name: 'Адский Слизень', emoji: '😈', sprite: 'demon_slime',
-  flask: { drunk: null, options: [
-    { key: 'ale3', name: 'Эль выдержанный', emoji: '🍺', label: '+7 урона', qty: 3 },
-    { key: 'wine', name: 'Вино', emoji: '🍷', label: '+6% крита', qty: 2 },
-    { key: 'sbiten', name: 'Сбитень', emoji: '🫖', label: 'снимает проклятье', qty: 1 },
-  ] },
-  blurb: 'Выперло из преисподней прямо посреди торга — туша смолы с рогами, харкает огнём и плодит из себя мелких бесов. Ползёт на кабаки, оставляя выжженный след.',
-  armor: 11, status: 'gathering', n: 3, me_registered: false,
-  roster: [{ name: 'Гриша Кабан', dmg: 0, hits: 0, mine: false }, { name: 'Авдотья', dmg: 0, hits: 0, mine: false }, { name: 'Прохор', dmg: 0, hits: 0, mine: false }],
-  gear_pct: 4, loot: [
-    { icon: '⛏️', label: 'Руда ×30–55', pct: 43 }, { icon: '🔩', label: 'Слитки ×15–28', pct: 32 },
-    { icon: '🪙', label: '220–420 золота', pct: 21 }, { icon: '🛡', label: 'Эксклюзивная снаряга', pct: 4, gear: true },
-  ],
-  gather_left: 16, preview_hp: 4200,
-})
+const demoBoss = (key = 'demon_slime'): RaidState => {
+  const base: RaidState = {
+    id: 1, key: 'demon_slime', name: 'Адский Слизень', emoji: '😈', sprite: 'demon_slime',
+    flask: { drunk: null, options: [
+      { key: 'ale3', name: 'Эль выдержанный', emoji: '🍺', label: '+7 урона', qty: 3 },
+      { key: 'wine', name: 'Вино', emoji: '🍷', label: '+6% крита', qty: 2 },
+      { key: 'sbiten', name: 'Сбитень', emoji: '🫖', label: 'снимает проклятье', qty: 1 },
+    ] },
+    blurb: 'Выперло из преисподней прямо посреди торга — туша смолы с рогами, харкает огнём и плодит из себя мелких бесов. Ползёт на кабаки, оставляя выжженный след.',
+    armor: 11, status: 'gathering', n: 3, me_registered: false,
+    roster: [{ name: 'Гриша Кабан', dmg: 0, hits: 0, mine: false }, { name: 'Авдотья', dmg: 0, hits: 0, mine: false }, { name: 'Прохор', dmg: 0, hits: 0, mine: false }],
+    gear_pct: 4, loot: [
+      { icon: '⛏️', label: 'Руда ×30–55', pct: 43 }, { icon: '🔩', label: 'Слитки ×15–28', pct: 32 },
+      { icon: '🪙', label: '220–420 золота', pct: 21 }, { icon: '🛡', label: 'Эксклюзивная снаряга', pct: 4, gear: true },
+    ],
+    gather_left: 16, preview_hp: 4200,
+  }
+  if (key === 'jailer') return {
+    ...base, key: 'jailer', name: 'Батог Мясомял', emoji: '🔨', sprite: 'jailer',
+    armor: 12, preview_hp: 4400, barks: JAILER_BARKS,
+    blurb: 'Городской кат-тюремщик, которого достала вечно пьяная братия. Вылез из ямы под ратушей с дубиной и связкой кандалов — всех переписать, оштрафовать и в острог: трезветь.',
+    loot: [
+      { icon: '🪵', label: 'Древесина ×30–55', pct: 43 }, { icon: '🔩', label: 'Слитки ×15–28', pct: 32 },
+      { icon: '🪙', label: '220–420 золота', pct: 21 }, { icon: '🛡', label: 'Снаряга Ката', pct: 4, gear: true },
+    ],
+  }
+  return base
+}
+// Реплики Тюремщика (демо; в проде — из raid.py Boss.barks)
+const JAILER_BARKS: Record<string, string> = {
+  intro: 'Догулялись, пьянь. Батог пришёл — всех перепишу да в яму.',
+  ward: 'Дубьём меня? А ну к стенке, пёс!',
+  curse: 'Держи кандалы, гуляка!',
+  summon: 'Стража-а! Волоки всю ораву сюда!',
+  roar: 'Бунтова-а-ать?! Запорю до костей!',
+  death: 'Кто ж… теперь… стеречь будет… голытьбу…',
+}
 let _demo: RaidState | null = null
 const _fired = new Set<string>()                  // DEV: какие касты уже сработали
 const DEMO_BOSSES: BossOpt[] = [
+  { key: 'jailer', name: 'Батог Мясомял', emoji: '🔨', sprite: 'jailer' },
   { key: 'demon_slime', name: 'Адский Слизень', emoji: '😈', sprite: 'demon_slime' },
   { key: 'rat_king', name: 'Крысиный Король', emoji: '🐀', sprite: '' },
   { key: 'bog_troll', name: 'Болотный Тролль', emoji: '👹', sprite: '' },
@@ -62,7 +85,7 @@ const DEMO_BOSSES: BossOpt[] = [
 function demoApi(path: string, _body: Record<string, unknown>): Promise<unknown> {
   // старт — «босса нет» (admin), чтобы прощёлкать призыв → сбор → бой
   if (path === 'raid') return Promise.resolve({ ok: true, raid: _demo ? { ..._demo } : null, admin: true, bosses: DEMO_BOSSES })
-  if (path === 'raid/summon') { _demo = demoBoss(); _fired.clear(); return Promise.resolve({ ok: true, raid: { ..._demo }, admin: true }) }
+  if (path === 'raid/summon') { _demo = demoBoss(String(_body.key || 'demon_slime')); _fired.clear(); return Promise.resolve({ ok: true, raid: { ..._demo }, admin: true }) }
   if (!_demo) { _demo = demoBoss(); _fired.clear() }
   const b = _demo
   if (path === 'raid/join') {
@@ -295,7 +318,7 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
     return wrap(
       <div className="raid-end win">
         <div className="raid-stage dead big">
-          {sprite ? <BossSprite sprite={sprite} anim="death" playId={1} loop frameStart={3} frameCount={6} durSec={0.95} width={Math.min(Math.round(window.innerWidth * 1.5), 560)} /> : <div className="raid-emo">{emoji}</div>}
+          {sprite ? <BossSprite sprite={sprite} anim="death" playId={1} loop frameStart={bossCfg(sprite).dead.start} frameCount={bossCfg(sprite).dead.count} durSec={0.95} width={Math.min(Math.round(window.innerWidth * 1.5), 560)} /> : <div className="raid-emo">{emoji}</div>}
           <div className="raid-burst" />
         </div>
         <div className="raid-end-ttl">{victory.name.toUpperCase()} ПОВЕРЖЕН!</div>
@@ -378,7 +401,7 @@ function GatherView({ st, busy, onJoin, onClose, sprite, emoji }: {
       <button className="raid-x" onClick={onClose}>✕</button>
       <div className="raid-gather">
         <div className="raid-stage gather big slimebox">
-          {sprite ? <BossSprite sprite={sprite} anim="slime_move" width={Math.min(Math.round(window.innerWidth * 2.2), 860)} /> : <div className="raid-emo">{emoji}</div>}
+          {sprite ? <BossSprite sprite={sprite} anim={bossCfg(sprite).gather} width={Math.min(Math.round(window.innerWidth * 2.2), 860)} /> : <div className="raid-emo">{emoji}</div>}
           <div className="raid-shadow" />
         </div>
         <div className="raid-name">{emoji} {st.name}</div>
@@ -409,6 +432,23 @@ function GatherView({ st, busy, onJoin, onClose, sprite, emoji }: {
   )
 }
 
+// Реплика босса — субтитр с эффектом печати (появляется на входе, кастах, смерти).
+function BossBark({ text, name }: { text: string; name: string }) {
+  const [n, setN] = useState(1)
+  useEffect(() => {
+    setN(1)
+    const t = setInterval(() => setN((x) => (x >= text.length ? x : x + 1)), 34)
+    return () => clearInterval(t)
+  }, [text])
+  const done = n >= text.length
+  return (
+    <div className="raid-bark">
+      <span className="raid-bark-nm">{name.split(' ')[0]}:</span>
+      <span className="raid-bark-tx">«{text.slice(0, n)}{done ? '»' : <span className="raid-bark-cur">▌</span>}</span>
+    </div>
+  )
+}
+
 // ── Экран битвы ──────────────────────────────────────────────────────────────
 function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose, sprite, emoji, flaskSel, onFlask }: {
   st: RaidState; cd: number; stunned: boolean; busy: boolean; floats: Float[]; toast: string
@@ -425,7 +465,7 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
     window.addEventListener('resize', f); return () => window.removeEventListener('resize', f)
   }, [])
   const attacking = boss.anim === 'cleave' || boss.anim === 'smash' || boss.anim === 'fire'  // приём → тряхнём сцену
-  const firing = boss.anim === 'fire'           // выдох огня → багрово-огненная вспышка
+  const firing = boss.anim === 'fire' && bossCfg(sprite).proj   // выдох огня → вспышка (только у боссов со снарядом)
   // ИНТРО: слизень оборачивается демоном (transform) при входе в бой, потом — патруль
   const [intro, setIntro] = useState(true)
   // кольцо-удар: щёлкает на каждый take_hit (playId меняется при ударе)
@@ -435,17 +475,23 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
   // в спрайте идёт ПРОТИВ facing), потом взрыв. Дальность — чтобы остаться в кадре.
   const [proj, setProj] = useState<{ id: number; dir: number; x0: number } | null>(null)
   useEffect(() => {
-    if (!intro && boss.anim === 'fire') {
+    if (!intro && boss.anim === 'fire' && bossCfg(sprite).proj) {
       const dir = -boss.facing
       setProj({ id: Date.now(), dir, x0: boss.pos + dir * 38 })
     }
-  }, [boss.playId, boss.anim, intro, boss.facing, boss.pos])
+  }, [boss.playId, boss.anim, intro, boss.facing, boss.pos, sprite])
   // КАСТЫ: ловим МОМЕНТ появления каждого заклинания (своё/чужое — через поллинг) →
   // босс воздевает руки (анимация cast) + драматичный баннер. Знаем КОНКРЕТНО какое.
   const wardOn = (st.ward_left ?? 0) > 0, curseOn = (st.curse_left ?? 0) > 0
   const addsOn = (st.adds_hp ?? 0) > 0, stunOn = (st.stun_left ?? 0) > 0
   const prevSpell = useRef({ ward: wardOn, curse: curseOn, adds: addsOn, stun: stunOn })
   const [castBanner, setCastBanner] = useState<{ id: number; k: string; t: string } | null>(null)
+  // РЕПЛИКИ-СУБТИТРЫ босса (barks): вход, касты, смерть. Пусто у боссов без barks.
+  const [bark, setBark] = useState<{ id: number; text: string } | null>(null)
+  const sayBark = (ev: string) => {
+    const line = st.barks?.[ev]
+    if (line) setBark({ id: Date.now(), text: line })
+  }
   useEffect(() => {
     const p = prevSpell.current
     prevSpell.current = { ward: wardOn, curse: curseOn, adds: addsOn, stun: stunOn }
@@ -456,10 +502,20 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
       : (stunOn && !p.stun) ? { k: 'roar', t: '🗣 ОГЛУШАЮЩИЙ РЁВ' } : null
     if (fired) {
       boss.cast(); setCastBanner({ id: Date.now(), ...fired })
+      sayBark(fired.k === 'adds' ? 'summon' : fired.k)     // босс приговаривает
       const tm = setTimeout(() => setCastBanner(null), 1700)
       return () => clearTimeout(tm)
     }
-  }, [wardOn, curseOn, addsOn, stunOn, intro, boss])
+  }, [wardOn, curseOn, addsOn, stunOn, intro, boss])   // eslint-disable-line react-hooks/exhaustive-deps
+  // реплика на входе (пока играет анимация появления) и на смерти
+  useEffect(() => { if (intro) sayBark('intro') }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (boss.dead) sayBark('death') }, [boss.dead])   // eslint-disable-line react-hooks/exhaustive-deps
+  // автоскрытие субтитра (время ∝ длине реплики)
+  useEffect(() => {
+    if (!bark) return
+    const t = setTimeout(() => setBark(null), Math.min(6000, 1900 + bark.text.length * 45))
+    return () => clearTimeout(t)
+  }, [bark])
   // живой обратный отсчёт активных эффектов (тикает локально, освежается поллингом)
   const [fxT, setFxT] = useState({ ward: 0, curse: 0, stun: 0 })
   useEffect(() => { setFxT({ ward: st.ward_left ?? 0, curse: st.curse_left ?? 0, stun: st.stun_left ?? 0 }) },
@@ -496,6 +552,7 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
       {!intro && curseOn && <div className="raid-aura curse" aria-hidden />}
       {pbanner && <div key={`pb${pbanner.id}`} className={`raid-pbanner${pbanner.rage ? ' rage' : ''}`}>{pbanner.text}</div>}
       {castBanner && <div key={`cb${castBanner.id}`} className={`raid-castbanner ${castBanner.k}`}>{castBanner.t}</div>}
+      {bark && <BossBark key={`bk${bark.id}`} text={bark.text} name={st.name} />}
       <button className="raid-x" onClick={onClose}>✕</button>
 
       <div className="raid-hud-top">
@@ -514,7 +571,7 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
             // заставка: слизень оборачивается демоном (по центру, без хода)
             <div className="raid-mover">
               <div className="raid-facer">
-                <BossSprite sprite={sprite} anim="transform" playId={1} width={bw} onRest={() => setIntro(false)} />
+                <BossSprite sprite={sprite} anim={bossCfg(sprite).enter} playId={1} width={bw} onRest={() => setIntro(false)} />
                 <div className="raid-shadow big" />
               </div>
             </div>

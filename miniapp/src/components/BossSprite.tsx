@@ -1,37 +1,70 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 
-// Спрайт-листы рейд-босса (из FULL-набора). Кадр 288×160. Два «атласа» ради памяти
-// (полный 32×12 ≈70МБ тяжёл для Android):
-//   demon  — боевой демон, лист 22×8  (<sprite>.png): idle/walk/cleave/smash/fire/cast/hit/death
-//   intro  — слизень + превращение, лист 32×4 (<sprite>_intro.png): slime_idle/move/hit + transform
-// Анимируем background-position-x шагами steps(N); @keyframes boss-play + --startx/--endx.
-const FW = 288, FH = 160
-const ATLAS = {
-  demon: { suffix: '',       cols: 22, rows: 8 },
-  intro: { suffix: '_intro', cols: 32, rows: 4 },
-} as const
-
-export type BossAnim =
-  | 'idle' | 'walk' | 'cleave' | 'smash' | 'fire' | 'cast' | 'hit' | 'death'
-  | 'slime_idle' | 'slime_move' | 'slime_hit' | 'transform'
-type Atlas = keyof typeof ATLAS
-const DEF: Record<BossAnim, { atlas: Atlas; row: number; frames: number; dur: number; loop: boolean }> = {
-  // боевой демон (лист demon)
-  idle:       { atlas: 'demon', row: 0, frames: 6,  dur: 0.95, loop: true },
-  walk:       { atlas: 'demon', row: 1, frames: 12, dur: 1.0,  loop: true },
-  cleave:     { atlas: 'demon', row: 2, frames: 15, dur: 0.85, loop: false },
-  smash:      { atlas: 'demon', row: 3, frames: 18, dur: 1.05, loop: false },
-  fire:       { atlas: 'demon', row: 4, frames: 21, dur: 1.30, loop: false },  // 🔥 выдох пламени
-  cast:       { atlas: 'demon', row: 5, frames: 6,  dur: 0.70, loop: false },  // каст заклинания
-  hit:        { atlas: 'demon', row: 6, frames: 5,  dur: 0.40, loop: false },
-  death:      { atlas: 'demon', row: 7, frames: 22, dur: 1.70, loop: false },
-  // слизень + превращение (лист intro)
-  slime_idle: { atlas: 'intro', row: 0, frames: 6,  dur: 0.95, loop: true },
-  slime_move: { atlas: 'intro', row: 1, frames: 8,  dur: 0.90, loop: true },
-  slime_hit:  { atlas: 'intro', row: 2, frames: 6,  dur: 0.45, loop: false },
-  transform:  { atlas: 'intro', row: 3, frames: 32, dur: 2.40, loop: false },  // слизень → демон
+// Реестр спрайт-боссов. У каждого свой лист(ы), размер кадра и раскладка анимаций.
+// Лист <sprite>.png (+ опц. <sprite>_intro.png): строка = анимация, столбец = кадр.
+// Два «атласа» ради памяти Android (один большой ≈70МБ роняет вкладку). Анимируем
+// background-position-x шагами steps(N); @keyframes boss-play + --startx/--endx.
+type AtlasCfg = { suffix: string; cols: number; rows: number }
+type AnimCfg = { atlas: string; row: number; frames: number; dur: number; loop?: boolean }
+type SpriteCfg = {
+  fw: number; fh: number                     // размер одного кадра (px)
+  pixel: boolean                             // пиксель-арт (nearest) или гладкий даунскейл
+  atlases: Record<string, AtlasCfg>
+  defs: Record<string, AnimCfg>
+  gather: string                             // анимация на экране сбора (луп, «приближается»)
+  enter: string                              // одношот-вход в бой, потом патруль
+  dead: { start: number; count: number }     // петля «труп» на экране победы
+  proj?: boolean                             // летит ли снаряд на анимацию 'fire'
 }
+
+// Единые ИМЕНА боевых анимаций у всех боссов (idle/walk/cleave/smash/fire/cast/hit/
+// death) — тогда useBossDirector и RaidSheet работают с любым боссом без правок.
+// Флейвор задаёт лист: у демона fire=выдох огня, у Тюремщика fire=бросок кандалов,
+// cast=глухая защита. Интро/спец-анимации — свои у каждого.
+const SPRITES: Record<string, SpriteCfg> = {
+  demon_slime: {
+    fw: 288, fh: 160, pixel: true,
+    atlases: { demon: { suffix: '', cols: 22, rows: 8 }, intro: { suffix: '_intro', cols: 32, rows: 4 } },
+    defs: {
+      idle:   { atlas: 'demon', row: 0, frames: 6,  dur: 0.95, loop: true },
+      walk:   { atlas: 'demon', row: 1, frames: 12, dur: 1.0,  loop: true },
+      cleave: { atlas: 'demon', row: 2, frames: 15, dur: 0.85 },
+      smash:  { atlas: 'demon', row: 3, frames: 18, dur: 1.05 },
+      fire:   { atlas: 'demon', row: 4, frames: 21, dur: 1.30 },   // 🔥 выдох пламени
+      cast:   { atlas: 'demon', row: 5, frames: 6,  dur: 0.70 },   // каст заклинания
+      hit:    { atlas: 'demon', row: 6, frames: 5,  dur: 0.40 },
+      death:  { atlas: 'demon', row: 7, frames: 22, dur: 1.70 },
+      slime_idle: { atlas: 'intro', row: 0, frames: 6,  dur: 0.95, loop: true },
+      slime_move: { atlas: 'intro', row: 1, frames: 8,  dur: 0.90, loop: true },
+      slime_hit:  { atlas: 'intro', row: 2, frames: 6,  dur: 0.45 },
+      transform:  { atlas: 'intro', row: 3, frames: 32, dur: 2.40 },   // слизень → демон
+    },
+    gather: 'slime_move', enter: 'transform', dead: { start: 3, count: 6 }, proj: true,
+  },
+  // Батог Мясомял — тюремщик-палач. Лист 18×8 кадр 300×200 (гладкий), интро 10×3.
+  jailer: {
+    fw: 300, fh: 200, pixel: false,
+    atlases: { main: { suffix: '', cols: 18, rows: 8 }, intro: { suffix: '_intro', cols: 10, rows: 3 } },
+    defs: {
+      idle:   { atlas: 'main', row: 0, frames: 12, dur: 1.15, loop: true },
+      walk:   { atlas: 'main', row: 1, frames: 8,  dur: 0.95, loop: true },
+      cleave: { atlas: 'main', row: 2, frames: 6,  dur: 0.70 },   // взмах дубиной
+      smash:  { atlas: 'main', row: 3, frames: 18, dur: 1.15 },   // тяжёлый удар с руки
+      fire:   { atlas: 'main', row: 4, frames: 10, dur: 0.95 },   // метнул связку кандалов
+      cast:   { atlas: 'main', row: 5, frames: 6,  dur: 0.60 },   // глухая защита (ward)
+      hit:    { atlas: 'main', row: 6, frames: 6,  dur: 0.40 },
+      death:  { atlas: 'main', row: 7, frames: 7,  dur: 1.20 },
+      climb:  { atlas: 'intro', row: 0, frames: 8,  dur: 1.30 },  // вылезает из ямы-острога (вход)
+      leap:   { atlas: 'intro', row: 1, frames: 10, dur: 1.00 },
+      gloat:  { atlas: 'intro', row: 2, frames: 10, dur: 1.60, loop: true },
+    },
+    gather: 'walk', enter: 'climb', dead: { start: 2, count: 4 }, proj: false,
+  },
+}
+
+export type BossAnim = string
+export function bossCfg(sprite: string): SpriteCfg { return SPRITES[sprite] ?? SPRITES.demon_slime }
 
 export default function BossSprite({
   sprite, anim, playId = 0, width = 300, onRest, dim, loop = false, frameStart = 0, frameCount, durSec,
@@ -47,9 +80,10 @@ export default function BossSprite({
   frameCount?: number  // сколько кадров (по умолч. вся строка) — напр. петля без хвоста
   durSec?: number      // переопределить длительность (для медленной драматичной петли)
 }) {
-  const h = Math.round(width * FH / FW)
-  const a = DEF[anim]
-  const at = ATLAS[a.atlas]
+  const cfg = bossCfg(sprite)
+  const h = Math.round(width * cfg.fh / cfg.fw)
+  const a = cfg.defs[anim] ?? cfg.defs.idle
+  const at = cfg.atlases[a.atlas]
   const looping = a.loop || loop
   const count = Math.max(1, frameCount ?? a.frames)
   const dur = durSec ?? (a.dur * count / a.frames)   // темп кадров (или override)
@@ -60,7 +94,7 @@ export default function BossSprite({
     backgroundRepeat: 'no-repeat',
     backgroundSize: `${at.cols * width}px ${at.rows * h}px`,
     backgroundPositionY: `${-a.row * h}px`,
-    imageRendering: 'pixelated',
+    imageRendering: cfg.pixel ? 'pixelated' : 'auto',
     animationName: 'boss-play',
     animationDuration: `${dur}s`,
     animationTimingFunction: `steps(${count})`,

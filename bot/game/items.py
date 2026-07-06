@@ -102,7 +102,7 @@ SOURCE_MULT = {
     "hunt": 1.25,        # компоненты охоты
     "region": 1.2,       # региональные пояса
     "orc": 1.45,         # орочий сет (сет-бонус — сверх бюджета, за сбор)
-    "raid_rat": 1.35, "raid_troll": 1.6, "raid_demon": 1.85, "raid_dragon": 2.1,
+    "raid_rat": 1.35, "raid_troll": 1.6, "raid_demon": 1.85, "raid_jailer": 1.85, "raid_dragon": 2.1,
     # чудо города (Ф2b): рецепт из Лавки Артели за зодары — самый дорогой чейз в
     # игре (кооп-мегастройка), потому и БиС-бюджет выше рейд-дракона.
     "wonder": 2.6,
@@ -116,6 +116,7 @@ ITEM_SOURCE = {
     "rat_crown": "raid_rat", "rat_pelt": "raid_rat", "rat_tail": "raid_rat",
     "troll_club": "raid_troll", "troll_hide": "raid_troll", "troll_eye": "raid_troll",
     "demon_fang": "raid_demon", "demon_hide": "raid_demon", "demon_core": "raid_demon",
+    "jailer_club": "raid_jailer", "jailer_coat": "raid_jailer", "jailer_shackles": "raid_jailer",
     "dragon_fang": "raid_dragon", "dragon_scale": "raid_dragon", "dragon_heart": "raid_dragon",
 }
 
@@ -125,7 +126,7 @@ ITEM_SOURCE = {
 RARITY_BY_SOURCE = {
     "forge": "common", "hunt": "rare", "region": "rare", "orc": "epic",
     "raid_rat": "epic", "raid_troll": "epic", "raid_demon": "legendary",
-    "raid_dragon": "legendary", "wonder": "legendary",
+    "raid_jailer": "legendary", "raid_dragon": "legendary", "wonder": "legendary",
 }
 
 
@@ -553,6 +554,25 @@ CATALOG: dict[str, Item] = {
             description="Уголёк из самого нутра твари. Греет мошну и косит удачу на тебя.",
             cost={"gold": 6500}, craft_hours=0, craftable=False,
             income_pct=5, yield_pct=4, luck=9,
+        ),
+        # 🔨 Батог Мясомял (Тюремщик)
+        Item(
+            id="jailer_club", slot="weapon", name="Дубина Ката",
+            description="Просмолённое бревно с ката-мясорубки. Бьёт глухо и наверняка — спорить нечем.",
+            cost={"gold": 6500}, craft_hours=0, craftable=False,
+            damage=35, crit=9,
+        ),
+        Item(
+            id="jailer_coat", slot="chest", name="Роба острожника",
+            description="Дублёная кожа в клёпках и цепях. Держит удар, как ворота острога.",
+            cost={"gold": 6500}, craft_hours=0, craftable=False,
+            armor=27, vitality=20,
+        ),
+        Item(
+            id="jailer_shackles", slot="talisman", name="Связка кандалов",
+            description="Ржавые кандалы на кольце. Должникам страшно — платят охотнее, а удача сама идёт в руки.",
+            cost={"gold": 6500}, craft_hours=0, craftable=False,
+            income_pct=4, yield_pct=4, luck=10,
         ),
     ]
 }
