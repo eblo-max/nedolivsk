@@ -18,14 +18,14 @@ from bot.game import production as prod
 # id -> повадка. Отрицательные id не пересекаются с Telegram-игроками.
 TRADERS = {
     -9001: {"name": "Перекуп Сизый", "style": "cheap",
-            "daily_gold": 400,   # скупает дешёвку ниже 0.8×справедливой
-            "goods": ("ale1", "ale2", "bread", "cheese")},
+            "daily_gold": 400,   # скупает дешёвку ниже 0.8×справедливой (BUY-лоты)
+            "goods": ("ale1", "ale2", "bread", "cheese", "kvas", "salat", "patties")},
     -9002: {"name": "Монастырь Святой Бочки", "style": "mead",
             "daily_gold": 300, "friday_gold": 600,   # мёд каждый день, в пятницу — вдвое
             "goods": ("mead",)},
     -9003: {"name": "Спекулянт Крысобой", "style": "supply",
-            "daily_qty": 10,     # завозит дефицит по 1.25×цены (сток золота)
-            "goods": ("ale1", "bread", "mead")},
+            "daily_qty": 10,     # завозит дефицит по 1.25×цены (SELL-лоты)
+            "goods": ("ale1", "bread", "mead", "sausage", "steak", "kebab")},
 }
 CHEAP_MULT = 0.75        # перекуп: цена скупки
 SUPPLY_MULT = 1.25       # спекулянт: цена завоза
