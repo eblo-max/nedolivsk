@@ -3,9 +3,12 @@
 мельница, story-выборы и онбординг. Перенесено из bot/webapp.py дословно (move-only)."""
 
 import json
+import logging
 from datetime import datetime, timezone
 
 from aiohttp import web
+
+logger = logging.getLogger("nedolivsk.trade")
 
 from bot.db import repo
 from bot.db.base import session_factory
@@ -422,6 +425,11 @@ async def _api_trade(request: web.Request) -> web.Response:
                  "state": _tavern_state(p, p.tavern)},
                 headers={"Cache-Control": "no-store"})
         world = await repo.get_or_create_world(s)
+        # ДИАГНОСТИКА (жалобы «торг ломается, кидает в начало»): снимок оффера НА ВХОДЕ —
+        # переживёт исключение (aiohttp залогирует трейсбек рядом) и покажет цепочку op.
+        _snap = {k: offer.get(k) for k in ("good", "arch", "greed", "max_unit", "counter", "qty", "cit")}
+        _snap["stock"] = int((p.tavern.products or {}).get(offer.get("good"), 0))
+        logger.info("trade uid=%s op=%s offer=%s", uid, op, _snap)
         st = {"result": None, "react": None, "qty": 0, "gold": 0, "unit": 0,
               "asked": 0, "short": False}
 
@@ -544,6 +552,9 @@ async def _api_trade(request: web.Request) -> web.Response:
         await s.commit()
         out = {"ok": True, "gold": p.gold, **st,
                "trade": _trade_dto(ss.get_trade(p)), "state": _tavern_state(p, p.tavern)}
+        logger.info("trade uid=%s op=%s → result=%s counter=%s has_trade=%s",
+                    uid, op, st.get("result"), (ss.get_trade(p) or {}).get("counter"),
+                    ss.get_trade(p) is not None)
     return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 
