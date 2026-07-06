@@ -43,12 +43,14 @@ RECIPES = {
     "bakery": {
         "bread": ({"flour": 8, "water": 6}, 5, 12),
         "pie":   ({"flour": 8, "berries": 6, "honey": 4}, 8, 10),
+        "bliny": ({"flour": 8, "milk": 6, "honey": 3}, 7, 12),   # Блины (паритет ~15/ч)
         # эксклюзив зодчих (Ф2b): рецепт из Лавки Артели, гейт по владению (EXCLUSIVE)
         "mason_loaf": ({"flour": 10, "milk": 6, "honey": 4, "salt": 3}, 8, 10),
     },
     "smokehouse": {
         "cured":       ({"game": 8, "salt": 4}, 8, 12),
         "smoked_fish": ({"fish": 10, "salt": 4}, 7, 12),
+        "sausage":     ({"game": 7, "salt": 4, "herbs": 3}, 8, 12),  # Колбаса
     },
     "dairy": {
         "cheese": ({"milk": 12, "salt": 3}, 10, 12),
@@ -62,6 +64,7 @@ PRODUCERS = ({"mill", "brewery", "meadery", "kitchen", "winery", "smelter"}
 # Кухня: рецепт -> (вход на 1 уровень, часы, выход порций на уровень)
 KITCHEN = {
     "roast": ({"game": 6, "grain": 6, "herbs": 4}, 6, 12),  # Жаркое
+    "kebab": ({"game": 8, "herbs": 4, "salt": 3}, 9, 12),   # Шашлык (премиум-мясо)
     # эксклюзив зодчих (Ф2b): «Пир зодчих» — рецепт из Лавки Артели (EXCLUSIVE)
     "zodchy_feast": ({"game": 10, "herbs": 6, "honey": 5, "salt": 3}, 10, 10),
 }
@@ -164,6 +167,10 @@ FOODS: dict[str, Drink] = {
     "smoked_fish": Drink("smoked_fish", "🐠", "Копчёная рыба", 9),
     "cheese": Drink("cheese", "🧀", "Сыр", 12),
     "butter": Drink("butter", "🧈", "Масло", 10),
+    # новые блюда (иконки из food-пака): свой пул спроса, продаются гостям/купцу/бирже
+    "kebab": Drink("kebab", "🍢", "Шашлык", 11),        # Кухня
+    "sausage": Drink("sausage", "🌭", "Колбаса", 10),   # Коптильня
+    "bliny": Drink("bliny", "🥞", "Блины", 9),          # Пекарня
     # эксклюзив зодчих (Ф2b): премиум-стол
     "zodchy_feast": Drink("zodchy_feast", "🍗", "Пир зодчих", 30),
     "mason_loaf": Drink("mason_loaf", "🍞", "Каравай каменщика", 28),
