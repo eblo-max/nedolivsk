@@ -8,6 +8,7 @@ dict (иначе SQLAlchemy не заметит). Хелперы делают э
 import random
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import inspect as _sa_inspect
 from sqlalchemy.orm.attributes import flag_modified
 
 from bot.db.models import Player
@@ -24,7 +25,9 @@ def _save(player: Player, st: dict) -> None:
     # (напр. offer['choice']/['counter'] у оффера, полученного через get_trade — это
     # ссылка внутрь story) не детектится: shallow-copy делит тот же объект, старое==новое,
     # UPDATE не шлётся → торг терял counter и вилку (take → stale, продажа не проходила).
-    flag_modified(player, "story")
+    # Гард: только для реальных ORM-инстансов (в тестах игрок — SimpleNamespace).
+    if _sa_inspect(player, raiseerr=False) is not None:
+        flag_modified(player, "story")
 
 
 # ── Флаги-факты (вечные) ───────────────────────────────────────────────
