@@ -72,6 +72,7 @@ def _raid_dto(boss, uid: int = 0) -> dict | None:
         "roster": _raid_roster(boss, uid),
         "gear_pct": rd.gear_drop_pct(boss.boss_key), "loot": _raid_loot_dto(boss.boss_key),
         "barks": dict(spec.barks),   # реплики-субтитры босса (пусто → молчит)
+        "lore": list(spec.lore),     # лор-реплики на сборе (речевое облако)
     }
     if boss.status == "gathering":
         base["gather_left"] = _secs_until(boss.gather_until, now)
@@ -79,6 +80,7 @@ def _raid_dto(boss, uid: int = 0) -> dict | None:
     elif boss.status == "active":
         adds = rd.adds_hp(boss)
         adds_max = max(1, int(boss.max_hp * rd.SUMMON_HP_PCT))
+        pit_who = rd.pit_who(boss, now)
         base.update({
             "hp": max(0, boss.hp), "max_hp": boss.max_hp,
             "hp_pct": round(100 * max(0, boss.hp) / boss.max_hp) if boss.max_hp else 0,
@@ -86,10 +88,13 @@ def _raid_dto(boss, uid: int = 0) -> dict | None:
             "stun_left": rd.stun_left(boss, now), "ward_left": rd.ward_left(boss, now),
             "curse_left": rd.curse_left(boss, now),
             "adds_hp": adds, "adds_pct": round(100 * adds / adds_max) if adds else 0,
+            "pit_n": len(pit_who), "pit_who": pit_who[:3],          # 🔒 кто в остроге
+            "tenure_pct": round(rd.tenure_frac(boss, now) * 100),   # 📖 стаж (митигация %)
         })
         if uid:
             base["my_cd"] = rd.cooldown_left(boss, uid, now)
             base["my_stunned"] = rd.stunned(boss, uid, now)
+            base["my_pit"] = rd.pit_left(boss, uid, now)            # 🔒 я в остроге, сек
     return base
 
 
@@ -311,9 +316,6 @@ async def _api_raid_hit(request: web.Request) -> web.Response:
             if pp is not None:
                 pp.gold += plan["gold"][pid]
                 economy.record(pp, "raid", int(plan["gold"][pid]))
-                repo.queue_notify(s, pid,
-                                  f"⚔️ Босс повержен! Твоя доля добычи: +{plan['gold'][pid]} 🪙",
-                                  kind="raid")
         drop_line, winner_name = "", None
         if plan["winner"] is not None:
             winner = await repo.get_player(s, plan["winner"], for_update=True)
@@ -323,10 +325,17 @@ async def _api_raid_hit(request: web.Request) -> web.Response:
                 if got:
                     rarity = rd.RARITY.get((plan["drop"] or {}).get("rarity"), "")
                     drop_line = f"{rarity} — {got}" if rarity else got
-                    repo.queue_notify(s, winner.id, f"🎁 С босса тебе выпал {rarity} трофей: {got}", kind="raid")
         top_full = sorted(((pid, r.get("name", pid), int(r.get("dmg", 0)))
                            for pid, r in (boss.contributions or {}).items()
                            if r.get("dmg", 0) > 0), key=lambda x: -x[2])
+        # Богатый персональный DM каждому бойцу: его ранг/урон/доля + кому трофей.
+        wid = plan["winner"]
+        for pid in sorted(plan["gold"]):
+            repo.queue_notify(s, pid, texts.raid_reward_dm(
+                boss, top_full, pid, plan["gold"][pid],
+                wid is not None and int(pid) == int(wid), winner_name, drop_line), kind="raid")
+        if drop_line and wid is not None and wid not in plan["gold"]:   # трофей без доли (толпа>пул)
+            repo.queue_notify(s, int(wid), f"🎁 С босса тебе выпал трофей: {drop_line}", kind="raid")
         # Флаг + данные победы нотифаеру: правь чатовые анонсы на экран «ПОВЕРЖЕН»
         # (килл случился в мини-аппе, не в чате — чат сам не узнает).
         boss.state = dict(boss.state or {}, mini_kill=True,

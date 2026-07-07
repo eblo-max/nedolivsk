@@ -1228,7 +1228,7 @@ body {
 .chron-dot { flex:none; width:9px; height:9px; border-radius:50%; margin-top:5px; z-index:1;
   background:radial-gradient(circle at 35% 30%, #f3b85a, #b9701c); box-shadow:0 0 7px #f0a83366; }
 .chron-body { flex:1; min-width:0; }
-.chron-text { font-family:Georgia,serif; font-size:14px; line-height:1.5; color:#e7ddc8; margin:0; }
+.chron-text { font-family:Georgia,serif; font-size:14px; line-height:1.5; color:#e7ddc8; margin:0; white-space:pre-line; }
 .chron-ago { font-family:system-ui,sans-serif; font-size:10.5px; color:#8a7f6a; }
 .chron-close { margin-top:12px; flex:none; }
 
@@ -2666,7 +2666,7 @@ body {
 /* слизень на сборе — крошечный (сидит на дне кадра), потому окно-зум с выравниванием
    по низу: тельце садится на тень, огромный прозрачный верх кадра обрезаем рамкой */
 .raid-stage.gather.slimebox { height:172px; min-height:0; overflow:hidden; align-items:flex-end; }
-.raid-stage.gather.slimebox .boss-sprite { flex:none; }
+.raid-stage.gather .boss-sprite { flex:none; }   /* не сжимать: держит явную ширину (иначе фон-кадр кривится) */
 .raid-stage.gather.slimebox .raid-shadow { width:76px; height:13px; bottom:6px; }
 
 /* большой босс боя — кадр шире экрана, центрируем, прозрачные поля уходят за края */
@@ -2845,6 +2845,8 @@ body {
 .raid-fxchip.adds  { color:#b58bff; background:linear-gradient(180deg, rgba(58,34,86,.6), rgba(36,20,56,.65)); }
 .raid-fxchip.ward  { color:#7db4ff; background:linear-gradient(180deg, rgba(30,52,86,.6), rgba(18,32,56,.65)); }
 .raid-fxchip.curse { color:#e07adf; background:linear-gradient(180deg, rgba(64,24,68,.6), rgba(40,14,46,.65)); }
+.raid-fxchip.pit    { color:#e9c07a; background:linear-gradient(180deg, rgba(92,64,26,.6), rgba(58,40,16,.65)); }
+.raid-fxchip.tenure { color:#c8b28a; background:linear-gradient(180deg, rgba(70,58,36,.55), rgba(44,36,22,.6)); }
 
 /* ── баннер каста: «БОСС ПРИМЕНИЛ ...» вспышкой по центру (цвет под заклинание) ── */
 .raid-castbanner { position:fixed; left:0; right:0; top:32%; z-index:6; text-align:center; pointer-events:none;
@@ -2854,21 +2856,35 @@ body {
 .raid-castbanner.curse { color:#f0b6ff; text-shadow:0 2px 12px #000, 0 0 30px rgba(200,80,255,.95); }
 .raid-castbanner.adds  { color:#d8c2ff; text-shadow:0 2px 12px #000, 0 0 30px rgba(150,95,255,.95); }
 .raid-castbanner.roar  { color:#ffd27a; text-shadow:0 2px 12px #000, 0 0 30px rgba(255,150,40,.95); }
+.raid-castbanner.pit   { color:#f0cf94; text-shadow:0 2px 12px #000, 0 0 30px rgba(200,130,40,.95); }
 @keyframes raid-cast { 0%{ opacity:0; transform:scale(.5); letter-spacing:.34em; }
   14%{ opacity:1; transform:scale(1.15); } 28%{ transform:scale(1); }
   72%{ opacity:1; } 100%{ opacity:0; transform:scale(1.05) translateY(-12px); } }
 
-/* Реплика-субтитр босса (barks): нижняя треть, как киносубтитр. pointer-events:none —
-   не блокирует тап по боссу. Без backdrop-filter (лагает на Android). */
-.raid-bark { position:absolute; left:50%; bottom:27%; transform:translateX(-50%); z-index:6;
-  max-width:90%; padding:9px 15px; border-radius:13px; text-align:center; pointer-events:none;
-  background:rgba(22,15,10,.86); border:1px solid rgba(202,166,78,.4); box-shadow:0 6px 22px #0008;
-  font-size:14.5px; line-height:1.32; color:#f1e2bf; animation:raid-barkin .24s ease-out; }
+/* Реплика-субтитр босса (barks): под шапкой, НАД боссом (не лезет на HP-полоску).
+   pointer-events:none — не блокирует тап. Без backdrop-filter (лагает на Android). */
+.raid-bark { position:absolute; left:50%; top:74px; transform:translateX(-50%); z-index:7;
+  max-width:86%; padding:8px 14px; border-radius:13px; text-align:center; pointer-events:none;
+  background:rgba(22,15,10,.9); border:1px solid rgba(202,166,78,.45); box-shadow:0 6px 22px #0009;
+  font-size:14px; line-height:1.3; color:#f1e2bf; animation:raid-barkin .24s ease-out; }
 .raid-bark-nm { color:#e7b54a; font-weight:800; margin-right:6px; }
 .raid-bark-tx { font-weight:600; }
 .raid-bark-cur { color:#e7b54a; animation:raid-barkblink 1s steps(1) infinite; }
 @keyframes raid-barkin { from{ opacity:0; transform:translate(-50%,10px); } to{ opacity:1; transform:translate(-50%,0); } }
 @keyframes raid-barkblink { 50%{ opacity:0; } }
+
+/* Речевое облако лора на СБОРЕ: у головы босса, с хвостиком к его рту. pointer-events:
+   none. Циклит предысторию за 20 мин ожидания. Без backdrop-filter (Android). */
+.raid-lore { position:absolute; top:2%; left:50%; transform:translateX(-50%); z-index:5;
+  max-width:90%; width:max-content; padding:9px 14px; border-radius:15px; text-align:center; pointer-events:none;
+  background:rgba(28,20,13,.95); border:1px solid rgba(202,166,78,.5); box-shadow:0 8px 24px #0009;
+  font-size:12.5px; line-height:1.36; color:#f0e2c2; animation:raid-lorein .3s ease-out; }
+.raid-lore-tx { font-style:italic; }
+.raid-lore-cur { color:#e7b54a; animation:raid-barkblink 1s steps(1) infinite; }
+.raid-lore-tail { position:absolute; bottom:-10px; left:50%; margin-left:-10px; width:0; height:0;
+  border-left:10px solid transparent; border-right:10px solid transparent;
+  border-top:12px solid rgba(28,20,13,.95); }
+@keyframes raid-lorein { from{ opacity:0; } to{ opacity:1; } }
 
 /* ── ауры арены под щитом/проклятьем: краевое свечение во весь экран, живёт пока
    эффект активен (вне трясущейся арены, в .raid-root). Цвет кодирует эффект. ── */

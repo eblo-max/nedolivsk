@@ -2774,6 +2774,11 @@ _RAID_FLAVOR: dict[str, tuple[str, str]] = {
         "Все до единого — в бой. Завтра либо пьём за победу, либо наливать "
         "будет некому.",
     ),
+    "jailer": (
+        "Под ратушей лязгнули кандалы — Батог поднялся из ямы.",
+        "Весь Недоливск — на ноги! Жми кнопку и лупи ката прямо в игре — "
+        "в одиночку он закуёт каждого, только всем миром свалим.",
+    ),
 }
 
 
@@ -2931,6 +2936,32 @@ def raid_dead(boss, top: list, winner_name: str | None, drop_line: str) -> str:
     return "\n".join(lines)
 
 
+def raid_reward_dm(boss, ranked: list, pid, gold: int,
+                   is_winner: bool, winner_name: str | None, drop_line: str) -> str:
+    """Богатый персональный DM бойцу после победы над рейд-боссом.
+    ranked: [(pid, имя, урон)] по убыванию урона (pid любой — сверяем через int);
+    pid — получатель; is_winner — ему ли достался трофей. Показывает его ранг/урон/
+    долю золота + кому ушёл (или что достался ему) трофей. Годится для любого босса."""
+    from bot.game import raid
+    spec = raid.BOSSES.get(boss.boss_key)
+    name = spec.name if spec else "Босс"
+    emoji = spec.emoji if spec else "⚔️"
+    num = lambda x: f"{int(x):,}".replace(",", " ")          # noqa: E731 — 1 234 вместо 1234
+    rank = next((i + 1 for i, (p, _n, _d) in enumerate(ranked) if int(p) == int(pid)), None)
+    mine = next((d for p, _n, d in ranked if int(p) == int(pid)), None)
+    lines = [f"⚔️ <b>{emoji} {name} повержен всем миром!</b>"]
+    if rank and mine is not None:
+        lines.append(f"Твой вклад: <b>#{rank}</b> из {len(ranked)} · {num(mine)} урона")
+    lines.append(f"🪙 Твоя доля добычи: <b>+{num(gold)}</b>")
+    if drop_line:
+        if is_winner:
+            lines.append(f"🎁 <b>Тебе выпал трофей:</b> {drop_line}")
+        elif winner_name:
+            lines.append(f"🎁 Трофей урвал <b>{escape(winner_name)}</b>: {drop_line}")
+    lines += ["", "Полная сводка боя — в окне рейда."]
+    return "\n".join(lines)
+
+
 def raid_cast_push(boss, events: list) -> str:
     """Пуш бойцам в личку о «громком» касте босса. Частую мелочь (рык/щит/реген)
     не шлём — она и так видна на экране боя; шумим только о крупном."""
@@ -2942,6 +2973,8 @@ def raid_cast_push(boss, events: list) -> str:
         return f"🔥 <b>{name} впал в БЕШЕНСТВО!</b> Лютует и быстро затягивает раны — добивайте, пока не оклемался!"
     if "enrage2" in events:
         return f"🔥 <b>{name} разъярился</b> — бьёт чаще и затягивает раны. Жмите сильнее!"
+    if "pit" in events:
+        return f"🔒 <b>{name} хватает буянов и волочёт в острог!</b> Кого заперли — переждите; остальные, бейте, не зевайте."
     if "summon" in events:
         return f"👹 <b>{name} призвал миньонов!</b> Сперва бей их — иначе вольются и подлечат тварь."
     if "adds_merge" in events:

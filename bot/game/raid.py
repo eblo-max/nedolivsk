@@ -45,6 +45,11 @@ CURSE_FACTOR = 0.55
 SUMMON_HP_PCT = 0.10         # 👹 призыв: щит миньонов = доля max_hp
 SUMMON_TTL_SEC = 120         # не счистили за столько → вливаются (хил боссу)
 SUMMON_MERGE_FRAC = 0.5      # вольются — лечат лишь на половину остатка щита
+# 🔒 «В острог!» (Тюремщик): сажает ЛИЧНО топ-урона, не всех (вместо тупого стана).
+PIT_SECONDS = 40             # на столько запертый не может бить
+PIT_TARGETS = 3              # скольких верхних по урону хватает за раз (апекс — троих)
+# 📖 «Стаж» (Тюремщик): чем дольше бой, тем толще шкура — митигация растёт со временем.
+TENURE_RAMP_SEC = 600        # за столько выходит на потолок (см. Boss.tenure_max)
 
 # Порог участия для доли золота и трофея: отсекает фри-райдеров (тапнул раз —
 # мимо). «Боец» = внёс ≥ MIN_SHARE_HP_PCT от max_hp ЛИБО сделал ≥ MIN_SHARE_HITS.
@@ -72,14 +77,25 @@ class Boss:
     sprite: str = ""        # ключ спрайт-босса в мини-аппе (public/boss/<sprite>.png);
                             # "" = фолбэк на крупный эмодзи. Размер кадра и раскладку
                             # анимаций держит реестр SPRITES в components/BossSprite.tsx.
-    # Скрипт заклинаний по ПОРОГАМ HP: ((hp%, "ward"/"curse"/"summon"/"roar"), ...),
+    # Скрипт заклинаний по ПОРОГАМ HP: ((hp%, "ward"/"curse"/"summon"/"roar"/"pit"), …),
     # по убыванию %. Каждый каст срабатывает один раз, когда HP падает до порога —
     # как сигнатурные способности рейд-боссов. Низкие пороги гуще = «ярость» к концу.
     script: tuple = ()
+    pit: bool = False       # 🔒 умеет сажать в острог (личный лок топ-урона + так же
+                            #    «второе дыхание» вместо общего стана). См. spell "pit".
+    tenure_max: float = 0.0  # 📖 «стаж»: макс. доля срезаемого урона к концу боя (0=нет)
+    # Персональная СИЛА баффов (0 = дефолт-константы). Меньше ward_mult/curse_factor =
+    # ЖЁСТЧЕ (урон режется сильнее); больше summon_pct = толще выводок-щит.
+    ward_mult: float = 0.0     # 🛡 доля проходящего урона под щитом (деф. WARD_MITIGATE)
+    curse_factor: float = 0.0  # 💀 множитель урона под проклятьем (деф. CURSE_FACTOR)
+    summon_pct: float = 0.0    # 👹 щит выводка = доля max_hp (деф. SUMMON_HP_PCT)
     # Реплики-субтитры босса (RaidSheet печатает их в бою). Кортеж пар
     # (событие, фраза): intro (вход) / ward / curse / summon / roar / death.
     # Пусто → босс молчит (как было). Событие ключуется тем же спелл-именем.
     barks: tuple = ()
+    # Лор-реплики на экране СБОРА (речевое облако у рта, циклом за 20 мин ожидания):
+    # предыстория босса — кто он, откуда, отчего озлобился. Пусто → облака нет.
+    lore: tuple = ()
 
 
 # Ярусы редкости бонус-дропа (для подписи в сообщениях).
@@ -131,22 +147,54 @@ BOSSES: dict[str, Boss] = {
         script=((88, "curse"), (74, "summon"), (60, "roar"), (48, "ward"),
                 (36, "summon"), (24, "curse"), (12, "roar"))),   # бесы + адское пламя
     "jailer": Boss(
-        "jailer", "🔨", "Батог Мясомял", 70, 2200, 2200,
-        "Городской кат-тюремщик, которого достала вечно пьяная братия. Вылез из ямы "
-        "под ратушей с дубиной да связкой кандалов — всех переписать, оштрафовать и в "
-        "острог, трезветь. В одиночку не суйся: закуёт и запорет до костей.",
-        (("res:wood", 430, ("wood", 30, 55)), ("ingot", 320, (15, 28)),
-         ("gold", 210, (220, 420)), ("gear", 40, None)),   # 4% — сильный босс
+        "jailer", "🔨", "Батог Мясомял", 85, 3200, 4400,
+        "Тридцать лет он держал лучшую корчму на тракте — пока не схоронил жену да "
+        "малую дочь, а с ними и всё людское. Ныне Батог Мясомял, городской кат, знает "
+        "один закон: кто пил да гулял — тот виновен. Из ямы под ратушей он встаёт с "
+        "дубиной, что валит быка, и связкой кандалов на буянов; земля гудит под его "
+        "поступью, стража сползается на рёв. В одиночку не суйся — закуёт, засадит и "
+        "запорет до костей. Только всем Недоливском свалим ката.",
+        (("res:wood", 395, ("wood", 45, 80)), ("ingot", 340, (24, 44)),
+         ("gold", 205, (360, 660)), ("gear", 60, None)),   # 6% — АПЕКС, сильнее дракона, топ-лут
         gear_pool=("jailer_club", "jailer_coat", "jailer_shackles"),
-        gear_tier_weights=(30, 52, 18), cooldown_min=0, armor=12, sprite="jailer",
-        script=((86, "curse"), (72, "roar"), (58, "summon"), (46, "ward"),
-                (34, "curse"), (22, "roar"), (12, "summon")),   # контролёр: кандалы+стража+рёв
+        gear_tier_weights=(10, 44, 46), cooldown_min=0, armor=16, sprite="jailer",
+        pit=True, tenure_max=0.30,          # 🔒 острог топ-3 + 📖 «стаж» до −30% (уникально; дракон 0)
+        ward_mult=0.27, curse_factor=0.52, summon_pct=0.13,   # его щит/проклятье/выводок злее дефолта,
+        #   но НЕ множатся в непробиваемость (аудит: 0.22×0.45×стаж = ~1 урон в окне)
+        script=((90, "ward"), (80, "curse"), (70, "pit"), (60, "summon"), (50, "ward"),
+                (40, "curse"), (30, "pit"), (20, "summon"), (12, "curse"), (6, "pit")),  # плотно, к концу — гуще
         barks=(("intro", "Догулялись, пьянь. Батог пришёл — всех перепишу да в яму."),
                ("ward", "Дубьём меня? А ну к стенке, пёс!"),
                ("curse", "Держи кандалы, гуляка!"),
                ("summon", "Стража-а! Волоки всю ораву сюда!"),
-               ("roar", "Бунтова-а-ать?! Запорю до костей!"),
-               ("death", "Кто ж… теперь… стеречь будет… голытьбу…"))),
+               ("pit", "Тебя, буян, — в острог! Волоки за решётку, к остальным!"),
+               ("death", "Кто ж… теперь… стеречь будет… голытьбу…")),
+        lore=(  # — трагедия —
+              "Думаете, Батог с колыбели такой? Тридцать годков держал я корчму «Тёплый Очаг» — лучшую на тракте.",
+              "Марьюшка, жёнушка, разливала гостям — от одной её улыбки и хмель слаще казался.",
+              "А доченька, Алёнка, семи годков, меж столов порхала: каждому — кружку да ласковое словцо.",
+              "Вечерами клала головку мне на плечо: „Тятя, спой“. И голосок её — что колокольчик по первому снегу.",
+              "В ту осень заехали гуляки — сытые, злые, хмельные. Крушили всё. Я сказал: будет, по домам.",
+              "Они лишь смеялись. А в ночь подпёрли двери снаружи колом… и пустили по крыше красного петуха.",
+              "Проснулся в дыму. Рвусь в горницу — балка рухнула поперёк. Слышу: „Тя-тя-а!“ — Алёнка зовёт…",
+              "…и звала, пока не смолкла. Я не добрался. Не добрался, слышите вы?",
+              "Наутро выгреб из золы два колечка — своё да её, совсем крохотное. Всё, что осталось от «Очага».",
+              "Так и стал катом. Двадцать годков в остроге отстоял — насмотрелся на вас, гуляк, на десять жизней.",
+              "Батог мой не простой: что зарубка — то чья-то пьяная ночка. Живого места на нём уже нет.",
+              # — мостик к байкам —
+              "Э, да что душу травить. Раз уж ждём народ — потешу вас, каких дурней сюда волокли.",
+              # — байки про Недоливск (бытовые) —
+              "Мужик по пьяни в чужую избу забрёл, лёг да уснул. Хозяйка утром: „Ты чей будешь?“ — „Твой, Люба, твой!“ А её Клавдией звать.",
+              "Другой сам в камеру просился — от жены хоронился. „У вас, — грит, — хоть сковородой не достанет.“ Неделю жил, за уши не выволочь.",
+              "Третий у соседа забор свёл — свой чинить. У того самого соседа, с кем за этот забор третий год и грызётся.",
+              "Бабка самогон гнала — до того забористый, что петух с одного глотка по-людски заговорил. Забрал обоих: и бабку, и петуха-свидетеля.",
+              "Один нарочно окно в управе высадил — чтоб посадили. „Три годика, — молит, — дай, от тёщи отдохну!“",
+              "Штраф мне гусём принёс. Гусь вырвался, мэра за ляжку — цап! Мэр гуся и помиловал: „Хоть кто-то, — грит, — в городе при деле.“",
+              "Бабу — мужа хватилась, пропал! Через три дня в соседской бане отрыли. „Я, — грит, — в отъезде был, по делам.“ Три дня в бане.",
+              "Сборщику податей палец откусил — „за колбасу, — грит, — принял“. Тот теперь подати в перчатках считает.",
+              "А отчего Недоливск-то? Шинкарь на палец недолил — ему кружкой в лоб. С того и повелось: что ни день — недолив да мордобой.",
+              # — обратно к угрозе (кольцует) —
+              "Ну да посмеялись — и будет. Батог не за смехом пришёл. За Алёнку пришёл. Готовьтесь, голубчики.")),
     "dragon": Boss(
         "dragon", "🐲", "Древний Змей", 80, 3000, 3900,
         "Древний, злой и голодный до золота. Накроет тенью пол-Недоливска, дохнёт "
@@ -332,8 +380,23 @@ def stun_left(boss, now: datetime | None = None) -> int:
     return _iso_left((boss.state or {}).get("stun_until"), now or _now())
 
 
+def pit_left(boss, player_id: int, now: datetime | None = None) -> int:
+    """🔒 Секунд, что игрок сидит в остроге (ЛИЧНЫЙ лок топ-урона, не общий стан)."""
+    pit = (boss.state or {}).get("pit") or {}
+    return _iso_left(pit.get(str(player_id)), now or _now())
+
+
+def pit_who(boss, now: datetime | None = None) -> list[str]:
+    """Имена бойцов, что сейчас в остроге (для баннера/подписи)."""
+    now = now or _now()
+    pit = (boss.state or {}).get("pit") or {}
+    contrib = boss.contributions or {}
+    return [(contrib.get(pid) or {}).get("name") or "боец"
+            for pid in pit if _iso_left(pit[pid], now) > 0]
+
+
 def cooldown_left(boss, player_id: int, now: datetime | None = None) -> int:
-    """Секунд до следующего удара: max(личный кулдаун, общее оглушение босса)."""
+    """Секунд до следующего удара: max(личный кд, общий стан, острог этого игрока)."""
     now = now or _now()
     rec = (boss.contributions or {}).get(str(player_id))
     personal = 0
@@ -341,13 +404,19 @@ def cooldown_left(boss, player_id: int, now: datetime | None = None) -> int:
         cd = BOSSES[boss.boss_key].cooldown_min * 60
         last_dt = datetime.fromisoformat(rec["last"]) + timedelta(seconds=cd)
         personal = _iso_left(last_dt.isoformat(), now)
-    return max(personal, stun_left(boss, now))
+    return max(personal, stun_left(boss, now), pit_left(boss, player_id, now))
 
 
 def stunned(boss, player_id: int, now: datetime | None = None) -> bool:
     """Оглушение — главная причина ждать (рык/второе дыхание сильнее личного кд)."""
     now = now or _now()
     return stun_left(boss, now) >= cooldown_left(boss, player_id, now) > 0
+
+
+def in_pit(boss, player_id: int, now: datetime | None = None) -> bool:
+    """🔒 Заперт ли игрок в остроге (сильнее личного кд — главная причина ждать)."""
+    now = now or _now()
+    return pit_left(boss, player_id, now) >= cooldown_left(boss, player_id, now) > 0
 
 
 def _fight_start(boss) -> datetime:
@@ -404,7 +473,11 @@ def maybe_second_wind(boss, now: datetime | None = None) -> bool:
     boss.hp = min(boss.max_hp, boss.hp + int(boss.max_hp * SECOND_WIND_HEAL_PCT))
     st = dict(boss.state or {})
     st["second_wind"] = True
-    st["stun_until"] = (now + timedelta(seconds=ROAR_STUN_SECONDS)).isoformat()
+    spec = BOSSES.get(boss.boss_key)
+    if spec and spec.pit:                # 🔒 «острог»-босс сажает топ-урона (не общий стан)
+        _imprison(st, boss, now)
+    else:
+        st["stun_until"] = (now + timedelta(seconds=ROAR_STUN_SECONDS)).isoformat()
     boss.state = st
     return True
 
@@ -426,6 +499,24 @@ def adds_hp(boss) -> int:
     return int((boss.state or {}).get("adds_hp", 0) or 0)
 
 
+def _imprison(st: dict, boss, now: datetime) -> list[int]:
+    """🔒 Посадить в острог топ по урону (личный лок, не общий стан). Мутирует st['pit']
+    (pid→до-когда). ВСЕГДА оставляет ≥1 бойца на свободе — иначе соло/малую пачку
+    залочит целиком, а босс на простое регенит → вечный бой. Возвращает id посаженных."""
+    contrib = boss.contributions or {}
+    top = sorted((kv for kv in contrib.items() if int((kv[1] or {}).get("dmg", 0)) > 0),
+                 key=lambda kv: -int((kv[1] or {}).get("dmg", 0)))
+    n = min(PIT_TARGETS, max(0, len(top) - 1))          # хотя бы одного не сажаем
+    targets = [int(pid) for pid, _ in top[:n]]
+    if targets:
+        pit = dict(st.get("pit") or {})
+        until = (now + timedelta(seconds=PIT_SECONDS)).isoformat()
+        for pid in targets:
+            pit[str(pid)] = until
+        st["pit"] = pit
+    return targets
+
+
 def _apply_spell(st: dict, key: str, now: datetime, boss) -> bool:
     """Наложить эффект каста на копию state. False — каст «пустой» (например призыв
     при живом выводке): порог всё равно считаем взятым, но события не выдаём."""
@@ -438,10 +529,14 @@ def _apply_spell(st: dict, key: str, now: datetime, boss) -> bool:
     if key == "roar":
         st["stun_until"] = (now + timedelta(seconds=ROAR_STUN_SECONDS)).isoformat()
         return True
+    if key == "pit":                                # 🔒 «В острог!» — личный лок топ-урона
+        return bool(_imprison(st, boss, now))       # некого сажать (пустой ростер) → пустой каст
     if key == "summon":
         if int(st.get("adds_hp", 0) or 0) > 0:      # выводок ещё жив — не плодим
             return False
-        st["adds_hp"] = max(1, int(boss.max_hp * SUMMON_HP_PCT))
+        spec = BOSSES.get(boss.boss_key)
+        pct = (spec and spec.summon_pct) or SUMMON_HP_PCT
+        st["adds_hp"] = max(1, int(boss.max_hp * pct))
         st["adds_until"] = (now + timedelta(seconds=SUMMON_TTL_SEC)).isoformat()
         return True
     return False
@@ -507,6 +602,16 @@ def mitigate(boss_key: str, raw: int) -> int:
     return max(1, round(raw * balance.HUNT_ARMOR_K / (balance.HUNT_ARMOR_K + armor)))
 
 
+def tenure_frac(boss, now: datetime | None = None) -> float:
+    """📖 «Стаж»: доля срезаемого урона от длительности боя (0..tenure_max). Чем дольше
+    тянут — тем толще шкура ката; награда за быстрый килл. 0 у боссов без стажа."""
+    spec = BOSSES.get(boss.boss_key)
+    if not spec or spec.tenure_max <= 0:
+        return 0.0
+    elapsed = ((now or _now()) - _fight_start(boss)).total_seconds()
+    return round(spec.tenure_max * min(1.0, max(0.0, elapsed) / TENURE_RAMP_SEC), 3)
+
+
 def apply_hit(boss, player, dmg: int, now: datetime | None = None,
               credit: int | None = None) -> None:
     """Снять HP боссу на dmg и записать вклад игрока. credit — сколько засчитать
@@ -542,14 +647,19 @@ def resolve_hit(boss, player, now: datetime | None = None,
     mods = flask_mods(flask_keys)
     raw, crit = player_damage(player, rng, mods)
 
+    spec = BOSSES.get(boss.boss_key)
     # сбитень отпаивает от проклятья босса — урон не режется
     curse = curse_left(boss, now) > 0 and not mods["antidote"]
     if curse:
-        raw = max(1, round(raw * CURSE_FACTOR))
+        raw = max(1, round(raw * ((spec and spec.curse_factor) or CURSE_FACTOR)))
 
     ward = ward_left(boss, now) > 0
     after_armor = mitigate(boss.boss_key, raw)        # толща-броня (процентом)
-    dmg = max(1, round(after_armor * WARD_MITIGATE)) if ward else after_armor
+    wmult = (spec and spec.ward_mult) or WARD_MITIGATE
+    dmg = max(1, round(after_armor * wmult)) if ward else after_armor
+    ten = tenure_frac(boss, now)                      # 📖 стаж: чем дольше бой, тем толще
+    if ten > 0:
+        dmg = max(1, round(dmg * (1 - ten)))
     soaked = max(0, raw - dmg)
 
     # Сперва бьём щит миньонов; остаток уходит в HP босса.

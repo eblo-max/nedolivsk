@@ -102,7 +102,7 @@ SOURCE_MULT = {
     "hunt": 1.25,        # компоненты охоты
     "region": 1.2,       # региональные пояса
     "orc": 1.45,         # орочий сет (сет-бонус — сверх бюджета, за сбор)
-    "raid_rat": 1.35, "raid_troll": 1.6, "raid_demon": 1.85, "raid_jailer": 1.85, "raid_dragon": 2.1,
+    "raid_rat": 1.35, "raid_troll": 1.6, "raid_demon": 1.85, "raid_dragon": 2.1, "raid_jailer": 2.25,
     # чудо города (Ф2b): рецепт из Лавки Артели за зодары — самый дорогой чейз в
     # игре (кооп-мегастройка), потому и БиС-бюджет выше рейд-дракона.
     "wonder": 2.6,
@@ -555,24 +555,24 @@ CATALOG: dict[str, Item] = {
             cost={"gold": 6500}, craft_hours=0, craftable=False,
             income_pct=5, yield_pct=4, luck=9,
         ),
-        # 🔨 Батог Мясомял (Тюремщик)
+        # 🔨 Батог Мясомял (Тюремщик) — АПЕКС: лучший дроп-шмот в игре (сильнее драконьего)
         Item(
             id="jailer_club", slot="weapon", name="Дубина Ката",
             description="Просмолённое бревно с ката-мясорубки. Бьёт глухо и наверняка — спорить нечем.",
-            cost={"gold": 6500}, craft_hours=0, craftable=False,
-            damage=35, crit=9,
+            cost={"gold": 9500}, craft_hours=0, craftable=False,
+            damage=45, crit=11,
         ),
         Item(
             id="jailer_coat", slot="chest", name="Роба острожника",
             description="Дублёная кожа в клёпках и цепях. Держит удар, как ворота острога.",
-            cost={"gold": 6500}, craft_hours=0, craftable=False,
-            armor=27, vitality=20,
+            cost={"gold": 9500}, craft_hours=0, craftable=False,
+            armor=34, vitality=26,
         ),
         Item(
             id="jailer_shackles", slot="talisman", name="Связка кандалов",
             description="Ржавые кандалы на кольце. Должникам страшно — платят охотнее, а удача сама идёт в руки.",
-            cost={"gold": 6500}, craft_hours=0, craftable=False,
-            income_pct=4, yield_pct=4, luck=10,
+            cost={"gold": 9500}, craft_hours=0, craftable=False,
+            income_pct=6, yield_pct=5, luck=12,
         ),
     ]
 }

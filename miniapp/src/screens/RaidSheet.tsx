@@ -15,10 +15,12 @@ export interface RaidState {
   gather_left?: number; preview_hp?: number
   hp?: number; max_hp?: number; hp_pct?: number; phase?: number; ends_left?: number
   stun_left?: number; ward_left?: number; curse_left?: number; adds_hp?: number; adds_pct?: number
-  my_cd?: number; my_stunned?: boolean
+  pit_n?: number; pit_who?: string[]; tenure_pct?: number     // 🔒 острог + 📖 стаж
+  my_cd?: number; my_stunned?: boolean; my_pit?: number
   report?: boolean; won?: boolean; top?: Fighter[]; my_gold?: number; i_fought?: boolean
   flask?: { drunk?: string[] | null; options: { key: string; name: string; emoji: string; label: string; qty: number }[] }
   barks?: Record<string, string>   // реплики босса-субтитры: intro/ward/curse/summon/roar/death
+  lore?: string[]                  // лор-реплики на сборе (речевое облако, цикл)
 }
 interface Victory {
   name: string; emoji: string; sprite: string; top: Fighter[]
@@ -55,22 +57,48 @@ const demoBoss = (key = 'demon_slime'): RaidState => {
   }
   if (key === 'jailer') return {
     ...base, key: 'jailer', name: 'Батог Мясомял', emoji: '🔨', sprite: 'jailer',
-    armor: 12, preview_hp: 4400, barks: JAILER_BARKS,
-    blurb: 'Городской кат-тюремщик, которого достала вечно пьяная братия. Вылез из ямы под ратушей с дубиной и связкой кандалов — всех переписать, оштрафовать и в острог: трезветь.',
+    armor: 16, preview_hp: 5200, barks: JAILER_BARKS, lore: JAILER_LORE, gear_pct: 6,
+    blurb: 'Тридцать лет он держал лучшую корчму на тракте — пока не схоронил жену да малую дочь, а с ними и всё людское. Ныне Батог Мясомял, городской кат, знает один закон: кто пил да гулял — тот виновен. Из ямы под ратушей он встаёт с дубиной, что валит быка, и связкой кандалов на буянов; земля гудит под его поступью, стража сползается на рёв. В одиночку не суйся — закуёт, засадит и запорет до костей. Только всем Недоливском свалим ката.',
+    // ЗЕРКАЛО _raid_loot_dto('jailer') → bot/game/raid.py BOSSES['jailer'].loot. Держать в синхроне!
     loot: [
-      { icon: '🪵', label: 'Древесина ×30–55', pct: 43 }, { icon: '🔩', label: 'Слитки ×15–28', pct: 32 },
-      { icon: '🪙', label: '220–420 золота', pct: 21 }, { icon: '🛡', label: 'Снаряга Ката', pct: 4, gear: true },
+      { icon: '🪵', label: 'Древесина ×45–80', pct: 39.5 }, { icon: '📦', label: 'Слитки ×24–44', pct: 34 },
+      { icon: '🪙', label: '360–660 золота', pct: 20.5 }, { icon: '🛡', label: 'Эксклюзивная снаряга', pct: 6, gear: true },
     ],
   }
   return base
 }
+// Лор-реплики Тюремщика на сборе (демо; в проде — из raid.py Boss.lore)
+const JAILER_LORE: string[] = [
+  'Думаете, Батог с колыбели такой? Тридцать годков держал я корчму «Тёплый Очаг» — лучшую на тракте.',
+  'Марьюшка, жёнушка, разливала гостям — от одной её улыбки и хмель слаще казался.',
+  'А доченька, Алёнка, семи годков, меж столов порхала: каждому — кружку да ласковое словцо.',
+  'Вечерами клала головку мне на плечо: „Тятя, спой“. И голосок её — что колокольчик по первому снегу.',
+  'В ту осень заехали гуляки — сытые, злые, хмельные. Крушили всё. Я сказал: будет, по домам.',
+  'Они лишь смеялись. А в ночь подпёрли двери снаружи колом… и пустили по крыше красного петуха.',
+  'Проснулся в дыму. Рвусь в горницу — балка рухнула поперёк. Слышу: „Тя-тя-а!“ — Алёнка зовёт…',
+  '…и звала, пока не смолкла. Я не добрался. Не добрался, слышите вы?',
+  'Наутро выгреб из золы два колечка — своё да её, совсем крохотное. Всё, что осталось от «Очага».',
+  'Так и стал катом. Двадцать годков в остроге отстоял — насмотрелся на вас, гуляк, на десять жизней.',
+  'Батог мой не простой: что зарубка — то чья-то пьяная ночка. Живого места на нём уже нет.',
+  'Э, да что душу травить. Раз уж ждём народ — потешу вас, каких дурней сюда волокли.',
+  'Мужик по пьяни в чужую избу забрёл, лёг да уснул. Хозяйка утром: „Ты чей будешь?“ — „Твой, Люба, твой!“ А её Клавдией звать.',
+  'Другой сам в камеру просился — от жены хоронился. „У вас, — грит, — хоть сковородой не достанет.“ Неделю жил, за уши не выволочь.',
+  'Третий у соседа забор свёл — свой чинить. У того самого соседа, с кем за этот забор третий год и грызётся.',
+  'Бабка самогон гнала — до того забористый, что петух с одного глотка по-людски заговорил. Забрал обоих: и бабку, и петуха-свидетеля.',
+  'Один нарочно окно в управе высадил — чтоб посадили. „Три годика, — молит, — дай, от тёщи отдохну!“',
+  'Штраф мне гусём принёс. Гусь вырвался, мэра за ляжку — цап! Мэр гуся и помиловал: „Хоть кто-то, — грит, — в городе при деле.“',
+  'Бабу — мужа хватилась, пропал! Через три дня в соседской бане отрыли. „Я, — грит, — в отъезде был, по делам.“ Три дня в бане.',
+  'Сборщику податей палец откусил — „за колбасу, — грит, — принял“. Тот теперь подати в перчатках считает.',
+  'А отчего Недоливск-то? Шинкарь на палец недолил — ему кружкой в лоб. С того и повелось: что ни день — недолив да мордобой.',
+  'Ну да посмеялись — и будет. Батог не за смехом пришёл. За Алёнку пришёл. Готовьтесь, голубчики.',
+]
 // Реплики Тюремщика (демо; в проде — из raid.py Boss.barks)
 const JAILER_BARKS: Record<string, string> = {
   intro: 'Догулялись, пьянь. Батог пришёл — всех перепишу да в яму.',
   ward: 'Дубьём меня? А ну к стенке, пёс!',
   curse: 'Держи кандалы, гуляка!',
   summon: 'Стража-а! Волоки всю ораву сюда!',
-  roar: 'Бунтова-а-ать?! Запорю до костей!',
+  pit: 'Тебя, буян, — в острог! Волоки за решётку, к остальным!',
   death: 'Кто ж… теперь… стеречь будет… голытьбу…',
 }
 let _demo: RaidState | null = null
@@ -97,7 +125,8 @@ function demoApi(path: string, _body: Record<string, unknown>): Promise<unknown>
   }
   if (path === 'raid/hit') {
     const crit = Math.random() < 0.25
-    const dmg = Math.round((crit ? 520 : 260) * (0.8 + Math.random() * 0.4))
+    const ten = b.key === 'jailer' ? (b.tenure_pct ?? 0) : 0   // 📖 стаж режет урон (как на сервере)
+    const dmg = Math.round((crit ? 520 : 260) * (0.8 + Math.random() * 0.4) * (1 - ten / 100))
     b.hp = Math.max(0, (b.hp ?? 0) - dmg)
     b.hp_pct = Math.round(100 * b.hp / (b.max_hp ?? 1))
     const me = b.roster.find((r) => r.mine); if (me) { me.dmg += dmg; me.hits++ }
@@ -107,13 +136,17 @@ function demoApi(path: string, _body: Record<string, unknown>): Promise<unknown>
     b.ward_left = Math.max(0, (b.ward_left ?? 0) - 9)
     b.curse_left = Math.max(0, (b.curse_left ?? 0) - 9)
     b.stun_left = Math.max(0, (b.stun_left ?? 0) - 9)
+    b.my_pit = Math.max(0, (b.my_pit ?? 0) - 9); b.my_cd = Math.max(0, (b.my_cd ?? 0) - 9)
+    if (!b.my_pit) { b.pit_n = 0; b.pit_who = [] }
+    if (b.key === 'jailer') b.tenure_pct = Math.min(30, (b.tenure_pct ?? 0) + 3)   // 📖 стаж растёт
     if ((b.adds_hp ?? 0) > 0) { b.adds_hp = Math.max(0, (b.adds_hp ?? 0) - dmg); b.adds_pct = Math.round(100 * (b.adds_hp ?? 0) / Math.max(1, (b.max_hp ?? 1) * 0.1)) }
-    // касты по порогам HP (зеркалит boss.script реального демона)
+    // касты по порогам HP (зеркалит boss.script; у ката roar → pit «В острог!»)
     const casts: string[] = []
     const fire = (id: string, pct: number, fn: () => void) => { if (b.hp_pct! <= pct && !_fired.has(id)) { _fired.add(id); fn(); casts.push(id) } }
     fire('ward', 84, () => { b.ward_left = 45 })
     fire('summon', 64, () => { b.adds_hp = Math.round((b.max_hp ?? 1) * 0.1); b.adds_pct = 100 })
-    fire('roar', 46, () => { b.stun_left = 45 })
+    if (b.key === 'jailer') fire('pit', 46, () => { b.my_pit = 10; b.my_cd = 10; b.pit_n = 3; b.pit_who = ['Гриша Кабан', 'Авдотья', 'Ты'] })
+    else fire('roar', 46, () => { b.stun_left = 45 })
     fire('curse', 30, () => { b.curse_left = 45 })
     if (b.hp <= 0) {
       b.status = 'dead'
@@ -174,19 +207,19 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
   const [busy, setBusy] = useState(false)
   const [admin, setAdmin] = useState(false)                 // показать админ-призыв
   const [bosses, setBosses] = useState<BossOpt[]>([])       // список боссов для призыва
-  const [cd, setCd] = useState(0)              // мой локальный кулдаун/оглушение
+  const [cd, setCd] = useState(0)              // мой локальный кулдаун/оглушение/острог
   const [stunned, setStunned] = useState(false)
+  const [pitted, setPitted] = useState(false)  // 🔒 я в остроге (личный лок)
   const [floats, setFloats] = useState<Float[]>([])
   const [toast, setToast] = useState<string>('')
   const [flaskSel, setFlaskSel] = useState<string[]>([])
   // диапазон хода босса к краям — от ширины экрана (босс реально доходит до бортов)
   const [paceRange] = useState(() => Math.round(Math.min(window.innerWidth, 640) * 0.3))
-  const boss = useBossDirector(paceRange)
-  const floatId = useRef(0)
-  const termRef = useRef(false)        // достигли финала (победа/уход) → стоп-поллинг
-
   const sprite = st?.sprite || victory?.sprite || ''
   const emoji = st?.emoji || victory?.emoji || '😈'
+  const boss = useBossDirector(paceRange, bossCfg(sprite).combat)   // «характер» боя из реестра
+  const floatId = useRef(0)
+  const termRef = useRef(false)        // достигли финала (победа/уход) → стоп-поллинг
 
   const pushFloat = useCallback((text: string, crit: boolean) => {
     const id = ++floatId.current
@@ -229,14 +262,16 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
   // кулдаун-тик
   useEffect(() => {
     if (cd <= 0) return
-    const i = setInterval(() => setCd((x) => { const n = Math.max(0, x - 1); if (n === 0) setStunned(false); return n }), 1000)
+    const i = setInterval(() => setCd((x) => { const n = Math.max(0, x - 1); if (n === 0) { setStunned(false); setPitted(false) } return n }), 1000)
     return () => clearInterval(i)
   }, [cd])
 
-  // синхронизуем мой кулдаун с сервером при апдейте состояния
+  // синхронизуем мой кулдаун/острог с сервером при апдейте состояния
   useEffect(() => {
-    if (st?.status === 'active' && (st.my_cd ?? 0) > 0) { setCd(st.my_cd!); setStunned(!!st.my_stunned) }
-  }, [st?.my_cd, st?.my_stunned, st?.status])
+    if (st?.status === 'active' && (st.my_cd ?? 0) > 0) {
+      setCd(st.my_cd!); setStunned(!!st.my_stunned); setPitted((st.my_pit ?? 0) > 0)
+    }
+  }, [st?.my_cd, st?.my_stunned, st?.my_pit, st?.status])
 
   async function join() {
     if (busy) return
@@ -285,13 +320,17 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
         return
       }
       if (r.hit) {
-        boss.hit(); thud(!!r.crit)
+        boss.hit(!!r.crit); thud(!!r.crit)   // крит → большой отлёт (whacked, если есть у босса)
         if (r.dmg) pushFloat(`${r.crit ? '💥' : ''}−${r.dmg}`, !!r.crit)
         if (r.toast) { setToast(r.toast); setTimeout(() => setToast(''), 1400) }
-        if (r.second_wind) { setCd(45); setStunned(true); hapticNotify('warning') }
-        if (r.raid) setSt(r.raid)
-      } else if (r.wait) {                 // рано (оглушение/кулдаун) — мягко
-        setCd(r.wait); setStunned(!!r.stunned); if (r.raid) setSt(r.raid)
+        if (r.second_wind) hapticNotify('warning')   // у ката = острог топ-урона, не общий стан
+        if (r.raid) {
+          setSt(r.raid)
+          const rc = r.raid
+          if ((rc.my_cd ?? 0) > 0) { setCd(rc.my_cd!); setStunned(!!rc.my_stunned); setPitted((rc.my_pit ?? 0) > 0) }
+        }
+      } else if (r.wait) {                 // рано (оглушение/острог/кулдаун) — мягко
+        setCd(r.wait); setStunned(!!r.stunned); setPitted(((r.raid?.my_pit) ?? 0) > 0); if (r.raid) setSt(r.raid)
         haptic('light')
       }
     } catch (e) {
@@ -318,7 +357,7 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
     return wrap(
       <div className="raid-end win">
         <div className="raid-stage dead big">
-          {sprite ? <BossSprite sprite={sprite} anim="death" playId={1} loop frameStart={bossCfg(sprite).dead.start} frameCount={bossCfg(sprite).dead.count} durSec={0.95} width={Math.min(Math.round(window.innerWidth * 1.5), 560)} /> : <div className="raid-emo">{emoji}</div>}
+          {sprite ? <BossSprite sprite={sprite} anim={bossCfg(sprite).deadAnim ?? 'death'} playId={1} loop frameStart={bossCfg(sprite).dead.start} frameCount={bossCfg(sprite).dead.count} durSec={0.95} width={Math.min(Math.round(window.innerWidth * 1.5), 560)} /> : <div className="raid-emo">{emoji}</div>}
           <div className="raid-burst" />
         </div>
         <div className="raid-end-ttl">{victory.name.toUpperCase()} ПОВЕРЖЕН!</div>
@@ -383,10 +422,28 @@ export default function RaidSheet({ onClose, onGold }: { onClose: () => void; on
   // ── ФАЗА БИТВЫ ──
   return (
     <BattleView
-      st={st} cd={cd} stunned={stunned} busy={busy} floats={floats} toast={toast}
+      st={st} cd={cd} stunned={stunned} pitted={pitted} busy={busy} floats={floats} toast={toast}
       boss={boss} onHit={hit} onClose={() => { haptic('light'); onClose() }} sprite={sprite} emoji={emoji}
       flaskSel={flaskSel} onFlask={(k) => setFlaskSel((cur) => cur.includes(k) ? cur.filter((x) => x !== k) : cur.length < 2 ? [...cur, k] : cur)}
     />
+  )
+}
+
+// Речевое облако у рта босса на сборе: печатает ОДНУ реплику (управляется GatherView,
+// который синхронит рот-анимацию с печатью). Скорость печати — CHAR_MS.
+const LORE_CHAR_MS = 33
+function LoreBubble({ text }: { text: string }) {
+  const [n, setN] = useState(1)
+  useEffect(() => {
+    setN(1)
+    const t = setInterval(() => setN((x) => (x >= text.length ? x : x + 1)), LORE_CHAR_MS)
+    return () => clearInterval(t)
+  }, [text])
+  return (
+    <div className="raid-lore">
+      <span className="raid-lore-tx">{text.slice(0, n)}{n < text.length && <span className="raid-lore-cur">▌</span>}</span>
+      <span className="raid-lore-tail" aria-hidden />
+    </div>
   )
 }
 
@@ -395,13 +452,40 @@ function GatherView({ st, busy, onJoin, onClose, sprite, emoji }: {
   st: RaidState; busy: boolean; onJoin: () => void; onClose: () => void; sprite: string; emoji: string
 }) {
   const left = useTicker(st.gather_left)
+  const cfg = bossCfg(sprite)
+  const lore = st.lore ?? []
+  const sayAnim = cfg.gatherAnims?.[0] ?? cfg.gather        // «говорит» (рот двигается)
+  const waitList = cfg.gatherAnims?.slice(1) ?? []          // паузы: переминается/усмехается/зыркает
+  const [line, setLine] = useState(0)                       // текущая реплика лора
+  const [speaking, setSpeaking] = useState(true)
+  const [waitAnim, setWaitAnim] = useState(waitList[0] ?? cfg.gather)
+  // синхрон: пока реплика печатается+читается — «говорит»; потом пауза с анимацией
+  // ожидания; затем следующая реплика. Рот двигается ровно когда идёт речь.
+  useEffect(() => {
+    if (!lore.length || !cfg.gatherAnims) return
+    const text = lore[line] ?? ''
+    setSpeaking(true)
+    const sayMs = 300 + text.length * LORE_CHAR_MS + 2400   // печать + время дочитать
+    const gapMs = 2600                                      // пауза-переминание перед след. репликой
+    const t1 = setTimeout(() => {
+      setSpeaking(false)
+      if (waitList.length) setWaitAnim(waitList[Math.floor(Math.random() * waitList.length)])
+    }, sayMs)
+    const t2 = setTimeout(() => setLine((x) => (x + 1) % lore.length), sayMs + gapMs)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+    // ВАЖНО: зависим от ДЛИНЫ лора, а не от массива st.lore — опрос сервера каждые 3с
+    // отдаёт новый массив (та же длина), и завязка на ссылку сбрасывала бы таймер
+    // смены реплики (t2 ~5–9с) раньше срабатывания → босс залипал и «молчал».
+  }, [line, lore.length])   // eslint-disable-line react-hooks/exhaustive-deps
+  const gAnim = (lore.length && cfg.gatherAnims) ? (speaking ? sayAnim : waitAnim) : cfg.gather
   return (
     <div className="raid-root">
       <div className="raid-vign" />
       <button className="raid-x" onClick={onClose}>✕</button>
       <div className="raid-gather">
-        <div className="raid-stage gather big slimebox">
-          {sprite ? <BossSprite sprite={sprite} anim={bossCfg(sprite).gather} width={Math.min(Math.round(window.innerWidth * 2.2), 860)} /> : <div className="raid-emo">{emoji}</div>}
+        <div className={`raid-stage gather big${cfg.gatherCrop ? ' slimebox' : ''}`}>
+          {sprite && lore.length > 0 && <LoreBubble key={line} text={lore[line]} />}
+          {sprite ? <BossSprite sprite={sprite} anim={gAnim} width={Math.min(Math.round(window.innerWidth * cfg.gatherW), cfg.gatherCap)} /> : <div className="raid-emo">{emoji}</div>}
           <div className="raid-shadow" />
         </div>
         <div className="raid-name">{emoji} {st.name}</div>
@@ -450,8 +534,8 @@ function BossBark({ text, name }: { text: string; name: string }) {
 }
 
 // ── Экран битвы ──────────────────────────────────────────────────────────────
-function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose, sprite, emoji, flaskSel, onFlask }: {
-  st: RaidState; cd: number; stunned: boolean; busy: boolean; floats: Float[]; toast: string
+function BattleView({ st, cd, stunned, pitted, busy, floats, toast, boss, onHit, onClose, sprite, emoji, flaskSel, onFlask }: {
+  st: RaidState; cd: number; stunned: boolean; pitted: boolean; busy: boolean; floats: Float[]; toast: string
   boss: ReturnType<typeof useBossDirector>; onHit: () => void; onClose: () => void; sprite: string; emoji: string
   flaskSel: string[]; onFlask: (k: string) => void
 }) {
@@ -464,10 +548,16 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
     const f = () => setBw(Math.min(Math.round(window.innerWidth * 1.42), 620))
     window.addEventListener('resize', f); return () => window.removeEventListener('resize', f)
   }, [])
-  const attacking = boss.anim === 'cleave' || boss.anim === 'smash' || boss.anim === 'fire'  // приём → тряхнём сцену
+  const attacking = ['cleave', 'smash', 'fire', 'stab', 'punch'].includes(boss.anim)  // приём → тряхнём сцену
   const firing = boss.anim === 'fire' && bossCfg(sprite).proj   // выдох огня → вспышка (только у боссов со снарядом)
-  // ИНТРО: слизень оборачивается демоном (transform) при входе в бой, потом — патруль
+  // ИНТРО: вход босса (демон — transform слизень→демон, Тюремщик — «говорит»), потом
+  // патруль. Одношот-вход снимает intro по onRest; зацикленный (talking) — по таймеру.
   const [intro, setIntro] = useState(true)
+  useEffect(() => {
+    if (!intro) return
+    const t = setTimeout(() => setIntro(false), bossCfg(sprite).enterMs)
+    return () => clearTimeout(t)
+  }, [intro, sprite])
   // кольцо-удар: щёлкает на каждый take_hit (playId меняется при ударе)
   const [impact, setImpact] = useState(0)
   useEffect(() => { if (!intro && boss.anim === 'hit') setImpact((x) => x + 1) }, [boss.playId, boss.anim, intro])
@@ -484,7 +574,8 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
   // босс воздевает руки (анимация cast) + драматичный баннер. Знаем КОНКРЕТНО какое.
   const wardOn = (st.ward_left ?? 0) > 0, curseOn = (st.curse_left ?? 0) > 0
   const addsOn = (st.adds_hp ?? 0) > 0, stunOn = (st.stun_left ?? 0) > 0
-  const prevSpell = useRef({ ward: wardOn, curse: curseOn, adds: addsOn, stun: stunOn })
+  const pitOn = (st.pit_n ?? 0) > 0            // 🔒 кто-то в остроге
+  const prevSpell = useRef({ ward: wardOn, curse: curseOn, adds: addsOn, stun: stunOn, pit: pitOn })
   const [castBanner, setCastBanner] = useState<{ id: number; k: string; t: string } | null>(null)
   // РЕПЛИКИ-СУБТИТРЫ босса (barks): вход, касты, смерть. Пусто у боссов без barks.
   const [bark, setBark] = useState<{ id: number; text: string } | null>(null)
@@ -494,19 +585,25 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
   }
   useEffect(() => {
     const p = prevSpell.current
-    prevSpell.current = { ward: wardOn, curse: curseOn, adds: addsOn, stun: stunOn }
+    prevSpell.current = { ward: wardOn, curse: curseOn, adds: addsOn, stun: stunOn, pit: pitOn }
     if (intro || boss.dead) return
+    const pitTxt = '🔒 В ОСТРОГ' + (st.pit_who?.length ? ': ' + st.pit_who.join(', ') : '!')
     const fired = (wardOn && !p.ward) ? { k: 'ward', t: '🛡 ЩИТ ВОЗДВИГНУТ' }
       : (curseOn && !p.curse) ? { k: 'curse', t: '💀 ПРОКЛЯТЬЕ' }
       : (addsOn && !p.adds) ? { k: 'adds', t: '👹 ПРИЗЫВ БЕСОВ' }
+      : (pitOn && !p.pit) ? { k: 'pit', t: pitTxt }
       : (stunOn && !p.stun) ? { k: 'roar', t: '🗣 ОГЛУШАЮЩИЙ РЁВ' } : null
     if (fired) {
-      boss.cast(); setCastBanner({ id: Date.now(), ...fired })
+      // призыв стражи — подрыв (jbomb); острог — хватает и слэмит (smash); прочее — вскинул руки
+      if (fired.k === 'adds' && bossCfg(sprite).defs.jbomb) boss.play('jbomb')
+      else if (fired.k === 'pit' && bossCfg(sprite).defs.smash) boss.play('smash')
+      else boss.cast()
+      setCastBanner({ id: Date.now(), ...fired })
       sayBark(fired.k === 'adds' ? 'summon' : fired.k)     // босс приговаривает
       const tm = setTimeout(() => setCastBanner(null), 1700)
       return () => clearTimeout(tm)
     }
-  }, [wardOn, curseOn, addsOn, stunOn, intro, boss])   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wardOn, curseOn, addsOn, stunOn, pitOn, intro, boss, sprite])   // eslint-disable-line react-hooks/exhaustive-deps
   // реплика на входе (пока играет анимация появления) и на смерти
   useEffect(() => { if (intro) sayBark('intro') }, [])   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (boss.dead) sayBark('death') }, [boss.dead])   // eslint-disable-line react-hooks/exhaustive-deps
@@ -539,9 +636,11 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
   // статус-эффекты (модерн-пилюли с живым отсчётом / процентом миньонов)
   const fx: { k: string; icon: string; label: string; sub: string }[] = []
   if (stunOn) fx.push({ k: 'roar', icon: '😵', label: 'Оглушение', sub: `${fxT.stun}с` })
+  if (pitOn) fx.push({ k: 'pit', icon: '🔒', label: 'В остроге', sub: `${st.pit_n}` })
   if (addsOn) fx.push({ k: 'adds', icon: '👹', label: 'Бесы', sub: `${st.adds_pct}%` })
   if (wardOn) fx.push({ k: 'ward', icon: '🛡', label: 'Щит', sub: `${fxT.ward}с` })
   if (curseOn) fx.push({ k: 'curse', icon: '💀', label: 'Проклятье', sub: `${fxT.curse}с` })
+  if ((st.tenure_pct ?? 0) > 0) fx.push({ k: 'tenure', icon: '📖', label: 'Стаж', sub: `−${st.tenure_pct}%` })
   const adds = addsOn
 
   return (
@@ -579,7 +678,12 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
             <>
               <div className="raid-mover" style={{ transform: `translateX(${boss.pos}px)`, transition: `transform ${boss.moveMs}ms ease-in-out` }}>
                 <div className="raid-facer" style={{ transform: `scaleX(${boss.facing})` }}>
-                  <BossSprite sprite={sprite} anim={boss.anim} playId={boss.playId} width={bw} onRest={boss.onRest} dim={(st.ward_left ?? 0) > 0} />
+                  {/* пока ward активен — держит глухую защиту (dpose); НО реакцию удара
+                      (whacked-звёздочки / hit) пропускаем ПОВЕРХ щита и без затемнения,
+                      иначе оглушение-в-звёздочки почти не видно (ward висит долго). */}
+                  {wardOn && bossCfg(sprite).defs.dpose && boss.anim !== 'whacked' && boss.anim !== 'hit'
+                    ? <BossSprite sprite={sprite} anim="dpose" playId={-1} width={bw} dim />
+                    : <BossSprite sprite={sprite} anim={boss.anim} playId={boss.playId} width={bw} onRest={boss.onRest} dim={wardOn && boss.anim !== 'whacked' && boss.anim !== 'hit'} />}
                   <div className="raid-shadow big" />
                 </div>
               </div>
@@ -641,8 +745,8 @@ function BattleView({ st, cd, stunned, busy, floats, toast, boss, onHit, onClose
           <div className="raid-flask drunk">🍺 Выпито на бой: {st.flask.drunk!.length} порц. — действует до конца битвы</div>
         )}
         {cd > 0 ? (
-          <button className="btn raid-hit wait" disabled>
-            {stunned ? `😵 Оглушён — ${secsLabel(cd)}` : `⏳ Передышка — ${secsLabel(cd)}`}
+          <button className={`btn raid-hit wait${pitted ? ' pit' : ''}`} disabled>
+            {pitted ? `🔒 Ты в остроге — ${secsLabel(cd)}` : stunned ? `😵 Оглушён — ${secsLabel(cd)}` : `⏳ Передышка — ${secsLabel(cd)}`}
           </button>
         ) : (
           <button className={`btn raid-hit${adds ? ' adds' : ''}`} disabled={busy} onClick={onHit}>

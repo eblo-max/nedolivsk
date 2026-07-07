@@ -261,9 +261,6 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
         if p is not None:
             p.gold += plan["gold"][pid]
             economy.record(p, "raid", int(plan["gold"][pid]))
-            repo.queue_notify(session, pid,
-                              f"⚔️ Босс повержен! Твоя доля добычи: +{plan['gold'][pid]} 🪙",
-                              kind="raid")
     drop_line, winner_name = "", None
     if plan["winner"] is not None:
         winner = await repo.get_player(session, plan["winner"], for_update=True)
@@ -273,15 +270,21 @@ async def cb_raid_hit(cb: CallbackQuery, session: AsyncSession) -> None:
             if got:
                 rarity = raid.RARITY.get((plan["drop"] or {}).get("rarity"), "")
                 drop_line = f"{rarity} — {got}" if rarity else got
-                repo.queue_notify(session, winner.id,
-                                  f"🎁 С босса тебе выпал {rarity} трофей: {got}",
-                                  kind="raid")
     # В список «кто рубился» — только реально бившие (dmg>0). Записавшиеся, но не
     # ударившие, награды не получают и в списке не маячат нулями.
-    top = sorted(((r.get("name", str(p)), r.get("dmg", 0))
-                  for p, r in (boss.contributions or {}).items()
-                  if r.get("dmg", 0) > 0),
-                 key=lambda x: -x[1])
+    top_full = sorted(((p, r.get("name", str(p)), r.get("dmg", 0))
+                       for p, r in (boss.contributions or {}).items()
+                       if r.get("dmg", 0) > 0),
+                      key=lambda x: -x[2])
+    # Богатый персональный DM каждому бойцу: его ранг/урон/доля + кому трофей.
+    wid = plan["winner"]
+    for pid in sorted(plan["gold"]):
+        repo.queue_notify(session, pid, texts.raid_reward_dm(
+            boss, top_full, pid, plan["gold"][pid],
+            wid is not None and int(pid) == int(wid), winner_name, drop_line), kind="raid")
+    if drop_line and wid is not None and wid not in plan["gold"]:   # трофей без доли (толпа>пул)
+        repo.queue_notify(session, int(wid), f"🎁 С босса тебе выпал трофей: {drop_line}", kind="raid")
+    top = [(n, d) for _p, n, d in top_full]
     text = texts.raid_dead(boss, top, winner_name, drop_line)
     msgs = dict(boss.messages or {})
     if str(cb.message.chat.id) not in msgs:       # на всякий — и кликнутое сообщение
