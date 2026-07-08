@@ -214,6 +214,14 @@ def create_wonder(session: AsyncSession, *, key: str, target: int) -> Wonder:
     return w
 
 
+async def latest_done_wonder(session: AsyncSession) -> Wonder | None:
+    """Последнее ВОЗВЕДЁННОЕ чудо — «мемориал» для экрана стройки: пока не заложили
+    новое, вкладка показывает готовое (не пустоту). expired не показываем."""
+    return (await session.execute(
+        select(Wonder).where(Wonder.status == "done")
+        .order_by(Wonder.id.desc()).limit(1))).scalar_one_or_none()
+
+
 async def sealing_wonders(session: AsyncSession) -> list[Wonder]:
     """Готовые к доплате чуда (status='sealing') — для settle в нотифаере. Лочим,
     пропуская занятые (skip_locked), как live_invasions — без гонок тика с тиком."""

@@ -9,6 +9,7 @@ interface Wonder {
   key: string; name: string; emoji: string; blurb: string; bonus: string
   phase: number; phases: Phase[]; phase_title: string
   progress: number; target: number; pct: number; sealed: boolean
+  status?: string                      // building | sealing | done (done = мемориал)
   mine_pts: number; mine_zodar: number; board: Board[]
 }
 interface Item { key: string; name: string; qty: number; pts?: number }
@@ -240,8 +241,9 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
               {/* таймлайн фаз */}
               <div className="wd2-timeline">
                 {w.phases.map((p, i) => {
-                  const st = i < w.phase - 1 ? 'done' : i === w.phase - 1 ? 'now' : 'wait'
-                  const fill = i < w.phase - 1 ? 100 : i === w.phase - 1 ? w.pct : 0
+                  const fin = w.status === 'done'      // мемориал: все фазы взяты
+                  const st = fin || i < w.phase - 1 ? 'done' : i === w.phase - 1 ? 'now' : 'wait'
+                  const fill = fin || i < w.phase - 1 ? 100 : i === w.phase - 1 ? w.pct : 0
                   return (
                     <div key={p.key} className={`wd2-seg ${st}`} title={p.title}>
                       <i style={{ width: `${fill}%` }} /><span>{st === 'done' ? '✓' : i + 1}</span>
@@ -257,12 +259,14 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
               </div>
 
               <div className="wd2-plaque">{w.blurb}</div>
-              <div className="wd2-bonus"><span>🎁</span> По готовности: {w.bonus}</div>
+              <div className="wd2-bonus"><span>{w.status === 'done' ? '✅' : '🎁'}</span> {w.status === 'done' ? 'Действует' : 'По готовности'}: {w.bonus}</div>
 
               {err && <div className="wd2-err">⚠ {err}<small>Артель ждёт — попробуй снова</small></div>}
 
               {w.sealed ? (
-                <div className="wd2-sealed">🏛 Возведено! Артель раздаёт зодары вкладчикам…</div>
+                <div className="wd2-sealed">{w.status === 'done'
+                  ? '🏛 Возведено и закрыто! Город пожинает плоды — скоро артель заложит новое чудо.'
+                  : '🏛 Возведено! Артель раздаёт зодары вкладчикам…'}</div>
               ) : (
                 <>
                   <div className="wd2-lbl">Неси в стройку</div>

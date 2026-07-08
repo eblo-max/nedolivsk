@@ -176,3 +176,14 @@ def test_active_bonuses_only_when_wonder_done():
     assert wonder.invasion_escal_mult(w) == wonder.WALL_ESCAL_MULT
     assert wonder.active_bonuses(w)["invasion_escal_mult"] == 0.85
     assert wonder.WALL_ESCAL_MULT < 1.0                    # Орда именно СЛАБЕЕ
+
+
+def test_done_wonder_dto_is_sealed_memorial():
+    """Мемориал: DTO возведённого чуда — status='done', sealed, 100% (экран стройки
+    показывает готовое чудо, а не пустоту, пока не заложили новое)."""
+    from bot.webapi.wonder import _wonder_dto
+    w = _wonder(phase=3, progress=64000, target=64000, status="done",
+                contributions={"1": {"name": "Зодчий", "pts": 10, "zodar": 2}})
+    dto = _wonder_dto(w, 1)
+    assert dto["status"] == "done" and dto["sealed"] is True
+    assert dto["pct"] == 100 and dto["board"][0]["name"] == "Зодчий"

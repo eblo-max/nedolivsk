@@ -81,6 +81,8 @@ async def _api_wonder(request: web.Request) -> web.Response:
         p = await repo.get_player(s, uid)
         zodar = int(getattr(p, "zodar", 0) or 0) if p else 0
         w = await repo.get_active_wonder(s)
+        if w is None:                                  # стройки нет → мемориал: последнее
+            w = await repo.latest_done_wonder(s)       # возведённое чудо (закрыто, бафф жив)
         dto = _wonder_dto(w, uid) if w is not None else None
         stock = _stock(p)
     return web.json_response({"ok": True, "wonder": dto, "zodar": zodar,
