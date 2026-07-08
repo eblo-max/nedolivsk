@@ -124,6 +124,18 @@ async def main() -> None:
         nightrun.router, invasion.router, hub.router, group.router
     )
 
+    # Кэш готовых чудес → глоб-буфы в котировках без world (Сады: добыча +5%).
+    # Пополняется в _settle_wonders нотифаера того же процесса — всегда точен.
+    from bot.db import repo as _repo
+    from bot.db.base import session_factory as _sf
+    from bot.game import wonder as _wmod
+    async with _sf() as _s:
+        _world = await _repo.get_or_create_world(_s)
+        _done = (_world.live or {}).get("wonders_done") or []
+        _wmod.set_done_cache(_done)
+        await _s.commit()                       # get_or_create мог создать строку мира
+    logging.info("Кэш чудес: %s", sorted(_done) or "пусто")
+
     notifier_task = asyncio.create_task(notifier_loop(bot))
 
     # Mini App карта: веб-сервер на $PORT (Railway даёт публичный домен). Без PORT

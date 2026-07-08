@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from bot.db.models import Player, Tavern
 from bot.game import (
     balance, buff, economy, inventory, items, newbie, perks, production, season,
-    worldevent,
+    wonder, worldevent,
 )
 
 
@@ -139,7 +139,8 @@ def expedition_gain_quote(player: Player, tavern: Tavern | None, resource: str) 
     return int(amount * items.yield_multiplier(equipment, resource)
                * season.yield_mult(resource) * buff.yield_mult(player)
                * worldevent.harvest_mult(player)
-               * newbie.yield_mult(player))
+               * newbie.yield_mult(player)
+               * wonder.gather_yield_mult())   # 🌿 Хмельные сады: весь город +5%
 
 
 def _passive_rate(player: Player, tavern: Tavern, base_rate: int | None = None) -> float:

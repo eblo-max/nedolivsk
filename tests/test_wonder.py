@@ -178,6 +178,45 @@ def test_active_bonuses_only_when_wonder_done():
     assert wonder.WALL_ESCAL_MULT < 1.0                    # Орда именно СЛАБЕЕ
 
 
+def test_gardens_yield_buff_only_when_done():
+    """🌿 Сады: множитель добычи 1.0 без чуда, ×1.05 с готовым; active_bonuses
+    (world-путь) и gather_yield_mult (кэш-путь) согласованы."""
+    wonder.set_done_cache([])
+    try:
+        assert wonder.gather_yield_mult() == 1.0
+        wonder.set_done_cache(["gardens"])
+        assert wonder.gather_yield_mult() == wonder.GARDENS_YIELD_MULT == 1.05
+        w = NS(live={"wonders_done": ["gardens"]})
+        assert wonder.active_bonuses(w)["gather_yield_mult"] == 1.05
+        assert "invasion_escal_mult" not in wonder.active_bonuses(w)  # чужой буф не протёк
+        wonder.set_done_cache([])
+        wonder.note_done("gardens")                     # путь нотифаера (settle)
+        assert wonder.gather_yield_mult() == 1.05
+    finally:
+        wonder.set_done_cache([])                       # не загрязняем другие тесты
+
+
+def test_expedition_quote_applies_gardens_buff():
+    """Показ=действие: единая котировка добычи реально умножается на бафф Садов
+    (и показ панели, и начисление claim зовут её же)."""
+    from bot.game import logic
+    t = NS(level=5, production={}, products={}, upgrades=[], buildings=[],
+           reputation=50, comfort=5, capacity=20)
+    p = NS(gold=0, level=5, equipment={}, inventory={}, expeditions=[],
+           region="green_valleys", buff_kind=None, buff_until=None,
+           perks={}, created_at=None, tavern=t, story=None)
+    wonder.set_done_cache([])
+    try:
+        base = logic.expedition_gain_quote(p, t, "wood")
+        wonder.set_done_cache(["gardens"])
+        buffed = logic.expedition_gain_quote(p, t, "wood")
+    finally:
+        wonder.set_done_cache([])
+    assert base > 0 and buffed >= base                  # буф не в минус
+    assert buffed <= int(base * 1.05) + 1               # и не больше заявленных +5%
+    assert buffed >= int(base * 1.05) - 1               # реально применился
+
+
 def test_done_wonder_dto_is_sealed_memorial():
     """Мемориал: DTO возведённого чуда — status='done', sealed, 100% (экран стройки
     показывает готовое чудо, а не пустоту, пока не заложили новое)."""

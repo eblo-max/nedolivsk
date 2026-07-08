@@ -273,7 +273,8 @@ async def cmd_wonder(
     if await repo.get_active_wonder(session) is not None:
         await message.answer("🏛 Стройка уже идёт — сперва доведите текущее чудо.")
         return
-    key = wmod.FIRST_WONDER
+    # /wonder [key] — заложить чудо по ключу реестра (напр. gardens); без ключа — первое
+    key = next((a for a in args if a in wmod.WONDERS), wmod.FIRST_WONDER)
     wdef = wmod.get(key)
     if wdef is None:
         await message.answer("Нет такого чуда в реестре.")

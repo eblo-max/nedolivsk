@@ -10,6 +10,7 @@ interface Wonder {
   phase: number; phases: Phase[]; phase_title: string
   progress: number; target: number; pct: number; sealed: boolean
   status?: string                      // building | sealing | done (done = мемориал)
+  sprite?: string                      // wonder_wall | wonder_gardens — выбор визуала
   mine_pts: number; mine_zodar: number; board: Board[]
 }
 interface Item { key: string; name: string; qty: number; pts?: number }
@@ -20,11 +21,11 @@ interface Contrib extends Resp { award: number }
 const DEV = import.meta.env.DEV
 const SAMPLE: Resp = {
   wonder: {
-    key: 'wall', name: 'Твердыня', emoji: '🏯',
-    blurb: 'Недоливск одевается в камень: ров, стены, ворота и детинец — теперь Орде так просто не пройти.',
-    bonus: 'Орда приходит слабее — всему городу легче отбиться',
-    phase: 1, phases: [{ key: 'foundation', title: 'Ров и фундамент' }, { key: 'walls', title: 'Стены и ворота' }, { key: 'keep', title: 'Башни и детинец' }],
-    phase_title: 'Ров и фундамент', progress: 18400, target: 51600, pct: 36, sealed: false,
+    key: 'gardens', name: 'Хмельные сады', emoji: '🌿', sprite: 'wonder_gardens',
+    blurb: 'Пустырь за стеной превращается в сады: шпалеры хмеля, ячменные гряды и сушильни — своя земля кормит весь Недоливск.',
+    bonus: 'Земля родит щедрее — добыча бригад всего города +5%',
+    phase: 2, phases: [{ key: 'clearing', title: 'Расчистка и саженцы' }, { key: 'trellis', title: 'Шпалеры и полив' }, { key: 'cellars', title: 'Сушильни и погреба' }],
+    phase_title: 'Шпалеры и полив', progress: 18400, target: 38400, pct: 55, sealed: false,
     mine_pts: 1240, mine_zodar: 6,
     board: [{ name: 'Синий Гоблин', pts: 3400, zodar: 18 }, { name: 'Wendigo', pts: 2100, zodar: 11 }, { name: 'Елена', pts: 1240, zodar: 6 }],
   },
@@ -51,14 +52,15 @@ function useCountUp(value: number, ms = 650): number {
   return n
 }
 
-/** Части крепости в порядке возведения. th — % готовности, когда часть «встаёт». */
+/** Части чуда в порядке возведения. th — % готовности, когда часть «встаёт». */
 const CASTLE_ORDER = ['base', 'wall', 'towers', 'keep', 'flag'] as const
 const CASTLE_TH: Record<string, number> = { base: 0, wall: 18, towers: 42, keep: 68, flag: 90 }
-function partStates(pct: number): Record<string, string> {
+function partStates(pct: number, order: readonly string[] = CASTLE_ORDER,
+                    th: Record<string, number> = CASTLE_TH): Record<string, string> {
   const st: Record<string, string> = {}
   let nowSet = false
-  for (const k of CASTLE_ORDER) {
-    if (pct >= CASTLE_TH[k]) st[k] = 'built'
+  for (const k of order) {
+    if (pct >= th[k]) st[k] = 'built'
     else if (!nowSet) { st[k] = 'now'; nowSet = true }
     else st[k] = 'ghost'
   }
@@ -147,6 +149,95 @@ function Castle({ pct, done }: { pct: number; done: boolean }) {
   )
 }
 
+/** 🌿 Хмельные сады: гряды → шпалеры с лозами → сушильня → гирлянда шишек.
+    Тот же тёплый ночной стиль и стейт-машина частей, что у крепости. */
+const GARDEN_ORDER = ['base', 'beds', 'trellis', 'shed', 'garland'] as const
+const GARDEN_TH: Record<string, number> = { base: 0, beds: 18, trellis: 42, shed: 68, garland: 90 }
+function Garden({ pct, done }: { pct: number; done: boolean }) {
+  const s = partStates(pct, GARDEN_ORDER, GARDEN_TH)
+  const poles = [44, 70, 96, 122]
+  return (
+    <svg className="wd2-castle" viewBox="0 0 200 128" preserveAspectRatio="xMidYMax meet">
+      <defs>
+        <linearGradient id="gFace" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f0cd85" /><stop offset="0.35" stopColor="#c99a4c" />
+          <stop offset="0.72" stopColor="#8f6531" /><stop offset="1" stopColor="#5a3e1e" />
+        </linearGradient>
+        <linearGradient id="gShade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#000" stopOpacity="0.42" /><stop offset="0.6" stopColor="#000" stopOpacity="0" />
+        </linearGradient>
+        <radialGradient id="gGate" cx="50%" cy="32%" r="78%">
+          <stop offset="0" stopColor="#ffe6a2" /><stop offset="0.5" stopColor="#d9852a" /><stop offset="1" stopColor="#2a1606" />
+        </radialGradient>
+        <radialGradient id="gGround" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stopColor="#ffb14a" stopOpacity="0.45" /><stop offset="1" stopColor="#ffb14a" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      <ellipse className="cp-ground" cx="100" cy="120" rx="92" ry="10" fill="url(#gGround)" />
+
+      {/* земляная терраса */}
+      <g className={`cp ${s.base}`}>
+        <path d="M16 121 L184 121 L177 109 L23 109 Z" fill="url(#gFace)" stroke="#3c2a12" strokeWidth="0.5" />
+        <rect className="cp-rim" x="24" y="108.4" width="152" height="1.4" rx="0.7" />
+      </g>
+
+      {/* гряды с ростками */}
+      <g className={`cp ${s.beds}`}>
+        {[0, 1, 2].map((r) => (
+          <g key={r}>
+            <rect className="cp-soil" x={30 + r * 6} y={102 - r * 5} width={104 - r * 12} height="3.6" rx="1.8" />
+            {Array.from({ length: 7 - r }, (_, i) => {
+              const x = 38 + r * 8 + i * (92 - r * 14) / (6 - r)
+              const y = 101.4 - r * 5
+              return <path key={i} className="cp-vine" d={`M${x} ${y} q-1.6 -3.4 -3 -4.6 M${x} ${y} q1.6 -3.4 3 -4.6`} />
+            })}
+          </g>
+        ))}
+      </g>
+
+      {/* шпалеры: столбы, перекладины, свисающие лозы */}
+      <g className={`cp ${s.trellis}`}>
+        {poles.map((x) => <rect key={x} className="cp-wood" x={x - 1.5} y="66" width="3" height="43" rx="1" />)}
+        <rect className="cp-wood" x={poles[0] - 3} y="70" width={poles[3] - poles[0] + 6} height="2.4" rx="1.2" />
+        <rect className="cp-wood" x={poles[0] - 3} y="84" width={poles[3] - poles[0] + 6} height="2.2" rx="1.1" />
+        {poles.slice(0, -1).map((x, i) => {
+          const nx = poles[i + 1]; const mid = (x + nx) / 2
+          return (
+            <g key={x}>
+              <path className="cp-vine" d={`M${mid} 72 q-2.4 8 -1 15 q1 5.4 -1.6 9.4`} />
+              <path className="cp-vine" d={`M${mid + 7} 72 q2 7 .6 13.4`} />
+              <circle className="cp-leaf" cx={mid - 2} cy="82" r="1.7" />
+              <circle className="cp-leaf" cx={mid + 6.4} cy="79" r="1.5" />
+              <circle className="cp-leaf" cx={mid - 3} cy="93" r="1.5" />
+            </g>
+          )
+        })}
+      </g>
+
+      {/* сушильня с тёплым окном */}
+      <g className={`cp ${s.shed}`}>
+        <rect x="140" y="80" width="34" height="30" fill="url(#gFace)" stroke="#3c2a12" strokeWidth="0.5" />
+        <rect x="140" y="80" width="12" height="30" fill="url(#gShade)" />
+        <path className="cp-wood" d="M136 81 L157 66 L178 81 Z" />
+        <path className="cp-gate" d="M151 110 V101 a6 6 0 0 1 12 0 V110 Z" />
+        <rect className="cp-win" x="155" y="86" width="4" height="7" rx="1.8" />
+      </g>
+
+      {/* гирлянда с шишками хмеля (загорается по финалу) */}
+      <g className={`cp ${s.garland} ${done ? 'lit' : ''}`}>
+        <line className="cp-pole" x1={poles[0]} y1="66" x2={poles[0]} y2="52" />
+        <line className="cp-pole" x1="157" y1="66" x2="157" y2="54" />
+        <path className="cp-vine" d={`M${poles[0]} 53 Q100 63 157 55`} fill="none" />
+        {[56, 78, 100, 122, 144].map((x, i) => {
+          const y = 53 + Math.sin((i + 0.5) / 5 * Math.PI) * 6.4
+          return <path key={x} className="cp-flag" d={`M${x} ${y} l2.6 3.4 l-2.6 4.4 l-2.6 -4.4 Z`} />
+        })}
+      </g>
+    </svg>
+  )
+}
+
 function goldPresets(g: number): { label: string; n: number }[] {
   const out: { label: string; n: number }[] = []
   for (const n of [100, 500]) if (n < g) out.push({ label: `${n}`, n })
@@ -215,7 +306,9 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
               <div className="wd2-embers">{Array.from({ length: 11 }, (_, i) => (
                 <span key={i} style={{ left: `${7 + i * 8.3}%`, animationDelay: `${(i * 0.7) % 6}s`, animationDuration: `${5 + (i % 4)}s` }} />
               ))}</div>
-              <Castle pct={w.pct} done={w.sealed} />
+              {w.sprite === 'wonder_gardens'
+                ? <Garden pct={w.pct} done={w.sealed} />
+                : <Castle pct={w.pct} done={w.sealed} />}
               {burst > 0 && (
                 <div key={burst} className="wd2-burst">
                   <i className="wd2-ring" />

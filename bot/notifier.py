@@ -176,6 +176,8 @@ async def _settle_wonders(bot: Bot) -> None:
                     f"Вкладчики награждены зодарами ⚒.")
             w.status = "done"
         await session.commit()
+        for w in wonders:                            # буф в кэш котировок — после коммита
+            wmod.note_done(w.key)                    # (Сады: добыча бригад +5% сразу)
     for t in announces:                              # сеть — ПОСЛЕ коммита
         for cid in chat_ids:
             await deliver(lambda c=cid, _t=t: bot.send_message(c, _t),

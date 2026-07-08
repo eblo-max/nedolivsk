@@ -53,6 +53,21 @@ WONDERS: dict[str, WonderDef] = {
         bonus="Орда приходит слабее — всему городу легче отбиться",
         sprite="wonder_wall",
     ),
+    "gardens": WonderDef(
+        "gardens", "🌿", "Хмельные сады",
+        "Пустырь за стеной превращается в сады: шпалеры хмеля, ячменные гряды и "
+        "сушильни — своя земля кормит весь Недоливск, и бригадам всегда есть что "
+        "везти с вылазок.",
+        phases=(
+            # Калибровка от Твердыни (снесена явкой за ~1.5 дня, база 200/300/1000):
+            # ×1.6 — вторая стройка длиннее, «на неделю». Тюнинг вживую: /wonder retarget.
+            Phase("clearing", "Расчистка и саженцы", 400),
+            Phase("trellis",  "Шпалеры и полив",     600),
+            Phase("cellars",  "Сушильни и погреба",  1600),
+        ),
+        bonus="Земля родит щедрее — добыча бригад всего города +5%",
+        sprite="wonder_gardens",
+    ),
 }
 
 # Какое чудо строим первым (Фаза 0 — без ротации; ротацию/выбор добавит Фаза 4).
@@ -82,6 +97,7 @@ BONUS_BRACKETS = ((0.10, 3.0), (0.25, 2.0), (0.50, 1.5), (1.00, 1.0))
 
 WALL_ESCAL_MULT = 0.85  # Твердыня готова → Орда на 15% СЛАБЕЕ (escal влияет на бой,
 #                         в отличие от threshold — тот лишь эталон сложности)
+GARDENS_YIELD_MULT = 1.05  # Хмельные сады готовы → добыча бригад всего города +5%
 
 
 def item_points(items: dict | None) -> int:
@@ -196,7 +212,32 @@ def active_bonuses(world) -> dict:
     out: dict = {}
     if "wall" in done:
         out["invasion_escal_mult"] = WALL_ESCAL_MULT
+    if "gardens" in done:
+        out["gather_yield_mult"] = GARDENS_YIELD_MULT
     return out
+
+
+# ── Кэш готовых чудес (для котировок БЕЗ доступа к world) ──────────────────
+# Процесс один (bot+web); wonders_done меняется только в _settle_wonders нотифаера
+# того же процесса → кэш, читаемый на старте и пополняемый на settle, всегда точен.
+_DONE_CACHE: set[str] = set()
+
+
+def set_done_cache(keys) -> None:
+    """Инициализация на старте бота: world.live['wonders_done'] → кэш."""
+    global _DONE_CACHE
+    _DONE_CACHE = set(keys or [])
+
+
+def note_done(key: str) -> None:
+    """Чудо достроено (settle нотифаера) — включить бафф в кэше немедленно."""
+    _DONE_CACHE.add(key)
+
+
+def gather_yield_mult() -> float:
+    """Множитель добычи бригад от готовых чудес (Сады ×1.05). ЕДИНАЯ котировка:
+    вызывается и из начисления (claim), и из показа панели — показ=действие."""
+    return GARDENS_YIELD_MULT if "gardens" in _DONE_CACHE else 1.0
 
 
 def invasion_escal_mult(world) -> float:
