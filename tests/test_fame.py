@@ -100,6 +100,56 @@ def test_backfill_sql_thresholds_match_ranks():
     assert sql == want, f"backfill-пороги {sql} ≠ FAME_RANKS {want}"
 
 
+def test_noble_chance_tip_grow_with_rank():
+    """🎩 Знатные гости (Ф2): на дне ранга не заходят; шанс и щедрость растут."""
+    ch = [fame.noble_chance(i) for i in range(len(fame.FAME_RANKS))]
+    tp = [fame.noble_tip(i) for i in range(len(fame.FAME_RANKS))]
+    assert ch[0] == 0.0 and tp[0] == 0.0            # ранг 0 — публика небогатая
+    assert ch == sorted(ch) and tp == sorted(tp)    # монотонно растут
+    assert 0 < ch[-1] <= 0.5 and 0 < tp[-1] <= 0.5  # но в разумных пределах
+    assert fame.noble_chance(99) == 0 and fame.noble_tip(-1) == 0  # вне диапазона — 0
+
+
+def test_noble_tip_gold_gate_and_amount():
+    class RNG:
+        def __init__(self, v): self.v = v
+        def random(self): return self.v
+    # ранг 6 (rep 2500): шанс 30%. rng<chance → зашёл, доля 35%; rng>=chance → 0
+    assert fame.noble_tip_gold(2500, 1000, RNG(0.0)) == 350
+    assert fame.noble_tip_gold(2500, 1000, RNG(0.99)) == 0
+    assert fame.noble_tip_gold(2500, 0, RNG(0.0)) == 0     # нет базы — нет чаевых
+    assert fame.noble_tip_gold(0, 1000, RNG(0.0)) == 0     # ранг 0 — не заходят
+    assert fame.noble_tip_gold(2500, 3, RNG(0.0)) == 1     # чаевые ≥ 1 (не проваливаются в 0)
+
+
+def test_noble_tip_is_bonus_not_in_base_gold():
+    """Показ=действие: чаевые начислены в кошель, но НЕ в возвращаемом base gold
+    (иначе показ retail_total разошёлся бы с ним). Гость сверх базы, помечен."""
+    import random as _r
+    from bot.game import logic
+    t = NS(level=5, reputation=2500, products={"ale1": 50}, rep_progress=0)
+    p = NS(tavern=t, gold=0, reputation=2500, buff_kind=None, buff_until=None,
+           region="green_valleys", bonus_kind=None, story={}, perks={}, econ={})
+    base_show = logic.retail_total({"ale1": 20}, p)
+    got_noble = False
+    for seed in range(60):                          # заведомо поймаем визит (шанс 30%)
+        _r.seed(seed)
+        t.products = {"ale1": 50}; p.gold = 0
+        _sold, gold, _rep, noble = logic.apply_retail(p, t, {"ale1": 20})
+        assert gold == base_show                    # база всегда == показу (чаевые вне base)
+        if noble:
+            got_noble = True
+            assert p.gold == gold + noble["tip"]     # кошель = база + чаевые
+            assert noble["tip"] >= 1
+    assert got_noble, "за 60 сделок знатный гость так и не зашёл — проверь шанс"
+
+
+def test_dto_exposes_noble_info():
+    d = fame.dto(NS(reputation=2500))
+    assert d["noble_chance"] == 30 and d["noble_tip"] == 35
+    assert fame.dto(NS(reputation=0))["noble_chance"] == 0
+
+
 def test_retail_income_applies_fame_buff_show_equals_apply():
     """Гостевой доход реально множится на бонус ранга — та же котировка на показ и
     начисление (logic.retail_total). Без таверны — множитель не падает."""

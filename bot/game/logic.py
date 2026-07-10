@@ -444,8 +444,9 @@ def retail_rep_left(tavern: Tavern) -> int:
 
 
 def apply_retail(player: Player, tavern: Tavern, want: dict | None):
-    """Исполнить подтверждённый сбыт гостям. Возвращает (sold{}, gold, rep_gain).
-    Перепроверяет наличие — продаёт не больше, чем сейчас в погребе."""
+    """Исполнить подтверждённый сбыт гостям. Возвращает (sold{}, gold, rep_gain,
+    noble). gold — БАЗА (== retail_total, показ=действие). noble={i,tip}|None —
+    знатный гость (Ф2): чаевые СВЕРХ базы, начислены отдельно (как «фарт»)."""
     products = dict(tavern.products or {})
     sold: dict[str, int] = {}
     gold = 0
@@ -458,7 +459,7 @@ def apply_retail(player: Player, tavern: Tavern, want: dict | None):
             sold[key] = n
             gold += n * unit_price(key)
     if not sold:
-        return {}, 0, 0
+        return {}, 0, 0, None
     from bot.game import factions, fame, fgoal
     _msk = (_now().hour + 3) % 24
     gold = int(gold * buff.gold_mult(player) * worldevent.income_mult(player)
@@ -470,13 +471,21 @@ def apply_retail(player: Player, tavern: Tavern, want: dict | None):
     tavern.products = products
     player.gold += gold
     economy.record(player, "retail", gold)
+    # 🎩 Ф2: знатный гость с шансом по рангу отсыпает чаевые СВЕРХ базы (не в gold —
+    # иначе показ≠действие; начисляем и помечаем отдельно, как «фарт» вылазок).
+    noble = None
+    tip = fame.noble_tip_gold(tavern.reputation, gold, random)
+    if tip > 0:
+        player.gold += tip
+        economy.record(player, "retail", tip)
+        noble = {"i": random.randrange(1_000_000), "tip": tip}
     total = sum(sold.values())
     rep_gain = add_goods_rep_progress(player, tavern, total * balance.REP_POINTS_RETAIL)
     if perks.has_fame(player):  # знаменитый кабак — доп. слава со сбыта гостям
         tavern.reputation += 1
         player.reputation += 1
         rep_gain += 1
-    return sold, gold, rep_gain
+    return sold, gold, rep_gain, noble
 
 
 def _spoilage(player: Player, tavern: Tavern, products: dict, hours: float) -> dict:

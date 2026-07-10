@@ -60,6 +60,34 @@ def reward_gold(rank_idx: int) -> int:
     return 0
 
 
+# ── Ф2: знатные гости ─────────────────────────────────────────────────────
+# Чем славнее кабак, тем чаще заглядывает знатная особа и тем щедрее её чаевые
+# (доля от выручки сделки). Чаевые — БОНУС сверх базы (как «фарт» вылазок): база
+# гарантирована и равна предпросмотру (retail_total), чаевые помечаются отдельно.
+# Индекс = ранг (0..6). Ожидаемое среднее сверх базы: топ ≈ 0.30×0.35 = +10%.
+_NOBLE_CHANCE: tuple[float, ...] = (0.0, 0.03, 0.06, 0.10, 0.15, 0.22, 0.30)
+_NOBLE_TIP: tuple[float, ...] = (0.0, 0.12, 0.15, 0.18, 0.22, 0.28, 0.35)
+
+
+def noble_chance(rank_idx: int) -> float:
+    """Шанс, что при сбыте гостям заглянет знатная особа (0 на дне ранга)."""
+    return _NOBLE_CHANCE[rank_idx] if 0 <= rank_idx <= MAX_RANK else 0.0
+
+
+def noble_tip(rank_idx: int) -> float:
+    """Доля выручки сделки, что знатный гость отсыпает чаевыми."""
+    return _NOBLE_TIP[rank_idx] if 0 <= rank_idx <= MAX_RANK else 0.0
+
+
+def noble_tip_gold(reputation: int, base_gold: int, rng) -> int:
+    """Чаевые знатного гостя за конкретную сделку: 0 если не зашёл (rng), иначе
+    доля выручки по рангу (≥1). ЕДИНАЯ котировка для начисления и показа."""
+    r = rank(reputation)
+    if base_gold <= 0 or rng.random() >= noble_chance(r):
+        return 0
+    return max(1, round(base_gold * noble_tip(r)))
+
+
 def next_at(reputation: int) -> int | None:
     """Порог следующего ранга (None — уже вершина)."""
     r = rank(reputation)
@@ -91,6 +119,8 @@ def dto(tavern) -> dict:
         "next_at": nxt if r < MAX_RANK else None,
         "next_title": FAME_RANKS[r + 1][1] if r < MAX_RANK else None,
         "progress": pct, "remaining": left,
+        "noble_chance": round(noble_chance(r) * 100),   # 🎩 знатные гости: шанс на сбыте
+        "noble_tip": round(noble_tip(r) * 100),
     }
 
 

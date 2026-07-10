@@ -157,7 +157,7 @@ def test_retail_night_bonus_actually_pays(monkeypatch):
         t = _mk_t()
         monkeypatch.setattr(logic, "_now",
                             lambda: datetime(2026, 7, 1, 20, 30, tzinfo=timezone.utc))  # 23:30 МСК
-        _sold, gold, _rep = logic.apply_retail(player, t, {"ale1": 5})
+        _sold, gold, _rep, _noble = logic.apply_retail(player, t, {"ale1": 5})
         return gold
 
     thief = NS(story={"faction": {"thieves": 45}}, gold=0, level=5,

@@ -273,7 +273,12 @@ function RetailBody({ p, busy, onFire }: { p: Panel; busy: boolean; onFire: (pat
         <span>Налить гостям на</span><b style={{ color: 'var(--gold-2)', fontSize: 16 }}>{fmt(p.total ?? 0)} 🪙</b>
       </div>
       <button className="btn gold" style={{ marginTop: 14 }} disabled={busy}
-        onClick={() => onFire('retail_sell', (r) => r.sold ? `+${fmt((r.gold as number) ?? 0)} 🪙 · +${r.rep} репутации` : 'Товар разошёлся')}>
+        onClick={() => onFire('retail_sell', (r) => {
+          if (!r.sold) return 'Товар разошёлся'
+          const n = r.noble as { name?: string; tip?: number } | null
+          const tip = n ? ` · 🎩 +${fmt(n.tip ?? 0)} чаевых` : ''
+          return `+${fmt((r.gold as number) ?? 0)} 🪙 · +${r.rep} репутации${tip}`
+        })}>
         🍺 Налить гостям
       </button>
       <button className="btn" style={{ marginTop: 9 }} disabled={busy}

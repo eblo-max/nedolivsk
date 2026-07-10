@@ -293,7 +293,7 @@ async def cb_retail_sell(callback: CallbackQuery, session: AsyncSession) -> None
         return
     now = datetime.now(timezone.utc)
     city = await repo.get_world_city(session)   # единый мир
-    sold, gold, rep = logic.apply_retail(player, player.tavern, want)
+    sold, gold, rep, noble_raw = logic.apply_retail(player, player.tavern, want)
     story_state.set_retail(player, None)
     if not sold:
         await _safe_edit(callback, texts.retail_held(), kb.back_kb())
@@ -308,9 +308,12 @@ async def cb_retail_sell(callback: CallbackQuery, session: AsyncSession) -> None
         economy.record(player, "skim", -skim)
     # Розница НЕ трогает единый оптовый рынок: гости пьют в своей таверне —
     # конечное потребление, замкнутый локальный контур.
-    await _safe_edit(callback, texts.retail_sold(sold, gold, rep, skim,
-                     logic.retail_rep_left(player.tavern)), kb.back_kb())
-    await callback.answer(f"+{gold - skim} 🪙")
+    _msg = texts.retail_sold(sold, gold, rep, skim, logic.retail_rep_left(player.tavern))
+    _tip = int(noble_raw["tip"]) if noble_raw else 0
+    if noble_raw:  # 🎩 знатный гость отсыпал чаевые сверх — отдельной строкой
+        _msg += "\n\n" + texts.retail_noble_line(noble_raw["i"], _tip)
+    await _safe_edit(callback, _msg, kb.back_kb())
+    await callback.answer(f"+{gold - skim + _tip} 🪙")
 
 
 @router.callback_query(F.data == "retail_hold")

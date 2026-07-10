@@ -38,6 +38,7 @@ interface Badge { key: string; emoji: string; short: string; tier?: string; styl
 interface FameState {
   rank: number; title: string; income_pct: number; rep: number; top: boolean
   next_at: number | null; next_title: string | null; progress: number; remaining: number
+  noble_chance?: number; noble_tip?: number
 }
 
 interface TavernState {
@@ -68,7 +69,7 @@ const SAMPLE: TavernState = {
   artel: { title: { key: 'spark', emoji: '⚡', short: 'Искра Артели', style: 'neon' }, facade: { key: 'blazing', emoji: '🔥', short: 'Пылающий герб', tier: 'legendary' } },
   flavor: 'Свечи оплыли, эль выдохся, но гости всё прут — знать, иначе некуда.',
   gold: 1340, income_rate: 18, income_ready: 126, reputation: 27,
-  fame: { rank: 1, title: 'Кабак', income_pct: 5, rep: 27, top: false, next_at: 50, next_title: 'Знатный кабак', progress: 42, remaining: 23 },
+  fame: { rank: 1, title: 'Кабак', income_pct: 5, rep: 27, top: false, next_at: 50, next_title: 'Знатный кабак', progress: 42, remaining: 23, noble_chance: 3, noble_tip: 12 },
   capacity: 24, comfort: 12, luck_pct: 8, gear_worn: 1, gear_slots: 11,
   now: [
     { icon: '🍺', text: 'Гости ждут заказ', sub: 'выкупят товар из погреба', badge: 'ready', action: 'retail' },
@@ -234,9 +235,11 @@ export default function Tavern() {
         </div>
         {t.fame && (
           <div className={`fame-strip r${t.fame.rank}${t.fame.top ? ' top' : ''}`}
-               title={`Слава заведения · гостевой доход +${t.fame.income_pct}%`}>
+               title={`Слава заведения · гостевой доход +${t.fame.income_pct}%` +
+                 ((t.fame.noble_chance ?? 0) > 0 ? ` · 🎩 знатные гости: шанс ${t.fame.noble_chance}%, чаевые +${t.fame.noble_tip}%` : '')}>
             <span className="fame-badge">🏆 {t.fame.title}</span>
             {t.fame.income_pct > 0 && <span className="fame-bonus">доход +{t.fame.income_pct}%</span>}
+            {(t.fame.noble_chance ?? 0) > 0 && <span className="fame-noble">🎩 {t.fame.noble_chance}%</span>}
             {t.fame.top ? (
               <span className="fame-prog top"><em>вершина славы</em></span>
             ) : (

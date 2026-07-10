@@ -810,20 +810,26 @@ async def _api_retail_sell(request: web.Request) -> web.Response:
             return web.json_response({"ok": False, "error": "gone"})
         ce = citymod.effects(await repo.get_world_city(s), p,
                              datetime.now(timezone.utc))
-        sold, gold, rep = logic.apply_retail(p, p.tavern, want)
+        sold, gold, rep, noble_raw = logic.apply_retail(p, p.tavern, want)
         story_state.set_retail(p, None)
         if sold and ce.skim_pct and gold > 0:  # воры/корона снимают долю и со сбыта (как в боте)
             skim = int(gold * ce.skim_pct)
             p.gold -= skim
             economy.record(p, "skim", -skim)
             gold -= skim
+        from bot import texts as _t
+        noble = _t.retail_noble(noble_raw["i"], noble_raw["tip"]) if noble_raw else None
         if sold:
             newbie.mark(p, "nb_sale")          # веха грамоты новосёла
-            repo.add_log(s, "player", p.id, f"🍺 налил гостям: +{gold} 🪙, +{rep} репутации")
+            _tip = f" (+{noble['tip']} чаевых 🎩)" if noble else ""
+            repo.add_log(s, "player", p.id, f"🍺 налил гостям: +{gold} 🪙{_tip}, +{rep} репутации")
             repo.feed_push(s, uid, f"🍻 Налил гостям: +{gold} 🪙, +{rep} ⭐", kind="retail")
+            if noble:                          # знатный гость — отдельная радостная весть
+                repo.feed_push(s, uid, _t.retail_noble_line(noble_raw["i"], noble["tip"]), kind="retail")
         await s.commit()
         st = _tavern_state(p, p.tavern)
-    return web.json_response({"ok": True, "state": st, "gold": gold, "rep": rep, "sold": bool(sold)},
+    return web.json_response({"ok": True, "state": st, "gold": gold, "rep": rep,
+                              "sold": bool(sold), "noble": noble},
                              headers={"Cache-Control": "no-store"})
 
 
