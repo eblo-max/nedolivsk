@@ -298,6 +298,8 @@ body.far .tav-pin .crown{opacity:0}
 .tav-pin.crowned .glow{width:24px;height:24px;box-shadow:0 0 15px 5px rgba(255,200,95,.85),0 0 6px 2px rgba(255,235,180,1)}
 .leaflet-tooltip.tav-label.tl-crown{border-color:#c9a24f;color:#ffe9a8;box-shadow:0 0 8px rgba(231,180,74,.5)}
 .tav-pop .title{margin:2px 0;font:700 11.5px/1.3 var(--serif);color:#ffd97a}
+.tav-pop .fame{display:inline-block;margin:3px 0 1px;padding:2px 10px;border-radius:8px;font:700 10.5px/1.3 var(--serif);color:#f3dfae;background:#241c0e;border:1px solid #caa24e66}
+.tav-pop .fame.fr5,.tav-pop .fame.fr6{border-color:#ffd24a;color:#fff0b8;box-shadow:0 0 8px #ffcf6e55}
 .tav-pop .atitle{display:inline-block;margin:3px 0 1px;padding:1px 8px;border-radius:7px;font:800 10.5px/1.3 var(--serif);color:#241405;border:1px solid #8a6a22}
 .tav-pop .atitle.st-stone{background:linear-gradient(180deg,#4a453c,#2a2620);border-color:#6a6152;color:#e8e0d0}
 .tav-pop .atitle.st-bronze{background:linear-gradient(180deg,#e6b076,#a56a30);border-color:#7a4a1e;color:#3a1e08}
@@ -439,9 +441,10 @@ function crownEmoji(cr){return cr.indexOf('gdp')>=0?'👑':(cr.indexOf('rep')>=0
 function card(t){
   var titles=(t.crowns||[]).map(function(k){return '<div class="title">'+TITLES[k]+'</div>';}).join('');
   var at=t.atitle?'<div class="atitle st-'+(t.atitle.style||'gold')+'">'+t.atitle.emoji+' '+esc(t.atitle.short)+'</div>':'';
+  var fm=t.fame?'<div class="fame fr'+t.fame.rank+'">🏆 '+esc(t.fame.title)+'</div>':'';
   var fac=t.facade?'<div class="facd">'+t.facade.emoji+' '+esc(t.facade.short)+'</div>':'';
   return '<div class="tav-pop"><div class="h">'+(t.facade?t.facade.emoji:'🏰')+' '+esc(t.name)+'</div>'+
-    '<div class="o">хозяин: '+esc(t.owner)+'</div>'+at+titles+fac+
+    '<div class="o">хозяин: '+esc(t.owner)+'</div>'+fm+at+titles+fac+
     '<div class="loc">📍 '+esc(t.continent)+'</div>'+
     '<div class="row"><span>⚜️ ур. '+t.level+'</span><span>⭐ реп. '+t.rep+'</span>'+
     '<span>👥 '+t.cap+'</span><span>☕ уют '+t.comfort+'</span><span>🏛 '+t.builds+'</span></div>'+
@@ -898,7 +901,7 @@ async def _world_taverns(request: web.Request) -> web.Response:
     # континента — без наложений (непрерывно, а не по сетке слотов).
     R = 0.095
     crown_of = _rating_leaders(_rating_entries(rows)[0])   # короны лидеров (👑/⭐/🏰)
-    from bot.game import artel_shop
+    from bot.game import artel_shop, fame as famemod
     out = []
     for tav, pl in rows:
         c = worldmap.continent_for(pl.region, pl.id) or conts[pl.id % nc]  # континент ЗОНЫ игрока
@@ -920,6 +923,7 @@ async def _world_taverns(request: web.Request) -> web.Response:
             "crowns": crown_of.get(pl.id, []),   # титулы лидера (gdp/rep/level)
             "atitle": artel_shop.top_title(pl),          # артель-титул зодчего
             "facade": artel_shop.facade_badge(pl),       # фасад вывески
+            "fame": famemod.badge(tav.reputation),       # 🏆 престиж-ранг славы
         })
     raid = None
     if boss is not None and boss.status in ("gathering", "active"):

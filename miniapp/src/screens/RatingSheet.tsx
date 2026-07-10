@@ -4,12 +4,23 @@ import { haptic } from '../telegram'
 
 type MetricKey = 'gdp' | 'rep' | 'level'
 interface ATit { emoji: string; short: string; style?: string }
-interface Row { place: number; name: string; id?: number; ava?: string; owner: string; level: number; loc: string; gdp: number; rep: number; cap?: number; comfort?: number; builds?: number; mine: boolean; trend?: number | null; atitle?: ATit | null }
+interface Fame { rank: number; title: string }
+interface Row { place: number; name: string; id?: number; ava?: string; owner: string; level: number; loc: string; gdp: number; rep: number; cap?: number; comfort?: number; builds?: number; mine: boolean; trend?: number | null; atitle?: ATit | null; fame?: Fame | null }
 
 /** Артель-звание зодчего у имени (за вклад в чудеса города). Стиль драйвит визуал. */
 function ATitle({ a }: { a?: ATit | null }) {
   if (!a) return null
   return <span className={`lb-atitle st-${a.style || 'gold'}`} title="Звание за вклад в чудеса города">{a.emoji} {a.short}</span>
+}
+
+/** 🏆 Престиж-ранг «Славы заведения». compact — только иконка ранга (в строках). */
+function FameBadge({ f, compact }: { f?: Fame | null; compact?: boolean }) {
+  if (!f) return null
+  return (
+    <span className={`fame-rank fr${f.rank}${compact ? ' cmp' : ''}`} title={`Слава заведения: ${f.title}`}>
+      🏆{compact ? '' : ` ${f.title}`}
+    </span>
+  )
 }
 interface Board { rows: Row[]; me: Row | null }
 interface Rating { boards: Record<MetricKey, Board>; total_gdp: number; total: number }
@@ -59,6 +70,7 @@ function TavernProfile({ r, boards, onClose }: { r: Row; boards: Record<MetricKe
       <div className="tp-card" onClick={(e) => e.stopPropagation()}>
         <Avatar ava={r.ava} name={r.name} rank={titles.length ? 1 : 99} />
         <div className="tp-name">{r.name}{r.mine && <span className="lb-you">ты</span>}</div>
+        {r.fame && <div className={`tp-fame fr${r.fame.rank}`}>🏆 {r.fame.title}</div>}
         {r.atitle && <div className={`tp-atitle st-${r.atitle.style || 'gold'}`}>{r.atitle.emoji} {r.atitle.short}</div>}
         <div className="tp-owner">хозяин: {r.owner} · 📍 {r.loc}</div>
         {titles.length > 0 && (
@@ -86,9 +98,9 @@ function TavernProfile({ r, boards, onClose }: { r: Row; boards: Record<MetricKe
 // Демо ТОЛЬКО в dev-превью (import.meta.env.DEV). В прод-сборке вырезается.
 const DEV = import.meta.env.DEV
 const DEMO_ROWS: Omit<Row, 'place' | 'mine'>[] = [
-  { name: 'Кривая Кружка', id: 1, owner: 'Барон', level: 7, loc: 'Изумрудная Чарка', gdp: 1340, rep: 27, cap: 26, comfort: 14, builds: 6, atitle: { emoji: '👑', short: 'Вечный Зодчий', style: 'holo' } },
-  { name: 'Пьяный Гусь', id: 2, owner: 'Прохор', level: 6, loc: 'Зелёный Змий', gdp: 1180, rep: 31, cap: 22, comfort: 11, builds: 5, atitle: { emoji: '🌑', short: 'Тень Основания', style: 'void' } },
-  { name: 'Косая Бочка', id: 3, owner: 'Фёкла', level: 6, loc: 'Сухой Закон', gdp: 1020, rep: 18 },
+  { name: 'Кривая Кружка', id: 1, owner: 'Барон', level: 7, loc: 'Изумрудная Чарка', gdp: 1340, rep: 854, cap: 26, comfort: 14, builds: 6, atitle: { emoji: '👑', short: 'Вечный Зодчий', style: 'holo' }, fame: { rank: 4, title: 'Гордость Недоливска' } },
+  { name: 'Пьяный Гусь', id: 2, owner: 'Прохор', level: 6, loc: 'Зелёный Змий', gdp: 1180, rep: 320, cap: 22, comfort: 11, builds: 5, atitle: { emoji: '🌑', short: 'Тень Основания', style: 'void' }, fame: { rank: 3, title: 'Прославленная таверна' } },
+  { name: 'Косая Бочка', id: 3, owner: 'Фёкла', level: 6, loc: 'Сухой Закон', gdp: 1020, rep: 70, fame: { rank: 2, title: 'Знатный кабак' } },
   { name: 'Тёплый Подвал', id: 4, owner: 'Гаврила', level: 5, loc: 'Рассольник', gdp: 880, rep: 22 },
   { name: 'Сухое Горло', id: 5, owner: 'Тихон', level: 5, loc: 'Похмельные Дюны', gdp: 760, rep: 12, atitle: { emoji: '⚡', short: 'Искра Артели', style: 'neon' } },
   { name: 'Бычий Глаз', id: 6, owner: 'Марфа', level: 4, loc: 'Чекушкины Холмы', gdp: 640, rep: 15 },
@@ -194,6 +206,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                     {r.place === 1 && <div className="lb-crown">👑</div>}
                     <Avatar ava={r.ava} name={r.name} rank={r.place} />
                     <div className="lb-pname">{r.name}</div>
+                    <FameBadge f={r.fame} compact />
                     {r.atitle && <div className={`lb-patitle st-${r.atitle.style || 'gold'}`}>{r.atitle.emoji} {r.atitle.short}</div>}
                     <div className="lb-pval">{m.fmt(m.val(r))}</div>
                     <Trend t={r.trend} />
@@ -213,7 +226,7 @@ export default function RatingSheet({ onClose }: { onClose: () => void }) {
                     <div className="lb-rank">{r.place}<Trend t={r.trend} /></div>
                     <Avatar ava={r.ava} name={r.name} rank={r.place} sm />
                     <div className="lb-info">
-                      <div className="lb-name">{r.name}{r.mine && <span className="lb-you">ты</span>}<ATitle a={r.atitle} /></div>
+                      <div className="lb-name">{r.name}{r.mine && <span className="lb-you">ты</span>}<FameBadge f={r.fame} compact /><ATitle a={r.atitle} /></div>
                       <div className="lb-meta">📍 {r.loc} · {r.owner}</div>
                       <div className="lb-bar"><i style={{ width: `${pct}%` }} /></div>
                     </div>

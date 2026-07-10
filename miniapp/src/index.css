@@ -118,6 +118,20 @@ body {
   background:#1c2a12; border:1px solid #3b6d1155; border-radius:20px; padding:2px 9px; }
 .fame-noble { font-family:var(--text); font-size:11.5px; color:#e6c266;
   background:#2a2110; border:1px solid #caa24e44; border-radius:20px; padding:2px 8px; }
+/* 🏆 Престиж-ранг в рейтинге/профиле (Ф1) — градация свечения по рангу */
+.fame-rank { display:inline-flex; align-items:center; gap:3px; margin-left:5px; padding:1px 7px;
+  border-radius:20px; font-family:var(--text); font-size:10.5px; font-weight:600; white-space:nowrap;
+  vertical-align:middle; background:#241c0e; border:1px solid #caa24e55; color:#e6c266; }
+.fame-rank.cmp { padding:1px 5px; gap:0; font-size:12px; }
+.fame-rank.fr1 { color:#c9a870; border-color:#8a6a3a55; }
+.fame-rank.fr3 { color:#ecc978; border-color:#caa24e77; }
+.fame-rank.fr4 { color:#f5d989; border-color:#e7b44a88; background:#31240f; }
+.fame-rank.fr5 { color:#ffe08a; border-color:#ffcf6e99; box-shadow:0 0 6px #ffcf6e33; }
+.fame-rank.fr6 { color:#fff0b8; border-color:#ffd24a; background:#3a2a10; box-shadow:0 0 9px #ffcf6e66;
+  animation:wd2-glow 2s ease-in-out infinite; }
+.tp-fame { display:inline-block; margin:3px 0 1px; padding:2px 11px; border-radius:8px;
+  font:700 11px/1.3 var(--serif); color:#f3dfae; background:#241c0e; border:1px solid #caa24e66; }
+.tp-fame.fr5, .tp-fame.fr6 { border-color:#ffd24a; box-shadow:0 0 8px #ffcf6e44; color:#fff0b8; }
 .fame-prog { position:relative; flex:1 1 150px; min-width:130px; height:16px; border-radius:9px;
   background:#0e0a04; border:1px solid #3c2a12; overflow:hidden; display:flex; align-items:center; }
 .fame-prog i { position:absolute; left:0; top:0; bottom:0; border-radius:9px;

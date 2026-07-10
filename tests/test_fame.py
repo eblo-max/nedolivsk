@@ -144,6 +144,20 @@ def test_noble_tip_is_bonus_not_in_base_gold():
     assert got_noble, "за 60 сделок знатный гость так и не зашёл — проверь шанс"
 
 
+def test_badge_public_prestige():
+    """Ф1: престиж-бейдж для витрин (рейтинг/карта). None на ранге 0, иначе
+    {rank,title} из ТОЙ ЖЕ fame.rank (показ=действие престижа)."""
+    assert fame.badge(0) is None and fame.badge(9) is None      # безымянных не светим
+    assert fame.badge(10) == {"rank": 1, "title": "Кабак"}
+    assert fame.badge(854) == {"rank": 4, "title": "Гордость Недоливска"}
+    assert fame.badge(9999) == {"rank": 6, "title": "Живая легенда"}
+    for rep in (0, 5, 10, 55, 160, 500, 1200, 3000):            # согласован с rank/title
+        b = fame.badge(rep)
+        assert (b is None) == (fame.rank(rep) == 0)
+        if b:
+            assert b["rank"] == fame.rank(rep) and b["title"] == fame.title(rep)
+
+
 def test_dto_exposes_noble_info():
     d = fame.dto(NS(reputation=2500))
     assert d["noble_chance"] == 30 and d["noble_tip"] == 35
