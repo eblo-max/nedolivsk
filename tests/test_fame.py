@@ -144,6 +144,22 @@ def test_noble_tip_is_bonus_not_in_base_gold():
     assert got_noble, "за 60 сделок знатный гость так и не зашёл — проверь шанс"
 
 
+def test_retail_reason_excludes_fame():
+    """Регресс: слава — ПОСТОЯННАЯ пассивка ранга (видна в полосе славы), а не «спрос».
+    Значок-причина сбыта НЕ должен объяснять бонус ранга как спрос/событие (иначе
+    славный кабак вечно показывал бы «спрос +55%» без всякого события)."""
+    from bot.game import logic
+    prods = {"ale1": 30}
+    base = int(30 * logic.unit_price("ale1"))
+    for rep in (0, 10, 400, 2500):                      # без события/буфов — значок пуст на любом ранге
+        t = NS(level=5, reputation=rep)
+        p = NS(tavern=t, buff_kind=None, buff_until=None, region="green_valleys",
+               bonus_kind=None, story={}, perks={})
+        total = logic.retail_total(prods, p)
+        assert total == int(base * fame.income_mult(rep))    # касса реально с бонусом ранга
+        assert logic.retail_reason(prods, p, base, total) is None, rep  # но «спрос» его не приписывает
+
+
 def test_badge_public_prestige():
     """Ф1: престиж-бейдж для витрин (рейтинг/карта). None на ранге 0, иначе
     {rank,title} из ТОЙ ЖЕ fame.rank (показ=действие престижа)."""

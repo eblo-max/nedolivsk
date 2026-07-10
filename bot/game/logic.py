@@ -407,7 +407,12 @@ def retail_reason(
     от показанного total, а не номинал события (показ = действие)."""
     if base <= 0 or total <= 0:
         return None
-    pct = round((total / base - 1) * 100)
+    # Слава заведения — ПОСТОЯННАЯ пассивка ранга (видна в полосе славы), а не «спрос»:
+    # выносим её из значка-причины, иначе славный кабак вечно показывал бы «спрос +55%».
+    from bot.game import fame
+    tav = getattr(player, "tavern", None)
+    fbase = base * (fame.income_mult(tav.reputation) if tav is not None else 1.0)
+    pct = round((total / fbase - 1) * 100) if fbase > 0 else 0
     if pct == 0:                                    # различие только в копейках — не шумим
         return None
     sign = f"{'+' if pct > 0 else '−'}{abs(pct)}%"
