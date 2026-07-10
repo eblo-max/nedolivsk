@@ -372,3 +372,20 @@ async def create_tables() -> None:
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS "
             "gear_stash JSONB NOT NULL DEFAULT '[]'::jsonb"
         ))
+        # «Слава заведения» — взятый ранг репутации (для события повышения ровно раз).
+        await conn.execute(text(
+            "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS "
+            "fame_rank INTEGER NOT NULL DEFAULT 0"
+        ))
+        # BACKFILL (одноразово): существующим игрокам ставим HWM = их ТЕКУЩИЙ ранг,
+        # иначе при первом открытии таверны pop_rankups выдаст ретро-награды/DM/чат-
+        # анонсы задним числом за уже накопленную репутацию (всплеск спама на деплое).
+        # Празднуем только БУДУЩИЕ повышения. Пороги — снимок fame.FAME_RANKS; трогает
+        # лишь неинициализированных (fame_rank=0 при reputation>0), потому безопасно.
+        await conn.execute(text(
+            "UPDATE taverns SET fame_rank = CASE "
+            "WHEN reputation >= 2500 THEN 6 WHEN reputation >= 1000 THEN 5 "
+            "WHEN reputation >= 400 THEN 4 WHEN reputation >= 150 THEN 3 "
+            "WHEN reputation >= 50 THEN 2 WHEN reputation >= 10 THEN 1 ELSE 0 END "
+            "WHERE fame_rank = 0 AND reputation >= 10"
+        ))

@@ -2992,6 +2992,30 @@ def raid_expired(boss) -> str:
             "добычу. В другой раз шевелитесь живее, мямли.")
 
 
+# ===== Слава заведения (ранги репутации) =====
+
+def fame_rankup_dm(tavern_name: str, rank_idx: int) -> str:
+    """Личка игроку при повышении ранга славы: новый титул + бонус + награда."""
+    from bot.game import fame
+    _thr, ttl, mult, reward = fame.FAME_RANKS[rank_idx]
+    pct = round((mult - 1) * 100)
+    lines = [f"🏆 <b>Слава растёт!</b> «{escape(tavern_name)}» — теперь <b>{ttl}</b>."]
+    if pct > 0:
+        lines.append(f"📈 Публика богаче: гостевой доход <b>+{pct}%</b>.")
+    if reward > 0:
+        lines.append(f"🪙 Награда за ранг: <b>+{reward}</b>.")
+    lines.append("Зови гостей да держи марку — впереди новые ступени.")
+    return "\n".join(lines)
+
+
+def fame_rankup_announce(tavern_name: str, rank_idx: int) -> str:
+    """Анонс в общий чат — престиж на публику (соц-момент)."""
+    from bot.game import fame
+    ttl = fame.FAME_RANKS[rank_idx][1]
+    return (f"🍺 <b>«{escape(tavern_name)}» дослужилась до ранга «{ttl}»!</b> "
+            "Молва о заведении гремит на весь Недоливск.")
+
+
 # ===== Ночная ходка =====
 
 _NR_ROAD = {

@@ -415,6 +415,9 @@ class Tavern(Base):
     comfort: Mapped[int] = mapped_column(default=1)
     income_rate: Mapped[int] = mapped_column(default=10)  # золото в час
     reputation: Mapped[int] = mapped_column(default=0)
+    # «Слава заведения»: взятый максимум ранга репутации (для события повышения —
+    # чтобы анонс/награда за ранг сработали ровно раз). См. bot/game/fame.py.
+    fame_rank: Mapped[int] = mapped_column(default=0)
     # Накопитель «молвы»: очки сбыта до следующей единицы репутации (остаток не
     # пропадает между мелкими продажами). И счётчик проданного на бирже — рейтинг.
     rep_progress: Mapped[int] = mapped_column(default=0)

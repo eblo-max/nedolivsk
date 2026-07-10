@@ -35,11 +35,18 @@ interface RaidSummary {
   n: number; left?: number; hp_pct?: number; phase?: number
 }
 interface Badge { key: string; emoji: string; short: string; tier?: string; style?: string }
+interface FameState {
+  rank: number; title: string; income_pct: number; rep: number; top: boolean
+  next_at: number | null; next_title: string | null; progress: number; remaining: number
+}
+
 interface TavernState {
   ok: boolean
   name: string; level: number; region: string; flavor: string
   artel?: { title: Badge | null; facade: Badge | null } | null
   gold: number; income_rate: number; income_ready: number; reputation: number
+  fame?: FameState | null
+  fame_rankup?: { rank: number; title: string; reward: number } | null
   capacity: number; comfort: number; luck_pct: number; gear_worn: number; gear_slots: number
   now: Activity[]
   storage: ResLine[]; cellar: CellarLine[]
@@ -61,6 +68,7 @@ const SAMPLE: TavernState = {
   artel: { title: { key: 'spark', emoji: '⚡', short: 'Искра Артели', style: 'neon' }, facade: { key: 'blazing', emoji: '🔥', short: 'Пылающий герб', tier: 'legendary' } },
   flavor: 'Свечи оплыли, эль выдохся, но гости всё прут — знать, иначе некуда.',
   gold: 1340, income_rate: 18, income_ready: 126, reputation: 27,
+  fame: { rank: 1, title: 'Кабак', income_pct: 5, rep: 27, top: false, next_at: 50, next_title: 'Знатный кабак', progress: 42, remaining: 23 },
   capacity: 24, comfort: 12, luck_pct: 8, gear_worn: 1, gear_slots: 11,
   now: [
     { icon: '🍺', text: 'Гости ждут заказ', sub: 'выкупят товар из погреба', badge: 'ready', action: 'retail' },
@@ -117,6 +125,12 @@ export default function Tavern() {
     else if (sp === 'orda') setInvOpen(true)
     else if (sp === 'notif') setNotifOpen(true)
   }, [])
+
+  // 🏆 Повышение ранга славы — сервер отдаёт fame_rankup ровно раз (дальше null)
+  useEffect(() => {
+    const ru = data?.fame_rankup
+    if (ru) flash(`🏆 Новый ранг: ${ru.title}${ru.reward ? ` · +${ru.reward} 🪙` : ''}`)
+  }, [data?.fame_rankup?.rank])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Орда собирается → панель «В строй» всплывает ВСЕМ (один раз на нашествие,
   // если ещё не записан) — чтобы не искать её на карте.
@@ -218,6 +232,21 @@ export default function Tavern() {
           <span className="region">📍 {t.region}</span>
           <span className="region">⭐ {t.reputation} репутации</span>
         </div>
+        {t.fame && (
+          <div className={`fame-strip r${t.fame.rank}${t.fame.top ? ' top' : ''}`}
+               title={`Слава заведения · гостевой доход +${t.fame.income_pct}%`}>
+            <span className="fame-badge">🏆 {t.fame.title}</span>
+            {t.fame.income_pct > 0 && <span className="fame-bonus">доход +{t.fame.income_pct}%</span>}
+            {t.fame.top ? (
+              <span className="fame-prog top"><em>вершина славы</em></span>
+            ) : (
+              <span className="fame-prog">
+                <i style={{ width: `${t.fame.progress}%` }} />
+                <em>до «{t.fame.next_title}»: ещё {t.fame.remaining}</em>
+              </span>
+            )}
+          </div>
+        )}
         <div className="orn"><b>✦</b></div>
         <div className="flavor">«{t.flavor}»</div>
       </div>

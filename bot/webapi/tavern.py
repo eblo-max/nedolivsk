@@ -15,7 +15,7 @@ from bot.db.base import session_factory
 from bot.game import worldmap
 from bot.webapi.core import (
     _AV_BY_ESTATE, _auth, _init_user, _is_admin, _npc_avatar, _verify_init_data,
-    touch_seen,
+    get_bot, touch_seen,
 )
 from bot.webapi.raid import _raid_summary
 
@@ -139,7 +139,7 @@ def _tavern_state(p, t) -> dict:
     """Состояние Таверны для мини-аппа — собрано из ТЕХ ЖЕ функций, что и текстовый
     экран бота (texts/logic/balance), но структурировано в JSON. Чистое чтение."""
     from bot import texts
-    from bot.game import balance as bal, buff as buffmod, items, logic
+    from bot.game import balance as bal, buff as buffmod, fame, items, logic
     from bot.game import city as citymod, production as prod, season as seasonmod
 
     chat_id = getattr(p, "chat_id", None)
@@ -207,6 +207,7 @@ def _tavern_state(p, t) -> dict:
         "flavor": texts._flavor_line(p, t, chat_id, seasonmod, citymod),
         "gold": int(p.gold), "income_rate": logic.income_rate_quote(p, t),
         "income_ready": int(texts._pending_income(t)), "reputation": int(t.reputation or 0),
+        "fame": fame.dto(t),                                 # 🏆 ранг славы + прогресс
         "capacity": int(t.capacity), "comfort": int(t.comfort),
         "luck_pct": int(bal.lucky_chance(cs["luck"] + buffmod.luck_bonus(p))),
         "gear_worn": len(eq), "gear_slots": len(items.SLOTS),
@@ -242,7 +243,8 @@ async def _api_state(request: web.Request) -> web.Response:
     uid, body = await _auth(request)
     if uid is None:
         return body
-    from bot.game import story_engine as se, buff as buffmod
+    from bot import texts
+    from bot.game import story_engine as se, buff as buffmod, economy, fame
     async with session_factory() as s:
         await touch_seen(s, uid)   # апп-активность: нуджи/рейд-пуши видят игрока живым
         p = await repo.get_player(s, uid, for_update=True)
@@ -251,6 +253,17 @@ async def _api_state(request: web.Request) -> web.Response:
         now = datetime.now(timezone.utc)
         before = (p.bonus_kind, p.buff_kind, p.buff_until)
         buffmod.refresh(p, now)                      # прокрутить ежедневный бонус (как бот перед таверной)
+        # 🏆 Слава заведения: детект повышения ранга — ровно раз (HWM под локом p).
+        rankup, fame_ann = None, []
+        for r in fame.pop_rankups(p.tavern):
+            g = fame.reward_gold(r)
+            if g:
+                p.gold += g; economy.record(p, "fame", g)
+            repo.queue_notify(s, uid, texts.fame_rankup_dm(p.tavern.name, r), kind="fame")
+            if r >= fame.ANNOUNCE_RANK_FROM:          # в общий чат — только высокие ранги
+                fame_ann.append(texts.fame_rankup_announce(p.tavern.name, r))
+            rankup = {"rank": r, "title": fame.FAME_RANKS[r][1],
+                      "reward": (rankup["reward"] if rankup else 0) + g}
         city = await repo.get_world_city(s, lock=True)   # единый мир — община у всех общая
         spawned = se.maybe_spawn(p, city, now)       # кулдаун+шанс → pending
         if spawned is not None:
@@ -273,7 +286,16 @@ async def _api_state(request: web.Request) -> web.Response:
         out["raid"] = _raid_summary(boss, uid) if boss else None  # кнопка «⚔️ РЕЙД-БОСС»
         out["admin"] = _is_admin(uid)                # админ-кнопка «Призвать босса» (если босса нет)
         out["notif_unread"] = await repo.feed_unread(s, uid)  # бейдж колокольчика
-        await s.commit()                             # зафиксировать уборку протухшего торга/touch
+        out["fame_rankup"] = rankup                  # тост «новый ранг!» в мини-аппе
+        await s.commit()                             # зафиксировать уборку/награду ранга/touch
+        if fame_ann:                                 # анонс в чаты — ПОСЛЕ коммита (сеть без лока)
+            _bot = get_bot()
+            if _bot is not None:
+                from bot.sender import deliver
+                cids = await repo.all_chat_ids(s)
+                for _t in fame_ann:
+                    for cid in cids:
+                        await deliver(lambda c=cid, m=_t: _bot.send_message(c, m), what="fame")
     return web.json_response(out, headers={"Cache-Control": "no-store"})
 
 

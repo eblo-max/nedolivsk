@@ -108,6 +108,21 @@ body {
   background:linear-gradient(#d6ab66,#8a5f2c); border:1px solid #5a4320; border-radius:5px; padding:3px 9px;
   box-shadow:0 2px 7px #0008,inset 0 1px 0 #ffffff66; }
 .region { font-family:var(--text); font-size:13px; color:var(--dim); }
+/* 🏆 Слава заведения: полоса ранга + прогресс под шапкой */
+.fame-strip { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px;
+  margin:9px auto 0; max-width:340px; padding:6px 12px; border-radius:12px;
+  background:#22190bcc; border:1px solid #caa24e2e; }
+.fame-strip.top { border-color:#ffd24a66; box-shadow:0 0 14px #ffcf6e22 inset; }
+.fame-badge { font-family:var(--disp); font-weight:700; font-size:12px; letter-spacing:.4px; color:#f3dfae; }
+.fame-bonus { font-family:var(--text); font-size:11.5px; color:#8fd06a;
+  background:#1c2a12; border:1px solid #3b6d1155; border-radius:20px; padding:2px 9px; }
+.fame-prog { position:relative; flex:1 1 150px; min-width:130px; height:16px; border-radius:9px;
+  background:#0e0a04; border:1px solid #3c2a12; overflow:hidden; display:flex; align-items:center; }
+.fame-prog i { position:absolute; left:0; top:0; bottom:0; border-radius:9px;
+  background:linear-gradient(90deg,#c98f3a,#ffd24a); transition:width .6s cubic-bezier(.2,.85,.25,1); }
+.fame-prog em { position:relative; z-index:1; width:100%; text-align:center; font-style:normal;
+  font-size:10.5px; color:#f0e2c2; text-shadow:0 1px 2px #000a; }
+.fame-prog.top em { color:#ffe08a; }
 .flavor { font-family:var(--text); font-style:italic; text-align:center; color:#b6a079; font-size:14px;
   line-height:1.4; margin:7px 8px 0; }
 .orn { display:flex; align-items:center; justify-content:center; gap:9px; margin-top:8px; }

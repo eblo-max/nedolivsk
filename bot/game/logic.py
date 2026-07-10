@@ -360,11 +360,14 @@ def retail_total(want: dict | None, player: Player | None = None) -> int:
                for k, q in (want or {}).items() if k in production.GOODS)
     if player is None:
         return base
-    from bot.game import factions, fgoal
+    from bot.game import factions, fame, fgoal
     _msk = (_now().hour + 3) % 24
+    _tav = getattr(player, "tavern", None)
+    fame_mult = fame.income_mult(_tav.reputation) if _tav is not None else 1.0
     return int(base * buff.gold_mult(player) * worldevent.income_mult(player)
                * assortment_mult(want)
                * factions.thief_night_sale_mult(player, _msk)   # ночная скупка воров
+               * fame_mult                # 🏆 слава заведения: богаче публика/чаевые
                * fgoal.feast_mult())     # городской пир (цель недели взята) — как в apply_retail
 
 
@@ -456,11 +459,12 @@ def apply_retail(player: Player, tavern: Tavern, want: dict | None):
             gold += n * unit_price(key)
     if not sold:
         return {}, 0, 0
-    from bot.game import factions, fgoal
+    from bot.game import factions, fame, fgoal
     _msk = (_now().hour + 3) % 24
     gold = int(gold * buff.gold_mult(player) * worldevent.income_mult(player)
                * assortment_mult(sold)    # бонус за число РЕАЛЬНО проданных видов
                * factions.thief_night_sale_mult(player, _msk)   # ночная скупка воров
+               * fame.income_mult(tavern.reputation)   # 🏆 слава: богаче публика
                * fgoal.feast_mult())      # городской пир: цель недели взята
     fgoal.note("gold_trade", gold)        # оборот двигает цель Лиги
     tavern.products = products
