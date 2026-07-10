@@ -222,6 +222,13 @@ async def latest_done_wonder(session: AsyncSession) -> Wonder | None:
         .order_by(Wonder.id.desc()).limit(1))).scalar_one_or_none()
 
 
+async def done_wonders(session: AsyncSession) -> list[Wonder]:
+    """Все возведённые чудеса, новые сверху — «зал славы» внизу вкладки стройки."""
+    return list((await session.execute(
+        select(Wonder).where(Wonder.status == "done")
+        .order_by(Wonder.id.desc()))).scalars().all())
+
+
 async def sealing_wonders(session: AsyncSession) -> list[Wonder]:
     """Готовые к доплате чуда (status='sealing') — для settle в нотифаере. Лочим,
     пропуская занятые (skip_locked), как live_invasions — без гонок тика с тиком."""

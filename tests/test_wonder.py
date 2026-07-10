@@ -217,6 +217,25 @@ def test_expedition_quote_applies_gardens_buff():
     assert buffed >= int(base * 1.05) - 1               # реально применился
 
 
+def test_done_list_dedups_and_excludes_main_screen():
+    """Зал славы: дубли одного чуда (тестовые обкатки) не двоятся — берём новейшее;
+    чудо главного экрана (мемориал) не дублируется внизу."""
+    from datetime import datetime, timezone
+    from bot.webapi.wonder import _done_list_dto
+    mk = lambda i, key, top_name: NS(  # noqa: E731
+        id=i, key=key, contributions={"1": {"name": top_name, "pts": 100}},
+        updated_at=datetime(2026, 7, i, tzinfo=timezone.utc))
+    ws = [mk(8, "wall", "Реальный"), mk(3, "wall", "Обкатка")]   # новые сверху
+    out = _done_list_dto(ws)
+    assert len(out) == 1 and out[0]["top"] == "Реальный"          # дедуп по key
+    assert out[0]["name"] == "Твердыня" and out[0]["date"] == "08.07.2026"
+    assert _done_list_dto(ws, exclude_id=8) == []                 # мемориал не двоится
+    both = [mk(9, "gardens", "Зодчий"), mk(8, "wall", "Реальный")]
+    names = [d["name"] for d in _done_list_dto(both, exclude_id=9)]
+    assert names == ["Твердыня"]                                  # активная стройка садов →
+    #                                                               внизу только Твердыня
+
+
 def test_done_wonder_dto_is_sealed_memorial():
     """Мемориал: DTO возведённого чуда — status='done', sealed, 100% (экран стройки
     показывает готовое чудо, а не пустоту, пока не заложили новое)."""

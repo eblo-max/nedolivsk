@@ -49,6 +49,30 @@ def _wonder_dto(w, pid: int) -> dict:
     }
 
 
+def _done_list_dto(wonders: list, exclude_id: int | None = None) -> list[dict]:
+    """«Зал славы» внизу вкладки: возведённые чудеса компактной строкой. Дедуп по
+    key (тестовые дубли обкаток не двоятся — берём новейшее), чудо главного экрана
+    (мемориал) не дублируем. Чистая функция — легко тестировать."""
+    out: list[dict] = []
+    seen: set[str] = set()
+    for w in wonders:                                   # новые сверху (order by id desc)
+        if w.key in seen:
+            continue
+        seen.add(w.key)          # ключ занят И при исключении — иначе всплывёт
+        if w.id == exclude_id:   # старый дубль-обкатка того же чуда из-под мемориала
+            continue
+        wdef = wmod.get(w.key)
+        top = max((w.contributions or {}).values(),
+                  key=lambda c: int(c.get("pts", 0)), default=None)
+        out.append({
+            "key": w.key, "name": wdef.name if wdef else w.key,
+            "emoji": wdef.emoji if wdef else "🏛", "bonus": wdef.bonus if wdef else "",
+            "top": (top or {}).get("name") or "",
+            "date": w.updated_at.strftime("%d.%m.%Y") if w.updated_at else "",
+        })
+    return out
+
+
 def _stock(p) -> dict | None:
     """Что игрок может НЕСТИ в стройку: сырьё (инвентарь), блюда (погреб), золото.
     Отдаём и ЦЕННОСТЬ за единицу (pts) — та же, что копит item_points, — чтобы
@@ -84,9 +108,12 @@ async def _api_wonder(request: web.Request) -> web.Response:
         if w is None:                                  # стройки нет → мемориал: последнее
             w = await repo.latest_done_wonder(s)       # возведённое чудо (закрыто, бафф жив)
         dto = _wonder_dto(w, uid) if w is not None else None
+        done = _done_list_dto(await repo.done_wonders(s),
+                              exclude_id=w.id if w is not None else None)
         stock = _stock(p)
     return web.json_response({"ok": True, "wonder": dto, "zodar": zodar,
-                              "stock": stock}, headers={"Cache-Control": "no-store"})
+                              "stock": stock, "done": done},
+                             headers={"Cache-Control": "no-store"})
 
 
 async def _api_wonder_contribute(request: web.Request) -> web.Response:

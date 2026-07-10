@@ -15,7 +15,8 @@ interface Wonder {
 }
 interface Item { key: string; name: string; qty: number; pts?: number }
 interface Stock { gold: number; gold_pts?: number; res: Item[]; goods: Item[] }
-interface Resp { ok?: boolean; wonder: Wonder | null; zodar: number; stock: Stock | null }
+interface DoneWonder { key: string; name: string; emoji: string; bonus: string; top?: string; date?: string }
+interface Resp { ok?: boolean; wonder: Wonder | null; zodar: number; stock: Stock | null; done?: DoneWonder[] }
 interface Contrib extends Resp { award: number }
 
 const DEV = import.meta.env.DEV
@@ -31,6 +32,7 @@ const SAMPLE: Resp = {
   },
   zodar: 6,
   stock: { gold: 4366, gold_pts: 0.5, res: [{ key: 'wood', name: 'Древесина', qty: 260, pts: 2 }, { key: 'stone', name: 'Камень', qty: 90, pts: 2.5 }, { key: 'clay', name: 'Глина', qty: 40, pts: 2 }], goods: [{ key: 'ale1', name: 'Эль', qty: 12, pts: 5 }, { key: 'roast', name: 'Жаркое', qty: 7, pts: 12 }] },
+  done: [{ key: 'wall', name: 'Твердыня', emoji: '🏯', bonus: 'Орда приходит слабее — всему городу легче отбиться', top: 'Синий Гоблин', date: '07.07.2026' }],
 }
 
 /** Кинетический счётчик: плавно догоняет значение (rAF, ease-out). */
@@ -429,6 +431,23 @@ export default function WonderSheet({ onClose, onOpenArtel, page }: {
                 <span>Лавка Артели</span>
                 <small>потратить зодары на престиж</small>
               </button>
+
+              {/* Зал славы: возведённые чудеса — их баффы живут вечно */}
+              {(d.done?.length ?? 0) > 0 && (
+                <>
+                  <div className="wd2-lbl">Возведено артелью</div>
+                  {d.done!.map((dw) => (
+                    <div key={dw.key} className="wd2-done">
+                      <span className="wd2-done-ic">{dw.emoji}</span>
+                      <span className="wd2-done-meta">
+                        <b>{dw.name}</b>
+                        <i>✅ {dw.bonus}</i>
+                        {dw.top && <em>Больше всех вложил(а) {dw.top}{dw.date ? ` · ${dw.date}` : ''}</em>}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           </>
         )}
