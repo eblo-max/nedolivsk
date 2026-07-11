@@ -95,6 +95,13 @@ RECIPE_BUDGET_CAP = 20       # потолок ≈ верх эксклюзива 
 
 RECIPE_KEY_PREFIX = "tr_"    # ключ игрового рецепта (owns_recipe/варка)
 
+# «Рандомные статы» (выбор дизайна: уникальный ролл на комбо, ЗАМОРОЖЕН). Сид ролла =
+# combo_hash → тот же рецепт при повторе (ноль реролл-абуза, кэш цел), но каждое НОВОЕ
+# комбо даёт свой прокрут: силу ±ROLL_PCT и уникальное распределение статов. Всё в
+# пределах бюджета/потолка — баланс держится.
+RECIPE_ROLL_PCT = 0.18       # разброс итоговой силы вокруг базового бюджета
+RECIPE_JITTER = (0.72, 1.28)  # разброс весов эффектов (распределение статов на комбо)
+
 # Ярусы по редкости (бюджетные полосы) — для UI-подсказки «какой силы блюдо выйдет».
 RECIPE_TIERS: tuple[tuple[int, str], ...] = (
     (9, "Обычный"), (14, "Необычный"), (20, "Редкий"), (10 ** 9, "Экзотический"),
@@ -353,12 +360,20 @@ def build_recipe(ingredients: list[str],
     reasoning («Повар рассудил») — только от ИИ; без него пусто (фронт скрывает).
 
     Возвращает dict под таблицу recipes: name/lore/reasoning/effects/budget/combo_hash/key."""
-    budget = recipe_budget(ingredients)
+    chash = combo_hash(ingredients)
+    # уникальный ЗАМОРОЖЕННЫЙ ролл на комбо: отдельный от name/lore поток (срез хэша),
+    # тот же рецепт при повторе → нет реролла ради статов.
+    roll = random.Random(int(chash[12:24], 16))
+    base = recipe_budget(ingredients)
+    budget = int(max(RECIPE_BUDGET_FLOOR, min(RECIPE_BUDGET_CAP,
+                     round(base * (1.0 + roll.uniform(-RECIPE_ROLL_PCT, RECIPE_ROLL_PCT))))))
     proposal = ai_proposal if ai_proposal else proposal_from_tags(ingredients)
+    # разброс распределения статов; сортировка ключей — чтобы ролл-поток совпадал
+    # независимо от порядка dict (иначе тот же combo дал бы разный рецепт).
+    proposal = {k: proposal[k] * roll.uniform(*RECIPE_JITTER) for k in sorted(proposal)}
     effects = assign_effects(proposal, budget)
     name = (ai_name or "").strip() or procedural_name(ingredients)
     lore = (ai_lore or "").strip() or procedural_lore(ingredients, effects)
-    chash = combo_hash(ingredients)
     return {
         "combo_hash": chash,
         "key": recipe_key(chash),
