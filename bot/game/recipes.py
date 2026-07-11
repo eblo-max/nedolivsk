@@ -45,25 +45,27 @@ INGREDIENT_TAGS: dict[str, tuple[str, ...]] = {
     "game":    ("fatty", "hearty"),
     "herbs":   ("spicy", "herbal"),
     "salt":    ("savory",),
-    "fish":    ("hearty", "savory"),
+    "fish":    ("savory", "tart"),        # рыба — постная/лёгкая: урон+уворот, не hp
     "milk":    ("fatty", "creamy"),
-    "malt":    ("hearty", "fermented"),
+    "malt":    ("fermented", "bitter"),   # солод — для варки: крит, не hp
     "flour":   ("hearty",),
 }
 
 # Тег → веса боевых эффектов (Ф0: только боевой словарь FLASK_EFFECTS). Ф1 расширит
 # теги на эконом-эффекты (income/yield/…) — см. docs/ai_recipes.md §4.6.
+# Баланс распределён: hp — только у явно сытного/жирного (и не «чистый» hp, а с урон-
+# долей), сладкое/кислое дают крит/уворот, чтобы блюда не схлопывались в «одно здоровье».
 TAG_EFFECTS: dict[str, dict[str, float]] = {
-    "hearty":    {"hp": 1.0},
-    "fatty":     {"hp": 1.0},
-    "creamy":    {"hp": 0.6, "antidote": 0.4},
+    "hearty":    {"hp": 0.6, "dmg": 0.4},
+    "fatty":     {"hp": 0.7, "dmg": 0.3},
+    "creamy":    {"hp": 0.5, "antidote": 0.5},
     "fermented": {"crit": 1.0},
-    "bitter":    {"crit": 0.7, "dmg": 0.3},
-    "sweet":     {"crit": 0.8, "hp": 0.2},
-    "tart":      {"crit": 0.6, "dodge": 0.4},
+    "bitter":    {"crit": 0.6, "dmg": 0.4},
+    "sweet":     {"crit": 0.6, "dodge": 0.4},
+    "tart":      {"dodge": 0.7, "crit": 0.3},
     "spicy":     {"dmg": 1.0},
-    "savory":    {"dmg": 0.7, "hp": 0.3},
-    "herbal":    {"antidote": 0.6, "dodge": 0.4},
+    "savory":    {"dmg": 0.7, "crit": 0.3},
+    "herbal":    {"antidote": 0.5, "dodge": 0.5},
     "plain":     {"dmg": 0.5},
 }
 

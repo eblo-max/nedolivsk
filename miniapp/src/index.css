@@ -3262,6 +3262,8 @@ body {
 .sk-eff.anti { color:#c9a0e0; border-color:#5a3f78; background:#1f142b80; }
 .sk-yield { font-family:var(--text); font-size:12.5px; color:var(--dim); }
 .sk-yield b { color:var(--parch); font-family:var(--num); }
+.sk-use { font-family:var(--text); font-size:12.5px; color:var(--amber); margin-top:8px;
+  padding:7px 12px; border-radius:9px; background:#2a1a0850; border:1px solid var(--line2); }
 .sk-done { max-width:240px; }
 
 /* ── Кулинарная книга ── */
@@ -3272,6 +3274,7 @@ body {
 .sk-chev { color:var(--dim); font-size:18px; transition:transform .25s ease; }
 .sk-chev.up { transform:rotate(-90deg); }
 .sk-book-list { display:flex; flex-direction:column; gap:7px; margin-top:11px; animation:skPop .32s backwards; }
+.sk-book-hint { font-family:var(--text); font-style:italic; font-size:12px; color:var(--dim); margin-bottom:3px; }
 .sk-recipe { display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:11px;
   background:linear-gradient(#20140990,#170e0690); border:1px solid var(--line); }
 .sk-r-dish { display:inline-flex; line-height:0; flex:0 0 auto; }

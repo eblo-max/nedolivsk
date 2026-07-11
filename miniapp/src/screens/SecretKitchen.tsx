@@ -123,7 +123,8 @@ export default function SecretKitchen({ dto, onResult, onFlash }: {
                 <span key={c.k} className={`sk-eff ${c.cls}`}><i>{c.ic}</i>{c.fmt(c.v)}</span>
               ))}
             </div>
-            <div className="sk-yield">Сварено <b>{card.qty}</b> порций · в погребе тайных блюд</div>
+            <div className="sk-yield">Сварено <b>{card.qty}</b> порций · лежат в кулинарной книге</div>
+            <div className="sk-use">🍶 Пей флягой в бою с рейд-боссом — даст этот бафф</div>
           </div>
           <button className="btn gold sk-done" onClick={done}>В котёл снова</button>
         </div>
@@ -220,6 +221,7 @@ function Cookbook({ entries }: { entries: CookbookEntry[] }) {
       </button>
       {open && (
         <div className="sk-book-list" ref={ref}>
+          <div className="sk-book-hint">Пьются флягой в рейде-боссе и на охоте (×N — сколько порций сварено).</div>
           {entries.map((e) => (
             <div key={e.key} className="sk-recipe">
               <span className="sk-r-dish"><GoodIcon k="pohlebka" size={30} /></span>
