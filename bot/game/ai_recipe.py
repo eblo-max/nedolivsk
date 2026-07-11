@@ -28,8 +28,12 @@ except Exception:  # noqa: BLE001
     anthropic = None
     AsyncAnthropic = None
 
-MODEL = "claude-haiku-4-5"       # дёшево/быстро для массовой простой задачи «флейвор»
-MAX_TOKENS = 600
+# Sonnet 5: нативный adaptive-thinking (включён по умолчанию) — реально рассуждает над
+# вкусом ингредиентов и билдом до выбора эффектов; проза богаче Haiku. Латентность
+# 5-10с (thinking), цена ~0.7¢/рецепт; глобальный потолок ~2.5к комбо → ~$18 за жизнь
+# мира. max_tokens с запасом под thinking (иначе усечёт: thinking+ответ ≤ max_tokens).
+MODEL = "claude-sonnet-5"
+MAX_TOKENS = 1500
 NAME_MAX = 60
 LORE_MAX = 220
 
@@ -65,10 +69,11 @@ def _get_client():
         # httpx-транспорт по умолчанию (идёт зависимостью с anthropic). aiohttp-клиент
         # (DefaultAioHttpClient) требует экстры anthropic[aiohttp] и без неё падал
         # RuntimeError; httpx-async работает в том же event-loop, что aiogram/aiohttp.
-        # timeout+ретрай ограничены: висящий вызов быстро уходит в фолбэк (фронт ждёт
-        # 15с), нормальный вызов — 2-3с; при таймауте/429 ретрай ещё раз, затем фолбэк.
+        # timeout < фронтовых 15с, БЕЗ ретраев: Sonnet-вызов с thinking идёт 5-10с;
+        # если превысил 12с — мгновенный фолбэк на процедурное имя (сервер всегда
+        # успевает ответить до фронт-таймаута). Ретрай убрал бы этот потолок.
         _client = AsyncAnthropic(api_key=settings.anthropic_api_key,
-                                 timeout=6.0, max_retries=1)
+                                 timeout=12.0, max_retries=0)
     return _client
 
 
@@ -131,10 +136,9 @@ async def invent(ingredients: list[str], budget: int) -> tuple[str, str, dict] |
         return None
     names = [f"{k} ({balance.RESOURCE_NAMES.get(k, k)})" for k in sorted(set(ingredients))]
     try:
-        # cache_control убран: реальный вход ~2076 токенов (< 4096 — минимума кэша
-        # Haiku), кэш не включался бы всё равно; к тому же каждое комбо зовётся ОДИН
-        # раз (дальше берётся из БД), так что prompt-кэш тут бесполезен. Стоимость и
-        # без него копеечная (~0.3¢/рецепт, глобальный потолок ~2.5к комбо).
+        # cache_control не ставим: каждое комбо зовётся ОДИН раз (дальше из БД), а
+        # prompt-кэш живёт 5 мин — почти никогда не переиспользуется между разными
+        # экспериментами. Стоимость и без него мелкая (глобальный потолок ~2.5к комбо).
         r = await _get_client().messages.parse(
             model=MODEL,
             max_tokens=MAX_TOKENS,
