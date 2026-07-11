@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, func, select, text, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
@@ -250,16 +251,19 @@ async def get_recipe_by_hash(
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
-def create_recipe(session: AsyncSession, data: dict, discoverer_id: int) -> Recipe:
-    """Сохранить новый рецепт (данные из recipes.build_recipe). Числа эффектов уже
-    склампованы кодом — сюда попадает только валидное."""
-    r = Recipe(
-        combo_hash=data["combo_hash"], key=data["key"], name=data["name"],
-        lore=data.get("lore", ""), effects=dict(data["effects"]),
-        budget=int(data.get("budget", 0)), discoverer_id=discoverer_id, status="open",
-    )
-    session.add(r)
-    return r
+async def upsert_recipe(session: AsyncSession, data: dict, discoverer_id: int) -> Recipe:
+    """Создать рецепт по combo_hash ИЛИ вернуть уже существующий — гонко-безопасно.
+    Два первооткрывателя одного нового комбо не роняют друг друга: ON CONFLICT DO
+    NOTHING, затем выбираем КАНОННУЮ строку (одну на весь мир). Числа эффектов уже
+    склампованы кодом (recipes.build_recipe) — сюда попадает только валидное."""
+    stmt = (pg_insert(Recipe.__table__)
+            .values(combo_hash=data["combo_hash"], key=data["key"], name=data["name"],
+                    lore=data.get("lore", ""), effects=dict(data["effects"]),
+                    budget=int(data.get("budget", 0)), discoverer_id=discoverer_id,
+                    status="open")
+            .on_conflict_do_nothing(index_elements=["combo_hash"]))
+    await session.execute(stmt)
+    return await get_recipe_by_hash(session, data["combo_hash"])
 
 
 async def all_recipes(session: AsyncSession) -> list[Recipe]:

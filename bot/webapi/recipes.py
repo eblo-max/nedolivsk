@@ -80,53 +80,72 @@ def _recipe_card(data: dict, t) -> dict:
             "qty": recipes.stock_get(t, data["key"])}
 
 
+def _row_data(row) -> dict:
+    """Recipe ORM → data-dict (одинаковый формат с recipes.build_recipe)."""
+    return {"combo_hash": row.combo_hash, "key": row.key, "name": row.name,
+            "lore": row.lore or "", "effects": dict(row.effects or {}),
+            "budget": row.budget}
+
+
 async def _api_recipe_experiment(request: web.Request) -> web.Response:
-    """Открыть/сварить тайное блюдо из выбранных ингредиентов."""
+    """Открыть/сварить тайное блюдо из выбранных ингредиентов.
+
+    Фаза A (без лока): проверки + ИИ-вызов ВНЕ транзакции — чтобы 2-3 с обращения к
+    Claude не держали лок строки игрока и соединение пула. Фаза B (лок строки): атомарно
+    списываем ингредиенты, варим порции, ставим кулдаун; рецепт — гонко-безопасный
+    get-or-create по combo_hash (два первооткрывателя одного комбо не роняют друг друга)."""
     uid, body = await _auth(request)
     if uid is None:
         return body
     ings = [str(x) for x in (body.get("ingredients") or [])]
     if not recipes.valid_combo(ings):
         return web.json_response({"ok": False, "error": "bad_combo"})
+    chash = recipes.combo_hash(ings)
+    now = datetime.now(timezone.utc)
+    cost = {k: recipes.EXPERIMENT_COST_EACH for k in set(ings)}
 
+    # ── Фаза A: быстрые проверки (без лока) + рецепт из БД или ИИ вне транзакции ──
+    async with session_factory() as s:
+        p0 = await repo.get_player(s, uid)
+        if p0 is None or not p0.tavern:
+            return web.json_response({"ok": False, "error": "no_tavern"})
+        left = _cooldown_left(p0, now)
+        if left > 0:
+            return web.json_response({"ok": False, "error": "cooldown", "left": left})
+        if not inventory.can_afford(p0, cost):
+            return web.json_response({"ok": False, "error": "not_enough",
+                                      "need": recipes.EXPERIMENT_COST_EACH})
+        existing = await repo.get_recipe_by_hash(s, chash)
+        existing_data = _row_data(existing) if existing is not None else None
+
+    if existing_data is not None:
+        data = existing_data                                  # уже открыт в мире — ИИ не зовём
+    else:
+        budget = recipes.recipe_budget(ings)
+        ai = await ai_recipe.invent(ings, budget)             # None → процедурный фолбэк
+        name, lore, proposal = ai if ai else (None, None, None)
+        data = recipes.build_recipe(ings, ai_name=name, ai_lore=lore, ai_proposal=proposal)
+
+    # ── Фаза B: атомарно на строке игрока (лок) ──────────────────────────────
     async with session_factory() as s:
         p = await repo.get_player(s, uid, for_update=True)
         if p is None or not p.tavern:
             return web.json_response({"ok": False, "error": "no_tavern"})
         touch_seen(p)
         now = datetime.now(timezone.utc)
-
         left = _cooldown_left(p, now)
-        if left > 0:
+        if left > 0:                                          # успел параллельный эксперимент
             return web.json_response({"ok": False, "error": "cooldown", "left": left})
-
-        cost = {k: recipes.EXPERIMENT_COST_EACH for k in set(ings)}
         if not inventory.can_afford(p, cost):
             return web.json_response({"ok": False, "error": "not_enough",
                                       "need": recipes.EXPERIMENT_COST_EACH})
-
-        # Рецепт: детерминирован по комбо. Уже открыт кем-то в мире → берём из БД
-        # (тот же рецепт у всех, без повторного вызова ИИ). Иначе — придумываем.
-        chash = recipes.combo_hash(ings)
-        existing = await repo.get_recipe_by_hash(s, chash, lock=True)
-        if existing is None:
-            budget = recipes.recipe_budget(ings)
-            ai = await ai_recipe.invent(ings, budget)         # None → процедурный фолбэк
-            name, lore, proposal = ai if ai else (None, None, None)
-            data = recipes.build_recipe(ings, ai_name=name, ai_lore=lore,
-                                        ai_proposal=proposal)
-            repo.create_recipe(s, data, discoverer_id=uid)
-            new_to_world = True
-        else:
-            data = {"combo_hash": existing.combo_hash, "key": existing.key,
-                    "name": existing.name, "lore": existing.lore or "",
-                    "effects": dict(existing.effects or {}), "budget": existing.budget}
-            new_to_world = False
-        recipes.note_recipe(data)                             # прогреть кэш немедленно
-
+        row = await repo.upsert_recipe(s, data, discoverer_id=uid)  # get-or-create по хэшу
+        data = _row_data(row)                                 # канонная строка (мог выиграть другой)
+        new_to_world = existing_data is None and row.discoverer_id == uid
+        recipes.note_recipe(data)
         inventory.pay(p, cost)
         recipes.stock_add(p.tavern, data["key"], recipes.EXPERIMENT_OUTPUT)
-        first_time = artel_shop.grant_recipe(p, data["key"])  # новое в мою книгу?
+        first_time = artel_shop.grant_recipe(p, data["key"])
         p.recipe_at = now
         repo.add_log(s, "player", p.id,
                      f"🍲 {'открыл' if first_time else 'сварил'} рецепт: {data['name']}")

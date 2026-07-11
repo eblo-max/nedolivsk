@@ -65,7 +65,10 @@ def _get_client():
         # httpx-транспорт по умолчанию (идёт зависимостью с anthropic). aiohttp-клиент
         # (DefaultAioHttpClient) требует экстры anthropic[aiohttp] и без неё падал
         # RuntimeError; httpx-async работает в том же event-loop, что aiogram/aiohttp.
-        _client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+        # timeout+ретрай ограничены: висящий вызов быстро уходит в фолбэк (фронт ждёт
+        # 15с), нормальный вызов — 2-3с; при таймауте/429 ретрай ещё раз, затем фолбэк.
+        _client = AsyncAnthropic(api_key=settings.anthropic_api_key,
+                                 timeout=6.0, max_retries=1)
     return _client
 
 
@@ -94,6 +97,7 @@ SYSTEM = f"""Ты — повар средневековой корчмы в го
   (0 = эффекта нет). ОБЯЗАТЕЛЬНО заполни 1–3 поля НЕНУЛЕВЫМИ по вкусу ингредиентов
   (см. теги), остальные оставь 0. Это ПОДСКАЗКА балансу — итоговые числа назначит
   игра из бюджета; ты задаёшь только НАПРАВЛЕНИЕ (какие эффекты и их соотношение).
+  antidote ставь только для явно лечебных/травяных сочетаний — он ценен, но узок.
 
 Белый список эффектов (и к чему тяготеет вкус):
 - dmg  — урон в бою (острое, пряное, солёное)
@@ -127,14 +131,18 @@ async def invent(ingredients: list[str], budget: int) -> tuple[str, str, dict] |
         return None
     names = [f"{k} ({balance.RESOURCE_NAMES.get(k, k)})" for k in sorted(set(ingredients))]
     try:
+        # cache_control убран: реальный вход ~2076 токенов (< 4096 — минимума кэша
+        # Haiku), кэш не включался бы всё равно; к тому же каждое комбо зовётся ОДИН
+        # раз (дальше берётся из БД), так что prompt-кэш тут бесполезен. Стоимость и
+        # без него копеечная (~0.3¢/рецепт, глобальный потолок ~2.5к комбо).
         r = await _get_client().messages.parse(
             model=MODEL,
             max_tokens=MAX_TOKENS,
-            system=[{"type": "text", "text": SYSTEM,
-                     "cache_control": {"type": "ephemeral"}}],
+            system=SYSTEM,
             messages=[{"role": "user",
                        "content": f"Ингредиенты: {', '.join(names)}. "
-                                  f"Ориентир силы (бюджет очков): {budget}."}],
+                                  f"Редкость блюда: {recipes.budget_tier(budget)} "
+                                  f"(ориентир силы {budget}). Лор — под стать редкости."}],
             output_format=AIRecipe,
         )
         if getattr(r, "stop_reason", None) == "refusal":   # классификатор отказал
