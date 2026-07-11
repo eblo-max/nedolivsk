@@ -131,7 +131,7 @@ async def _api_recipe_experiment(request: web.Request) -> web.Response:
         p = await repo.get_player(s, uid, for_update=True)
         if p is None or not p.tavern:
             return web.json_response({"ok": False, "error": "no_tavern"})
-        touch_seen(p)
+        await touch_seen(s, uid)
         now = datetime.now(timezone.utc)
         left = _cooldown_left(p, now)
         if left > 0:                                          # успел параллельный эксперимент
