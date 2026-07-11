@@ -101,6 +101,19 @@ RECIPE_KEY_PREFIX = "tr_"    # ключ игрового рецепта (owns_re
 # пределах бюджета/потолка — баланс держится.
 RECIPE_ROLL_PCT = 0.18       # разброс итоговой силы вокруг базового бюджета
 RECIPE_JITTER = (0.72, 1.28)  # разброс весов эффектов (распределение статов на комбо)
+RECIPE_LUCKY_RATIO = 1.08    # ролл силы выше базы на 8%+ = «✨ Удачная партия»
+
+
+def luck_tier(budget: int, ingredients: list[str]) -> str:
+    """Насколько удачен ролл силы относительно базы — для «✨ Удачная партия».
+    lucky / normal / lean; заморожен на комбо (тот же рецепт — тот же ярлык)."""
+    base = recipe_budget(ingredients) or 1
+    ratio = budget / base
+    if ratio >= RECIPE_LUCKY_RATIO:
+        return "lucky"
+    if ratio <= 1.0 / RECIPE_LUCKY_RATIO:
+        return "lean"
+    return "normal"
 
 # Ярусы по редкости (бюджетные полосы) — для UI-подсказки «какой силы блюдо выйдет».
 RECIPE_TIERS: tuple[tuple[int, str], ...] = (

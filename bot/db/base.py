@@ -402,3 +402,7 @@ async def create_tables() -> None:
             "ALTER TABLE recipes ADD COLUMN IF NOT EXISTS "
             "reasoning VARCHAR(240) NOT NULL DEFAULT ''"
         ))
+        await conn.execute(text(
+            "ALTER TABLE recipes ADD COLUMN IF NOT EXISTS "
+            "ingredients VARCHAR(80) NOT NULL DEFAULT ''"
+        ))

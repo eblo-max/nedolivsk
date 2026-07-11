@@ -392,6 +392,7 @@ class Recipe(Base):
     name: Mapped[str] = mapped_column(String(80))
     lore: Mapped[str] = mapped_column(String(240), default="")
     reasoning: Mapped[str] = mapped_column(String(240), default="")  # «Повар рассудил» (от ИИ)
+    ingredients: Mapped[str] = mapped_column(String(80), default="")  # состав, comma-joined (ролл-удача/«сварить ещё»)
     effects: Mapped[dict] = mapped_column(_JDICT, default=dict)
     budget: Mapped[int] = mapped_column(default=0)
     discoverer_id: Mapped[int | None] = mapped_column(BigInteger)  # первооткрыватель

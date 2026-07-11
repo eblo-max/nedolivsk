@@ -12,7 +12,7 @@ export interface ExperimentDTO {
   budget_base: number; budget_k: number; budget_floor: number; budget_cap: number
   tiers: [number, string][]; cookbook: CookbookEntry[]
 }
-interface RecipeCard { key: string; name: string; lore: string; reasoning?: string; label: string; effects: Record<string, number | boolean>; budget: number; qty: number }
+interface RecipeCard { key: string; name: string; lore: string; reasoning?: string; luck?: string; label: string; effects: Record<string, number | boolean>; budget: number; qty: number }
 interface ExpResult { ok: true; recipe: RecipeCard; experiment: ExperimentDTO; new_to_world: boolean; first_time: boolean }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -89,7 +89,7 @@ export default function SecretKitchen({ dto, onResult, onFlash }: {
         setCard({ key: 'tr_dev', name: 'Похмельный разносол боярина', budget: est, qty: dto.output,
           lore: 'Тёмное варево из отборных припасов — с одной ложки и сыт, и в драке лих.',
           reasoning: 'Дичь сытная да жирная, травы горячат кровь — выйдет крепкое блюдо для доброй драки.',
-          label: '', effects: { hp: 24, dmg: 5, crit: 3 } })
+          luck: 'lucky', label: '', effects: { hp: 24, dmg: 5, crit: 3 } })
         setNewWorld(true); setFirstTime(true); setPhase('reveal'); hapticNotify('success')
         return
       }
@@ -123,6 +123,9 @@ export default function SecretKitchen({ dto, onResult, onFlash }: {
                 <span key={c.k} className={`sk-eff ${c.cls}`}><i>{c.ic}</i>{c.fmt(c.v)}</span>
               ))}
             </div>
+            {card.luck === 'lucky' && (
+              <div className="sk-lucky">✨ Удачная партия — статы вышли щедрее обычного!</div>
+            )}
             <div className="sk-yield">Сварено <b>{card.qty}</b> порций · лежат в кулинарной книге</div>
             <div className="sk-use">🍶 Пей флягой в бою с рейд-боссом — даст этот бафф</div>
           </div>

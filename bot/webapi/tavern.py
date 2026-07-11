@@ -198,6 +198,11 @@ def _tavern_state(p, t) -> dict:
                for r in bal.RESOURCES if int(inv.get(r, 0)) > 0]
     cellar = [{"key": k, "name": prod.GOODS[k].name, "qty": int(q)}
               for k, q in (t.products or {}).items() if q and k in prod.GOODS]
+    # тайные блюда (recipes_stock) — показываем в погребе как фляги (в экономику НЕ идут).
+    from bot.game import recipes as _recm
+    cellar += [{"key": k, "name": _recm.name_for_key(k) or "Тайное блюдо",
+                "qty": int(q), "secret": True}
+               for k, q in (getattr(t, "recipes_stock", None) or {}).items() if int(q) > 0]
 
     from bot.game import artel_shop
     return {

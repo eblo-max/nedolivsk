@@ -215,6 +215,9 @@ body {
 .chips { display:flex; flex-wrap:wrap; gap:7px; padding:11px 14px; }
 .chip { font-family:var(--text); font-size:13px; color:var(--parch); display:flex; align-items:center; gap:5px;
   background:linear-gradient(#2c1e0d,#191007); border:1px solid var(--line2); border-radius:7px; padding:5px 10px; }
+/* тайное блюдо в погребе — фляга, не товар (визуально отделяем от продаваемого) */
+.chip-secret { background:linear-gradient(#33220f,#20130a); border-color:var(--amber); border-left:3px solid var(--amber); }
+.chip-flask { font-style:normal; color:var(--amber); font-family:var(--text); font-size:11px; opacity:.9; }
 
 /* кнопки */
 .btn { font-family:var(--disp); text-align:center; padding:13px 14px; border-radius:10px; cursor:pointer;
@@ -3264,6 +3267,10 @@ body {
 .sk-yield b { color:var(--parch); font-family:var(--num); }
 .sk-use { font-family:var(--text); font-size:12.5px; color:var(--amber); margin-top:8px;
   padding:7px 12px; border-radius:9px; background:#2a1a0850; border:1px solid var(--line2); }
+.sk-lucky { font-family:var(--disp); font-weight:700; font-size:12.5px; letter-spacing:.3px;
+  color:#2a1c00; margin:0 auto 12px; padding:7px 14px; border-radius:20px; display:inline-block;
+  background:linear-gradient(var(--gold-2),var(--amber)); box-shadow:0 0 18px #e7bf6355;
+  animation:skPop .4s cubic-bezier(.2,1.4,.4,1) backwards; }
 .sk-done { max-width:240px; }
 
 /* ── Кулинарная книга ── */

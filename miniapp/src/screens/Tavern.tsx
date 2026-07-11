@@ -24,7 +24,7 @@ const GuideSheet = lazy(() => import('./GuideSheet'))
 
 interface Activity { icon?: string; text: string; sub?: string; badge?: 'ready' | 'wait'; progress?: number; gold?: boolean; action?: string }
 interface ResLine { key: string; name: string; amount: number }
-interface CellarLine { key: string; name: string; qty: number }
+interface CellarLine { key: string; name: string; qty: number; secret?: boolean }
 interface WEffect { text: string; good: boolean }
 interface WorldEvent { id: string; emoji: string; name: string; blurb: string; good?: string | null; good_name?: string | null; effects: WEffect[] }
 interface CityFaction { id: string; name: string; power: number }
@@ -85,6 +85,7 @@ const SAMPLE: TavernState = {
   cellar: [
     { key: 'ale1', name: 'Эль', qty: 12 }, { key: 'roast', name: 'Жаркое', qty: 4 },
     { key: 'pie', name: 'Пирог', qty: 3 },
+    { key: 'tr_demo1', name: 'Огневая солянка «У плахи»', qty: 3, secret: true },
   ],
   world: ['🍂 Осень — спрос обычный', '🪓 Орда орков точит топоры на севере', '🏛 В городе тихо'],
   next_upgrade: { gold: 715, wood: 220, grain: 180, hops: 120 }, upgrade_pct: 60,
@@ -391,7 +392,10 @@ export default function Tavern() {
         <div className="chips">
           {t.cellar.length
             ? t.cellar.map((p, i) => (
-                <span key={i} className="chip"><GoodIcon k={p.key} /> {p.name} <b style={{ fontFamily: 'var(--num)' }}>×{p.qty}</b></span>
+                <span key={i} className={`chip${p.secret ? ' chip-secret' : ''}`}>
+                  <GoodIcon k={p.secret ? 'pohlebka' : p.key} /> {p.name}
+                  {p.secret && <em className="chip-flask">🍶 фляга</em>}
+                  <b style={{ fontFamily: 'var(--num)' }}>×{p.qty}</b></span>
               ))
             : <span className="muted" style={{ fontStyle: 'italic', padding: '2px 0' }}>Пусто — гони товар на продажу</span>}
         </div>

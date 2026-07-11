@@ -57,7 +57,8 @@ def _wire(monkeypatch, player, *, existing=None, invent=None, ingredients=("game
         return existing
 
     async def fake_upsert(_s, data, discoverer_id):
-        return NS(**data, discoverer_id=discoverer_id)   # канонная «строка» из data
+        row = {**data, "ingredients": ",".join(data.get("ingredients", []))}  # как в БД (String)
+        return NS(**row, discoverer_id=discoverer_id)    # канонная «строка» из data
 
     async def fake_invent(_ings, _budget):
         return invent                                    # None → процедурный фолбэк
@@ -134,7 +135,7 @@ def test_known_recipe_skips_ai(monkeypatch):
     p = _player()
     ch = core.combo_hash(["game", "herbs"])
     row = NS(combo_hash=ch, key=core.recipe_key(ch), name="Старое блюдо", lore="л",
-             reasoning="р", effects={"hp": 12}, budget=11, discoverer_id=999)
+             reasoning="р", ingredients="game,herbs", effects={"hp": 12}, budget=11, discoverer_id=999)
     called = {"invent": False}
 
     async def spy_invent(_i, _b):

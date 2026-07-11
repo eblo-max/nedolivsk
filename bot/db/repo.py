@@ -259,6 +259,7 @@ async def upsert_recipe(session: AsyncSession, data: dict, discoverer_id: int) -
     stmt = (pg_insert(Recipe.__table__)
             .values(combo_hash=data["combo_hash"], key=data["key"], name=data["name"],
                     lore=data.get("lore", ""), reasoning=data.get("reasoning", ""),
+                    ingredients=",".join(data.get("ingredients", [])),
                     effects=dict(data["effects"]), budget=int(data.get("budget", 0)),
                     discoverer_id=discoverer_id, status="open")
             .on_conflict_do_nothing(index_elements=["combo_hash"]))

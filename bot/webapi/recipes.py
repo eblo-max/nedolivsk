@@ -78,13 +78,16 @@ def _recipe_card(data: dict, t) -> dict:
             "reasoning": data.get("reasoning", ""),
             "label": recipes.cellar_label(data["effects"]),
             "effects": data["effects"], "budget": data["budget"],
+            "luck": recipes.luck_tier(data["budget"], data.get("ingredients", [])),
             "qty": recipes.stock_get(t, data["key"])}
 
 
 def _row_data(row) -> dict:
     """Recipe ORM → data-dict (одинаковый формат с recipes.build_recipe)."""
+    ing = (getattr(row, "ingredients", "") or "")
     return {"combo_hash": row.combo_hash, "key": row.key, "name": row.name,
             "lore": row.lore or "", "reasoning": getattr(row, "reasoning", "") or "",
+            "ingredients": ing.split(",") if ing else [],
             "effects": dict(row.effects or {}), "budget": row.budget}
 
 
