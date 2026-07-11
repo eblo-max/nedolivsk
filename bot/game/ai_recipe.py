@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from bot.config import settings
 from bot.game import balance, recipes
@@ -23,11 +23,10 @@ log = logging.getLogger(__name__)
 # SDK может быть ещё не установлен локально — импорт под guard, чтобы модуль грузился.
 try:  # pragma: no cover - зависит от окружения
     import anthropic
-    from anthropic import AsyncAnthropic, DefaultAioHttpClient
+    from anthropic import AsyncAnthropic
 except Exception:  # noqa: BLE001
     anthropic = None
     AsyncAnthropic = None
-    DefaultAioHttpClient = None
 
 MODEL = "claude-haiku-4-5"       # дёшево/быстро для массовой простой задачи «флейвор»
 MAX_TOKENS = 600
@@ -37,11 +36,22 @@ LORE_MAX = 220
 _client = None
 
 
+class AIEffects(BaseModel):
+    """Веса эффектов 0..5 (0 = нет). Конкретные поля — чтобы модель их РЕАЛЬНО
+    заполняла (свободный dict она возвращала пустым). Величины назначит код."""
+    model_config = ConfigDict(extra="ignore")
+    dmg: float = 0
+    crit: float = 0
+    dodge: float = 0
+    hp: float = 0
+    antidote: float = 0
+
+
 class AIRecipe(BaseModel):
     """Структурированный ответ ИИ. effects — ПРЕДЛОЖЕНИЕ весов; числа переназначит код."""
     name: str
     lore: str
-    effects: dict[str, float]
+    effects: AIEffects
 
 
 def available() -> bool:
@@ -52,10 +62,10 @@ def available() -> bool:
 def _get_client():
     global _client
     if _client is None:
-        _client = AsyncAnthropic(
-            api_key=settings.anthropic_api_key,
-            http_client=DefaultAioHttpClient() if DefaultAioHttpClient else None,
-        )
+        # httpx-транспорт по умолчанию (идёт зависимостью с anthropic). aiohttp-клиент
+        # (DefaultAioHttpClient) требует экстры anthropic[aiohttp] и без неё падал
+        # RuntimeError; httpx-async работает в том же event-loop, что aiogram/aiohttp.
+        _client = AsyncAnthropic(api_key=settings.anthropic_api_key)
     return _client
 
 
@@ -80,10 +90,10 @@ SYSTEM = f"""Ты — повар средневековой корчмы в го
   с прозвищем («Похмельный борщ боярина Твердислава»). Без пошлости, жестокости,
   реальных людей и политики.
 - lore: 1-2 предложения атмосферного описания (до {LORE_MAX} символов).
-- effects: словарь «эффект → относительный вес 0..5». БЕРИ ТОЛЬКО из белого списка
-  и опирайся на вкус ингредиентов (см. теги). Это лишь ПОДСКАЗКА балансу — итоговые
-  числа назначит игра из бюджета, ты задаёшь только НАПРАВЛЕНИЕ (какие эффекты и их
-  соотношение). 1-3 эффекта.
+- effects: объект с полями dmg/crit/dodge/hp/antidote — относительный вес 0..5
+  (0 = эффекта нет). ОБЯЗАТЕЛЬНО заполни 1–3 поля НЕНУЛЕВЫМИ по вкусу ингредиентов
+  (см. теги), остальные оставь 0. Это ПОДСКАЗКА балансу — итоговые числа назначит
+  игра из бюджета; ты задаёшь только НАПРАВЛЕНИЕ (какие эффекты и их соотношение).
 
 Белый список эффектов (и к чему тяготеет вкус):
 - dmg  — урон в бою (острое, пряное, солёное)
@@ -137,7 +147,7 @@ async def invent(ingredients: list[str], budget: int) -> tuple[str, str, dict] |
 
     name = _clean(out.name, NAME_MAX)
     lore = _clean(out.lore, LORE_MAX)
-    # берём только валидные эффекты из белого списка; числа всё равно назначит ядро
-    proposal = {k: float(v) for k, v in (out.effects or {}).items()
-                if k in recipes.EFFECT_COST and float(v) > 0}
+    # веса из именованных полей (только ненулевые); величины всё равно назначит ядро
+    proposal = {k: float(getattr(out.effects, k)) for k in recipes.ALLOWED_EFFECTS
+                if float(getattr(out.effects, k)) > 0}
     return name, lore, proposal
