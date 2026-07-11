@@ -68,6 +68,8 @@ from bot.webapi.production import (  # noqa: E402,F401 — фасад
     _api_brew_age, _api_build_start, _api_building, _api_buildings, _api_hunt,
     _api_hunt_fight, _api_hunt_forecast, _api_prod_claim, _api_prod_start,
 )
+# Тайные рецепты (ИИ-блюда, эксперимент в Кухне) — bot/webapi/recipes.py.
+from bot.webapi.recipes import _api_recipe_experiment  # noqa: E402,F401 — фасад
 # Карта мира (/world, тайлы, таверны с коронами) — bot/webapi/world.py
 # (распил, move-only). Импорт = ре-экспорт для build_app и внешних потребителей.
 from bot.webapi.world import (  # noqa: E402,F401 — фасад
@@ -206,6 +208,7 @@ def build_app() -> web.Application:
     app.router.add_post("/api/prod_start", _api_prod_start)   # запустить партию
     app.router.add_post("/api/brew_age", _api_brew_age)       # выдержка эля (риск)
     app.router.add_post("/api/prod_claim", _api_prod_claim)   # забрать партию
+    app.router.add_post("/api/recipe/experiment", _api_recipe_experiment)  # тайные рецепты: открыть/сварить
     app.router.add_post("/api/hunt", _api_hunt)               # меню охоты (бестиарий+прогноз)
     app.router.add_post("/api/hunt_fight", _api_hunt_fight)
     app.router.add_post("/api/hunt_forecast", _api_hunt_forecast)  # прогноз с флягой (dry-run)   # бой со зверем

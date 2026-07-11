@@ -70,6 +70,8 @@ class Player(Base):
     # из bot.game.nightrun) и метка кулдауна (когда можно уйти на тракт снова).
     night_run: Mapped[dict] = mapped_column(_JDICT, default=dict)
     night_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Тайные рецепты: метка кулдауна эксперимента (защита ИИ-бюджета от спама комбо).
+    recipe_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Вылазка «телега за зерном» к мельнице: отправка + привезённое (ждёт сбора).
     mill_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -372,6 +374,32 @@ class Wonder(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class Recipe(Base):
+    """«Тайный рецепт» — ИИ-блюдо, детерминированное по комбинации ингредиентов.
+    Одна строка на combo_hash: генерится ОДИН раз на весь мир и кэшируется (тот же
+    набор ингредиентов → тот же рецепт у всех, «реролл ради статов» невозможен).
+    Числа эффектов назначены КОДОМ из бюджета (recipes.assign_effects); имя/лор — от
+    ИИ (ai_recipe) или детерминированного процедурного фолбэка. Таблица создаётся
+    автоматически через create_all — отдельная миграция не нужна (аддитивно).
+
+    effects: {"dmg":int,"crit":int,"dodge":int,"hp":int,"antidote":bool}."""
+
+    __tablename__ = "recipes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    combo_hash: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    key: Mapped[str] = mapped_column(String(24), index=True)   # ключ для owns_recipe/products
+    name: Mapped[str] = mapped_column(String(80))
+    lore: Mapped[str] = mapped_column(String(240), default="")
+    effects: Mapped[dict] = mapped_column(_JDICT, default=dict)
+    budget: Mapped[int] = mapped_column(default=0)
+    discoverer_id: Mapped[int | None] = mapped_column(BigInteger)  # первооткрыватель
+    status: Mapped[str] = mapped_column(String(10), default="open")  # Ф0: open; Ф1: secret/leaked
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class LogEntry(Base):
     """Журнал событий: действия игроков и админа (для админ-панели)."""
 
@@ -427,6 +455,10 @@ class Tavern(Base):
     buildings: Mapped[list] = mapped_column(_JLIST, default=list)
     production: Mapped[dict] = mapped_column(_JDICT, default=dict)  # партии зданий
     products: Mapped[dict] = mapped_column(_JDICT, default=dict)    # погреб: {ярус: эль}
+    # Тайные рецепты: порции открытых ИИ-блюд {recipe_key: qty}. ОТДЕЛЬНО от products,
+    # чтобы не задеть экономику (розница/биржа/ВВП итерируют products). В Ф0 пьются как
+    # фляги в рейде/охоте; продажа блюд — Ф1. Ключи и эффекты — в таблице recipes.
+    recipes_stock: Mapped[dict] = mapped_column(_JDICT, default=dict)
     # Аукцион: один активный лот {good, qty, unit_min, ends_at, top_bid,
     # top_bidder, bids, history} — товар заморожен в лоте.
     auction: Mapped[dict] = mapped_column(_JDICT, default=dict)

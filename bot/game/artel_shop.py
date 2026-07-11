@@ -129,6 +129,17 @@ def owned_recipe_ids(player) -> set[str]:
     return set(_artel(player)["recipes"])
 
 
+def grant_recipe(player, key: str) -> bool:
+    """Добавить ключ рецепта во владение (тайные ИИ-блюда: персистентная кулинарная
+    книга + гейт варки). True если добавили новый, False если уже был."""
+    a = _artel(player)
+    if key in a["recipes"]:
+        return False
+    a["recipes"] = a["recipes"] + [key]
+    _save(player, a)
+    return True
+
+
 def owned_ids(player) -> set[str]:
     """id наград, которыми игрок уже владеет (гейт «уже куплено»)."""
     return {r.id for r in CATALOG if owns(player, r)}

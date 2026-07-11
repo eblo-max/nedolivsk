@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import (
     Chronicle, CityState, Invasion, KnownChat, LogEntry, LootDrop, MarketOrder,
-    Notification, NotifFeed, Player, RaidBoss, RankSnap, Tavern, Wonder, WorldState,
+    Notification, NotifFeed, Player, RaidBoss, RankSnap, Recipe, Tavern, Wonder,
+    WorldState,
 )
 from bot.game import balance, economy
 
@@ -235,6 +236,35 @@ async def sealing_wonders(session: AsyncSession) -> list[Wonder]:
     return list((await session.execute(
         select(Wonder).where(Wonder.status == "sealing")
         .with_for_update(skip_locked=True))).scalars().all())
+
+
+# ── Тайные рецепты (ИИ-блюда) ────────────────────────────────────────────────
+async def get_recipe_by_hash(
+    session: AsyncSession, combo_hash: str, *, lock: bool = False
+) -> Recipe | None:
+    """Рецепт по хэшу комбинации (кэш детерминизма: одно комбо = одна строка на мир).
+    lock=True — под блокировку строки, чтобы два игрока не создали дубль одновременно."""
+    stmt = select(Recipe).where(Recipe.combo_hash == combo_hash)
+    if lock:
+        stmt = stmt.with_for_update()
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
+def create_recipe(session: AsyncSession, data: dict, discoverer_id: int) -> Recipe:
+    """Сохранить новый рецепт (данные из recipes.build_recipe). Числа эффектов уже
+    склампованы кодом — сюда попадает только валидное."""
+    r = Recipe(
+        combo_hash=data["combo_hash"], key=data["key"], name=data["name"],
+        lore=data.get("lore", ""), effects=dict(data["effects"]),
+        budget=int(data.get("budget", 0)), discoverer_id=discoverer_id, status="open",
+    )
+    session.add(r)
+    return r
+
+
+async def all_recipes(session: AsyncSession) -> list[Recipe]:
+    """Все рецепты — для прогрева in-memory кэша эффектов на старте (seam показ=действие)."""
+    return list((await session.execute(select(Recipe))).scalars().all())
 
 
 async def active_player_count(session: AsyncSession, days: int = 7) -> int:

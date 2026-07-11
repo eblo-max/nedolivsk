@@ -3124,3 +3124,154 @@ body {
 .guide-inner p:last-child { margin-bottom:0; }
 .guide-tail { flex:none; text-align:center; font-family:Georgia,serif; font-style:italic; font-size:12.5px;
   color:#93876d; padding:6px 8px 2px; }
+
+/* ═══ Тайная кухня — алхимический котёл (ИИ-блюда) ═══
+   Современный motion/interaction в материалах игры: угольный котёл, живое
+   кольцо силы, припасы «влетают» в варево, драматичный reveal рецепта.
+   Анимации только transform/opacity (GPU); без backdrop-filter/фикс-фонов. */
+.sk-seg { display:flex; gap:6px; margin:2px 0 4px; padding:4px; border-radius:12px;
+  background:linear-gradient(#160e05,#0f0904); border:1px solid var(--line); }
+.sk-seg button { flex:1; padding:9px 6px; border-radius:9px; border:1px solid transparent;
+  background:none; color:var(--dim); font-family:var(--disp); font-weight:600; font-size:12.5px;
+  letter-spacing:.4px; cursor:pointer; transition:color .2s, background .2s, border-color .2s; }
+.sk-seg button.on { color:var(--parch); background:linear-gradient(#2f210f,#1c1208);
+  border-color:var(--line2); box-shadow:inset 0 1px 0 #ffffff12, 0 1px 3px #00000055; }
+
+.sk { display:flex; flex-direction:column; gap:15px; padding-top:4px; }
+
+/* ── Котёл: настоящий чугунный котёл (SVG) на огне ── */
+.sk-cauldron { position:relative; display:flex; flex-direction:column; align-items:center; gap:10px; padding:8px 0 2px; }
+.sk-vessel { --p:0; position:relative; width:210px; height:196px; }
+.sk-iron { position:absolute; inset:0; width:100%; height:100%; filter:drop-shadow(0 9px 13px #000b); z-index:1; }
+/* огонь под котлом — ярче с силой блюда (var(--p) 0..100). Глоу статичен (без
+   анимированного blur — он пересчитывался каждый кадр); двигаются лишь язычки. */
+.sk-fire { position:absolute; left:50%; bottom:0; width:158px; height:62px; transform:translateX(-50%); z-index:0;
+  pointer-events:none; opacity:calc(.14 + var(--p) / 130); transition:opacity .5s ease;
+  background:radial-gradient(52% 60% at 50% 76%, #ffca4d, #e0641c 40%, #cf5a2a00 72%); }
+.sk-cauldron.lit .sk-fire { opacity:calc(.34 + var(--p) / 120); }
+.sk-cauldron.brew .sk-fire { opacity:.95; }
+.sk-fire i { position:absolute; bottom:12px; width:11px; height:24px; border-radius:50% 50% 46% 46%;
+  background:linear-gradient(#ffdf6e,#e0641c 72%); transform-origin:bottom center; opacity:0; }
+.sk-fire i:nth-child(1) { left:38%; } .sk-fire i:nth-child(2) { left:49%; height:31px; } .sk-fire i:nth-child(3) { left:59%; }
+.sk-cauldron.lit .sk-fire i, .sk-cauldron.brew .sk-fire i { opacity:.92; animation:skFlame 1.3s ease-in-out infinite; }
+.sk-cauldron.lit .sk-fire i:nth-child(2) { animation-delay:.35s; } .sk-cauldron.lit .sk-fire i:nth-child(3) { animation-delay:.7s; }
+.sk-cauldron.brew .sk-fire i { animation-duration:.7s; }
+@keyframes skFlame { 0%,100% { transform:scaleY(.82) translateY(0); } 50% { transform:scaleY(1.22) translateY(-3px); } }
+/* варево в ободе (эллипс поверх тёмного нутра рима) */
+.sk-broth { position:absolute; left:42px; top:51px; width:126px; height:24px; border-radius:50%; z-index:2;
+  background:radial-gradient(60% 70% at 50% 38%, #ffcf7a, #e0903c 44%, #a1421c 82%);
+  box-shadow:inset 0 2px 8px #ffdca055, inset 0 -6px 12px #3a140888, 0 0 16px -2px #cf5a2a55; opacity:.92;
+  animation:skBroth 3.4s ease-in-out infinite; }
+.sk-cauldron.brew .sk-broth { animation-duration:1.5s; opacity:1; }
+@keyframes skBroth { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.18); } }
+.sk-bubbles { position:absolute; left:66px; top:52px; width:78px; height:22px; z-index:3; pointer-events:none; }
+.sk-bubbles i { position:absolute; bottom:2px; width:8px; height:8px; border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #ffe6b8, #e0903c); opacity:0; animation:skBub 2.6s ease-in infinite; }
+.sk-bubbles i:nth-child(1) { left:14%; animation-delay:0s; }
+.sk-bubbles i:nth-child(2) { left:44%; width:11px; height:11px; animation-delay:.9s; }
+.sk-bubbles i:nth-child(3) { left:70%; animation-delay:1.5s; }
+.sk-bubbles i:nth-child(4) { left:32%; width:6px; height:6px; animation-delay:2.1s; }
+.sk-cauldron.brew .sk-bubbles i { animation-duration:1.25s; }
+@keyframes skBub { 0% { transform:translateY(0) scale(.5); opacity:0; } 25% { opacity:.9; }
+  70% { opacity:.6; } 100% { transform:translateY(-20px) scale(1.1); opacity:0; } }
+.sk-drop { position:absolute; left:0; right:0; top:38px; height:42px; z-index:4;
+  display:flex; align-items:center; justify-content:center; gap:3px; }
+.sk-in { display:inline-flex; filter:drop-shadow(0 3px 4px #000b);
+  animation:skIn .42s cubic-bezier(.2,1.5,.4,1) backwards, skBob 2.8s ease-in-out infinite;
+  animation-delay:0s, calc(var(--i) * .25s); }
+@keyframes skIn { 0% { transform:translateY(-74px) scale(.3) rotate(-25deg); opacity:0; } 100% { transform:none; opacity:1; } }
+@keyframes skBob { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
+.sk-steam { position:absolute; left:0; right:0; top:20px; height:40px; z-index:5; display:flex; justify-content:center; gap:16px; pointer-events:none; }
+.sk-steam i { width:8px; height:32px; border-radius:8px; background:linear-gradient(#ffffff00,#ffe9c766);
+  opacity:0; animation:skSteam 1.6s ease-out infinite; }
+.sk-steam i:nth-child(2) { animation-delay:.5s; } .sk-steam i:nth-child(3) { animation-delay:1s; }
+@keyframes skSteam { 0% { transform:translateY(10px) scaleY(.5); opacity:0; } 40% { opacity:.5; } 100% { transform:translateY(-30px) scaleY(1.2); opacity:0; } }
+
+.sk-gauge { display:flex; align-items:baseline; gap:9px; min-height:22px; }
+.sk-hint { font-family:var(--text); font-style:italic; font-size:13.5px; color:var(--dim); }
+.sk-power { font-family:var(--disp); font-weight:700; font-size:17px; color:var(--amber);
+  text-shadow:0 0 12px #e0903c55; letter-spacing:.5px; }
+.sk-tier { font-family:var(--text); font-size:12.5px; color:var(--dim); padding:2px 9px; border-radius:20px;
+  border:1px solid var(--line2); background:#1c120790; }
+
+/* ── Палитра припасов ── */
+.sk-palette { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+.sk-tok { position:relative; width:70px; padding:8px 4px 7px; border-radius:12px; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  background:linear-gradient(#241708,#160d04); border:1px solid var(--line);
+  transition:transform .16s ease, border-color .2s, box-shadow .2s, opacity .2s; }
+.sk-tok:disabled { cursor:default; }
+.sk-tok.on { border-color:var(--ember); background:linear-gradient(#3a2410,#241408);
+  transform:translateY(-3px); box-shadow:0 6px 14px -6px #cf5a2a99, inset 0 1px 0 #ffffff14; }
+.sk-tok.low { opacity:.42; filter:grayscale(.5); }
+.sk-emo { display:inline-flex; align-items:center; justify-content:center; height:32px; }
+.sk-emo .ric { filter:drop-shadow(0 1px 2px #0007); }
+.sk-tn { font-family:var(--text); font-size:11px; color:var(--silver); text-align:center; line-height:1.05; }
+.sk-have { font-family:var(--num); font-size:10.5px; color:var(--dim); }
+.sk-tok.on .sk-have { color:var(--amber); }
+.sk-num { position:absolute; top:-6px; right:-6px; width:19px; height:19px; border-radius:50%;
+  background:linear-gradient(var(--amber),var(--ember)); color:#1c0e04; font-family:var(--num); font-weight:700;
+  font-size:11px; display:grid; place-items:center; box-shadow:0 2px 5px #0008; animation:skIn .3s backwards; }
+
+.sk-cost { display:flex; justify-content:space-between; align-items:center; gap:10px;
+  font-family:var(--text); font-size:12.5px; color:var(--dim); padding:0 2px; }
+.sk-cost b { color:var(--silver); font-family:var(--num); }
+.sk-ai { font-style:italic; opacity:.75; } .sk-ai.on { color:var(--amber); opacity:1; font-style:normal; }
+
+.sk-cta { font-family:var(--disp); font-weight:700; letter-spacing:.6px; }
+.sk-cta.go { color:#241000; border-color:#f6b072;
+  background:linear-gradient(var(--amber), #d47a30 50%, var(--ember));
+  box-shadow:0 0 20px -4px #cf5a2a88, inset 0 1px 0 #ffe0b0; animation:skPulse 2.2s ease-in-out infinite; }
+@keyframes skPulse { 0%,100% { box-shadow:0 0 16px -4px #cf5a2a77, inset 0 1px 0 #ffe0b0; }
+  50% { box-shadow:0 0 26px -2px #cf5a2abb, inset 0 1px 0 #ffe0b0; } }
+
+/* ── Reveal: рецепт-свиток ── */
+.sk-reveal { display:flex; flex-direction:column; align-items:center; gap:14px; padding:8px 0; }
+.sk-scroll { position:relative; width:100%; overflow:hidden; text-align:center; padding:24px 20px 20px;
+  border-radius:16px; border:1px solid #9c7838;
+  background:linear-gradient(168deg,#2c1e11,#191007); box-shadow:0 12px 34px -12px #000, inset 0 1px 0 #ffffff10;
+  animation:skPop .5s cubic-bezier(.2,1.3,.35,1) backwards; }
+@keyframes skPop { 0% { transform:scale(.86) translateY(14px); opacity:0; } 100% { transform:none; opacity:1; } }
+.sk-sheen { position:absolute; top:0; left:-60%; width:50%; height:100%;
+  background:linear-gradient(105deg,transparent,#ffe9c733,transparent); transform:skewX(-18deg);
+  animation:skSheen 1.15s ease .18s 1 backwards; }
+@keyframes skSheen { 0% { left:-60%; } 100% { left:130%; } }
+.sk-badge { display:inline-block; font-family:var(--disp); font-weight:700; font-size:10.5px; letter-spacing:.8px;
+  padding:4px 12px; border-radius:20px; margin-bottom:8px; }
+.sk-badge.new { color:#2a1600; background:linear-gradient(var(--gold-2),var(--amber)); box-shadow:0 0 16px #e0903c66; }
+.sk-badge.known { color:var(--dim); border:1px solid var(--line2); }
+.sk-dish { display:inline-flex; line-height:0; filter:drop-shadow(0 5px 9px #000b); animation:skBob 3s ease-in-out infinite; }
+.sk-name { font-family:var(--disp); font-weight:700; font-size:21px; color:var(--gold-2);
+  text-shadow:0 0 18px #e7bf6344; margin:8px 0 6px; line-height:1.2; }
+.sk-lore { font-family:var(--text); font-style:italic; font-size:14px; color:var(--silver); line-height:1.4;
+  max-width:290px; margin:0 auto 14px; }
+.sk-effs { display:flex; flex-wrap:wrap; gap:7px; justify-content:center; margin-bottom:12px; }
+.sk-eff { display:inline-flex; align-items:center; gap:4px; font-family:var(--num); font-weight:700; font-size:13px;
+  padding:5px 11px; border-radius:20px; border:1px solid; }
+.sk-eff i { font-style:normal; font-size:12px; }
+.sk-eff.dmg { color:#f0a884; border-color:#a1421c; background:#3a180c80; }
+.sk-eff.crit { color:var(--gold-2); border-color:#8a6a2e; background:#33260c80; }
+.sk-eff.dodge { color:var(--blue); border-color:#3f5878; background:#141d2b80; }
+.sk-eff.hp { color:var(--green); border-color:#3f6a42; background:#14260f80; }
+.sk-eff.anti { color:#c9a0e0; border-color:#5a3f78; background:#1f142b80; }
+.sk-yield { font-family:var(--text); font-size:12.5px; color:var(--dim); }
+.sk-yield b { color:var(--parch); font-family:var(--num); }
+.sk-done { max-width:240px; }
+
+/* ── Кулинарная книга ── */
+.sk-book { border-top:1px solid #3a2c1455; padding-top:12px; }
+.sk-book-h { width:100%; display:flex; align-items:center; justify-content:space-between; background:none; border:none;
+  cursor:pointer; font-family:var(--disp); font-weight:600; font-size:13.5px; color:var(--silver); padding:2px; }
+.sk-book-h em { font-style:normal; color:var(--amber); font-family:var(--num); margin-left:4px; }
+.sk-chev { color:var(--dim); font-size:18px; transition:transform .25s ease; }
+.sk-chev.up { transform:rotate(-90deg); }
+.sk-book-list { display:flex; flex-direction:column; gap:7px; margin-top:11px; animation:skPop .32s backwards; }
+.sk-recipe { display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:11px;
+  background:linear-gradient(#20140990,#170e0690); border:1px solid var(--line); }
+.sk-r-dish { display:inline-flex; line-height:0; flex:0 0 auto; }
+.sk-r-mid { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
+.sk-r-name { font-family:var(--text); font-size:14px; color:var(--parch); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sk-r-eff { font-family:var(--text); font-size:12px; color:var(--amber); opacity:.85; }
+.sk-r-qty { flex:0 0 auto; font-family:var(--num); font-weight:700; font-size:13px; color:var(--green);
+  padding:3px 9px; border-radius:9px; background:#14260f70; border:1px solid #3f6a4255; }
+.sk-r-qty.zero { color:var(--dim); background:#1c120770; border-color:var(--line); }

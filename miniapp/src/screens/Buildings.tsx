@@ -5,6 +5,7 @@ import { haptic, hapticNotify, pushBack, popBack } from '../telegram'
 import { ResIcon, GoodIcon, fmt } from '../components/icons'
 import Sheet from '../components/Sheet'
 import CoachTour, { useFirstVisitTour } from './CoachTour'
+import SecretKitchen, { type ExperimentDTO } from './SecretKitchen'
 
 // ── типы (зеркало webapp _buildings_state/_building_detail/_production_state) ──
 type BStatus = 'built' | 'building' | 'locked' | 'available'
@@ -28,6 +29,7 @@ interface ProdState {
   ok: boolean; id: string; emoji: string; name: string; desc: string; image: string; level: number
   kind: 'grind' | 'recipe' | 'brewery'; to: 'inventory' | 'cellar'
   recipes: Recipe[]; stock: OutItem[]; batch: Batch; brewery?: Brewery; flavor?: string | null
+  experiment?: ExperimentDTO           // Кухня: «Тайная кухня» (ИИ-блюда)
 }
 
 const art = (id: string) => `${import.meta.env.BASE_URL}buildings/${id}.webp`
@@ -158,6 +160,40 @@ const SAMPLE: BState = {
   ],
 }
 
+// DEV-сэмпл детали Кухни с «Тайной кухней» — ТОЛЬКО для превью без бэкенда
+// (используется под гейтом import.meta.env.DEV, в прод не попадает).
+const SAMPLE_KITCHEN: ProdState = {
+  ok: true, id: 'kitchen', emoji: '🍖', name: 'Кухня', desc: '', image: 'kitchen', level: 3,
+  kind: 'recipe', to: 'cellar', flavor: 'Сытые гости платят за еду сверх выпивки.',
+  recipes: [{ key: 'kebab', name: 'Шашлык', emoji: '🍢', good: true, out_qty: 36, time: '9 ч',
+    inputs: [{ key: 'game', name: 'Дичь', emoji: '🥩', need: 12, have: 15, ok: true }, { key: 'herbs', name: 'Травы', emoji: '🌶️', need: 6, have: 9, ok: true }] }],
+  stock: [{ key: 'kebab', name: 'Шашлык', emoji: '🍢', good: true, qty: 12 }],
+  batch: { state: 'none', minutes: 0, out: null },
+  experiment: {
+    palette: [
+      { key: 'grain', name: 'Зерно', emoji: '🌾', have: 40, value: 2.5, tags: ['hearty'] },
+      { key: 'hops', name: 'Хмель', emoji: '🌿', have: 18, value: 4, tags: ['fermented'] },
+      { key: 'water', name: 'Вода', emoji: '💧', have: 99, value: 1, tags: ['plain'] },
+      { key: 'honey', name: 'Мёд', emoji: '🍯', have: 12, value: 6, tags: ['sweet'] },
+      { key: 'berries', name: 'Ягоды', emoji: '🍒', have: 22, value: 3, tags: ['sweet'] },
+      { key: 'game', name: 'Дичь', emoji: '🥩', have: 15, value: 6.5, tags: ['fatty'] },
+      { key: 'herbs', name: 'Травы', emoji: '🌶️', have: 9, value: 4.5, tags: ['spicy'] },
+      { key: 'salt', name: 'Соль', emoji: '🧂', have: 14, value: 5, tags: ['savory'] },
+      { key: 'fish', name: 'Рыба', emoji: '🐟', have: 3, value: 4, tags: ['savory'] },
+      { key: 'milk', name: 'Молоко', emoji: '🥛', have: 10, value: 3, tags: ['fatty'] },
+      { key: 'malt', name: 'Солод', emoji: '🧺', have: 6, value: 3.1, tags: ['hearty'] },
+      { key: 'flour', name: 'Мука', emoji: '🧺', have: 5, value: 3.1, tags: ['hearty'] },
+    ],
+    cost_each: 5, output: 3, min: 2, max: 4, cooldown: 60, cooldown_left: 0, ai: false,
+    budget_base: 3, budget_k: 0.7, budget_floor: 4, budget_cap: 20,
+    tiers: [[9, 'Обычный'], [14, 'Необычный'], [20, 'Редкий'], [9999, 'Экзотический']],
+    cookbook: [
+      { key: 'tr_d1', name: 'Огневая солянка «У плахи»', lore: 'Наперчено так, что палач слезу пустил.', label: '+9 урона', qty: 2 },
+      { key: 'tr_d2', name: 'Похмельный взвар деда Пафнутия', lore: 'С одной кружки в глазах двоится, а рука тверда.', label: '+7% крита, +6 ❤', qty: 0 },
+    ],
+  },
+}
+
 const BUILD_TOUR = [
   { sel: '[data-tut="yard"]', emoji: '🏗', title: 'Твой двор',
     body: 'Здесь стоят производства. Каждое здание делает свой товар: пивоварня — эль, кухня — жаркое, винокурня — вино. Товар потом продаёшь в Торге.', place: 'top' as const },
@@ -233,7 +269,10 @@ export default function Buildings() {
       const r = await api<Detail | ProdState>('building', { id: b.id })
       if ((r as ProdState).kind) { setProd(r as ProdState); setView('prod') }
       else setDetail(r as Detail)
-    } catch { flash('Не открылось') }
+    } catch {
+      if (import.meta.env.DEV && b.id === 'kitchen') { setProd(SAMPLE_KITCHEN); setView('prod'); return }
+      flash('Не открылось')
+    }
   }
 
   async function build(id: string) {
@@ -313,7 +352,8 @@ export default function Buildings() {
     <div className="scr">
       {toast && <div className="toast">{toast}</div>}
       <ProductionView prod={prod} busy={busy} onStart={startRecipe} onClaim={claim}
-        onAge={() => { haptic('medium'); setAgeOpen(true) }} onExpire={refetchProd} onBack={() => setView('list')} />
+        onAge={() => { haptic('medium'); setAgeOpen(true) }} onExpire={refetchProd} onBack={() => setView('list')}
+        onExperiment={(dto) => setProd((p) => (p ? { ...p, experiment: dto } : p))} onFlash={flash} />
       {ageOpen && prod.brewery && (
         <Sheet title="🛢 Выдержка эля" onClose={() => setAgeOpen(false)}>
           <p className="bd-desc">Поставить {stars(prod.brewery.tier)} на выдержку — азартная затея.</p>
@@ -438,9 +478,10 @@ function BuildDetail({ detail, busy, onBuild }: { detail: Detail; busy: boolean;
 }
 
 // ── Экран производства ───────────────────────────────────────────────────
-function ProductionView({ prod, busy, onStart, onClaim, onAge, onExpire, onBack }: {
+function ProductionView({ prod, busy, onStart, onClaim, onAge, onExpire, onBack, onExperiment, onFlash }: {
   prod: ProdState; busy: boolean
   onStart: (r: Recipe) => void; onClaim: () => void; onAge: () => void; onExpire: () => void; onBack: () => void
+  onExperiment: (dto: ExperimentDTO) => void; onFlash: (m: string) => void
 }) {
   const bw = prod.brewery
   const phase = bw?.phase
@@ -449,6 +490,8 @@ function ProductionView({ prod, busy, onStart, onClaim, onAge, onExpire, onBack 
   const active = !idle && !ready
   const warn = phase === 'ripe' || phase === 'overripe'        // выдержка перекисает — срочно
   const stockLabel = prod.to === 'inventory' ? 'На складе' : 'В погребе'
+  const canSecret = prod.id === 'kitchen' && !!prod.experiment  // Кухня: доступна «Тайная кухня»
+  const [mode, setMode] = useState<'cook' | 'secret'>('cook')
 
   const endsAt = prod.batch.ends_at ?? null
   const liveSecs = useLiveSecs(endsAt)
@@ -475,41 +518,54 @@ function ProductionView({ prod, busy, onStart, onClaim, onAge, onExpire, onBack 
         </div>
       </div>
 
-      <div className={`prod-status ${warn ? 'wn' : ready ? 'rd' : active ? 'ac' : ''}`}>{status}</div>
-
-      {active && (
-        <div className="prod-batch">
-          <ProdBar secs={liveSecs ?? (prod.kind === 'brewery' ? (bw?.minutes ?? 0) : prod.batch.minutes) * 60} totalMin={prod.batch.total} />
-          {prod.batch.out && <div className="pb-out"><OutIcon it={prod.batch.out} />×{prod.batch.out.qty}</div>}
+      {canSecret && (
+        <div className="sk-seg" role="tablist">
+          <button className={mode === 'cook' ? 'on' : ''} onClick={() => { haptic('light'); setMode('cook') }}>🍳 Готовка</button>
+          <button className={mode === 'secret' ? 'on' : ''} onClick={() => { haptic('light'); setMode('secret') }}>⚗️ Тайная кухня</button>
         </div>
       )}
 
-      {ready && (
-        <div className="prod-claim">
-          {prod.kind === 'brewery' ? (
-            <>
-              <button className="btn green" disabled={busy} onClick={onClaim}>Разлить в погреб{prod.batch.out ? ` · ${prod.batch.out.qty}` : ''}</button>
-              {bw!.can_age && (
-                <button className="btn danger" disabled={busy} onClick={onAge}>Выдержать — риск +ярус ({bw!.mature_chance}%)</button>
-              )}
-            </>
-          ) : (
-            <button className="btn green" disabled={busy} onClick={onClaim}>
-              {prod.to === 'inventory' ? 'Забрать на склад' : 'Забрать в погреб'}{prod.batch.out ? ` · ${prod.batch.out.qty}` : ''}
-            </button>
+      {canSecret && mode === 'secret' ? (
+        <SecretKitchen dto={prod.experiment!} onResult={onExperiment} onFlash={onFlash} />
+      ) : (
+        <>
+          <div className={`prod-status ${warn ? 'wn' : ready ? 'rd' : active ? 'ac' : ''}`}>{status}</div>
+
+          {active && (
+            <div className="prod-batch">
+              <ProdBar secs={liveSecs ?? (prod.kind === 'brewery' ? (bw?.minutes ?? 0) : prod.batch.minutes) * 60} totalMin={prod.batch.total} />
+              {prod.batch.out && <div className="pb-out"><OutIcon it={prod.batch.out} />×{prod.batch.out.qty}</div>}
+            </div>
           )}
-        </div>
-      )}
 
-      {idle && (
-        <div className="rcp-list">
-          {prod.recipes.map((r) => (
-            <RecipeRow key={r.key} r={r} busy={busy} onStart={() => onStart(r)} />
-          ))}
-        </div>
-      )}
+          {ready && (
+            <div className="prod-claim">
+              {prod.kind === 'brewery' ? (
+                <>
+                  <button className="btn green" disabled={busy} onClick={onClaim}>Разлить в погреб{prod.batch.out ? ` · ${prod.batch.out.qty}` : ''}</button>
+                  {bw!.can_age && (
+                    <button className="btn danger" disabled={busy} onClick={onAge}>Выдержать — риск +ярус ({bw!.mature_chance}%)</button>
+                  )}
+                </>
+              ) : (
+                <button className="btn green" disabled={busy} onClick={onClaim}>
+                  {prod.to === 'inventory' ? 'Забрать на склад' : 'Забрать в погреб'}{prod.batch.out ? ` · ${prod.batch.out.qty}` : ''}
+                </button>
+              )}
+            </div>
+          )}
 
-      {prod.flavor && <p className="prod-flavor">{prod.flavor}</p>}
+          {idle && (
+            <div className="rcp-list">
+              {prod.recipes.map((r) => (
+                <RecipeRow key={r.key} r={r} busy={busy} onStart={() => onStart(r)} />
+              ))}
+            </div>
+          )}
+
+          {prod.flavor && <p className="prod-flavor">{prod.flavor}</p>}
+        </>
+      )}
     </>
   )
 }

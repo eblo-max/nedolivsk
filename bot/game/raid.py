@@ -13,7 +13,7 @@ import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from bot.game import balance, combat
+from bot.game import balance, combat, recipes
 
 GATHER_MINUTES = 20      # сбор перед битвой
 FIGHT_HOURS = 1          # окно на добивание
@@ -323,12 +323,18 @@ RAID_HP_TO_DMG = 3      # 1 урон за каждые 3 ❤ фляги (feast 4
 RAID_DODGE_TO_DMG = 4   # 1 урон за каждые 4% уворота фляги (loaf 28 → +7 урона)
 
 
+def _effect_of(key: str) -> dict:
+    """Единый резолвер эффектов фляги: сперва статическое благо (FLASK_EFFECTS), затем
+    тайный ИИ-рецепт (recipes-кэш). Одна котировка — метка на экране == эффект в бою."""
+    return balance.FLASK_EFFECTS.get(key) or recipes.effects_for_key(key) or {}
+
+
 def flask_mods(keys: list[str] | None) -> dict:
     """Суммарный боевой эффект выпитого на рейд: урон (вкл. конверсию hp/уворота)/
     крит/противоядие. См. RAID_HP_TO_DMG — почему сытость/ловкость идут в урон."""
     out = {"dmg": 0, "crit": 0, "antidote": False}
     for k in keys or []:
-        eff = balance.FLASK_EFFECTS.get(k) or {}
+        eff = _effect_of(k)
         out["dmg"] += (eff.get("dmg", 0)
                        + eff.get("hp", 0) // RAID_HP_TO_DMG
                        + eff.get("dodge", 0) // RAID_DODGE_TO_DMG)

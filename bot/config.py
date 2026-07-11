@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # в ГРУППАХ даёт url-кнопку t.me/<бот>/<app>?startapp=… (открывает карту прямо в
     # Telegram). Пусто → в группах фолбэк на обычную кнопку записи.
     webapp_short_name: str = ""
+    # Ключ Anthropic для «Тайных рецептов» (ИИ-имена/лор блюд). Пусто → фича работает
+    # в детерминированном ПРОЦЕДУРНОМ режиме (числа эффектов и так из кода). Задать
+    # только в Railway-env, никогда в коде/логах. См. docs/ai_recipes.md.
+    anthropic_api_key: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

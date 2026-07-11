@@ -295,6 +295,9 @@ def _production_state(p, bid: str) -> dict:
     ends = _ends_epoch(braw.get("ready_at")) if state == "active" else None
     base.update(kind="recipe", to="cellar", recipes=recipes, stock=stock, flavor=flavor,
                 batch={"state": state, "minutes": minutes, "total": total, "ends_at": ends, "out": out})
+    if bid == "kitchen":                        # «Тайная кухня»: эксперимент + книга
+        from bot.webapi.recipes import experiment_dto
+        base["experiment"] = experiment_dto(p)
     return base
 
 

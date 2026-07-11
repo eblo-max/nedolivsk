@@ -129,12 +129,17 @@ async def main() -> None:
     from bot.db import repo as _repo
     from bot.db.base import session_factory as _sf
     from bot.game import wonder as _wmod
+    from bot.game import recipes as _recmod
     async with _sf() as _s:
         _world = await _repo.get_or_create_world(_s)
         _done = (_world.live or {}).get("wonders_done") or []
         _wmod.set_done_cache(_done)
+        # Тайные рецепты: прогрев кэша, чтобы бой видел ИИ-блюда (и их имена) после деплоя.
+        _recs = await _repo.all_recipes(_s)
+        _recmod.set_recipe_cache(_recs)
         await _s.commit()                       # get_or_create мог создать строку мира
-    logging.info("Кэш чудес: %s", sorted(_done) or "пусто")
+    logging.info("Кэш чудес: %s; тайных рецептов: %d",
+                 sorted(_done) or "пусто", len(_recs))
 
     notifier_task = asyncio.create_task(notifier_loop(bot))
 

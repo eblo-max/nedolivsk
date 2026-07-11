@@ -190,20 +190,26 @@ async def _api_raid(request: web.Request) -> web.Response:
             dto = _raid_dto(boss, uid)
             # фляга: что уже выпито на этот бой + что есть в погребе (эль/вино/сбитень)
             from bot.game import balance as bal, production as prodm, raid as rd
+            from bot.game import recipes as recm
             p = await repo.get_player(s, uid)
             prods = (p.tavern.products if p and p.tavern else None) or {}
+            rstock = (p.tavern.recipes_stock if p and p.tavern else None) or {}
             me = (boss.contributions or {}).get(str(uid)) or {}
-            dto["flask"] = {
-                "drunk": me.get("flask"),
-                # все фляги из погреба; метка — РЕЙД-эффект (rd.flask_label), т.к. в
-                # рейде hp/уворот идут в урон — «+45❤» тут было бы показ≠действие.
-                "options": [{"key": k, "name": prodm.GOODS[k].name,
-                             "emoji": prodm.GOODS[k].emoji,
-                             "label": rd.flask_label(k),
-                             "qty": int(prods.get(k, 0))}
-                            for k in bal.FLASK_EFFECTS
-                            if k in prodm.GOODS and int(prods.get(k, 0)) > 0],
-            }
+            # все фляги из погреба; метка — РЕЙД-эффект (rd.flask_label), т.к. в рейде
+            # hp/уворот идут в урон — «+45❤» тут было бы показ≠действие.
+            options = [{"key": k, "name": prodm.GOODS[k].name,
+                        "emoji": prodm.GOODS[k].emoji,
+                        "label": rd.flask_label(k),
+                        "qty": int(prods.get(k, 0))}
+                       for k in bal.FLASK_EFFECTS
+                       if k in prodm.GOODS and int(prods.get(k, 0)) > 0]
+            # тайные ИИ-блюда игрока (свой склад) — та же rd.flask_label (показ=действие).
+            options += [{"key": k, "name": recm.name_for_key(k) or "Тайное блюдо",
+                         "emoji": "🍲", "label": rd.flask_label(k), "qty": int(q),
+                         "secret": True}
+                        for k, q in rstock.items()
+                        if int(q) > 0 and recm.effects_for_key(k)]
+            dto["flask"] = {"drunk": me.get("flask"), "options": options}
         elif boss is not None and boss.status in ("dead", "expired"):
             dto = _raid_report_dto(boss, uid)
         else:

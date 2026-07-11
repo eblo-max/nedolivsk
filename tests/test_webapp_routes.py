@@ -86,6 +86,7 @@ ROUTES = [
     "POST /api/raid/seed _api_raid_seed",
     "POST /api/raid/summon _api_raid_summon",
     "POST /api/rating _api_rating",
+    "POST /api/recipe/experiment _api_recipe_experiment",
     "POST /api/referral _api_referral",
     "POST /api/reputation _api_reputation",
     "POST /api/retail_hold _api_retail_hold",

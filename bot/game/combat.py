@@ -482,23 +482,35 @@ def flask_apply(player, keys: list[str] | None,
     просто пропускается (фронт шлёт актуальное, гонка не валит бой)."""
     if not keys or player.tavern is None:
         return chp, [], []
+    from bot.game import recipes as rec        # тайные ИИ-блюда: свой склад + эффекты
     prods = dict(player.tavern.products or {})
     used: list[str] = []
     labels: list[str] = []
+    prods_dirty = False
     for key in list(keys)[:balance.FLASK_SLOTS]:
         eff = balance.FLASK_EFFECTS.get(key)
-        if eff is None or prods.get(key, 0) <= 0:
-            continue
-        prods[key] -= 1
+        if eff is not None:                    # статическое благо — из погреба products
+            if prods.get(key, 0) <= 0:
+                continue
+            prods[key] -= 1
+            prods_dirty = True
+            labels.append(eff["label"])
+        else:                                  # тайный рецепт — из своего склада
+            reff = rec.effects_for_key(key)
+            if reff is None or rec.stock_get(player.tavern, key) <= 0:
+                continue
+            if consume and not rec.stock_spend(player.tavern, key, 1):
+                continue
+            eff = reff
+            labels.append(rec.cellar_label(eff))
         used.append(key)
-        labels.append(eff["label"])
         stats["damage"] = stats.get("damage", 0) + eff.get("dmg", 0)
         stats["crit"] = stats.get("crit", 0) + eff.get("crit", 0)
         stats["dodge_flat"] = stats.get("dodge_flat", 0) + eff.get("dodge", 0)
         if eff.get("antidote"):
             stats["antidote"] = True
         chp += eff.get("hp", 0)
-    if used and consume:
+    if consume and prods_dirty:
         player.tavern.products = prods
     return chp, used, labels
 

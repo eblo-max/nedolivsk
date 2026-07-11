@@ -389,3 +389,12 @@ async def create_tables() -> None:
             "WHEN reputation >= 50 THEN 2 WHEN reputation >= 10 THEN 1 ELSE 0 END "
             "WHERE fame_rank = 0 AND reputation >= 10"
         ))
+        # «Тайные рецепты»: погреб открытых ИИ-блюд (отдельно от products) + кулдаун
+        # эксперимента. Таблица recipes создаётся через create_all автоматически.
+        await conn.execute(text(
+            "ALTER TABLE taverns ADD COLUMN IF NOT EXISTS "
+            "recipes_stock JSONB NOT NULL DEFAULT '{}'::jsonb"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE players ADD COLUMN IF NOT EXISTS recipe_at TIMESTAMPTZ"
+        ))
