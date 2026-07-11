@@ -185,7 +185,7 @@ const SAMPLE_KITCHEN: ProdState = {
       { key: 'flour', name: 'Мука', emoji: '🧺', have: 5, value: 3.1, tags: ['hearty'] },
     ],
     cost_each: 5, output: 3, min: 2, max: 4, cooldown: 60, cooldown_left: 0, ai: false,
-    budget_base: 3, budget_k: 0.7, budget_floor: 4, budget_cap: 20,
+    budget_base: 3, budget_k: 0.7, budget_floor: 4, budget_cap: 20, roll_pct: 0.18,
     tiers: [[9, 'Обычный'], [14, 'Необычный'], [20, 'Редкий'], [9999, 'Экзотический']],
     cookbook: [
       { key: 'tr_d1', name: 'Огневая солянка «У плахи»', lore: 'Наперчено так, что палач слезу пустил.', label: '+9 урона', qty: 2 },

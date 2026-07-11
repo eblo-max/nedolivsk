@@ -10,7 +10,7 @@ export interface ExperimentDTO {
   palette: ExpIngredient[]; cost_each: number; output: number; min: number; max: number
   cooldown: number; cooldown_left: number; ai: boolean
   budget_base: number; budget_k: number; budget_floor: number; budget_cap: number
-  tiers: [number, string][]; cookbook: CookbookEntry[]
+  roll_pct: number; tiers: [number, string][]; cookbook: CookbookEntry[]
 }
 interface RecipeCard { key: string; name: string; lore: string; reasoning?: string; luck?: string; label: string; effects: Record<string, number | boolean>; budget: number; qty: number }
 interface ExpResult { ok: true; recipe: RecipeCard; experiment: ExperimentDTO; new_to_world: boolean; first_time: boolean }
@@ -60,6 +60,10 @@ export default function SecretKitchen({ dto, onResult, onFlash }: {
   }, [sel, byKey, dto])
   const tier = useMemo(() => (dto.tiers.find(([c]) => est <= c) || dto.tiers[dto.tiers.length - 1])[1], [est, dto.tiers])
   const ringPct = Math.round(Math.min(1, est / dto.budget_cap) * 100)
+  // сила роллится ±roll_pct вокруг оценки — показываем ДИАПАЗОН (не мнимо точное число)
+  const rp = dto.roll_pct || 0
+  const loP = Math.max(dto.budget_floor, Math.round(est * (1 - rp)))
+  const hiP = Math.min(dto.budget_cap, Math.round(est * (1 + rp)))
 
   const shortfall = (k: string) => (byKey[k]?.have || 0) < dto.cost_each
   const canBrew = sel.length >= dto.min && sel.length <= dto.max && !sel.some(shortfall) && cd <= 0 && !busy
@@ -176,7 +180,7 @@ export default function SecretKitchen({ dto, onResult, onFlash }: {
           {sel.length < dto.min ? (
             <span className="sk-hint">Брось {dto.min}–{dto.max} припаса в котёл</span>
           ) : (
-            <><span className="sk-power">Сила ~{est}</span><span className="sk-tier">{tier}</span></>
+            <><span className="sk-power">Сила {loP}–{hiP}</span><span className="sk-tier">{tier} · ролл</span></>
           )}
         </div>
       </div>

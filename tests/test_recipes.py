@@ -147,3 +147,18 @@ def test_full_matrix_every_combo_builds_valid_recipe():
     total = sum(1 for r in range(recipes.MIN_INGREDIENTS, recipes.MAX_INGREDIENTS + 1)
                 for _ in itertools.combinations(recipes.INGREDIENTS, r))
     assert len(seen_keys) == total
+
+
+def test_luck_tier_empty_ingredients_is_normal():
+    """Регресс: старые рецепты без сохранённого состава НЕ должны ложно светить
+    «✨ Удачная партия» (иначе база=recipe_budget([])=4 → любой рецепт «lucky»)."""
+    assert recipes.luck_tier(15, []) == "normal"
+    assert recipes.luck_tier(20, []) == "normal"
+
+
+def test_luck_tier_reflects_roll_vs_base():
+    ing = ["game", "herbs"]
+    base = recipes.recipe_budget(ing)
+    assert recipes.luck_tier(round(base * 1.15), ing) == "lucky"    # ролл заметно выше базы
+    assert recipes.luck_tier(round(base * 0.85), ing) == "lean"     # заметно ниже
+    assert recipes.luck_tier(base, ing) == "normal"

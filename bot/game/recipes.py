@@ -106,7 +106,11 @@ RECIPE_LUCKY_RATIO = 1.08    # ролл силы выше базы на 8%+ = «
 
 def luck_tier(budget: int, ingredients: list[str]) -> str:
     """Насколько удачен ролл силы относительно базы — для «✨ Удачная партия».
-    lucky / normal / lean; заморожен на комбо (тот же рецепт — тот же ярлык)."""
+    lucky / normal / lean; заморожен на комбо (тот же рецепт — тот же ярлык).
+    Без состава (старые рецепты до колонки ingredients) — «normal», иначе база=4 и
+    любой рецепт ложно «удачный»."""
+    if not ingredients:
+        return "normal"
     base = recipe_budget(ingredients) or 1
     ratio = budget / base
     if ratio >= RECIPE_LUCKY_RATIO:

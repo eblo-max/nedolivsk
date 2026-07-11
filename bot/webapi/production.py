@@ -459,6 +459,17 @@ def _hunt_state(p) -> dict:
     heal_opts = [{"key": k, "name": prod.GOODS[k].name, "emoji": prod.GOODS[k].emoji,
                   "hp": combat.heal_amount(p, k), "qty": int(prods.get(k, 0))}
                  for k in bal.HEAL_VALUES if k in prod.GOODS and int(prods.get(k, 0)) > 0]
+    # фляги: статические блага + тайные ИИ-блюда (combat.hunt применяет их через
+    # flask_apply). Метка — СЫРЫЕ эффекты (в охоте hp даёт HP, не урон, как в рейде).
+    from bot.game import recipes as _recm
+    _rstock = (p.tavern.recipes_stock if p.tavern else None) or {}
+    flask_opts = [{"key": k, "name": prod.GOODS[k].name, "emoji": prod.GOODS[k].emoji,
+                   "label": bal.FLASK_EFFECTS[k]["label"], "qty": int(prods.get(k, 0))}
+                  for k in bal.FLASK_EFFECTS if k in prod.GOODS and int(prods.get(k, 0)) > 0]
+    flask_opts += [{"key": k, "name": _recm.name_for_key(k) or "Тайное блюдо", "emoji": "🍲",
+                    "label": _recm.cellar_label(_recm.effects_for_key(k) or {}),
+                    "qty": int(q), "secret": True}
+                   for k, q in _rstock.items() if int(q) > 0 and _recm.effects_for_key(k)]
     return {
         "ok": True,
         "hp": {"cur": chp, "max": mhp, "regen": combat.regen_full_minutes(p)},
@@ -468,11 +479,7 @@ def _hunt_state(p) -> dict:
                   "crit": min(bal.HUNT_CRIT_CAP, stats.get("crit", 0)),
                   "armor": stats.get("armor", 0), "luck": stats.get("luck", 0)},
         "heal": {"can": chp < mhp, "full": chp >= mhp, "options": heal_opts},
-        "flask": {"slots": bal.FLASK_SLOTS, "options": [
-            {"key": k, "name": prod.GOODS[k].name, "emoji": prod.GOODS[k].emoji,
-             "label": bal.FLASK_EFFECTS[k]["label"], "qty": int(prods.get(k, 0))}
-            for k in bal.FLASK_EFFECTS
-            if k in prod.GOODS and int(prods.get(k, 0)) > 0]},
+        "flask": {"slots": bal.FLASK_SLOTS, "options": flask_opts},
         "beasts": beasts,
     }
 

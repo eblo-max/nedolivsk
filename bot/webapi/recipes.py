@@ -67,6 +67,7 @@ def experiment_dto(p) -> dict:
         # константы бюджета — фронт считает живую «силу ~N» и ярус до эксперимента
         "budget_base": recipes.RECIPE_BUDGET_BASE, "budget_k": recipes.RECIPE_BUDGET_K,
         "budget_floor": recipes.RECIPE_BUDGET_FLOOR, "budget_cap": recipes.RECIPE_BUDGET_CAP,
+        "roll_pct": recipes.RECIPE_ROLL_PCT,          # разброс силы (оценка = диапазон)
         "tiers": [[cap if cap < 10 ** 8 else 9999, name] for cap, name in recipes.RECIPE_TIERS],
         "cookbook": _cookbook(p),
     }
