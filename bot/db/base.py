@@ -398,3 +398,7 @@ async def create_tables() -> None:
         await conn.execute(text(
             "ALTER TABLE players ADD COLUMN IF NOT EXISTS recipe_at TIMESTAMPTZ"
         ))
+        await conn.execute(text(
+            "ALTER TABLE recipes ADD COLUMN IF NOT EXISTS "
+            "reasoning VARCHAR(240) NOT NULL DEFAULT ''"
+        ))

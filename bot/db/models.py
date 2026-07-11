@@ -391,6 +391,7 @@ class Recipe(Base):
     key: Mapped[str] = mapped_column(String(24), index=True)   # ключ для owns_recipe/products
     name: Mapped[str] = mapped_column(String(80))
     lore: Mapped[str] = mapped_column(String(240), default="")
+    reasoning: Mapped[str] = mapped_column(String(240), default="")  # «Повар рассудил» (от ИИ)
     effects: Mapped[dict] = mapped_column(_JDICT, default=dict)
     budget: Mapped[int] = mapped_column(default=0)
     discoverer_id: Mapped[int | None] = mapped_column(BigInteger)  # первооткрыватель

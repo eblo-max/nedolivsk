@@ -3244,7 +3244,13 @@ body {
 .sk-name { font-family:var(--disp); font-weight:700; font-size:21px; color:var(--gold-2);
   text-shadow:0 0 18px #e7bf6344; margin:8px 0 6px; line-height:1.2; }
 .sk-lore { font-family:var(--text); font-style:italic; font-size:14px; color:var(--silver); line-height:1.4;
-  max-width:290px; margin:0 auto 14px; }
+  max-width:290px; margin:0 auto 12px; }
+/* «Повар рассудил» — реплика повара (нативное рассуждение ИИ, в характере) */
+.sk-reason { font-family:var(--text); font-size:13px; color:var(--dim); line-height:1.4;
+  max-width:300px; margin:0 auto 14px; padding:9px 13px; border-radius:11px;
+  background:#1a110780; border:1px solid var(--line); border-left:3px solid var(--amber); text-align:left; }
+.sk-reason b { color:var(--amber); font-style:normal; font-family:var(--disp); font-weight:600;
+  font-size:11.5px; letter-spacing:.3px; display:block; margin-bottom:2px; }
 .sk-effs { display:flex; flex-wrap:wrap; gap:7px; justify-content:center; margin-bottom:12px; }
 .sk-eff { display:inline-flex; align-items:center; gap:4px; font-family:var(--num); font-weight:700; font-size:13px;
   padding:5px 11px; border-radius:20px; border:1px solid; }

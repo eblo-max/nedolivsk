@@ -75,6 +75,7 @@ def experiment_dto(p) -> dict:
 def _recipe_card(data: dict, t) -> dict:
     """Карточка блюда для фронта (после открытия/варки)."""
     return {"key": data["key"], "name": data["name"], "lore": data["lore"],
+            "reasoning": data.get("reasoning", ""),
             "label": recipes.cellar_label(data["effects"]),
             "effects": data["effects"], "budget": data["budget"],
             "qty": recipes.stock_get(t, data["key"])}
@@ -83,8 +84,8 @@ def _recipe_card(data: dict, t) -> dict:
 def _row_data(row) -> dict:
     """Recipe ORM → data-dict (одинаковый формат с recipes.build_recipe)."""
     return {"combo_hash": row.combo_hash, "key": row.key, "name": row.name,
-            "lore": row.lore or "", "effects": dict(row.effects or {}),
-            "budget": row.budget}
+            "lore": row.lore or "", "reasoning": getattr(row, "reasoning", "") or "",
+            "effects": dict(row.effects or {}), "budget": row.budget}
 
 
 async def _api_recipe_experiment(request: web.Request) -> web.Response:
@@ -123,8 +124,9 @@ async def _api_recipe_experiment(request: web.Request) -> web.Response:
     else:
         budget = recipes.recipe_budget(ings)
         ai = await ai_recipe.invent(ings, budget)             # None → процедурный фолбэк
-        name, lore, proposal = ai if ai else (None, None, None)
-        data = recipes.build_recipe(ings, ai_name=name, ai_lore=lore, ai_proposal=proposal)
+        name, lore, reasoning, proposal = ai if ai else (None, None, None, None)
+        data = recipes.build_recipe(ings, ai_name=name, ai_lore=lore,
+                                    ai_reasoning=reasoning, ai_proposal=proposal)
 
     # ── Фаза B: атомарно на строке игрока (лок) ──────────────────────────────
     async with session_factory() as s:

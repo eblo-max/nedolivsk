@@ -159,9 +159,10 @@ _RECIPE_CACHE: dict[str, dict] = {}
 
 
 def _norm(rec) -> dict:
-    """Привести запись (dict или ORM-объект) к {name,lore,effects}."""
+    """Привести запись (dict или ORM-объект) к {name,lore,reasoning,effects}."""
     g = (lambda k, d="": rec.get(k, d)) if isinstance(rec, dict) else (lambda k, d="": getattr(rec, k, d))
-    return {"name": g("name", ""), "lore": g("lore", ""), "effects": dict(g("effects", {}) or {})}
+    return {"name": g("name", ""), "lore": g("lore", ""), "reasoning": g("reasoning", ""),
+            "effects": dict(g("effects", {}) or {})}
 
 
 def set_recipe_cache(records) -> None:
@@ -343,11 +344,13 @@ def procedural_lore(ingredients: list[str], effects: dict) -> str:
 def build_recipe(ingredients: list[str],
                  ai_name: str | None = None,
                  ai_lore: str | None = None,
+                 ai_reasoning: str | None = None,
                  ai_proposal: dict[str, float] | None = None) -> dict:
     """Собрать рецепт: бюджет из ингредиентов + числа из клампа. Флейвор — от ИИ,
     если передан, иначе процедурный. Числа ВСЕГДА из assign_effects (не от ИИ).
+    reasoning («Повар рассудил») — только от ИИ; без него пусто (фронт скрывает).
 
-    Возвращает dict под таблицу recipes: name/lore/effects/budget/combo_hash/key."""
+    Возвращает dict под таблицу recipes: name/lore/reasoning/effects/budget/combo_hash/key."""
     budget = recipe_budget(ingredients)
     proposal = ai_proposal if ai_proposal else proposal_from_tags(ingredients)
     effects = assign_effects(proposal, budget)
@@ -359,6 +362,7 @@ def build_recipe(ingredients: list[str],
         "key": recipe_key(chash),
         "name": name,
         "lore": lore,
+        "reasoning": (ai_reasoning or "").strip(),
         "effects": effects,
         "budget": budget,
         "ingredients": sorted(set(ingredients)),

@@ -36,6 +36,7 @@ MODEL = "claude-sonnet-5"
 MAX_TOKENS = 1500
 NAME_MAX = 60
 LORE_MAX = 220
+REASONING_MAX = 220
 
 _client = None
 
@@ -52,7 +53,10 @@ class AIEffects(BaseModel):
 
 
 class AIRecipe(BaseModel):
-    """Структурированный ответ ИИ. effects — ПРЕДЛОЖЕНИЕ весов; числа переназначит код."""
+    """Структурированный ответ ИИ. reasoning заполняется ПЕРВЫМ (кондиционирует выбор
+    и показывается игроку как «Повар рассудил»). effects — ПРЕДЛОЖЕНИЕ весов; числа
+    переназначит код."""
+    reasoning: str
     name: str
     lore: str
     effects: AIEffects
@@ -94,6 +98,11 @@ SYSTEM = f"""Ты — повар средневековой корчмы в го
 короткий сочный лор и НАБОР эффектов.
 
 ВЕРНИ строго JSON с полями:
+- reasoning: 1-2 предложения — КАК ты, повар, рассуждаешь над этими припасами: чем
+  они хороши и какой норов выйдет у блюда. Живым голосом трактирного повара, БЕЗ
+  игровых слов (эффект, вес, бюджет, крит, +урона). Заполни ПЕРВЫМ — по нему и выбирай
+  effects. Пример: «Дичь сытная да жирная, травы горячат кровь — выйдет блюдо для
+  доброй драки, чтоб кулак был крепок».
 - name: название блюда (до {NAME_MAX} символов), средневеково-трактирный тон, можно
   с прозвищем («Похмельный борщ боярина Твердислава»). Без пошлости, жестокости,
   реальных людей и политики.
@@ -115,8 +124,8 @@ SYSTEM = f"""Ты — повар средневековой корчмы в го
 {_catalog()}
 
 Примеры (формат, не копируй дословно):
-{{"name": "Похмельный взвар деда Пафнутия", "lore": "Тёмное варево из хмеля и солода — с одной кружки в глазах двоится, а рука в драке тверда.", "effects": {{"crit": 3, "hp": 1}}}}
-{{"name": "Огневая солянка «У плахи»", "lore": "Наперчено так, что палач слезу пустил. Пьёшь — и кулаки сами тянутся к драке.", "effects": {{"dmg": 4}}}}
+{{"reasoning": "Хмель да солод — бродящее, хмельное; такое горячит кровь и острит глаз перед дракой.", "name": "Похмельный взвар деда Пафнутия", "lore": "Тёмное варево из хмеля и солода — с одной кружки в глазах двоится, а рука в драке тверда.", "effects": {{"crit": 3, "hp": 1}}}}
+{{"reasoning": "Перца не жалели — жжёт нутро и злит; после такого кулаки сами тянутся в бой.", "name": "Огневая солянка «У плахи»", "lore": "Наперчено так, что палач слезу пустил. Пьёшь — и кулаки сами тянутся к драке.", "effects": {{"dmg": 4}}}}
 """
 
 
@@ -128,8 +137,8 @@ def _clean(s: str | None, maxlen: int) -> str:
     return s[:maxlen].strip()
 
 
-async def invent(ingredients: list[str], budget: int) -> tuple[str, str, dict] | None:
-    """Спросить ИИ имя/лор/веса. Возвращает (name, lore, proposal) или None → фолбэк.
+async def invent(ingredients: list[str], budget: int) -> tuple[str, str, str, dict] | None:
+    """Спросить ИИ. Возвращает (name, lore, reasoning, proposal) или None → фолбэк.
     `ingredients` уже провалидированы вызывающим (recipes.valid_combo) — свободного
     текста в модель не уходит, только ключи из словаря (анти-инъекция)."""
     if not available():
@@ -159,7 +168,8 @@ async def invent(ingredients: list[str], budget: int) -> tuple[str, str, dict] |
 
     name = _clean(out.name, NAME_MAX)
     lore = _clean(out.lore, LORE_MAX)
+    reasoning = _clean(out.reasoning, REASONING_MAX)
     # веса из именованных полей (только ненулевые); величины всё равно назначит ядро
     proposal = {k: float(getattr(out.effects, k)) for k in recipes.ALLOWED_EFFECTS
                 if float(getattr(out.effects, k)) > 0}
-    return name, lore, proposal
+    return name, lore, reasoning, proposal
